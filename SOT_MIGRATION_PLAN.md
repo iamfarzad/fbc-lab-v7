@@ -79,6 +79,23 @@ This document replaces all other planning notes for the F.B/c intelligence migra
 
 **Validation:** final `pnpm tsc --noEmit`, `pnpm lint`, manual smoke tests, optional deployment dry run.
 
+## 8. WebSocket Live Voice Infrastructure
+1. Port the real-time server from `FBC_masterV5/server/live-server.ts` (plus helpers)
+   - Ensure environment parity: `LIVE_SERVER_PORT`, `LIVE_SERVER_TLS`, `GOOGLE_GENAI_API_KEY`, etc.
+   - Copy deployment scripts/guides (`WEBSOCKET_DEPLOYMENT_GUIDE.md`, Dockerfile) as references
+2. Restore client voice stack
+   - Hooks: `hooks/use-websocket-voice.ts`, `hooks/useGeminiLiveAudio.ts`, any audio utils they consume
+   - UI integrations: re-enable voice toggle in chat, guard behind feature flag if backend missing
+3. Infrastructure wiring
+   - Update `.env.local` and docs with `NEXT_PUBLIC_LIVE_SERVER_URL`
+   - Add middleware/CSP allowances for `wss://` endpoints if needed
+   - Provide local dev script (`pnpm dev:local-ws`) and deployment instructions (Fly.io/Render)
+
+**Validation:**
+- Start the local live server (`pnpm dev:local-ws`) and verify handshake from chat client
+- Confirm voice intents reach Gemini Live API (log output) or document sandbox restrictions
+- Update SoT Progress with status + known blockers
+
 ---
 
 👉 **Rule:** Do not advance to the next numbered section until all validation steps for the current stage pass. Record deviations directly in this file.
