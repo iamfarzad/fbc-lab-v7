@@ -21,9 +21,9 @@ Refer to `SOT_MIGRATION_PLAN.md` for detailed instructions. Tick off each item o
 - [x] 3.4 Verify upgraded exports and run `pnpm tsc --noEmit`
 
 ## 4. Restore API Surface
-- [ ] 4.1 Copy `app/api-utils/*`
-- [ ] 4.2 Replace `/app/api/intelligence/*` routes with FBC versions
-- [ ] 4.3 Add `/app/api/chat/unified/route.ts` and decide on legacy chat route
+- [x] 4.1 Copy `app/api-utils/*`
+- [x] 4.2 Replace `/app/api/intelligence/*` routes with FBC versions
+- [x] 4.3 Add `/app/api/chat/unified/route.ts` and decide on legacy chat route
 - [ ] 4.4 Exercise key endpoints (`session-init`, `intent`, `chat/unified`) via curl
 
 ## 5. Rewire Frontend Chat
