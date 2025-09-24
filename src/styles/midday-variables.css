@@ -1,0 +1,76 @@
+/* Midday AI Design System Variables */
+:root {
+  /* Colors */
+  --midday-background: 0 0% 100%;
+  --midday-foreground: 222.2 84% 4.9%;
+  --midday-card: 0 0% 100%;
+  --midday-card-foreground: 222.2 84% 4.9%;
+  --midday-popover: 0 0% 100%;
+  --midday-popover-foreground: 222.2 84% 4.9%;
+  --midday-primary: 222.2 47.4% 11.2%;
+  --midday-primary-foreground: 210 40% 98%;
+  --midday-secondary: 210 40% 96%;
+  --midday-secondary-foreground: 222.2 84% 4.9%;
+  --midday-muted: 210 40% 96%;
+  --midday-muted-foreground: 215.4 16.3% 46.9%;
+  --midday-accent: 210 40% 96%;
+  --midday-accent-foreground: 222.2 84% 4.9%;
+  --midday-destructive: 0 84.2% 60.2%;
+  --midday-destructive-foreground: 210 40% 98%;
+  --midday-border: 214.3 31.8% 91.4%;
+  --midday-input: 214.3 31.8% 91.4%;
+  --midday-ring: 222.2 84% 4.9%;
+  --midday-radius: 0.5rem;
+
+  /* Chat specific colors */
+  --midday-chat-user-bg: 222.2 47.4% 11.2%;
+  --midday-chat-user-text: 210 40% 98%;
+  --midday-chat-assistant-bg: 0 0% 100%;
+  --midday-chat-assistant-text: 222.2 84% 4.9%;
+  --midday-chat-assistant-border: 214.3 31.8% 91.4%;
+
+  /* Typography */
+  --midday-font-sans: 'Inter', system-ui, sans-serif;
+  --midday-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  /* Spacing */
+  --midday-spacing-xs: 0.25rem;
+  --midday-spacing-sm: 0.5rem;
+  --midday-spacing-md: 1rem;
+  --midday-spacing-lg: 1.5rem;
+  --midday-spacing-xl: 2rem;
+
+  /* Shadows */
+  --midday-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --midday-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --midday-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.dark {
+  --midday-background: 222.2 84% 4.9%;
+  --midday-foreground: 210 40% 98%;
+  --midday-card: 222.2 84% 4.9%;
+  --midday-card-foreground: 210 40% 98%;
+  --midday-popover: 222.2 84% 4.9%;
+  --midday-popover-foreground: 210 40% 98%;
+  --midday-primary: 210 40% 98%;
+  --midday-primary-foreground: 222.2 47.4% 11.2%;
+  --midday-secondary: 217.2 32.6% 17.5%;
+  --midday-secondary-foreground: 210 40% 98%;
+  --midday-muted: 217.2 32.6% 17.5%;
+  --midday-muted-foreground: 215 20.2% 65.1%;
+  --midday-accent: 217.2 32.6% 17.5%;
+  --midday-accent-foreground: 210 40% 98%;
+  --midday-destructive: 0 62.8% 30.6%;
+  --midday-destructive-foreground: 210 40% 98%;
+  --midday-border: 217.2 32.6% 17.5%;
+  --midday-input: 217.2 32.6% 17.5%;
+  --midday-ring: 212.7 26.8% 83.9%;
+
+  /* Chat specific colors for dark mode */
+  --midday-chat-user-bg: 210 40% 98%;
+  --midday-chat-user-text: 222.2 47.4% 11.2%;
+  --midday-chat-assistant-bg: 217.2 32.6% 17.5%;
+  --midday-chat-assistant-text: 210 40% 98%;
+  --midday-chat-assistant-border: 217.2 32.6% 17.5%;
+}

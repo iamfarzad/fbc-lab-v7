@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "commonjs",
+    "outDir": ".smoke",
+    "moduleResolution": "node",
+    "target": "ES2018",
+    "jsx": "react"
+  },
+  "include": [
+    "scripts/api_smoke.ts"
+  ]
+}

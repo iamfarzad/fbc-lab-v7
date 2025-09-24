@@ -1,0 +1,160 @@
+/* Midday AI Design System - Main Styles */
+@import './midday-variables.css';
+
+/* Base styles */
+* {
+  border-color: hsl(var(--midday-border));
+}
+
+body {
+  background-color: hsl(var(--midday-background));
+  color: hsl(var(--midday-foreground));
+  font-family: var(--midday-font-sans);
+}
+
+/* Chat message styles */
+.midday-message {
+  display: flex;
+  width: 100%;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 0;
+}
+
+.midday-message.user {
+  justify-content: flex-end;
+}
+
+.midday-message.assistant {
+  justify-content: flex-start;
+  flex-direction: row-reverse;
+}
+
+.midday-message-content {
+  position: relative;
+  transition: all 0.2s ease;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  max-width: 80%;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  box-shadow: var(--midday-shadow-sm);
+}
+
+.midday-message-content.user {
+  background-color: hsl(var(--midday-chat-user-bg));
+  color: hsl(var(--midday-chat-user-text));
+  margin-left: auto;
+}
+
+.midday-message-content.assistant {
+  background-color: hsl(var(--midday-chat-assistant-bg));
+  color: hsl(var(--midday-chat-assistant-text));
+  border: 1px solid hsl(var(--midday-chat-assistant-border));
+  margin-right: auto;
+}
+
+.midday-message-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid hsl(var(--midday-border));
+  flex-shrink: 0;
+}
+
+.midday-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: hsl(var(--midday-muted-foreground));
+  margin-top: 0.25rem;
+}
+
+.midday-message-meta.user {
+  justify-content: flex-end;
+}
+
+.midday-message-meta.assistant {
+  justify-content: flex-start;
+}
+
+.midday-message-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.midday-message-actions.user {
+  justify-content: flex-end;
+}
+
+.midday-message-actions.assistant {
+  justify-content: flex-start;
+}
+
+.midday-action-button {
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: hsl(var(--midday-muted-foreground));
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.midday-action-button:hover {
+  color: hsl(var(--midday-foreground));
+  background-color: hsl(var(--midday-accent));
+}
+
+/* Typography */
+.midday-text-sm {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.midday-text-xs {
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.midday-font-mono {
+  font-family: var(--midday-font-mono);
+}
+
+/* Utilities */
+.midday-shadow-sm {
+  box-shadow: var(--midday-shadow-sm);
+}
+
+.midday-shadow-md {
+  box-shadow: var(--midday-shadow-md);
+}
+
+.midday-shadow-lg {
+  box-shadow: var(--midday-shadow-lg);
+}
+
+.midday-rounded {
+  border-radius: var(--midday-radius);
+}
+
+.midday-rounded-lg {
+  border-radius: calc(var(--midday-radius) + 0.25rem);
+}
+
+/* Animation */
+.midday-transition {
+  transition: all 0.2s ease;
+}
+
+.midday-transition-colors {
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
