@@ -6,7 +6,7 @@ A cutting-edge AI-powered web application featuring real-time conversational AI,
 
 ## 🚀 Live Demo
 
-- **Production**: [fbc-master-v5.vercel.app](https://fbc-master-v5.vercel.app)
+- **Production**: [farzadbayat.com](https://farzadbayat.com)
 - **GitHub**: [iamfarzad/fbc-lab-v7](https://github.com/iamfarzad/fbc-lab-v7)
 
 ## ✨ Key Features
