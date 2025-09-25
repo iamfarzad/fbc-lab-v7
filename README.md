@@ -266,4 +266,4 @@ This project is proprietary software. All rights reserved.
 
 **Built with ❤️ by the F.B/c Development Team**
 
-*Version: 7.0.0 | Last updated: January 2025*
+*Version: 7.0.1 | Last updated: January 2025*
