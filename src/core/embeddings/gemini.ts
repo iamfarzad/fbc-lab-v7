@@ -4,7 +4,7 @@ export async function embedTexts(texts: string[], dims: 768 | 1536 = 1536): Prom
   if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not set')
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   const res = await ai.models.embedContent({
-    model: 'gemini-embedding-001',
+    model: 'text-embedding-004',
     contents: texts,
     config: { outputDimensionality: dims },
   })
