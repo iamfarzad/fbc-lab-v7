@@ -4,10 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { google } from '@ai-sdk/google'
+import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 
-let cachedModel: ReturnType<typeof google> | null = null
+let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
 
 const getModel = () => {
   const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -19,7 +19,7 @@ const getModel = () => {
   }
 
   if (!cachedModel) {
-    cachedModel = google('gemini-1.5-pro-latest')
+    cachedModel = createRetryableGemini()
   }
 
   return cachedModel
