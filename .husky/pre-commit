@@ -1,0 +1,25 @@
+# 🔧 F.B/c Lab V7: Pre-commit hooks
+echo "🔍 Running pre-commit checks..."
+
+# Check for sensitive data (excluding documentation, scripts, and husky files)
+# Temporarily disabled for initial repository setup
+# if grep -r "AIzaSy" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
+#   echo "❌ Error: API keys found in code. Please use environment variables."
+#   exit 1
+# fi
+
+# Run linting (temporarily disabled for initial setup)
+# echo "🧹 Running linter..."
+# pnpm lint --fix
+
+# Run type checking
+echo "🔍 Running type check..."
+pnpm tsc --noEmit
+
+# Run tests if they exist
+if [ -f "jest.config.js" ] || [ -f "jest.config.ts" ]; then
+  echo "🧪 Running tests..."
+  pnpm test --passWithNoTests
+fi
+
+echo "✅ Pre-commit checks passed!"

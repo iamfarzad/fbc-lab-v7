@@ -1,0 +1,10 @@
+# 🔧 F.B/c Lab V7: Commit message validation
+echo "🔍 Validating commit message..."
+
+# Check if commitlint is available
+if command -v commitlint >/dev/null 2>&1; then
+  commitlint --edit "$1"
+else
+  echo "⚠️  commitlint not found, skipping commit message validation"
+  echo "💡 Install with: pnpm add -D @commitlint/cli @commitlint/config-conventional"
+fi

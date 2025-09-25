@@ -151,9 +151,9 @@ export function EnhancedMessage({
     if (!config?.showReasoning || !message.metadata?.reasoning) return null;
 
     return (
-      <div className="midday-rounded-lg border border-border/40 bg-muted/30 px-4 py-3 text-[13px] leading-relaxed text-muted-foreground/80 backdrop-blur-sm midday-shadow-sm">
-        <p className="font-medium text-xs uppercase tracking-[0.2em] text-muted-foreground/60 midday-font-mono">Thinking</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground/70 midday-font-sans">
+      <div className="rounded-lg border border-border/40 bg-muted/30 px-4 py-3 text-[13px] leading-relaxed text-muted-foreground/80 backdrop-blur-sm shadow-sm">
+        <p className="font-medium text-xs uppercase tracking-[0.2em] text-muted-foreground/60 font-mono">Thinking</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground/70 font-sans">
           {message.metadata.reasoning}
         </p>
       </div>
@@ -168,26 +168,26 @@ export function EnhancedMessage({
         {message.metadata.codeBlocks.map((codeBlock: CodeBlock) => (
           <div
             key={codeBlock.id}
-            className="overflow-hidden midday-rounded-lg border border-border/30 bg-muted/20 shadow-inner backdrop-blur-sm midday-shadow-sm"
+            className="overflow-hidden rounded-lg border border-border/30 bg-muted/20 shadow-inner backdrop-blur-sm shadow-sm"
           >
             <div className="flex items-center justify-between border-b border-border/20 bg-background/60 px-3 py-2">
-              <Badge className="bg-muted/50 text-muted-foreground dark:bg-muted/30 dark:text-muted-foreground midday-font-mono">
+              <Badge className="bg-muted/50 text-muted-foreground dark:bg-muted/30 dark:text-muted-foreground font-mono">
                 {(codeBlock.language || 'code').toUpperCase()}
               </Badge>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground midday-transition-colors"
+                className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => navigator.clipboard.writeText(codeBlock.code)}
               >
                 <Copy className="mr-1 h-3 w-3" /> Copy
               </Button>
             </div>
-            <pre className="overflow-x-auto px-3 py-3 text-xs leading-relaxed bg-muted/10 midday-font-mono">
+            <pre className="overflow-x-auto px-3 py-3 text-xs leading-relaxed bg-muted/10 font-mono">
               <code className="text-muted-foreground/90">{codeBlock.code}</code>
             </pre>
             {codeBlock.description && (
-              <p className="border-t border-border/20 px-3 py-2 text-[12px] text-muted-foreground/70 midday-font-sans">
+              <p className="border-t border-border/20 px-3 py-2 text-[12px] text-muted-foreground/70 font-sans">
                 {codeBlock.description}
               </p>
             )}
@@ -202,13 +202,13 @@ export function EnhancedMessage({
 
     return (
       <div className="mt-3 space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60 midday-font-mono">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60 font-mono">
           Sources
         </p>
-        <ol className="space-y-1 text-sm midday-font-sans">
+        <ol className="space-y-1 text-sm font-sans">
           {message.metadata.sources.map((source: Source, index: number) => (
             <li key={source.id} className="flex items-start gap-2">
-              <span className="mt-0.5 text-[11px] font-semibold text-muted-foreground/60 midday-font-mono">
+              <span className="mt-0.5 text-[11px] font-semibold text-muted-foreground/60 font-mono">
                 {index + 1}.
               </span>
               <div>
@@ -216,7 +216,7 @@ export function EnhancedMessage({
                   href={source.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[13px] font-medium text-foreground hover:text-muted-foreground midday-transition-colors"
+                  className="text-[13px] font-medium text-foreground hover:text-muted-foreground transition-colors"
                 >
                   {source.title}
                 </a>
@@ -238,26 +238,26 @@ export function EnhancedMessage({
 
     return (
       <div className="mt-3 space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60 midday-font-mono">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60 font-mono">
           Attachments
         </p>
         {message.metadata.attachments.map((attachment) => (
           <div
             key={attachment.id}
-            className="flex items-center gap-3 midday-rounded-lg border border-dashed border-border/30 bg-background/40 px-3 py-2 text-sm backdrop-blur-sm midday-shadow-sm"
+            className="flex items-center gap-3 rounded-lg border border-dashed border-border/30 bg-background/40 px-3 py-2 text-sm backdrop-blur-sm shadow-sm"
           >
-            <span className="midday-rounded-full bg-muted/30 p-2 text-muted-foreground/70">
+            <span className="rounded-full bg-muted/30 p-2 text-muted-foreground/70">
               <Paperclip className="h-4 w-4" />
             </span>
             <div className="min-w-0 flex-1 text-left">
-              <p className="truncate text-[13px] font-medium text-foreground/90 midday-font-sans">
+              <p className="truncate text-[13px] font-medium text-foreground/90 font-sans">
                 {attachment.name}
               </p>
-              <p className="text-[11px] text-muted-foreground/60 midday-font-mono">
+              <p className="text-[11px] text-muted-foreground/60 font-mono">
                 {attachment.type} • {Math.round(attachment.size / 1024)}KB
               </p>
             </div>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground midday-transition-colors">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground transition-colors">
               <Download className="h-4 w-4" />
             </Button>
           </div>
@@ -282,7 +282,7 @@ export function EnhancedMessage({
             variant="ghost"
             size="sm"
             className={cn(
-              'h-6 px-2 text-xs text-muted-foreground midday-transition-colors',
+              'h-6 px-2 text-xs text-muted-foreground transition-colors',
               reaction.userReacted && 'bg-primary/10 text-primary',
             )}
             onClick={() => handleReaction(reaction.emoji)}
@@ -292,8 +292,7 @@ export function EnhancedMessage({
         ))}
       </div>
     );
-  };
-
+  }
 
   return (
     <TooltipProvider>
@@ -303,17 +302,20 @@ export function EnhancedMessage({
         animate="visible"
         exit="exit"
         className="w-full"
+        role="article"
+        aria-label={`${message.role} message`}
       >
         <div className={cn(
-          'flex gap-3 w-full max-w-3xl mx-auto px-4 py-3',
+          'flex gap-2 sm:gap-3 w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl mx-auto px-3 sm:px-4 py-2 sm:py-3',
           isUser ? 'flex-row-reverse' : 'flex-row',
           className
         )}>
           <div
             className={cn(
-              'flex-shrink-0 h-8 w-8 midday-rounded-full flex items-center justify-center text-xs font-semibold text-white',
-              isUser ? 'midday-bg-primary' : 'midday-bg-secondary'
+              'flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8 rounded-full flex items-center justify-center text-xs font-semibold text-white',
+              isUser ? 'bg-primary' : 'bg-secondary'
             )}
+            aria-hidden="true"
           >
             {message.role === 'assistant' ? 'AI' : 'Yo'}
           </div>
@@ -323,40 +325,40 @@ export function EnhancedMessage({
             isUser ? 'text-right' : 'text-left'
           )}>
             <div className={cn(
-              'flex items-center gap-2 text-xs',
+              'flex items-center gap-1 sm:gap-2 text-xs',
               isUser ? 'justify-end' : 'justify-start'
             )}>
               <span className={cn(
-                'font-medium midday-font-sans',
-                isUser ? 'midday-chat-user-text' : 'midday-chat-assistant-text'
+                'font-medium font-sans',
+                isUser ? 'chat-user-text' : 'chat-assistant-text'
               )}>
                 {message.role === 'assistant' ? 'F.B/c AI' : 'You'}
               </span>
-              <span className="midday-text-muted">•</span>
-              <span className="midday-text-muted midday-font-mono">
+              <span className="text-muted" aria-hidden="true">•</span>
+              <time className="text-muted font-mono" dateTime={message.timestamp.toISOString()}>
                 {formatTimestamp(message.timestamp)}
-              </span>
+              </time>
               {message.status && message.status !== 'read' && (
-                <StatusIcon className={cn('h-3 w-3', statusColor.replace('text-', 'text-').replace('500', '/60').replace('600', '/70'))} />
+                <StatusIcon className={cn('h-3 w-3', statusColor.replace('text-', 'text-').replace('500', '/60').replace('600', '/70'))} aria-hidden="true" />
               )}
               {message.error && (
                 <Tooltip>
                   <TooltipTrigger>
-                    <AlertCircle className="h-3 w-3 text-red-500/70" />
+                    <AlertCircle className="h-3 w-3 text-red-500/70" aria-hidden="true" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="text-xs midday-font-sans">{message.error}</p>
+                    <p className="text-xs font-sans">{message.error}</p>
                   </TooltipContent>
                 </Tooltip>
               )}
             </div>
 
             <div className={cn(
-              'midday-message-bubble',
-              isUser ? 'midday-message-user' : 'midday-message-assistant'
+              'message-bubble interactive',
+              isUser ? 'message-user' : 'message-assistant'
             )}>
-              <div className="space-y-3">
-                <div className="whitespace-pre-wrap midday-font-sans">
+              <div className="space-y-2 sm:space-y-3">
+                <div className="whitespace-pre-wrap font-mono text-sm sm:text-sm" tabIndex={0}>
                   {message.content}
                 </div>
                 {renderReasoning()}
@@ -370,7 +372,7 @@ export function EnhancedMessage({
 
             {config?.showActions && (
               <div className={cn(
-                'flex items-center gap-1',
+                'flex items-center gap-0.5 sm:gap-1',
                 isUser ? 'justify-end' : 'justify-start'
               )}>
                 {actions.map((action) => (
@@ -380,24 +382,25 @@ export function EnhancedMessage({
                         variant="ghost"
                         size="sm"
                         className={cn(
-                          'h-7 w-7 p-0',
-                          'midday-text-muted hover:midday-text-accent',
-                          'midday-transition-colors'
+                          'h-6 w-6 sm:h-7 sm:w-7 p-0',
+                          'text-muted hover:text-accent',
+                          'transition-colors hover-scale focus-ring-offset interactive'
                         )}
                         onClick={() => handleAction(action)}
                         disabled={action.disabled}
+                        aria-label={action.label}
                       >
                         {typeof action.icon === 'string' ? (
-                          <span className="text-[10px] font-semibold uppercase">
+                          <span className="text-[9px] sm:text-[10px] font-semibold uppercase">
                             {action.icon}
                           </span>
                         ) : action.icon ? (
-                          <action.icon className="h-3 w-3" />
+                          <action.icon className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
                         ) : null}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="text-xs midday-font-sans">{action.label}</p>
+                      <p className="text-xs font-sans">{action.label}</p>
                     </TooltipContent>
                   </Tooltip>
                 ))}
@@ -408,13 +411,15 @@ export function EnhancedMessage({
                       variant="ghost"
                       size="sm"
                       className={cn(
-                        'h-7 w-7 p-0',
-                        'midday-text-muted hover:midday-text-accent',
-                        'midday-transition-colors'
+                        'h-6 w-6 sm:h-7 sm:w-7 p-0',
+                        'text-muted hover:text-accent',
+                        'transition-colors hover-scale focus-ring-offset interactive'
                       )}
                       onClick={() => setShowReactions((prev) => !prev)}
+                      aria-label="Add reaction"
+                      aria-expanded={showReactions}
                     >
-                      <ThumbsUp className="h-3 w-3" />
+                      <ThumbsUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
                     </Button>
                     <AnimatePresence>
                       {showReactions && (
@@ -424,10 +429,12 @@ export function EnhancedMessage({
                           exit={{ opacity: 0, scale: 0.85 }}
                           className={cn(
                             'absolute bottom-full left-0 mb-2 flex gap-1',
-                            'midday-rounded-lg border midday-border-secondary bg-background/80 px-2 py-1',
-                            'midday-shadow-md',
+                            'rounded-lg border border-secondary bg-background/80 px-2 py-1',
+                            'shadow-md',
                             isUser ? 'right-0 left-auto' : 'left-0 right-auto'
                           )}
+                          role="group"
+                          aria-label="Quick reactions"
                         >
                           {defaultReactions.map((emoji) => (
                             <Button
@@ -435,10 +442,11 @@ export function EnhancedMessage({
                               variant="ghost"
                               size="sm"
                               className={cn(
-                                'h-6 w-6 p-0 text-base',
-                                'hover:bg-muted/20 midday-transition-colors'
+                                'h-5 w-5 sm:h-6 sm:w-6 p-0 text-sm sm:text-base',
+                                'hover:bg-muted/20 transition-colors hover-scale focus-ring-offset interactive'
                               )}
                               onClick={() => handleReaction(emoji)}
+                              aria-label={`React with ${emoji}`}
                             >
                               {emoji}
                             </Button>

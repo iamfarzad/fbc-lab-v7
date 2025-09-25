@@ -34,6 +34,7 @@ import { AIDevtools } from "@ai-sdk-tools/devtools";
 import { generateId } from "ai";
 import { useAIElements } from "@/hooks/useAIElements";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
+import { useWebSocketVoice } from "@/hooks/useWebSocketVoice";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,42 @@ const MEETING_KEYWORDS = [
   "calendly"
 ];
 
+const TARGET_VOICE_SAMPLE_RATE = 16000;
+
+function convertFloat32ToPCM16Buffer(float32: Float32Array) {
+  const int16 = new Int16Array(float32.length)
+  for (let i = 0; i < float32.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, float32[i]))
+    int16[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+  }
+  return int16.buffer
+}
+
+function downsampleToPCM16(input: Float32Array, inputSampleRate: number, targetSampleRate: number) {
+  if (targetSampleRate >= inputSampleRate) {
+    return convertFloat32ToPCM16Buffer(input)
+  }
+
+  const sampleRateRatio = inputSampleRate / targetSampleRate
+  const newLength = Math.round(input.length / sampleRateRatio)
+  const result = new Float32Array(newLength)
+
+  let offset = 0
+  for (let i = 0; i < newLength; i += 1) {
+    const nextOffset = Math.round((i + 1) * sampleRateRatio)
+    let accum = 0
+    let count = 0
+    for (let j = offset; j < nextOffset && j < input.length; j += 1) {
+      accum += input[j]
+      count += 1
+    }
+    result[i] = count > 0 ? accum / count : 0
+    offset = nextOffset
+  }
+
+  return convertFloat32ToPCM16Buffer(result)
+}
+
 // Types - Using EnhancedChatMessage from chat-enhanced.ts
 interface ChatMessage {
   id: string;
@@ -105,49 +142,6 @@ interface ChatState {
 interface Props {
   id?: string | null;
 }
-
-// Voice recognition hook (simplified)
-const useVoice = () => {
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [isSupported, setIsSupported] = useState(false);
-
-  useEffect(() => {
-    setIsSupported('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
-  }, []);
-
-  const startListening = () => {
-    if (!isSupported) {
-      toast.error("Voice recognition not supported in this browser");
-      return;
-    }
-    setIsListening(true);
-    // Simulate voice input
-    setTimeout(() => {
-      setTranscript("Hello, I'd like to learn more about AI consulting services.");
-      setIsListening(false);
-    }, 2000);
-  };
-
-  const stopListening = () => {
-    setIsListening(false);
-  };
-
-  const clearTranscript = () => {
-    setTranscript('');
-  };
-
-  return {
-    isListening,
-    transcript,
-    interimTranscript: '',
-    isSupported,
-    error: null,
-    startListening,
-    stopListening,
-    clearTranscript
-  };
-};
 
 // Camera service hook (simplified)
 const useCameraService = () => {
@@ -218,17 +212,17 @@ export function ChatInterface({ id }: Props) {
   const [enhancedMessages, setEnhancedMessages] = useState<EnhancedChatMessage[]>([]);
   const [isMeetingOpen, setIsMeetingOpen] = useState(false);
 
-  // Hooks
-  const { 
-    isListening, 
-    transcript, 
-    interimTranscript, 
-    isSupported: isVoiceSupported, 
-    startListening, 
-    stopListening, 
-    clearTranscript 
-  } = useVoice();
-  
+  // Voice streaming state
+  const voice = useWebSocketVoice();
+  const [isListening, setIsListening] = useState(false);
+  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const captureContextRef = useRef<AudioContext | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const voiceUserSegmentsRef = useRef<string[]>([]);
+  const voiceAssistantSegmentsRef = useRef<string[]>([]);
+
   const { 
     cameraState, 
     startCamera, 
@@ -303,11 +297,164 @@ export function ChatInterface({ id }: Props) {
     }
   }, [chatState.isOpen, initialiseSession]);
 
+  const teardownAudio = useCallback(() => {
+    try {
+      processorRef.current?.disconnect();
+    } catch {}
+    processorRef.current = null;
+
+    try {
+      sourceNodeRef.current?.disconnect();
+    } catch {}
+    sourceNodeRef.current = null;
+
+    if (captureContextRef.current) {
+      captureContextRef.current.close().catch(() => undefined);
+      captureContextRef.current = null;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+      mediaStreamRef.current = null;
+    }
+  }, []);
+
+  const handleAudioProcess = useCallback((event: any) => {
+    if (!voice.isSessionActive) return;
+    const channelData = event.inputBuffer.getChannelData(0);
+    const pcmBuffer = downsampleToPCM16(channelData, event.inputBuffer.sampleRate, TARGET_VOICE_SAMPLE_RATE);
+    voice.sendAudioChunk(pcmBuffer, `audio/pcm;rate=${TARGET_VOICE_SAMPLE_RATE}`);
+  }, [voice]);
+
+  const setupRecorder = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: TARGET_VOICE_SAMPLE_RATE,
+          sampleSize: 16,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+
+      mediaStreamRef.current = stream;
+      const audioContext = new AudioContext({ sampleRate: TARGET_VOICE_SAMPLE_RATE });
+      captureContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      sourceNodeRef.current = source;
+
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+      processor.onaudioprocess = handleAudioProcess;
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+    } catch (error) {
+      teardownAudio();
+      throw error;
+    }
+  }, [handleAudioProcess, teardownAudio]);
+
+  const startVoiceSession = useCallback(async () => {
+    if (!isVoiceSupported) {
+      toast.error('Voice capture not supported in this browser');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      aiElements.setLoading(true);
+      await voice.startSession();
+      await setupRecorder();
+      voiceUserSegmentsRef.current = [];
+      voiceAssistantSegmentsRef.current = [];
+      setIsListening(true);
+    } catch (error) {
+      console.error('Failed to start voice session', error);
+      toast.error('Unable to start voice session');
+      setIsListening(false);
+      setIsLoading(false);
+      aiElements.setLoading(false);
+      voice.stopSession();
+      teardownAudio();
+    }
+  }, [aiElements, isVoiceSupported, setupRecorder, teardownAudio, voice]);
+
+  const stopVoiceSession = useCallback(() => {
+    teardownAudio();
+    voice.stopSession();
+    setIsListening(false);
+    setIsLoading(false);
+    aiElements.setLoading(false);
+  }, [aiElements, teardownAudio, voice]);
+
+  const appendVoiceMessage = useCallback((role: 'user' | 'assistant', content: string) => {
+    if (!content) return;
+    const message: ChatMessage = {
+      id: generateId(),
+      content,
+      role,
+      timestamp: new Date(),
+      type: 'voice'
+    };
+
+    const enhanced = aiElements.createEnhancedMessage(content, role, {
+      fileType: 'audio/pcm',
+      fileName: role === 'user' ? 'voice-input' : 'voice-response'
+    });
+
+    setMessages(prev => {
+      const next = [...prev, message];
+      messagesRef.current = next;
+      return next;
+    });
+    setEnhancedMessages(prev => [...prev, enhanced]);
+
+    if (role === 'assistant') {
+      setIsLoading(false);
+      aiElements.setLoading(false);
+    }
+  }, [aiElements]);
+
+  useEffect(() => {
+    const segments = voice.transcript ? voice.transcript.split('\n').filter(Boolean) : [];
+    if (segments.length > voiceUserSegmentsRef.current.length) {
+      const newSegments = segments.slice(voiceUserSegmentsRef.current.length);
+      voiceUserSegmentsRef.current = segments;
+      newSegments.forEach((segment) => appendVoiceMessage('user', segment));
+    }
+  }, [appendVoiceMessage, voice.transcript]);
+
+  useEffect(() => {
+    const segments = voice.modelReplies;
+    if (segments.length > voiceAssistantSegmentsRef.current.length) {
+      const newSegments = segments.slice(voiceAssistantSegmentsRef.current.length);
+      voiceAssistantSegmentsRef.current = segments;
+      newSegments.forEach((segment) => appendVoiceMessage('assistant', segment));
+    }
+  }, [appendVoiceMessage, voice.modelReplies]);
+
+  useEffect(() => {
+    if (voice.error) {
+      stopVoiceSession();
+    }
+  }, [stopVoiceSession, voice.error]);
+
   // Sync refs and auto-scroll when messages update
   useEffect(() => {
     messagesRef.current = messages;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      setIsVoiceSupported(true);
+    }
+  }, []);
 
   // Focus input when chat opens
   useEffect(() => {
@@ -322,11 +469,17 @@ export function ChatInterface({ id }: Props) {
       if (cameraState.isActive) {
         stopCamera();
       }
-      if (isListening) {
-        stopListening();
+      if (isListening || voice.isSessionActive) {
+        stopVoiceSession();
       }
     }
-  }, [chatState.isOpen, cameraState.isActive, isListening, stopCamera, stopListening]);
+  }, [chatState.isOpen, cameraState.isActive, isListening, stopCamera, stopVoiceSession, voice.isSessionActive]);
+
+  useEffect(() => {
+    return () => {
+      stopVoiceSession();
+    };
+  }, [stopVoiceSession]);
 
   // Handle sending messages
   const handleSendMessage = useCallback(async (content: string) => {
@@ -334,17 +487,18 @@ export function ChatInterface({ id }: Props) {
 
     const trimmed = content.trim();
     const normalized = trimmed.toLowerCase();
+    const voiceActive = isListening || voice.isSessionActive;
     const userMessage: ChatMessage = {
       id: generateId(),
       content: trimmed,
       role: 'user',
       timestamp: new Date(),
-      type: isListening ? 'voice' : 'text'
+      type: voiceActive ? 'voice' : 'text'
     };
 
     const enhancedUserMessage = aiElements.createEnhancedMessage(trimmed, 'user', {
-      fileName: isListening ? 'voice-recording' : undefined,
-      fileType: isListening ? 'audio/wav' : undefined
+      fileName: voiceActive ? 'voice-recording' : undefined,
+      fileType: voiceActive ? 'audio/wav' : undefined
     });
 
     if (MEETING_KEYWORDS.some(keyword => normalized.includes(keyword))) {
@@ -359,10 +513,6 @@ export function ChatInterface({ id }: Props) {
     setInputValue('');
     setIsLoading(true);
     aiElements.setLoading(true);
-
-    if (isListening) {
-      clearTranscript();
-    }
 
     try {
       const payload = {
@@ -439,14 +589,7 @@ export function ChatInterface({ id }: Props) {
       aiElements.setError('Failed to process message');
       setSuggestions(DEFAULT_SUGGESTIONS);
     }
-  }, [aiElements, clearTranscript, fetchSuggestions, isListening, isLoading]);
-
-  // Handle voice transcript completion
-  useEffect(() => {
-    if (transcript && !isListening) {
-      void handleSendMessage(transcript);
-    }
-  }, [handleSendMessage, transcript, isListening]);
+  }, [aiElements, fetchSuggestions, isListening, isLoading, voice.isSessionActive]);
 
   // Toggle functions
   const toggleChat = () => {
@@ -465,19 +608,18 @@ export function ChatInterface({ id }: Props) {
     setChatState(prev => ({ ...prev, isExpanded: !prev.isExpanded, isMinimized: false }));
   };
 
-  const toggleVoice = () => {
+  const toggleVoice = useCallback(() => {
     if (!isVoiceSupported) {
-      toast.error("Voice recognition not supported in this browser");
+      toast.error('Voice capture not supported in this browser');
       return;
     }
 
-    if (isListening) {
-      stopListening();
+    if (isListening || voice.isSessionActive) {
+      stopVoiceSession();
     } else {
-      clearTranscript();
-      startListening();
+      void startVoiceSession();
     }
-  };
+  }, [isListening, isVoiceSupported, startVoiceSession, stopVoiceSession, voice.isSessionActive]);
 
   const toggleCamera = async () => {
     try {
@@ -503,15 +645,17 @@ export function ChatInterface({ id }: Props) {
 
   // Get current input display value
   const getInputDisplayValue = () => {
-    if (isListening) {
-      return transcript + interimTranscript;
+    if (isListening || voice.isSessionActive) {
+      if (voice.partialTranscript) return voice.partialTranscript;
+      if (voice.transcript) return voice.transcript.split('\n').slice(-1)[0] || '';
+      return '';
     }
     return inputValue;
   };
 
   // Get appropriate placeholder text
   const getPlaceholder = () => {
-    if (isListening) {
+    if (isListening || voice.isSessionActive) {
       return "Listening... speak now";
     }
     return "Ask about AI consulting...";
@@ -528,14 +672,17 @@ export function ChatInterface({ id }: Props) {
         <Button
           onClick={toggleChat}
           data-chat-trigger
-          className="h-12 w-12 sm:h-14 sm:w-14 midday-bg-primary midday-chat-user-text hover:bg-primary/90 shadow-lg relative touch-manipulation midday-transition midday-hover-lift"
+          aria-label={chatState.isOpen ? "Close chat" : "Open chat"}
+          aria-expanded={chatState.isOpen}
+          className="h-12 w-12 sm:h-14 sm:w-14 midday-bg-primary midday-chat-user-text hover:bg-primary/90 shadow-lg relative touch-manipulation midday-transition midday-hover-lift focus-ring-offset interactive"
         >
           {chatState.isOpen ? (
-            <X className="h-5 w-5 sm:h-6 sm:w-6" />
+            <X className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
           ) : (
             <>
-              <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
-              <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full animate-pulse bg-primary"></div>
+              <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
+              <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full animate-pulse bg-primary" aria-hidden="true"></div>
+              <span className="sr-only">Unread messages</span>
             </>
           )}
         </Button>
@@ -553,9 +700,9 @@ export function ChatInterface({ id }: Props) {
               chatState.isMinimized 
                 ? 'bottom-16 right-4 sm:bottom-24 sm:right-6 w-72 sm:w-80 h-12' 
                 : chatState.isExpanded
-                  ? 'top-0 left-0 right-0 bottom-0 w-full'
-                  : 'bottom-4 left-4 right-4 sm:bottom-6 sm:right-6 sm:left-auto sm:w-96 h-[70vh] sm:h-[600px] max-h-[600px]'
-            } z-[100] midday-bg-card border border-border midday-shadow-lg flex flex-col transition-all duration-300 safe-area-inset-bottom`}
+                  ? 'top-0 left-0 right-0 bottom-0 w-full flex items-center justify-center p-4'
+                  : 'bottom-4 left-4 right-4 sm:bottom-6 sm:right-6 sm:left-auto sm:w-96 h-[70vh] sm:h-[600px] max-h-[600px] md:w-[28rem] lg:w-[32rem]'
+            } z-[100] bg-background border border-border midday-shadow-lg flex flex-col transition-all duration-300 safe-area-inset-bottom backdrop-blur-sm bg-opacity-95`}
           >
             {chatState.isMinimized ? (
               /* Minimized State */
@@ -583,7 +730,7 @@ export function ChatInterface({ id }: Props) {
               </motion.div>
             ) : (
               /* Normal and Expanded Layout */
-              <div className="flex flex-col h-full">
+              <div className={`flex flex-col h-full ${chatState.isExpanded ? 'max-w-4xl w-full' : ''}`}>
                 {/* Header */}
                 <div className={`${chatState.isExpanded ? 'pt-10 sm:pt-16' : 'pt-4'} pb-4 px-4 sm:px-6 border-b border-border/60 midday-bg-card/95 flex items-center justify-between backdrop-blur ${chatState.isExpanded ? 'safe-area-inset-top' : ''}`}>
                   <div className="flex items-center gap-3">
@@ -599,8 +746,9 @@ export function ChatInterface({ id }: Props) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="hidden sm:inline-flex h-8 px-3 font-medium"
+                      className="hidden sm:inline-flex h-8 px-3 font-medium hover-scale focus-ring-offset interactive"
                       onClick={openMeeting}
+                      aria-label="Book a strategy call"
                     >
                       Book a call
                     </Button>
@@ -610,10 +758,11 @@ export function ChatInterface({ id }: Props) {
                           variant="ghost"
                           size="sm"
                           onClick={toggleExpand}
-                          className="h-6 w-6 p-0 touch-manipulation midday-transition-colors"
-                          title="Expand"
+                          className="h-6 w-6 p-0 touch-manipulation midday-transition-colors hover-scale focus-ring-offset interactive"
+                          title="Expand chat interface"
+                          aria-label="Expand chat"
                         >
-                          <Expand className="h-3 w-3" />
+                          <Expand className="h-3 w-3" aria-hidden="true" />
                         </Button>
                       )}
                       {chatState.isExpanded && (
@@ -621,29 +770,32 @@ export function ChatInterface({ id }: Props) {
                           variant="ghost"
                           size="sm"
                           onClick={toggleExpand}
-                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 touch-manipulation midday-transition-colors"
-                          title="Exit Fullscreen"
+                          className="h-8 w-8 sm:h-6 sm:w-6 p-0 touch-manipulation midday-transition-colors hover-scale focus-ring-offset interactive"
+                          title="Exit fullscreen mode"
+                          aria-label="Exit fullscreen"
                         >
-                          <Shrink className="h-4 w-4 sm:h-3 sm:w-3" />
+                          <Shrink className="h-4 w-4 sm:h-3 sm:w-3" aria-hidden="true" />
                         </Button>
                       )}
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={toggleMinimize}
-                        className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation midday-transition-colors`}
-                        title="Minimize"
+                        className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation midday-transition-colors hover-scale focus-ring-offset interactive`}
+                        title="Minimize chat"
+                        aria-label="Minimize chat"
                       >
-                        <Minimize2 className={`${chatState.isExpanded ? 'h-4 w-4 sm:h-3 sm:w-3' : 'h-3 w-3'}`} />
+                        <Minimize2 className={`${chatState.isExpanded ? 'h-4 w-4 sm:h-3 sm:w-3' : 'h-3 w-3'}`} aria-hidden="true" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={toggleChat}
-                        className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation midday-transition-colors`}
-                        title="Close"
+                        className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation midday-transition-colors hover-scale focus-ring-offset interactive`}
+                        title="Close chat"
+                        aria-label="Close chat"
                       >
-                        <X className={`${chatState.isExpanded ? 'h-4 w-4 sm:h-3 sm:w-3' : 'h-3 w-3'}`} />
+                        <X className={`${chatState.isExpanded ? 'h-4 w-4 sm:h-3 sm:w-3' : 'h-3 w-3'}`} aria-hidden="true" />
                       </Button>
                     </div>
                   </div>
@@ -769,7 +921,7 @@ export function ChatInterface({ id }: Props) {
                 {/* Input Area */}
                 <div className="border-t border-border/60 midday-bg-card/80 safe-area-inset-bottom">
                   <PromptInput
-                    className="mx-4 my-4 flex flex-col gap-2 midday-rounded-3xl border border-border/60 midday-bg-background/95 px-3 pb-2 pt-3 midday-shadow-lg midday-shadow-md backdrop-blur"
+                    className="mx-2 sm:mx-4 my-2 sm:my-4 flex flex-col gap-2 midday-rounded-3xl border border-border/60 midday-bg-background/95 px-3 pb-2 pt-3 midday-shadow-lg midday-shadow-md backdrop-blur"
                     accept="image/*,.pdf"
                     onSubmit={async (message, event) => {
                       event.preventDefault();
@@ -791,7 +943,7 @@ export function ChatInterface({ id }: Props) {
                       </PromptInputAttachments>
 
                       <PromptInputTextarea
-                        className="midday-rounded-2xl bg-transparent px-4 text-base leading-relaxed placeholder:text-muted-foreground/70 midday-font-sans"
+                        className="midday-rounded-2xl bg-transparent px-2 sm:px-4 text-base sm:text-base leading-relaxed placeholder:text-muted-foreground/70 midday-font-sans"
                         value={getInputDisplayValue()}
                         onChange={(e) => setInputValue(e.target.value)}
                         placeholder={getPlaceholder()}
@@ -799,77 +951,104 @@ export function ChatInterface({ id }: Props) {
                         ref={inputRef}
                       />
 
+                      {(isListening || voice.isSessionActive) && (voice.partialTranscript || voice.transcript) && (
+                        <div className="px-2 text-xs text-muted-foreground/80">
+                          <span className="font-medium text-muted-foreground">Voice preview:</span>{' '}
+                          {voice.partialTranscript || voice.transcript?.split('\n').slice(-1)[0]}
+                        </div>
+                      )}
+
+                      {voice.error && (
+                        <div className="px-2 text-xs text-destructive/80">
+                          {voice.error}
+                        </div>
+                      )}
+
                       <PromptInputToolbar className="items-center px-2 pb-1 pt-0">
-                        <PromptInputTools className="gap-1.5">
-                          <PromptInputButton
-                            variant={isListening ? 'default' : 'ghost'}
-                            className="h-9 midday-rounded-full px-3 text-sm midday-transition-colors"
-                            onClick={toggleVoice}
-                            disabled={!isVoiceSupported}
-                            title={!isVoiceSupported ? 'Voice recognition not supported in this browser' : isListening ? 'Stop voice input' : 'Start voice input'}
-                          >
-                            {isListening ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
-                          </PromptInputButton>
-
-                          <PromptInputButton
-                            variant={cameraState.isActive ? 'default' : 'ghost'}
-                            className="h-9 midday-rounded-full px-3 text-sm midday-transition-colors"
-                            onClick={toggleCamera}
-                            title={`${cameraState.isActive ? 'Disable' : 'Enable'} camera`}
-                          >
-                            {cameraState.isActive ? <Camera className="h-4 w-4" /> : <CameraOff className="h-4 w-4" />}
-                          </PromptInputButton>
-
-                          <PromptInputButton
-                            variant={chatState.isScreenSharing ? 'default' : 'ghost'}
-                            className="h-9 midday-rounded-full px-3 text-sm midday-transition-colors"
-                            onClick={toggleScreenShare}
-                            title="Toggle screen share"
-                          >
-                            {chatState.isScreenSharing ? <Monitor className="h-4 w-4" /> : <MonitorOff className="h-4 w-4" />}
-                          </PromptInputButton>
-
-                          <PromptInputButton
-                            variant={chatState.showSettings ? 'default' : 'ghost'}
-                            className="h-9 midday-rounded-full px-3 text-sm midday-transition-colors"
-                            onClick={toggleSettings}
-                            title="Chat settings"
-                          >
-                            <Settings className="h-4 w-4" />
-                          </PromptInputButton>
-
+                        <PromptInputTools className="gap-0.5 sm:gap-1.5">
+                          {/* Upload/Attachment button - moved to left */}
                           <PromptInputActionMenu>
-                            <PromptInputActionMenuTrigger className="midday-rounded-full border border-border/60 midday-bg-background px-3 py-2 text-sm font-medium text-muted-foreground midday-shadow-sm midday-transition-colors">
-                              <Plus className="h-4 w-4" />
+                            <PromptInputActionMenuTrigger className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive border border-border/60 midday-bg-background" aria-label="Upload files">
+                              <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                             </PromptInputActionMenuTrigger>
-                            <PromptInputActionMenuContent align="end" className="midday-rounded-2xl border border-border/40 midday-bg-background/95 midday-shadow-lg midday-shadow-xl">
-                              <PromptInputActionAddAttachments label="Add photos & files" />
+                            <PromptInputActionMenuContent align="start" className="midday-rounded-2xl border border-border/40 midday-bg-background/95 midday-shadow-lg midday-shadow-xl">
+                              <PromptInputActionAddAttachments label="Upload photos & files" />
                               <PromptInputActionMenuItem
                                 onClick={() => toast.info('PDF summaries are on the roadmap. Stay tuned!')}
                               >
-                                <FileText className="mr-2 h-4 w-4" />
+                                <FileText className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                                 Generate summary (soon)
                               </PromptInputActionMenuItem>
                             </PromptInputActionMenuContent>
                           </PromptInputActionMenu>
 
+                          {/* Voice button */}
+                          <PromptInputButton
+                            variant={(isListening || voice.isSessionActive) ? 'default' : 'ghost'}
+                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                            onClick={toggleVoice}
+                            disabled={!isVoiceSupported}
+                            aria-label={!isVoiceSupported ? 'Voice capture not supported in this browser' : (isListening || voice.isSessionActive) ? 'Stop voice conversation' : 'Start voice conversation'}
+                            title={!isVoiceSupported ? 'Voice capture not supported in this browser' : (isListening || voice.isSessionActive) ? 'Stop voice conversation' : 'Start voice conversation'}
+                          >
+                            {(isListening || voice.isSessionActive)
+                              ? <Mic className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                              : <MicOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
+                          </PromptInputButton>
+
+                          {/* Camera button */}
+                          <PromptInputButton
+                            variant={cameraState.isActive ? 'default' : 'ghost'}
+                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                            onClick={toggleCamera}
+                            aria-label={`${cameraState.isActive ? 'Disable' : 'Enable'} camera`}
+                            title={`${cameraState.isActive ? 'Disable' : 'Enable'} camera`}
+                          >
+                            {cameraState.isActive ? <Camera className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" /> : <CameraOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
+                          </PromptInputButton>
+
+                          {/* Screen share button */}
+                          <PromptInputButton
+                            variant={chatState.isScreenSharing ? 'default' : 'ghost'}
+                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                            onClick={toggleScreenShare}
+                            aria-label="Toggle screen share"
+                            title="Toggle screen share"
+                          >
+                            {chatState.isScreenSharing ? <Monitor className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" /> : <MonitorOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
+                          </PromptInputButton>
+
+                          {/* Camera switch button - only show when camera is active */}
                           {cameraState.isActive && cameraState.availableDevices.length > 1 && (
                             <PromptInputButton
                               variant="ghost"
-                              className="h-9 midday-rounded-full px-3 text-sm midday-transition-colors"
+                              className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
                               onClick={switchCamera}
+                              aria-label="Switch camera"
                               title="Switch camera"
                             >
-                              <RotateCcw className="h-4 w-4" />
+                              <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
                             </PromptInputButton>
                           )}
+
+                          {/* Settings button */}
+                          <PromptInputButton
+                            variant={chatState.showSettings ? 'default' : 'ghost'}
+                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                            onClick={toggleSettings}
+                            aria-label="Chat settings"
+                            title="Chat settings"
+                          >
+                            <Settings className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                          </PromptInputButton>
                         </PromptInputTools>
 
                         <PromptInputSubmit
-                          className="h-10 w-10 midday-rounded-full midday-bg-primary midday-chat-user-text hover:bg-primary/90 midday-transition-colors"
+                          className="h-8 w-8 sm:h-10 sm:w-10 midday-rounded-full midday-bg-primary midday-chat-user-text hover:bg-primary/90 midday-transition-colors hover-scale focus-ring-offset interactive"
                           variant="ghost"
                           status={isLoading ? 'submitted' : undefined}
                           disabled={isLoading || !getInputDisplayValue().trim()}
+                          aria-label={isLoading ? 'Sending message...' : 'Send message'}
                         />
                       </PromptInputToolbar>
                     </PromptInputBody>

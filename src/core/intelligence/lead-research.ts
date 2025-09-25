@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { GoogleGroundingProvider, GroundedAnswer } from './providers/search/google-grounding'
+import { streamPerplexity } from './providers/perplexity'
 import { recordCapabilityUsed } from '@/src/core/context/capabilities'
 import { supabaseService, createLeadSummary } from '@/src/core/supabase/client'
 import { finalizeLeadSession } from '../workflows/finalizeLeadSession'
@@ -15,6 +16,7 @@ export interface ResearchResult {
     title?: string
     description?: string
   }>
+  provider?: 'perplexity' | 'google' | 'fallback'
 }
 
 export class LeadResearchService {
@@ -22,10 +24,12 @@ export class LeadResearchService {
   private cacheTTL = 24 * 60 * 60 * 1000 // 24 hours
   private genAI: GoogleGenAI
   private groundingProvider: GoogleGroundingProvider
+  private perplexityEnabled: boolean
 
   constructor() {
     this.genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
     this.groundingProvider = new GoogleGroundingProvider()
+    this.perplexityEnabled = Boolean(process.env.PERPLEXITY_API_KEY)
   }
 
   /**
@@ -160,12 +164,19 @@ Citations: ${research.citations?.length || 0} sources reviewed`
         }
       }
 
-      // Use Google Grounding for comprehensive research
-      const researchResult = await this.researchWithGrounding(email, (name ?? email.split('@')[0] ?? 'Unknown').toString(), domain, companyUrl as any)
+      let researchResult: ResearchResult | null = null
+
+      if (this.perplexityEnabled) {
+        researchResult = await this.researchWithPerplexity(email, (name ?? email.split('@')[0] ?? 'Unknown').toString(), domain, companyUrl as any)
+      }
+
+      if (!researchResult) {
+        researchResult = await this.researchWithGrounding(email, (name ?? email.split('@')[0] ?? 'Unknown').toString(), domain, companyUrl as any)
+      }
       
       // Record capability usage for search
       if (sessionId) {
-        await recordCapabilityUsed(sessionId, 'search', { email, name, companyUrl })
+        await recordCapabilityUsed(sessionId, 'search', { email, name, companyUrl, provider: researchResult.provider })
       }
 
       // Cache the result
@@ -193,8 +204,138 @@ Citations: ${research.citations?.length || 0} sources reviewed`
         },
         role: 'Unknown',
         confidence: 0,
-        citations: []
+        citations: [],
+        provider: 'fallback'
       }
+    }
+  }
+
+  private async researchWithPerplexity(
+    email: string,
+    name: string | undefined,
+    domain: string,
+    companyUrl?: string
+  ): Promise<ResearchResult | null> {
+    const apiKey = process.env.PERPLEXITY_API_KEY
+    if (!apiKey) return null
+
+    try {
+      const prospectName = (name ?? email.split('@')[0] ?? 'Unknown').toString()
+      const normalizedDomain = domain || (email.split('@')[1] ?? 'unknown.com')
+
+      const systemPrompt = `You are an elite F.B/c business research analyst. Use grounded, cited information to research a prospect.
+Respond ONLY with valid JSON matching this schema:
+{
+  "company": {
+    "name": string | null,
+    "domain": string | null,
+    "industry": string | null,
+    "size": string | null,
+    "summary": string | null,
+    "website": string | null,
+    "linkedin": string | null
+  },
+  "person": {
+    "fullName": string | null,
+    "role": string | null,
+    "seniority": string | null,
+    "profileUrl": string | null,
+    "company": string | null
+  },
+  "role": string | null,
+  "confidence": number
+}
+
+If any value is unknown, set it to null. Do not include extra text.`
+
+      const userPrompt = `Research the following lead using real-time search.
+Email: ${email}
+Name: ${prospectName}
+Company domain: ${normalizedDomain}
+Company URL: ${companyUrl || 'Not provided'}
+
+Return structured data only.`
+
+      const messages = [
+        { role: 'system' as const, content: systemPrompt },
+        { role: 'user' as const, content: userPrompt }
+      ]
+
+      let text = ''
+      let citations: string[] = []
+
+      for await (const event of streamPerplexity({
+        apiKey,
+        messages,
+        options: {
+          model: process.env.PERPLEXITY_MODEL ?? 'llama-3.1-sonar-small-128k-online',
+          web_search: true,
+          temperature: 0.2,
+          max_output_tokens: 1200,
+          web_search_options: {
+            search_context_size: 'high'
+          }
+        }
+      })) {
+        if (event.content) {
+          text += event.content
+        }
+        if (Array.isArray(event.citations) && event.citations.length) {
+          citations = event.citations
+        }
+        if (event.done) break
+      }
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        return null
+      }
+
+      const researchData = JSON.parse(jsonMatch[0])
+      const citationObjects = citations.map((uri) => ({ uri }))
+
+      try {
+        const { normalizeCompany } = await import('./providers/enrich/company-normalizer')
+        const { normalizePerson } = await import('./providers/enrich/person-normalizer')
+
+        const normalizedCompany = normalizeCompany({ name: researchData?.company?.name || (normalizedDomain.split('.')[0] ?? ''), domain: normalizedDomain })
+        const normalizedPerson = normalizePerson({ fullName: researchData?.person?.fullName, company: normalizedCompany.name })
+
+        return {
+          company: { ...normalizedCompany, ...researchData.company },
+          person: { ...normalizedPerson, ...researchData.person },
+          role: researchData.role ?? 'Unknown',
+          confidence: typeof researchData.confidence === 'number' ? researchData.confidence : 0.7,
+          citations: citationObjects,
+          provider: 'perplexity'
+        }
+      } catch {
+        return {
+          company: {
+            name: researchData?.company?.name ?? (normalizedDomain.split('.')[0] ?? ''),
+            domain: researchData?.company?.domain ?? normalizedDomain,
+            industry: researchData?.company?.industry ?? null,
+            size: researchData?.company?.size ?? null,
+            summary: researchData?.company?.summary ?? null,
+            website: researchData?.company?.website ?? (companyUrl || `https://${normalizedDomain}`),
+            linkedin: researchData?.company?.linkedin ?? null
+          },
+          person: {
+            fullName: researchData?.person?.fullName ?? prospectName,
+            role: researchData?.person?.role ?? researchData?.role ?? null,
+            seniority: researchData?.person?.seniority ?? null,
+            profileUrl: researchData?.person?.profileUrl ?? null,
+            company: researchData?.person?.company ?? (normalizedDomain.split('.')[0] ?? null)
+          },
+          role: researchData?.role ?? researchData?.person?.role ?? 'Unknown',
+          confidence: typeof researchData?.confidence === 'number' ? researchData.confidence : 0.6,
+          citations: citationObjects,
+          provider: 'perplexity'
+        }
+      }
+    } catch (error) {
+      console.error('Perplexity research failed', error)
+      return null
     }
   }
 
@@ -222,7 +363,8 @@ Citations: ${research.citations?.length || 0} sources reviewed`
           uri: 'https://en.wikipedia.org/wiki/Example.com',
           title: 'Example.com',
           description: 'Reserved domain for documentation'
-        }]
+        }],
+        provider: 'fallback'
       }
     }
 
@@ -317,7 +459,8 @@ Be thorough and accurate. If information is not available, use null for that fie
           person: { ...np, ...researchData.person },
           role: researchData.role,
           confidence: researchData.confidence,
-          citations: allCitations
+          citations: allCitations,
+          provider: 'google'
         }
       } catch {
         return {
@@ -325,7 +468,8 @@ Be thorough and accurate. If information is not available, use null for that fie
           person: researchData.person,
           role: researchData.role,
           confidence: researchData.confidence,
-          citations: allCitations
+          citations: allCitations,
+          provider: 'google'
         }
       }
     }
@@ -344,7 +488,8 @@ Be thorough and accurate. If information is not available, use null for that fie
       } as any,
       role: 'Business Professional',
       confidence: 0.2,
-      citations: allCitations
+      citations: allCitations,
+      provider: 'google'
     }
   }
 
@@ -371,7 +516,7 @@ Be thorough and accurate. If information is not available, use null for that fie
         company: researchResult.company.name,
         industry: researchResult.company.industry,
         company_size: researchResult.company.size,
-        notes: `Research completed with ${researchResult.confidence * 100}% confidence. Role: ${researchResult.role}`,
+        notes: `Research completed with ${Math.round(researchResult.confidence * 100)}% confidence. Role: ${researchResult.role}. Source: ${researchResult.provider || 'unknown'}.`,
         status: 'qualified',
         lead_score: Math.round(researchResult.confidence * 100),
         user_id: null // Will be set by createLeadSummary

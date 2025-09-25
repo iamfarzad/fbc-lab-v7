@@ -84,7 +84,8 @@ export async function handleIntelligence(body: IntelligenceRequest): Promise<unk
         person: result.person,
         role: result.role,
         scores: { confidence: result.confidence },
-        citations: result.citations || []
+        citations: result.citations || [],
+        provider: result.provider || 'unknown'
       }}
     }
 

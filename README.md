@@ -1,69 +1,269 @@
-# React + TypeScript + Vite
+# F.B/c Lab V7 - AI Assistant
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**F.B/c AI Assistant - Multimodal AI Webapp with Gemini 2.5 Flash (Lab Version 7)**
 
-Currently, two official plugins are available:
+A cutting-edge AI-powered web application featuring real-time conversational AI, intelligent tools, and comprehensive business intelligence capabilities.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Live Demo
 
-## Expanding the ESLint configuration
+- **Production**: [fbc-master-v5.vercel.app](https://fbc-master-v5.vercel.app)
+- **GitHub**: [iamfarzad/fbc-lab-v7](https://github.com/iamfarzad/fbc-lab-v7)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## ✨ Key Features
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 🤖 AI-Powered Chat
+- **Gemini 2.5 Flash** integration for real-time conversations
+- **Google Grounding Search** for accurate, up-to-date information
+- **URL Context** for enhanced content understanding
+- **WebSocket Voice** integration for audio interactions
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 🛠️ Intelligent Tools
+- **Calculator** with advanced mathematical operations
+- **ROI Analysis** for business decision making
+- **Translation** services with multiple language support
+- **Web Preview** for content analysis
+- **Lead Research** and market analysis
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 📊 Business Intelligence
+- **Admin Dashboard** with comprehensive monitoring
+- **Analytics Dashboard** with real-time metrics
+- **Meeting Management** and scheduling
+- **Contact Management** with lead capture
+- **Workshop Platform** for educational content
+
+### 🎨 Modern UI/UX
+- **Responsive Design** with mobile-first approach
+- **Dark/Light Mode** with brand-compliant theming
+- **Component Library** built with shadcn/ui and Radix UI
+- **Performance Optimized** with Next.js App Router
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Next.js 14** with App Router
+- **React 19** with TypeScript
+- **Tailwind CSS** for styling
+- **shadcn/ui** component library
+- **Framer Motion** for animations
+
+### AI & Backend
+- **Google Gemini 2.5 Flash** for AI conversations
+- **@ai-sdk/google** for AI integration
+- **Supabase** for database and authentication
+- **WebSocket** for real-time communication
+- **Vercel** for deployment and hosting
+
+### Development Tools
+- **TypeScript** for type safety
+- **ESLint** for code quality
+- **Husky** for Git hooks
+- **Commitlint** for conventional commits
+- **Commitizen** for better commit experience
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+ 
+- pnpm (recommended) or npm
+- Google Gemini API key
+- Supabase account
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/iamfarzad/fbc-lab-v7.git
+cd fbc-lab-v7
+
+# Install dependencies
+pnpm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Edit .env.local with your API keys
+
+# Start development server
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Environment Variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```env
+# Gemini API
+GEMINI_API_KEY=your_gemini_api_key
+GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Vercel
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_token
 ```
+
+## 📝 Development
+
+### Available Scripts
+
+```bash
+# Development
+pnpm dev              # Start Next.js development server
+pnpm dev:live         # Start with WebSocket server
+pnpm dev:local-ws     # Start WebSocket server only
+
+# Building
+pnpm build            # Build for production
+pnpm start            # Start production server
+
+# Code Quality
+pnpm lint             # Run ESLint
+pnpm lint:fix         # Fix ESLint issues
+pnpm type-check       # Run TypeScript type checking
+
+# Git & Commits
+pnpm commit           # Interactive commit with Commitizen
+pnpm commit:retry     # Retry last commit
+```
+
+### Commit Convention
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) with custom types:
+
+```bash
+# Standard types
+feat: add new feature
+fix: fix bug
+docs: update documentation
+style: code formatting changes
+refactor: code refactoring
+perf: performance improvements
+test: add or update tests
+chore: maintenance tasks
+
+# Custom types for this project
+gemini: Gemini API changes
+vercel: Vercel deployment changes
+admin: Admin dashboard changes
+chat: Chat interface changes
+ui: UI component changes
+api: API changes
+db: Database changes
+auth: Authentication changes
+security: Security improvements
+config: Configuration changes
+```
+
+### Example Commits
+
+```bash
+feat(chat): add voice input support
+fix(gemini): resolve API quota issues
+docs: update deployment guide
+gemini: upgrade to 2.5 Flash model
+vercel: configure production environment
+admin: add user management dashboard
+```
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+
+1. **Connect Repository**
+   ```bash
+   vercel --prod
+   ```
+
+2. **Set Environment Variables**
+   - Add all required environment variables in Vercel dashboard
+   - Ensure `GEMINI_API_KEY` is properly configured
+
+3. **Deploy**
+   - Automatic deployments on push to main branch
+   - Preview deployments for pull requests
+
+### Manual Deployment
+
+```bash
+# Build for production
+pnpm build
+
+# Start production server
+pnpm start
+```
+
+## 📊 Project Structure
+
+```
+fbc-lab-v7/
+├── app/                    # Next.js App Router
+│   ├── (chat)/            # Chat interface routes
+│   ├── admin/             # Admin dashboard
+│   ├── api/               # API routes
+│   └── globals.css        # Global styles
+├── src/
+│   ├── components/        # React components
+│   │   ├── ai-elements/   # AI-powered components
+│   │   ├── chat/          # Chat components
+│   │   ├── ui/            # Reusable UI components
+│   │   └── admin/         # Admin components
+│   ├── core/              # Core business logic
+│   │   ├── intelligence/  # AI intelligence features
+│   │   ├── live/          # WebSocket voice integration
+│   │   └── admin/         # Admin services
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Utility libraries
+│   └── styles/            # Design system
+├── server/                # WebSocket server
+├── scripts/               # Development scripts
+└── public/                # Static assets
+```
+
+## 🔧 Configuration
+
+### Commit Rules
+
+The project uses a customized commit system:
+
+- **Husky** for Git hooks
+- **Commitlint** for message validation
+- **Commitizen** for interactive commits
+- **Custom types** for project-specific changes
+
+### Pre-commit Hooks
+
+- API key detection and prevention
+- ESLint code quality checks
+- TypeScript type checking
+- Test execution (if available)
+
+## 🤝 Contributing
+
+1. **Fork the repository**
+2. **Create a feature branch**
+   ```bash
+   git checkout -b feat/your-feature-name
+   ```
+3. **Make your changes**
+4. **Commit using conventional format**
+   ```bash
+   pnpm commit
+   ```
+5. **Push and create a Pull Request**
+
+## 📄 License
+
+This project is proprietary software. All rights reserved.
+
+## 🙏 Acknowledgments
+
+- **F.B/c Team** for the vision and requirements
+- **Google Gemini** for AI capabilities
+- **Vercel** for hosting and deployment
+- **Open Source Community** for amazing tools and libraries
+
+---
+
+**Built with ❤️ by the F.B/c Development Team**
+
+*Version: 7.0.0 | Last updated: January 2025*

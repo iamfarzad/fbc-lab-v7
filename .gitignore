@@ -92,3 +92,38 @@ next-env.d.ts
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Documentation and planning files (contain sensitive info)
+*.md
+!README.md
+!CHANGELOG.md
+
+# API keys and sensitive data
+cookies.txt
+*.key
+*.pem
+*.crt
+
+# Development and testing files
+scripts/
+server.log
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+.atom/
+.brackets.json
+
+# Local development
+.env.example
+.env.template

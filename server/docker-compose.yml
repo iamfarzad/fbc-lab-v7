@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  websocket-voice:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LIVE_SERVER_PORT=3001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const ws = require('ws'); const client = new ws('ws://localhost:3001'); client.on('open', () => { client.close(); process.exit(0); }); client.on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

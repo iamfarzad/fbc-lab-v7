@@ -18,56 +18,56 @@ module.exports = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--midday-border))",
-        input: "hsl(var(--midday-input))",
-        ring: "hsl(var(--midday-ring))",
-        background: "hsl(var(--midday-background))",
-        foreground: "hsl(var(--midday-foreground))",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "hsl(var(--midday-primary))",
-          foreground: "hsl(var(--midday-primary-foreground))",
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
-          DEFAULT: "hsl(var(--midday-secondary))",
-          foreground: "hsl(var(--midday-secondary-foreground))",
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
         },
         destructive: {
-          DEFAULT: "hsl(var(--midday-destructive))",
-          foreground: "hsl(var(--midday-destructive-foreground))",
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
-          DEFAULT: "hsl(var(--midday-muted))",
-          foreground: "hsl(var(--midday-muted-foreground))",
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
-          DEFAULT: "hsl(var(--midday-accent))",
-          foreground: "hsl(var(--midday-accent-foreground))",
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
-          DEFAULT: "hsl(var(--midday-popover))",
-          foreground: "hsl(var(--midday-popover-foreground))",
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
         card: {
-          DEFAULT: "hsl(var(--midday-card))",
-          foreground: "hsl(var(--midday-card-foreground))",
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
         // Chat-specific colors
         chat: {
           user: {
-            bg: "hsl(var(--midday-chat-user-bg))",
-            text: "hsl(var(--midday-chat-user-text))",
+            bg: "hsl(var(--chat-user-bg))",
+            text: "hsl(var(--chat-user-text))",
           },
           assistant: {
-            bg: "hsl(var(--midday-chat-assistant-bg))",
-            text: "hsl(var(--midday-chat-assistant-text))",
-            border: "hsl(var(--midday-chat-assistant-border))",
+            bg: "hsl(var(--chat-assistant-bg))",
+            text: "hsl(var(--chat-assistant-text))",
+            border: "hsl(var(--chat-assistant-border))",
           },
         },
       },
       borderRadius: {
-        lg: "var(--midday-radius)",
-        md: "calc(var(--midday-radius) - 2px)",
-        sm: "calc(var(--midday-radius) - 4px)",
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
         "accordion-down": {

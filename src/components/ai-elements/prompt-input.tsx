@@ -85,33 +85,36 @@ export function PromptInputAttachment({
 
   return (
     <div
-      className={cn("group relative h-14 w-14 midday-rounded-md border midday-border-secondary", className)}
+      className={cn(
+        "group relative h-12 w-12 sm:h-14 sm:w-14 midday-rounded-md border midday-border-secondary interactive transition-all duration-200 hover-scale",
+        className
+      )}
       key={data.id}
       {...props}
     >
-      {data.mediaType?.startsWith("image/") && data.url ? (
-        <img
-          alt={data.filename || "attachment"}
-          className="size-full midday-rounded-md object-cover"
-          height={56}
-          src={data.url}
-          width={56}
-        />
-      ) : (
-        <div className="flex size-full items-center justify-center midday-text-muted">
-          <PaperclipIcon className="size-4" />
-        </div>
-      )}
-      <Button
-        aria-label="Remove attachment"
-        className="-right-1.5 -top-1.5 absolute h-6 w-6 midday-rounded-full opacity-0 group-hover:opacity-100 midday-transition"
-        onClick={() => attachments.remove(data.id)}
-        size="icon"
-        type="button"
-        variant="outline"
-      >
-        <XIcon className="h-3 w-3" />
-      </Button>
+        {data.mediaType?.startsWith("image/") && data.url ? (
+          <img
+            alt={data.filename || "attachment"}
+            className="size-full midday-rounded-md object-cover"
+            height={48}
+            src={data.url}
+            width={48}
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center midday-text-muted">
+            <PaperclipIcon className="size-3 sm:size-4" aria-hidden="true" />
+          </div>
+        )}
+        <Button
+          aria-label="Remove attachment"
+          className="-right-1.5 -top-1.5 absolute h-5 w-5 sm:h-6 sm:w-6 midday-rounded-full opacity-0 group-hover:opacity-100 midday-transition-all hover-scale focus-ring-offset interactive"
+          onClick={() => attachments.remove(data.id)}
+          size="icon"
+          type="button"
+          variant="outline"
+        >
+          <XIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" aria-hidden="true" />
+        </Button>
     </div>
   );
 }
@@ -155,7 +158,7 @@ export function PromptInputAttachments({
       style={{ height: attachments.files.length ? height : 0 }}
       {...props}
     >
-      <div className="flex flex-wrap gap-2 p-3 pt-3" ref={contentRef}>
+      <div className="flex flex-wrap gap-1 sm:gap-2 p-2 sm:p-3 pt-2 sm:pt-3" ref={contentRef}>
         {attachments.files.map((file) => (
           <Fragment key={file.id}>{children(file)}</Fragment>
         ))}
@@ -512,11 +515,11 @@ export const PromptInputTextarea = ({
   return (
     <Textarea
       className={cn(
-        "w-full resize-none rounded-none border-none p-3 shadow-none outline-none ring-0",
+        "w-full resize-none rounded-none border-none p-2 sm:p-3 shadow-none outline-none ring-0",
         "field-sizing-content bg-transparent dark:bg-transparent",
-        "max-h-48 min-h-16",
+        "max-h-32 sm:max-h-48 min-h-12 sm:min-h-16",
         "focus-visible:ring-0",
-        "midday-font-sans",
+        "midday-font-sans text-sm",
         className
       )}
       name="message"
@@ -538,7 +541,7 @@ export const PromptInputToolbar = ({
   ...props
 }: PromptInputToolbarProps) => (
   <div
-    className={cn("flex items-center justify-between p-1", className)}
+    className={cn("flex items-center justify-between p-0.5 sm:p-1", className)}
     {...props}
   />
 );
@@ -551,7 +554,7 @@ export const PromptInputTools = ({
 }: PromptInputToolsProps) => (
   <div
     className={cn(
-      "flex items-center gap-1",
+      "flex items-center gap-0.5 sm:gap-1",
       "[&_button:first-child]:rounded-bl-xl",
       className
     )}
@@ -573,10 +576,10 @@ export const PromptInputButton = ({
   return (
     <Button
       className={cn(
-        "shrink-0 gap-1.5 midday-rounded-lg",
+        "shrink-0 gap-1 sm:gap-1.5 midday-rounded-lg",
         variant === "ghost" && "midday-text-muted",
-        newSize === "default" && "px-3",
-        "midday-transition-colors",
+        newSize === "default" && "px-2 sm:px-3",
+        "midday-transition-all hover-scale focus-ring-offset interactive",
         className
       )}
       size={newSize}
@@ -602,7 +605,7 @@ export const PromptInputActionMenuTrigger = ({
 }: PromptInputActionMenuTriggerProps) => (
   <DropdownMenuTrigger asChild>
     <PromptInputButton className={className} {...props}>
-      {children ?? <PlusIcon className="size-4" />}
+      {children ?? <PlusIcon className="size-3 sm:size-4" />}
     </PromptInputButton>
   </DropdownMenuTrigger>
 );
@@ -642,19 +645,22 @@ export const PromptInputSubmit = ({
   children,
   ...props
 }: PromptInputSubmitProps) => {
-  let Icon = <SendIcon className="size-4" />;
+  let Icon = <SendIcon className="size-3 sm:size-4" />;
 
   if (status === "submitted") {
-    Icon = <Loader2Icon className="size-4 animate-spin" />;
+    Icon = <Loader2Icon className="size-3 sm:size-4 animate-spin" />;
   } else if (status === "streaming") {
-    Icon = <SquareIcon className="size-4" />;
+    Icon = <SquareIcon className="size-3 sm:size-4" />;
   } else if (status === "error") {
-    Icon = <XIcon className="size-4" />;
+    Icon = <XIcon className="size-3 sm:size-4" />;
   }
 
   return (
     <Button
-      className={cn("gap-1.5 midday-btn midday-btn-primary", className)}
+      className={cn(
+        "gap-1 sm:gap-1.5 midday-btn midday-btn-primary midday-transition-all hover-scale focus-ring-offset interactive",
+        className
+      )}
       size={size}
       type="submit"
       variant={variant}
