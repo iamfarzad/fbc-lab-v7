@@ -12,17 +12,24 @@ type LiveConnectOptions = {
  */
 export async function connectLive({ apiKey, model, config }: LiveConnectOptions) {
   const genAI = new GoogleGenAI({ apiKey })
-  const liveModel = model ?? 'gemini-2.5-flash-preview-native-audio-dialog'
+  const liveModel = model ?? 'gemini-2.5-flash-native-audio-preview-09-2025'
 
   const mergedConfig: Record<string, unknown> = {
-    responseModalities: [Modality.AUDIO, Modality.TEXT],
+    response_modalities: ["AUDIO"],
+    system_instruction: "You are a helpful assistant.",
     ...config,
   }
 
   const session = await genAI.live.connect({
     model: liveModel,
     ...mergedConfig,
-  } as any)
+    callbacks: {
+      onopen: () => console.log('Live API session opened'),
+      onmessage: (message: any) => console.log('Live API message received'),
+      onerror: (error: any) => console.error('Live API error:', error),
+      onclose: () => console.log('Live API session closed')
+    }
+  })
 
-  return session as any
+  return session
 }

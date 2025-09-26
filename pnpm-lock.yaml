@@ -33,8 +33,8 @@ importers:
         specifier: ^2.0.49
         version: 2.0.49(react@19.1.1)(zod@4.1.11)
       '@google/genai':
-        specifier: ^1.20.0
-        version: 1.20.0
+        specifier: ^1.21.0
+        version: 1.21.0
       '@nlux/react':
         specifier: ^2.17.1
         version: 2.17.1(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -579,8 +579,8 @@ packages:
     peerDependencies:
       postcss: ^8.0.0
 
-  '@google/genai@1.20.0':
-    resolution: {integrity: sha512-QdShxO9LX35jFogy3iKprQNqgKKveux4H2QjOnyIvyHRuGi6PHiz3fjNf8Y0VPY8o5V2fHqR2XqiSVoz7yZs0w==}
+  '@google/genai@1.21.0':
+    resolution: {integrity: sha512-k47DECR8BF9z7IJxQd3reKuH2eUnOH5NlJWSe+CKM6nbXx+wH3hmtWQxUQR9M8gzWW1EvFuRVgjQssEIreNZsw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.11.4
@@ -5891,7 +5891,7 @@ snapshots:
       postcss: 8.5.6
       purgecss: 7.0.2
 
-  '@google/genai@1.20.0':
+  '@google/genai@1.21.0':
     dependencies:
       google-auth-library: 9.15.1
       ws: 8.18.3
