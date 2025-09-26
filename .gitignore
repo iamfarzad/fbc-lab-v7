@@ -124,6 +124,10 @@ server.log
 .atom/
 .brackets.json
 
+# Cursor MCP configuration (contains sensitive tokens)
+.cursor/
+mcp.json
+
 # Local development
 .env.example
 .env.template
