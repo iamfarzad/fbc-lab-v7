@@ -7,6 +7,7 @@ import {
   requestNotRetryable,
   serviceOverloaded
 } from 'ai-retry/retryables';
+import { multimodalContextManager } from '@/src/core/context/multimodal-context';
 
 // Create a retryable model with proper fallback strategies
 const retryableModel = createRetryable({
@@ -74,12 +75,28 @@ export async function POST(req: Request) {
       );
     }
 
+    // Build enhanced system prompt with multimodal context
+    let systemPrompt = "You are F.B/c, an AI assistant for Farzad Bayat's website. You provide helpful, accurate, and engaging responses with real-time conversational capabilities."
+
+    // Add multimodal context if session ID is available
+    try {
+      const sessionId = body.sessionId || req.headers.get('x-session-id')
+      if (sessionId) {
+        const multimodalContext = await multimodalContextManager.prepareChatContext(sessionId, true, false)
+        if (multimodalContext.multimodalContext.hasRecentImages) {
+          systemPrompt += '\n\n' + multimodalContext.systemPrompt
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to load multimodal context for chat:', error)
+    }
+
     // Use the retryable model with generateText
     const result = await generateText({
       model: retryableModel,
       messages,
       temperature: 0.7,
-      system: "You are F.B/c, an AI assistant for Farzad Bayat's website. You provide helpful, accurate, and engaging responses with real-time conversational capabilities.",
+      system: systemPrompt,
     });
 
     return new Response(

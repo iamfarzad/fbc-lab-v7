@@ -345,6 +345,91 @@ export class MultimodalContextManager {
     return context
   }
 
+  // Enhanced method to get context for conversation
+  async getConversationContext(sessionId: string, includeRecentVisual: boolean = true, includeRecentAudio: boolean = true): Promise<{
+    conversationHistory: ConversationEntry[]
+    visualContext: VisualEntry[]
+    audioContext: AudioEntry[]
+    summary: {
+      totalMessages: number
+      modalitiesUsed: Modality[]
+      lastActivity: string
+      recentVisualAnalyses: number
+      recentAudioEntries: number
+    }
+  }> {
+    const context = await this.getOrCreateContext(sessionId)
+    if (!context) {
+      return {
+        conversationHistory: [],
+        visualContext: [],
+        audioContext: [],
+        summary: {
+          totalMessages: 0,
+          modalitiesUsed: [],
+          lastActivity: '',
+          recentVisualAnalyses: 0,
+          recentAudioEntries: 0
+        }
+      }
+    }
+
+    const recentVisual = includeRecentVisual ? context.visualContext.slice(-3) : []
+    const recentAudio = includeRecentAudio ? asAudioEntries(context.audioContext).slice(-3) : []
+
+    return {
+      conversationHistory: context.conversationHistory.slice(-10), // Last 10 messages
+      visualContext: recentVisual,
+      audioContext: recentAudio,
+      summary: {
+        totalMessages: context.conversationHistory.length,
+        modalitiesUsed: context.metadata.modalitiesUsed,
+        lastActivity: context.metadata.lastUpdated,
+        recentVisualAnalyses: recentVisual.length,
+        recentAudioEntries: recentAudio.length
+      }
+    }
+  }
+
+  // Method to prepare context for AI chat
+  async prepareChatContext(sessionId: string, includeVisual: boolean = true, includeAudio: boolean = false): Promise<{
+    systemPrompt: string
+    contextData: any
+    multimodalContext: {
+      hasRecentImages: boolean
+      hasRecentAudio: boolean
+      recentAnalyses: string[]
+    }
+  }> {
+    const context = await this.getConversationContext(sessionId, includeVisual, includeAudio)
+
+    // Build system prompt with multimodal context
+    let systemPrompt = "You are F.B/c AI, a helpful business assistant with multimodal capabilities."
+
+    if (context.summary.recentVisualAnalyses > 0 || context.summary.recentAudioEntries > 0) {
+      systemPrompt += "\n\nYou have access to recent multimodal context from this conversation:"
+    }
+
+    const multimodalContext = {
+      hasRecentImages: context.visualContext.length > 0,
+      hasRecentAudio: context.audioContext.length > 0,
+      recentAnalyses: context.visualContext.map(v => v.analysis).slice(-2) // Last 2 analyses
+    }
+
+    if (multimodalContext.hasRecentImages) {
+      systemPrompt += `\n\nRecent visual analyses (${context.visualContext.length} items):`
+      multimodalContext.recentAnalyses.forEach((analysis, i) => {
+        systemPrompt += `\n${i + 1}. ${analysis.substring(0, 200)}${analysis.length > 200 ? '...' : ''}`
+      })
+    }
+
+    return {
+      systemPrompt,
+      contextData: context,
+      multimodalContext
+    }
+  }
+
   private async saveContext(sessionId: string, context: MultimodalContext): Promise<void> {
     // Update memory only (like FB-c_labV2 approach)
     this.activeContexts.set(sessionId, context)

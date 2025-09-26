@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
+import { multimodalContextManager } from '@/src/core/context/multimodal-context'
+import { getContextSnapshot } from '@/src/core/context/context-manager'
 
 let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
 
@@ -85,18 +87,31 @@ Response style: Be concise, actionable, and data-driven.`
       systemPrompt += contextData
     }
 
-    // Add multimodal context
+    // Add multimodal context from conversation history
+    if (context?.sessionId) {
+      try {
+        const multimodalContext = await multimodalContextManager.prepareChatContext(context.sessionId, true, false)
+
+        if (multimodalContext.multimodalContext.hasRecentImages) {
+          systemPrompt += '\n\n' + multimodalContext.systemPrompt
+        }
+      } catch (error) {
+        console.warn('Failed to load multimodal context:', error)
+      }
+    }
+
+    // Add multimodal context from direct input
     if (context?.multimodalData) {
       let multimodalContext = '\n\nMULTIMODAL INPUT:\n'
-      
+
       if (context.multimodalData.audioData) {
         multimodalContext += `Audio input received (${context.multimodalData.audioData.length} bytes)\n`
       }
-      
+
       if (context.multimodalData.imageData) {
         multimodalContext += `Image input received (${context.multimodalData.imageData.length} bytes)\n`
       }
-      
+
       if (context.multimodalData.videoData) {
         multimodalContext += `Video input received\n`
       }
