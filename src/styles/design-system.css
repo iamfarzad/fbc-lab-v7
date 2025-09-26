@@ -22,7 +22,7 @@
   --border: 0 0% 75%; /* Silver #C0C0C0 */
   --input: 0 0% 75%; /* Silver #C0C0C0 */
   --ring: 210 13% 20%; /* Gunmetal dark #2C3539 */
-  --radius: 0.125rem; /* Sharp corners for monochrome aesthetic */
+  --radius: 0.125rem; /* Sharp corners */
 
   /* Chat specific colors - Monochrome Light */
   --chat-user-bg: 210 13% 20%; /* Gunmetal dark #2C3539 */
@@ -32,7 +32,7 @@
   --chat-assistant-border: 0 0% 75%; /* Silver #C0C0C0 */
 
   /* Typography */
-  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-mono: 'JetBrains Mono', monospace;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-serif: 'Crimson Text', Georgia, serif;
   --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -53,7 +53,7 @@
 /* Dark mode - Gunmetal background with silver text */
 .dark {
   /* Core Colors - Monochrome Dark */
-  --background: 210 13% 13%; /* Darker gunmetal #1C2326 */
+  --background: 210 13% 13%; /* Darker gunmetal */
   --foreground: 0 0% 90%; /* Silver light #E5E5E5 */
   --card: 210 13% 20%; /* Gunmetal #2C3539 */
   --card-foreground: 0 0% 90%; /* Silver light #E5E5E5 */
@@ -398,4 +398,16 @@ body {
 /* Container */
 .container {
   @apply mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* Add glassmorphism */
+.glass {
+  background: hsla(var(--background), 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid hsla(var(--border), 0.2);
+}
+
+/* Add gradient utility */
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
 }

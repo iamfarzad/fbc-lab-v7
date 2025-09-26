@@ -263,9 +263,22 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
 }
 
 export function resolveAssetPath(relativePath: string) {
-  const currentModuleUrl = import.meta.url
-  const currentFilePath = fileURLToPath(currentModuleUrl)
-  const currentDir = path.dirname(currentFilePath)
+  // Use __dirname in CommonJS environments (Jest) or compute it from import.meta.url in ESM
+  let currentDir: string
+  
+  if (typeof __dirname !== 'undefined') {
+    // CommonJS environment (Jest)
+    currentDir = __dirname
+  } else if (typeof import.meta !== 'undefined' && import.meta.url) {
+    // ESM environment
+    const currentModuleUrl = import.meta.url
+    const currentFilePath = fileURLToPath(currentModuleUrl)
+    currentDir = path.dirname(currentFilePath)
+  } else {
+    // Fallback
+    currentDir = process.cwd()
+  }
+  
   return path.resolve(currentDir, relativePath)
 }
 

@@ -1,8 +1,8 @@
 import { GoogleGenAI } from '@google/genai'
 import { GoogleGroundingProvider, GroundedAnswer } from './providers/search/google-grounding'
 import { streamPerplexity } from './providers/perplexity'
-import { recordCapabilityUsed } from '@/src/core/context/capabilities'
-import { supabaseService, createLeadSummary } from '@/src/core/supabase/client'
+import { recordCapabilityUsed } from '@/core/context/capabilities'
+import { supabaseService, createLeadSummary } from '@/core/supabase/client'
 import { finalizeLeadSession } from '../workflows/finalizeLeadSession'
 import type { LeadContext, CompanyContext, PersonContext } from '../context/context-types'
 
@@ -291,7 +291,22 @@ Return structured data only.`
         return null
       }
 
-      const researchData = JSON.parse(jsonMatch[0])
+      // Fix malformed JSON by ensuring all string values are properly quoted
+      let fixedJson = jsonMatch[0]
+      // Fix unquoted string values (e.g., "full": Farzadat -> "full": "Farzadat")
+      fixedJson = fixedJson.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=[,}])/g, ': "$1"')
+      // Fix unquoted string values with spaces (e.g., "full": Farzadat Bayat -> "full": "Farzadat Bayat")
+      fixedJson = fixedJson.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s]*)\s*(?=[,}])/g, ': "$1"')
+      
+      let researchData
+      try {
+        researchData = JSON.parse(fixedJson)
+      } catch (parseError) {
+        console.error('Failed to parse Perplexity JSON response:', parseError)
+        console.error('Original JSON:', jsonMatch[0])
+        console.error('Fixed JSON:', fixedJson)
+        return null
+      }
       const citationObjects = citations.map((uri) => ({ uri }))
 
       try {

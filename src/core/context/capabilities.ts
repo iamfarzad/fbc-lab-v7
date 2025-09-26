@@ -1,4 +1,4 @@
-import { supabase } from '@/src/core/supabase/server'
+import { supabase } from '@/core/supabase/server'
 
 /**
  * Records first-time capability usage for a session by calling the DB RPC
