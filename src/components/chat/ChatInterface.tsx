@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 // Import AI Elements components
 import {
@@ -662,7 +663,7 @@ export function ChatInterface({ id }: Props) {
   };
 
   return (
-    <>
+    <ErrorBoundary>
       {/* Chat Toggle Button */}
       <motion.div 
         className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50"
@@ -674,14 +675,14 @@ export function ChatInterface({ id }: Props) {
           data-chat-trigger
           aria-label={chatState.isOpen ? "Close chat" : "Open chat"}
           aria-expanded={chatState.isOpen}
-          className="h-12 w-12 sm:h-14 sm:w-14 midday-bg-primary midday-chat-user-text hover:bg-primary/90 shadow-lg relative touch-manipulation midday-transition midday-hover-lift focus-ring-offset interactive"
+          className="h-12 w-12 sm:h-14 sm:w-14 bg-black text-white hover:bg-gray-800 shadow-lg relative"
         >
           {chatState.isOpen ? (
             <X className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
           ) : (
             <>
-              <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
-              <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full animate-pulse bg-primary" aria-hidden="true"></div>
+              <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+              <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-[#FF6B35]"></div>
               <span className="sr-only">Unread messages</span>
             </>
           )}
@@ -738,7 +739,7 @@ export function ChatInterface({ id }: Props) {
                       F•B
                     </div>
                     <div className="space-y-0.5">
-                      <p className="text-sm font-semibold midday-font-sans">F.B/c Assistant</p>
+                      <p className="text-sm font-semibold font-mono">F.B/c Assistant</p>
                       <p className="text-xs text-muted-foreground midday-font-sans">Strategic AI guidance tailored to your session</p>
                     </div>
                   </div>
@@ -919,140 +920,142 @@ export function ChatInterface({ id }: Props) {
                 </div>
 
                 {/* Input Area */}
-                <div className="border-t border-border/60 midday-bg-card/80 safe-area-inset-bottom">
-                  <PromptInput
-                    className="mx-2 sm:mx-4 my-2 sm:my-4 flex flex-col gap-2 midday-rounded-3xl border border-border/60 midday-bg-background/95 px-3 pb-2 pt-3 midday-shadow-lg midday-shadow-md backdrop-blur"
-                    accept="image/*,.pdf"
-                    onSubmit={async (message, event) => {
-                      event.preventDefault();
+                <div className="border-t border-border bg-card safe-area-inset-bottom">
+                  <div className="flex items-center gap-2 p-4">
+                    <PromptInput
+                      className="mx-2 sm:mx-4 my-2 sm:my-4 flex flex-col gap-2 midday-rounded-3xl border border-border/60 midday-bg-background/95 px-3 pb-2 pt-3 midday-shadow-lg midday-shadow-md backdrop-blur"
+                      accept="image/*,.pdf"
+                      onSubmit={async (message, event) => {
+                        event.preventDefault();
 
-                      if (message.files && message.files.length > 0) {
-                        toast.info('File analysis is coming soon. The attachment was noted but not yet processed.');
-                      }
+                        if (message.files && message.files.length > 0) {
+                          toast.info('File analysis is coming soon. The attachment was noted but not yet processed.');
+                        }
 
-                      if (message.text) {
-                        await handleSendMessage(message.text);
-                      }
-                    }}
-                  >
-                    <PromptInputBody className="flex flex-col gap-2">
-                      <PromptInputAttachments className="px-2">
-                        {(attachment) => (
-                          <PromptInputAttachment key={attachment.id} data={attachment} />
-                        )}
-                      </PromptInputAttachments>
-
-                      <PromptInputTextarea
-                        className="midday-rounded-2xl bg-transparent px-2 sm:px-4 text-base sm:text-base leading-relaxed placeholder:text-muted-foreground/70 midday-font-sans"
-                        value={getInputDisplayValue()}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder={getPlaceholder()}
-                        disabled={isLoading || isListening}
-                        ref={inputRef}
-                      />
-
-                      {(isListening || voice.isSessionActive) && (voice.partialTranscript || voice.transcript) && (
-                        <div className="px-2 text-xs text-muted-foreground/80">
-                          <span className="font-medium text-muted-foreground">Voice preview:</span>{' '}
-                          {voice.partialTranscript || voice.transcript?.split('\n').slice(-1)[0]}
-                        </div>
-                      )}
-
-                      {voice.error && (
-                        <div className="px-2 text-xs text-destructive/80">
-                          {voice.error}
-                        </div>
-                      )}
-
-                      <PromptInputToolbar className="items-center px-2 pb-1 pt-0">
-                        <PromptInputTools className="gap-0.5 sm:gap-1.5">
-                          {/* Upload/Attachment button - moved to left */}
-                          <PromptInputActionMenu>
-                            <PromptInputActionMenuTrigger className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive border border-border/60 midday-bg-background" aria-label="Upload files">
-                              <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                            </PromptInputActionMenuTrigger>
-                            <PromptInputActionMenuContent align="start" className="midday-rounded-2xl border border-border/40 midday-bg-background/95 midday-shadow-lg midday-shadow-xl">
-                              <PromptInputActionAddAttachments label="Upload photos & files" />
-                              <PromptInputActionMenuItem
-                                onClick={() => toast.info('PDF summaries are on the roadmap. Stay tuned!')}
-                              >
-                                <FileText className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                                Generate summary (soon)
-                              </PromptInputActionMenuItem>
-                            </PromptInputActionMenuContent>
-                          </PromptInputActionMenu>
-
-                          {/* Voice button */}
-                          <PromptInputButton
-                            variant={(isListening || voice.isSessionActive) ? 'default' : 'ghost'}
-                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
-                            onClick={toggleVoice}
-                            disabled={!isVoiceSupported}
-                            aria-label={!isVoiceSupported ? 'Voice capture not supported in this browser' : (isListening || voice.isSessionActive) ? 'Stop voice conversation' : 'Start voice conversation'}
-                            title={!isVoiceSupported ? 'Voice capture not supported in this browser' : (isListening || voice.isSessionActive) ? 'Stop voice conversation' : 'Start voice conversation'}
-                          >
-                            {(isListening || voice.isSessionActive)
-                              ? <Mic className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                              : <MicOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
-                          </PromptInputButton>
-
-                          {/* Camera button */}
-                          <PromptInputButton
-                            variant={cameraState.isActive ? 'default' : 'ghost'}
-                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
-                            onClick={toggleCamera}
-                            aria-label={`${cameraState.isActive ? 'Disable' : 'Enable'} camera`}
-                            title={`${cameraState.isActive ? 'Disable' : 'Enable'} camera`}
-                          >
-                            {cameraState.isActive ? <Camera className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" /> : <CameraOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
-                          </PromptInputButton>
-
-                          {/* Screen share button */}
-                          <PromptInputButton
-                            variant={chatState.isScreenSharing ? 'default' : 'ghost'}
-                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
-                            onClick={toggleScreenShare}
-                            aria-label="Toggle screen share"
-                            title="Toggle screen share"
-                          >
-                            {chatState.isScreenSharing ? <Monitor className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" /> : <MonitorOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
-                          </PromptInputButton>
-
-                          {/* Camera switch button - only show when camera is active */}
-                          {cameraState.isActive && cameraState.availableDevices.length > 1 && (
-                            <PromptInputButton
-                              variant="ghost"
-                              className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
-                              onClick={switchCamera}
-                              aria-label="Switch camera"
-                              title="Switch camera"
-                            >
-                              <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                            </PromptInputButton>
+                        if (message.text) {
+                          await handleSendMessage(message.text);
+                        }
+                      }}
+                    >
+                      <PromptInputBody className="flex flex-col gap-2">
+                        <PromptInputAttachments className="px-2">
+                          {(attachment) => (
+                            <PromptInputAttachment key={attachment.id} data={attachment} />
                           )}
+                        </PromptInputAttachments>
 
-                          {/* Settings button */}
-                          <PromptInputButton
-                            variant={chatState.showSettings ? 'default' : 'ghost'}
-                            className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
-                            onClick={toggleSettings}
-                            aria-label="Chat settings"
-                            title="Chat settings"
-                          >
-                            <Settings className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
-                          </PromptInputButton>
-                        </PromptInputTools>
-
-                        <PromptInputSubmit
-                          className="h-8 w-8 sm:h-10 sm:w-10 midday-rounded-full midday-bg-primary midday-chat-user-text hover:bg-primary/90 midday-transition-colors hover-scale focus-ring-offset interactive"
-                          variant="ghost"
-                          status={isLoading ? 'submitted' : undefined}
-                          disabled={isLoading || !getInputDisplayValue().trim()}
-                          aria-label={isLoading ? 'Sending message...' : 'Send message'}
+                        <PromptInputTextarea
+                          className="midday-rounded-2xl bg-transparent px-2 sm:px-4 text-base sm:text-base leading-relaxed placeholder:text-muted-foreground/70 midday-font-sans"
+                          value={getInputDisplayValue()}
+                          onChange={(e) => setInputValue(e.target.value)}
+                          placeholder={getPlaceholder()}
+                          disabled={isLoading || isListening}
+                          ref={inputRef}
                         />
-                      </PromptInputToolbar>
-                    </PromptInputBody>
-                  </PromptInput>
+
+                        {(isListening || voice.isSessionActive) && (voice.partialTranscript || voice.transcript) && (
+                          <div className="px-2 text-xs text-muted-foreground/80">
+                            <span className="font-medium text-muted-foreground">Voice preview:</span>{' '}
+                            {voice.partialTranscript || voice.transcript?.split('\n').slice(-1)[0]}
+                          </div>
+                        )}
+
+                        {voice.error && (
+                          <div className="px-2 text-xs text-destructive/80">
+                            {voice.error}
+                          </div>
+                        )}
+
+                        <PromptInputToolbar className="items-center px-2 pb-1 pt-0">
+                          <PromptInputTools className="gap-0.5 sm:gap-1.5">
+                            {/* Upload/Attachment button - moved to left */}
+                            <PromptInputActionMenu>
+                              <PromptInputActionMenuTrigger className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive border border-border/60 midday-bg-background" aria-label="Upload files">
+                                <Plus className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                              </PromptInputActionMenuTrigger>
+                              <PromptInputActionMenuContent align="start" className="midday-rounded-2xl border border-border/40 midday-bg-background/95 midday-shadow-lg midday-shadow-xl">
+                                <PromptInputActionAddAttachments label="Upload photos & files" />
+                                <PromptInputActionMenuItem
+                                  onClick={() => toast.info('PDF summaries are on the roadmap. Stay tuned!')}
+                                >
+                                  <FileText className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                                  Generate summary (soon)
+                                </PromptInputActionMenuItem>
+                              </PromptInputActionMenuContent>
+                            </PromptInputActionMenu>
+
+                            {/* Voice button */}
+                            <PromptInputButton
+                              variant={(isListening || voice.isSessionActive) ? 'default' : 'ghost'}
+                              className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                              onClick={toggleVoice}
+                              disabled={!isVoiceSupported}
+                              aria-label={!isVoiceSupported ? 'Voice capture not supported in this browser' : (isListening || voice.isSessionActive) ? 'Stop voice conversation' : 'Start voice conversation'}
+                              title={!isVoiceSupported ? 'Voice capture not supported in this browser' : (isListening || voice.isSessionActive) ? 'Stop voice conversation' : 'Start voice conversation'}
+                            >
+                              {(isListening || voice.isSessionActive)
+                                ? <Mic className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                                : <MicOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
+                            </PromptInputButton>
+
+                            {/* Camera button */}
+                            <PromptInputButton
+                              variant={cameraState.isActive ? 'default' : 'ghost'}
+                              className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                              onClick={toggleCamera}
+                              aria-label={`${cameraState.isActive ? 'Disable' : 'Enable'} camera`}
+                              title={`${cameraState.isActive ? 'Disable' : 'Enable'} camera`}
+                            >
+                              {cameraState.isActive ? <Camera className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" /> : <CameraOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
+                            </PromptInputButton>
+
+                            {/* Screen share button */}
+                            <PromptInputButton
+                              variant={chatState.isScreenSharing ? 'default' : 'ghost'}
+                              className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                              onClick={toggleScreenShare}
+                              aria-label="Toggle screen share"
+                              title="Toggle screen share"
+                            >
+                              {chatState.isScreenSharing ? <Monitor className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" /> : <MonitorOff className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />}
+                            </PromptInputButton>
+
+                            {/* Camera switch button - only show when camera is active */}
+                            {cameraState.isActive && cameraState.availableDevices.length > 1 && (
+                              <PromptInputButton
+                                variant="ghost"
+                                className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                                onClick={switchCamera}
+                                aria-label="Switch camera"
+                                title="Switch camera"
+                              >
+                                <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                              </PromptInputButton>
+                            )}
+
+                            {/* Settings button */}
+                            <PromptInputButton
+                              variant={chatState.showSettings ? 'default' : 'ghost'}
+                              className="h-8 sm:h-9 midday-rounded-full px-2 sm:px-3 text-xs sm:text-sm midday-transition-colors hover-scale focus-ring-offset interactive"
+                              onClick={toggleSettings}
+                              aria-label="Chat settings"
+                              title="Chat settings"
+                            >
+                              <Settings className="h-3 w-3 sm:h-4 sm:w-4" aria-hidden="true" />
+                            </PromptInputButton>
+                          </PromptInputTools>
+
+                          <PromptInputSubmit
+                            className="h-8 w-8 sm:h-10 sm:w-10 midday-rounded-full midday-bg-primary midday-chat-user-text hover:bg-primary/90 midday-transition-colors hover-scale focus-ring-offset interactive"
+                            variant="ghost"
+                            status={isLoading ? 'submitted' : undefined}
+                            disabled={isLoading || !getInputDisplayValue().trim()}
+                            aria-label={isLoading ? 'Sending message...' : 'Send message'}
+                          />
+                        </PromptInputToolbar>
+                      </PromptInputBody>
+                    </PromptInput>
+                  </div>
                 </div>
               </div>
             )}
@@ -1076,6 +1079,6 @@ export function ChatInterface({ id }: Props) {
         open={isMeetingOpen}
         onClose={() => setIsMeetingOpen(false)}
       />
-    </>
+    </ErrorBoundary>
   );
 }

@@ -149,13 +149,17 @@ export function EnhancedMessage({
 
   const renderReasoning = () => {
     if (!config?.showReasoning || !message.metadata?.reasoning) return null;
-
     return (
-      <div className="rounded-lg border border-border/40 bg-muted/30 px-4 py-3 text-[13px] leading-relaxed text-muted-foreground/80 backdrop-blur-sm shadow-sm">
-        <p className="font-medium text-xs uppercase tracking-[0.2em] text-muted-foreground/60 font-mono">Thinking</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground/70 font-sans">
+      <div className="mt-3">
+        <h4 className="text-sm font-bold text-gray-700 mb-2">**Thinking:**</h4>
+        <p className="text-sm text-gray-600 whitespace-pre-wrap">
           {message.metadata.reasoning}
         </p>
+        {message.metadata.reasoningDuration && (
+          <Badge className="bg-[#FF6B35] text-white text-xs px-2 py-1 rounded-full mt-2">
+            {message.metadata.reasoningDuration}ms
+          </Badge>
+        )}
       </div>
     );
   };
@@ -354,18 +358,20 @@ export function EnhancedMessage({
             </div>
 
             <div className={cn(
-              'message-bubble interactive',
-              isUser ? 'message-user' : 'message-assistant'
+              'message-bubble interactive glass gradient-bg', // Add new classes
+              isUser ? 'bg-[#FF6B35] text-white' : 'bg-[#F5F5F5] text-gray-900'
             )}>
-              <div className="space-y-2 sm:space-y-3">
-                <div className="whitespace-pre-wrap font-mono text-sm sm:text-sm" tabIndex={0}>
-                  {message.content}
+              <motion.div whileHover={{ scale: 1.02 }}>
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="whitespace-pre-wrap font-mono text-sm sm:text-sm" tabIndex={0}>
+                    {message.content}
+                  </div>
+                  {renderReasoning()}
+                  {renderCodeBlocks()}
+                  {renderSources()}
+                  {renderAttachments()}
                 </div>
-                {renderReasoning()}
-                {renderCodeBlocks()}
-                {renderSources()}
-                {renderAttachments()}
-              </div>
+              </motion.div>
             </div>
 
             {renderReactions()}

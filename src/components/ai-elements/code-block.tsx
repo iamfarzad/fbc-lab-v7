@@ -10,6 +10,7 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Badge } from "@/components/ui/badge";
 
 type CodeBlockContextType = {
   code: string;
@@ -43,6 +44,11 @@ export const CodeBlock = ({
       {...props}
     >
       <div className="relative">
+        <div className="mb-2">
+          <Badge className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
+            {language.toUpperCase()}
+          </Badge>
+        </div>
         <SyntaxHighlighter
           className="overflow-hidden dark:hidden"
           codeTagProps={{
