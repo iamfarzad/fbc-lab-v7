@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Functionality Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .connected { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .disconnected { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .message { margin: 5px 0; padding: 5px; background: #f8f9fa; border-radius: 3px; }
+        button { margin: 5px; padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <h1>Voice Functionality Test</h1>
+    <div id="connection-status" class="status disconnected">Disconnected</div>
+    <div id="session-status">No session</div>
+    <div>
+        <button id="connect-btn" onclick="connect()">Connect WebSocket</button>
+        <button id="start-session-btn" onclick="startSession()" disabled>Start Voice Session</button>
+        <button id="stop-session-btn" onclick="stopSession()" disabled>Stop Voice Session</button>
+    </div>
+    <div id="messages"></div>
+
+    <script>
+        let ws = null;
+        let sessionId = null;
+        let connectionStatus = document.getElementById('connection-status');
+        let sessionStatus = document.getElementById('session-status');
+        let connectBtn = document.getElementById('connect-btn');
+        let startSessionBtn = document.getElementById('start-session-btn');
+        let stopSessionBtn = document.getElementById('stop-session-btn');
+        let messages = document.getElementById('messages');
+
+        function log(message) {
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function connect() {
+            if (ws) {
+                ws.close();
+                return;
+            }
+
+            connectionStatus.textContent = 'Connecting...';
+            connectionStatus.className = 'status disconnected';
+
+            ws = new WebSocket('ws://localhost:3002');
+
+            ws.onopen = function() {
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.className = 'status connected';
+                connectBtn.textContent = 'Disconnect';
+                startSessionBtn.disabled = false;
+                log('WebSocket connected');
+            };
+
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    log('Received: ' + JSON.stringify(data));
+
+                    if (data.type === 'connected') {
+                        sessionId = data.payload.connectionId;
+                        log('Session ID: ' + sessionId);
+                    } else if (data.type === 'session_started') {
+                        sessionStatus.textContent = 'Voice session active';
+                        startSessionBtn.disabled = true;
+                        stopSessionBtn.disabled = false;
+                        log('Voice session started');
+                    } else if (data.type === 'session_closed') {
+                        sessionStatus.textContent = 'Voice session closed';
+                        startSessionBtn.disabled = false;
+                        stopSessionBtn.disabled = true;
+                        log('Voice session closed');
+                    } else if (data.type === 'text') {
+                        log('AI Response: ' + data.payload.content);
+                    }
+                } catch (e) {
+                    log('Error parsing message: ' + e.message);
+                }
+            };
+
+            ws.onerror = function(error) {
+                connectionStatus.textContent = 'Error';
+                connectionStatus.className = 'status disconnected';
+                log('WebSocket error: ' + error);
+            };
+
+            ws.onclose = function(event) {
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.className = 'status disconnected';
+                connectBtn.textContent = 'Connect';
+                startSessionBtn.disabled = true;
+                stopSessionBtn.disabled = true;
+                sessionStatus.textContent = 'No session';
+                log('WebSocket closed: ' + event.code);
+            };
+        }
+
+        function startSession() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket not connected');
+                return;
+            }
+
+            log('Starting voice session...');
+            ws.send(JSON.stringify({
+                type: 'start',
+                payload: {
+                    languageCode: 'en-US',
+                    voiceName: 'Puck'
+                }
+            }));
+        }
+
+        function stopSession() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket not connected');
+                return;
+            }
+
+            log('Stopping voice session...');
+            ws.send(JSON.stringify({
+                type: 'TURN_COMPLETE'
+            }));
+
+            sessionStatus.textContent = 'Voice session stopping...';
+        }
+    </script>
+</body>
+</html>
