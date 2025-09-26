@@ -10,7 +10,11 @@
     "build": "tsc -p tsconfig.json",
     "deploy": "sh deploy-fly.sh",
     "logs": "fly logs",
-    "status": "fly status"
+    "status": "fly status",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "dependencies": {
     "@google/genai": "^1.21.0",
@@ -20,9 +24,14 @@
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.19.9",
+    "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.8",
     "@types/ws": "^8.18.1",
+    "jest": "^30.1.3",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.4",
     "typescript": "^5.9.2"
   },
   "engines": {
