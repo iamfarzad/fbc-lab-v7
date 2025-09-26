@@ -96,6 +96,30 @@ export const fileUploadSchema = z.object({
 })
 
 // ============================================================================
+// TOOL SERVICE VALIDATION
+// ============================================================================
+
+export const WebcamCaptureSchema = z.object({
+  image: z.string().min(1, 'Image data is required'),
+  type: z.enum(['webcam', 'upload']).default('webcam'),
+  metadata: z.object({
+    width: z.number().optional(),
+    height: z.number().optional(),
+    format: z.string().optional()
+  }).optional()
+})
+
+export const ScreenShareSchema = z.object({
+  image: z.string().min(1, 'Image data is required'),
+  type: z.enum(['screen', 'document', 'window']).default('screen'),
+  metadata: z.object({
+    width: z.number().optional(),
+    height: z.number().optional(),
+    format: z.string().optional()
+  }).optional()
+})
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
