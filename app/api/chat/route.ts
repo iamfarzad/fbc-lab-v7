@@ -1,27 +1,90 @@
-import { createRetryableGeminiStream } from '@/core/ai/retry-model';
-import { streamText } from 'ai';
+import { google } from '@ai-sdk/google';
+import { generateText } from 'ai';
+import { createRetryable } from 'ai-retry';
+import {
+  contentFilterTriggered,
+  requestTimeout,
+  requestNotRetryable,
+  serviceOverloaded
+} from 'ai-retry/retryables';
+
+// Create a retryable model with proper fallback strategies
+const retryableModel = createRetryable({
+  // Primary model - most capable
+  model: google('gemini-2.5-flash'),
+  
+  // Retry strategies with fallback models
+  retries: [
+    // Handle rate limiting with a faster model
+    serviceOverloaded(google('gemini-1.5-flash')),
+    
+    // Handle content filtering with a different model
+    contentFilterTriggered(google('gemini-1.5-pro')),
+    
+    // Handle timeouts with a more reliable model
+    requestTimeout(google('gemini-1.5-pro')),
+    
+    // Handle other retryable errors
+    requestNotRetryable(google('gemini-1.5-flash')),
+    
+    // Final fallback to most available model
+    google('gemini-1.5-flash')
+  ]
+});
 
 export async function POST(req: Request) {
   try {
-    const { messages } = await req.json();
+    const body = await req.json();
+    let messages;
 
-    // Use retryable Gemini model with automatic fallbacks
-    const result = await streamText({
-      model: createRetryableGeminiStream(),
+    // Handle both formats: single message or messages array
+    if (body.message) {
+      // Convert single message to messages array format
+      messages = [
+        {
+          role: 'user',
+          content: body.message
+        }
+      ];
+    } else if (body.messages && Array.isArray(body.messages)) {
+      // Use existing messages array
+      messages = body.messages;
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request: message or messages array required' }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Use the retryable model with generateText
+    const result = await generateText({
+      model: retryableModel,
       messages,
       temperature: 0.7,
       system: "You are F.B/c, an AI assistant for Farzad Bayat's website. You provide helpful, accurate, and engaging responses with real-time conversational capabilities.",
     });
 
-    return result.toTextStreamResponse();
+    return new Response(
+      JSON.stringify({ 
+        response: result.text,
+        usage: result.usage 
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
 
   } catch (error) {
     // The retry wrapper handles fallbacks automatically, so we just log the error
     console.error('Error in Gemini chat route (retry wrapper will handle fallbacks):', error);
     return new Response(
       JSON.stringify({ error: 'Failed to generate response' }),
-      { 
-        status: 500, 
+      {
+        status: 500,
         headers: { 'Content-Type': 'application/json' }
       }
     );

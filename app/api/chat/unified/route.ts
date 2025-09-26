@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
+import { google } from '@ai-sdk/google'
 
 let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
 
@@ -111,9 +112,12 @@ Response style: Be concise, actionable, and data-driven.`
 
     // Handle streaming vs non-streaming
     if (stream !== false) {
+      // For streaming, use direct Google model (ai-retry doesn't support streaming)
+      const streamingModel = google('gemini-1.5-flash')
+      
       // Streaming response using AI SDK
       const result = await streamText({
-        model,
+        model: streamingModel,
         system: systemPrompt,
         messages: aiMessages,
         temperature: 0.7,
