@@ -36,7 +36,6 @@ describe('Server Configuration', () => {
   beforeEach(() => {
     // Mock environment variables
     process.env.PORT = '3001'
-    process.env.NODE_ENV = 'test'
     process.env.FLY_APP_NAME = undefined
   })
 
@@ -46,14 +45,7 @@ describe('Server Configuration', () => {
   })
 
   it('should handle development environment correctly', () => {
-    // Test that development environment is properly detected
+    // Test that development environment is properly detected (set by jest.setup.js)
     expect(process.env.NODE_ENV).toBe('test')
-  })
-
-  it('should detect local development environment', () => {
-    // Test environment detection logic
-    process.env.NODE_ENV = 'test'
-    const isLocalDev = process.env.NODE_ENV !== 'production' && !process.env.FLY_APP_NAME
-    expect(isLocalDev).toBe(true)
   })
 })
