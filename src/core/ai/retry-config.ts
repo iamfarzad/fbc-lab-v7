@@ -16,16 +16,16 @@ export const RETRY_CONFIG = {
   models: {
     // Primary models (most capable)
     primary: 'gemini-2.5-flash',
-    primaryStream: 'gemini-1.5-flash',
-    primaryReliable: 'gemini-1.5-pro',
+    primaryStream: 'gemini-2.5-flash',
+    primaryReliable: 'gemini-2.5-pro',
     
     // Fallback models (more available)
-    fallback: 'gemini-1.5-flash',
-    fallbackFast: 'gemini-1.5-flash-8b',
-    fallbackReliable: 'gemini-1.5-flash',
+    fallback: 'gemini-2.5-flash',
+    fallbackFast: 'gemini-2.0-flash',
+    fallbackReliable: 'gemini-2.5-flash',
     
     // Final fallback (most available)
-    final: 'gemini-1.5-flash',
+    final: 'gemini-2.5-flash',
   },
   
   // Retry behavior

@@ -30,17 +30,17 @@ export function selectModelForFeature(
     // Fallback to simple selection
     if (estimatedTokens > 8000) {
       return {
-        model: 'gemini-1.5-pro',
+        model: 'gemini-2.5-pro',
         reason: 'High token requirement'
       }
     } else if (estimatedTokens > 4000) {
       return {
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         reason: 'Medium token requirement'
       }
     } else {
       return {
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         reason: 'Standard token requirement'
       }
     }

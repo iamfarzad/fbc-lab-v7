@@ -19,16 +19,16 @@ export interface ModelConfig {
 }
 
 export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
-  'gemini-1.5-flash': {
-    name: 'gemini-1.5-flash',
+  'gemini-2.5-flash': {
+    name: 'gemini-2.5-flash',
     contextWindow: 1048576,
     maxOutputTokens: 8192,
     inputCostPerToken: 0.000000075, // $0.075 per 1M tokens
     outputCostPerToken: 0.0000003, // $0.3 per 1M tokens
     capabilities: ['chat', 'image_analysis', 'screenshot_analysis', 'document_analysis', 'voice_transcription']
   },
-  'gemini-1.5-pro': {
-    name: 'gemini-1.5-pro',
+  'gemini-2.5-pro': {
+    name: 'gemini-2.5-pro',
     contextWindow: 2097152,
     maxOutputTokens: 8192,
     inputCostPerToken: 0.00000125, // $1.25 per 1M tokens

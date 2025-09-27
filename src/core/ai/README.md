@@ -29,17 +29,17 @@ const result = await generateText({
 
 ### `createRetryableGemini()`
 - **Primary**: `gemini-2.5-flash` (most capable)
-- **Fallbacks**: `gemini-1.5-flash` → `gemini-1.5-pro`
+- **Fallbacks**: `gemini-2.0-flash` → `gemini-2.5-pro`
 - **Use for**: General purpose requests
 
 ### `createRetryableGeminiStream()`
-- **Primary**: `gemini-1.5-flash` (fastest)
-- **Fallbacks**: `gemini-1.5-flash-8b` → `gemini-1.5-flash`
+- **Primary**: `gemini-2.5-flash` (fastest)
+- **Fallbacks**: `gemini-2.0-flash` → `gemini-2.5-flash`
 - **Use for**: Streaming responses
 
 ### `createRetryableGeminiReliable()`
-- **Primary**: `gemini-1.5-pro` (most reliable)
-- **Fallbacks**: `gemini-1.5-flash` → `gemini-2.5-flash`
+- **Primary**: `gemini-2.5-pro` (most reliable)
+- **Fallbacks**: `gemini-2.5-flash` → `gemini-2.0-flash`
 - **Use for**: Critical requests
 
 ## 🛠️ **Retry Conditions**
