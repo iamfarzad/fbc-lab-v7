@@ -17,19 +17,19 @@ const retryableModel = createRetryable({
   // Retry strategies with fallback models
   retries: [
     // Handle rate limiting with a faster model
-    serviceOverloaded(google('gemini-1.5-flash')),
+    serviceOverloaded(google('gemini-2.0-flash')),
     
     // Handle content filtering with a different model
-    contentFilterTriggered(google('gemini-1.5-pro')),
+    contentFilterTriggered(google('gemini-2.5-pro')),
     
     // Handle timeouts with a more reliable model
-    requestTimeout(google('gemini-1.5-pro')),
+    requestTimeout(google('gemini-2.5-pro')),
     
     // Handle other retryable errors
-    requestNotRetryable(google('gemini-1.5-flash')),
+    requestNotRetryable(google('gemini-2.0-flash')),
     
     // Final fallback to most available model
-    google('gemini-1.5-flash')
+    google('gemini-2.0-flash')
   ]
 });
 

@@ -1,0 +1,368 @@
+{
+  "timestamp": "2025-09-27T10:46:57.814Z",
+  "duration": 13669,
+  "totalTests": 60,
+  "passedTests": 54,
+  "failedTests": 6,
+  "successRate": "90.0",
+  "results": [
+    {
+      "test": "WebSocket - Live Server (port 3001)",
+      "details": "Connected successfully",
+      "timestamp": "2025-09-27T10:46:44.046Z"
+    },
+    {
+      "test": "WebSocket - WebRTC Signaling (port 3002)",
+      "details": "Connected successfully",
+      "timestamp": "2025-09-27T10:46:44.148Z"
+    },
+    {
+      "test": "React Analysis - ContactSection.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.269Z"
+    },
+    {
+      "test": "React Analysis - Navigation.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.271Z"
+    },
+    {
+      "test": "React Analysis - ThemeSwitcher.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.272Z"
+    },
+    {
+      "test": "React Analysis - AdminDashboard.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.272Z"
+    },
+    {
+      "test": "React Analysis - branch.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.272Z"
+    },
+    {
+      "test": "React Analysis - code-block.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.273Z"
+    },
+    {
+      "test": "React Analysis - conversation.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.273Z"
+    },
+    {
+      "test": "React Analysis - enhanced-message.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.273Z"
+    },
+    {
+      "test": "React Analysis - inline-citation.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.274Z"
+    },
+    {
+      "test": "React Analysis - prompt-input.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.274Z"
+    },
+    {
+      "test": "React Analysis - reasoning.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.274Z"
+    },
+    {
+      "test": "React Analysis - tool.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.275Z"
+    },
+    {
+      "test": "React Analysis - web-preview.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.275Z"
+    },
+    {
+      "test": "React Analysis - ChatInterface.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.278Z"
+    },
+    {
+      "test": "React Analysis - MeetingOverlay.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.279Z"
+    },
+    {
+      "test": "React Analysis - page-shell.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.279Z"
+    },
+    {
+      "test": "React Analysis - avatar.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.279Z"
+    },
+    {
+      "test": "React Analysis - badge.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.280Z"
+    },
+    {
+      "test": "React Analysis - button.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.280Z"
+    },
+    {
+      "test": "React Analysis - card.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.280Z"
+    },
+    {
+      "test": "React Analysis - carousel.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.281Z"
+    },
+    {
+      "test": "React Analysis - dropdown-menu.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.281Z"
+    },
+    {
+      "test": "React Analysis - error-boundary.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.281Z"
+    },
+    {
+      "test": "React Analysis - hover-card.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.281Z"
+    },
+    {
+      "test": "React Analysis - input.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.281Z"
+    },
+    {
+      "test": "React Analysis - progress.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.282Z"
+    },
+    {
+      "test": "React Analysis - scroll-area.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.282Z"
+    },
+    {
+      "test": "React Analysis - select.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.282Z"
+    },
+    {
+      "test": "React Analysis - tabs.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.282Z"
+    },
+    {
+      "test": "React Analysis - textarea.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.282Z"
+    },
+    {
+      "test": "React Analysis - tooltip.tsx",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.282Z"
+    },
+    {
+      "test": "React Analysis - capability-registry.ts",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.283Z"
+    },
+    {
+      "test": "React Analysis - useAIElements.ts",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.283Z"
+    },
+    {
+      "test": "React Analysis - useConversationalIntelligence.ts",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.283Z"
+    },
+    {
+      "test": "React Analysis - useUnifiedChat.ts",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.284Z"
+    },
+    {
+      "test": "React Analysis - useWebSocketVoice.ts",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.287Z"
+    },
+    {
+      "test": "React Analysis - run-tests.ts",
+      "passed": false,
+      "details": "Pattern /useState.*setState.*useState.*setState/gs: 1 occurrences, Pattern /componentDidUpdate.*setState/g: 1 occurrences, Pattern /shouldComponentUpdate.*true/g: 1 occurrences",
+      "timestamp": "2025-09-27T10:46:44.289Z"
+    },
+    {
+      "test": "React Analysis - test-config.ts",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.290Z"
+    },
+    {
+      "test": "React Analysis - chat-enhanced.ts",
+      "passed": true,
+      "details": "No infinite loop patterns detected",
+      "timestamp": "2025-09-27T10:46:44.291Z"
+    },
+    {
+      "test": "API - POST /api/chat/unified",
+      "passed": false,
+      "details": "Status: 500",
+      "timestamp": "2025-09-27T10:46:44.760Z"
+    },
+    {
+      "test": "API - GET /api/intelligence/context",
+      "passed": true,
+      "details": "Status: 400",
+      "timestamp": "2025-09-27T10:46:45.530Z"
+    },
+    {
+      "test": "API - POST /api/intelligence/intent",
+      "passed": true,
+      "details": "Status: 400",
+      "timestamp": "2025-09-27T10:46:45.652Z"
+    },
+    {
+      "test": "API - GET /api/admin/stats",
+      "passed": true,
+      "details": "Status: 401",
+      "timestamp": "2025-09-27T10:46:45.703Z"
+    },
+    {
+      "test": "Performance - AnalyticsDashboard.tsx",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.746Z"
+    },
+    {
+      "test": "Performance - LazyComponents.tsx",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.746Z"
+    },
+    {
+      "test": "Performance - WorkshopsSection.tsx",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.746Z"
+    },
+    {
+      "test": "Performance - AdminDashboard.tsx",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.747Z"
+    },
+    {
+      "test": "Performance - error-boundary.tsx",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.747Z"
+    },
+    {
+      "test": "Performance - retry-model.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.747Z"
+    },
+    {
+      "test": "Performance - error-handler.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.748Z"
+    },
+    {
+      "test": "Performance - multimodal-context.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.748Z"
+    },
+    {
+      "test": "Performance - admin.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.748Z"
+    },
+    {
+      "test": "Performance - run-tests.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.748Z"
+    },
+    {
+      "test": "Performance - test-config.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-27T10:46:45.748Z"
+    },
+    {
+      "test": "Performance - Page Load",
+      "passed": false,
+      "details": "Load time: 4443ms",
+      "timestamp": "2025-09-27T10:46:50.191Z"
+    },
+    {
+      "test": "Error Scenario - Invalid API Endpoint",
+      "passed": true,
+      "details": "Handled correctly",
+      "timestamp": "2025-09-27T10:46:57.280Z"
+    },
+    {
+      "test": "Error Scenario - WebSocket Connection Failure",
+      "passed": true,
+      "details": "Handled correctly",
+      "timestamp": "2025-09-27T10:46:57.282Z"
+    },
+    {
+      "test": "Error Scenario - Rate Limiting",
+      "passed": false,
+      "details": "Not handled properly",
+      "timestamp": "2025-09-27T10:46:57.660Z"
+    }
+  ]
+}
