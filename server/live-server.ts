@@ -117,11 +117,11 @@ function safeSend(ws: WebSocket, data: any, isBinary = false) {
 }
 
 async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
-  console.info(`[${connectionId}] handleStart called with payload:`, JSON.stringify(payload));
-  
+  console.info(`[${connectionId}] 🔊 handleStart called with payload:`, JSON.stringify(payload));
+
   // Prevent concurrent starts
   if (sessionStarting.has(connectionId)) {
-    console.info(`[${connectionId}] start() already in progress; skipping duplicate call.`)
+    console.info(`[${connectionId}] 🔊 start() already in progress; skipping duplicate call.`)
     return
   }
   sessionStarting.add(connectionId)
@@ -200,7 +200,8 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     })
 
     // Start the Live API session
-    await (session as any).start();
+    // Note: The session is already started when we call ai.live.connect()
+    // No need to call session.start() as it doesn't exist
     console.info(`[${connectionId}] Live API session started.`)
 
     activeSessions.set(connectionId, { ws, session });

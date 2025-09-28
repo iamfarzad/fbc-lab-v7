@@ -1,138 +1,121 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Voice Functionality Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chat Test</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
-        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
-        .connected { background-color: #d4edda; border: 1px solid #c3e6cb; }
-        .disconnected { background-color: #f8d7da; border: 1px solid #f5c6cb; }
-        .message { margin: 5px 0; padding: 5px; background: #f8f9fa; border-radius: 3px; }
-        button { margin: 5px; padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #0056b3; }
-        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .error { background-color: #fff3cd; color: #856404; }
+        button { margin: 5px; padding: 10px 15px; cursor: pointer; }
+        #log { height: 300px; overflow-y: scroll; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; }
     </style>
 </head>
 <body>
-    <h1>Voice Functionality Test</h1>
-    <div id="connection-status" class="status disconnected">Disconnected</div>
-    <div id="session-status">No session</div>
+    <h1>Voice Chat WebSocket Test</h1>
     <div>
-        <button id="connect-btn" onclick="connect()">Connect WebSocket</button>
-        <button id="start-session-btn" onclick="startSession()" disabled>Start Voice Session</button>
-        <button id="stop-session-btn" onclick="stopSession()" disabled>Stop Voice Session</button>
+        <button onclick="testConnection()">Test Connection</button>
+        <button onclick="testSessionStart()">Test Session Start</button>
+        <button onclick="clearLog()">Clear Log</button>
     </div>
-    <div id="messages"></div>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div id="log"></div>
 
     <script>
+        const WS_URL = 'ws://localhost:3001';
         let ws = null;
-        let sessionId = null;
-        let connectionStatus = document.getElementById('connection-status');
-        let sessionStatus = document.getElementById('session-status');
-        let connectBtn = document.getElementById('connect-btn');
-        let startSessionBtn = document.getElementById('start-session-btn');
-        let stopSessionBtn = document.getElementById('stop-session-btn');
-        let messages = document.getElementById('messages');
 
         function log(message) {
-            const div = document.createElement('div');
-            div.className = 'message';
-            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
         }
 
-        function connect() {
+        function updateStatus(status, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function testConnection() {
+            log('🔍 Testing WebSocket connection...');
+
             if (ws) {
                 ws.close();
-                return;
             }
 
-            connectionStatus.textContent = 'Connecting...';
-            connectionStatus.className = 'status disconnected';
+            try {
+                ws = new WebSocket(WS_URL);
 
-            ws = new WebSocket('ws://localhost:3002');
+                ws.onopen = () => {
+                    log('✅ WebSocket connected successfully');
+                    updateStatus('Connected', 'connected');
+                };
 
-            ws.onopen = function() {
-                connectionStatus.textContent = 'Connected';
-                connectionStatus.className = 'status connected';
-                connectBtn.textContent = 'Disconnect';
-                startSessionBtn.disabled = false;
-                log('WebSocket connected');
-            };
-
-            ws.onmessage = function(event) {
-                try {
-                    const data = JSON.parse(event.data);
-                    log('Received: ' + JSON.stringify(data));
-
-                    if (data.type === 'connected') {
-                        sessionId = data.payload.connectionId;
-                        log('Session ID: ' + sessionId);
-                    } else if (data.type === 'session_started') {
-                        sessionStatus.textContent = 'Voice session active';
-                        startSessionBtn.disabled = true;
-                        stopSessionBtn.disabled = false;
-                        log('Voice session started');
-                    } else if (data.type === 'session_closed') {
-                        sessionStatus.textContent = 'Voice session closed';
-                        startSessionBtn.disabled = false;
-                        stopSessionBtn.disabled = true;
-                        log('Voice session closed');
-                    } else if (data.type === 'text') {
-                        log('AI Response: ' + data.payload.content);
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`📨 Received: ${JSON.stringify(data)}`);
+                    } catch (e) {
+                        log(`📨 Raw message: ${event.data}`);
                     }
-                } catch (e) {
-                    log('Error parsing message: ' + e.message);
-                }
-            };
+                };
 
-            ws.onerror = function(error) {
-                connectionStatus.textContent = 'Error';
-                connectionStatus.className = 'status disconnected';
-                log('WebSocket error: ' + error);
-            };
+                ws.onerror = (error) => {
+                    log(`❌ WebSocket error: ${error}`);
+                    updateStatus('Error', 'error');
+                };
 
-            ws.onclose = function(event) {
-                connectionStatus.textContent = 'Disconnected';
-                connectionStatus.className = 'status disconnected';
-                connectBtn.textContent = 'Connect';
-                startSessionBtn.disabled = true;
-                stopSessionBtn.disabled = true;
-                sessionStatus.textContent = 'No session';
-                log('WebSocket closed: ' + event.code);
-            };
+                ws.onclose = (event) => {
+                    log(`🔌 WebSocket closed: ${event.code} - ${event.reason}`);
+                    updateStatus('Disconnected', 'disconnected');
+                    ws = null;
+                };
+
+            } catch (error) {
+                log(`❌ Failed to create WebSocket: ${error.message}`);
+                updateStatus('Error', 'error');
+            }
         }
 
-        function startSession() {
+        function testSessionStart() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
-                log('WebSocket not connected');
+                log('❌ WebSocket not connected. Testing connection first...');
+                testConnection();
+                setTimeout(() => testSessionStart(), 1000);
                 return;
             }
 
-            log('Starting voice session...');
-            ws.send(JSON.stringify({
+            log('🚀 Testing session start...');
+            const message = {
                 type: 'start',
                 payload: {
                     languageCode: 'en-US',
                     voiceName: 'Puck'
                 }
-            }));
+            };
+
+            ws.send(JSON.stringify(message));
+            log(`📤 Sent: ${JSON.stringify(message)}`);
         }
 
-        function stopSession() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
-                log('WebSocket not connected');
-                return;
-            }
-
-            log('Stopping voice session...');
-            ws.send(JSON.stringify({
-                type: 'TURN_COMPLETE'
-            }));
-
-            sessionStatus.textContent = 'Voice session stopping...';
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
         }
+
+        // Auto-test on page load
+        window.onload = () => {
+            log('🔧 Voice Chat Test Page Loaded');
+            log(`🔗 WebSocket URL: ${WS_URL}`);
+            setTimeout(testConnection, 1000);
+        };
     </script>
 </body>
 </html>

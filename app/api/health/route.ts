@@ -1,7 +1,10 @@
-import { NextRequest } from 'next/server';
-import { createHealthCheckHandler } from '@/src/lib/api-middleware';
+import { NextResponse } from 'next/server'
 
-// Health check endpoint for monitoring system status
-export async function GET(request: NextRequest) {
-  return createHealthCheckHandler();
+export async function GET() {
+  return NextResponse.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    version: process.env.npm_package_version || '1.0.0'
+  })
 }

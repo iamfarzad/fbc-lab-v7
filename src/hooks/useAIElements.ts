@@ -56,8 +56,7 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
     }
   });
 
-  const elementsRef = useRef(elements);
-  elementsRef.current = elements;
+  // Removed problematic ref pattern that could cause infinite loops
 
   // Register AI elements
   const registerElement = useCallback((element: AIBaseElement) => {
@@ -75,8 +74,10 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
 
   // Get element by ID
   const getElement = useCallback((elementId: string): AIBaseElement | undefined => {
-    return elementsRef.current.get(elementId);
-  }, []);
+    // Use elements state directly instead of ref to prevent infinite loops
+    const currentElements = new Map(elements);
+    return currentElements.get(elementId);
+  }, [elements]);
 
   // Extract AI elements from message content
   const extractElements = useCallback((content: string): ExtractedElements => {

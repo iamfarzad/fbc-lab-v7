@@ -288,16 +288,33 @@ Return structured data only.`
 
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
+        console.error('No JSON found in Perplexity response')
         return null
       }
 
-      // Fix malformed JSON by ensuring all string values are properly quoted
+      // Enhanced JSON cleaning for Perplexity responses
       let fixedJson = jsonMatch[0]
+
+      // Remove any trailing commas before closing braces/brackets
+      fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1')
+
       // Fix unquoted string values (e.g., "full": Farzadat -> "full": "Farzadat")
       fixedJson = fixedJson.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=[,}])/g, ': "$1"')
-      // Fix unquoted string values with spaces (e.g., "full": Farzadat Bayat -> "full": "Farzadat Bayat")
-      fixedJson = fixedJson.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s]*)\s*(?=[,}])/g, ': "$1"')
-      
+
+      // Fix unquoted string values with spaces and special characters
+      fixedJson = fixedJson.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s&\-\.,\(\)]*)\s*(?=[,}])/g, (match, value) => {
+        // Don't quote if it's already a valid JSON value (number, boolean, null)
+        if (/^(true|false|null|-?\d+(\.\d+)?)$/.test(value.trim())) {
+          return match
+        }
+        // Escape quotes within the value
+        const escapedValue = value.replace(/"/g, '\\"')
+        return `: "${escapedValue}"`
+      })
+
+      // Fix boolean and null values that might be unquoted
+      fixedJson = fixedJson.replace(/:\s*(true|false|null)\s*(?=[,}])/g, ': $1')
+
       let researchData
       try {
         researchData = JSON.parse(fixedJson)
@@ -305,7 +322,22 @@ Return structured data only.`
         console.error('Failed to parse Perplexity JSON response:', parseError)
         console.error('Original JSON:', jsonMatch[0])
         console.error('Fixed JSON:', fixedJson)
-        return null
+        console.error('Raw response text:', text.substring(0, 500))
+
+        // Try more aggressive cleaning
+        try {
+          // Remove everything before the first { and after the last }
+          const start = text.indexOf('{')
+          const last = text.lastIndexOf('}')
+          if (start !== -1 && last !== -1 && start < last) {
+            const extracted = text.substring(start, last + 1)
+            console.log('Trying extracted JSON:', extracted)
+            researchData = JSON.parse(extracted)
+          }
+        } catch (secondError) {
+          console.error('Secondary parsing also failed:', secondError)
+          return null
+        }
       }
       const citationObjects = citations.map((uri) => ({ uri }))
 

@@ -82,25 +82,23 @@ export type BranchMessagesProps = HTMLAttributes<HTMLDivElement>;
 
 export const BranchMessages = ({ children, ...props }: BranchMessagesProps) => {
   const { currentBranch, setBranches, branches } = useBranch();
-  const childrenArray = useMemo(() => 
-    Array.isArray(children) ? children : [children], 
+  const childrenArray = useMemo(() =>
+    Array.isArray(children) ? children : [children],
     [children]
   );
 
-  // Use useEffect to update branches when they change
+  // Update branches when children change - simplified to prevent infinite loop
   useEffect(() => {
-    if (branches.length !== childrenArray.length) {
-      setBranches(childrenArray);
-    }
-  }, [childrenArray, branches.length, setBranches]);
+    setBranches(childrenArray);
+  }, [childrenArray, setBranches]);
 
-  return childrenArray.map((branch, index) => (
+  return branches.map((branch, index) => (
     <div
       className={cn(
         "grid gap-2 overflow-hidden [&>div]:pb-0",
         index === currentBranch ? "block" : "hidden"
       )}
-      key={branch.key}
+      key={branch.key || index}
       {...props}
     >
       {branch}

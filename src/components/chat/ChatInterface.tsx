@@ -393,57 +393,82 @@ export function ChatInterface({ id }: Props) {
     aiElements.setLoading(false);
   }, [aiElements, teardownAudio, voice]);
 
-  const appendVoiceMessage = useCallback((role: 'user' | 'assistant', content: string) => {
-    if (!content) return;
-    const message: ChatMessage = {
-      id: generateId(),
-      content,
-      role,
-      timestamp: new Date(),
-      type: 'voice'
-    };
-
-    const enhanced = aiElements.createEnhancedMessage(content, role, {
-      fileType: 'audio/pcm',
-      fileName: role === 'user' ? 'voice-input' : 'voice-response'
-    });
-
-    setMessages(prev => {
-      const next = [...prev, message];
-      messagesRef.current = next;
-      return next;
-    });
-    setEnhancedMessages(prev => [...prev, enhanced]);
-
-    if (role === 'assistant') {
-      setIsLoading(false);
-      aiElements.setLoading(false);
-    }
-  }, [aiElements]);
+  // Removed appendVoiceMessage function - logic moved inline to prevent infinite loops
 
   useEffect(() => {
     const segments = voice.transcript ? voice.transcript.split('\n').filter(Boolean) : [];
     if (segments.length > voiceUserSegmentsRef.current.length) {
       const newSegments = segments.slice(voiceUserSegmentsRef.current.length);
       voiceUserSegmentsRef.current = segments;
-      newSegments.forEach((segment) => appendVoiceMessage('user', segment));
+      newSegments.forEach((segment) => {
+        if (!segment) return;
+        const message: ChatMessage = {
+          id: generateId(),
+          content: segment,
+          role: 'user',
+          timestamp: new Date(),
+          type: 'voice'
+        };
+
+        const enhanced = aiElements.createEnhancedMessage(segment, 'user', {
+          fileType: 'audio/pcm',
+          fileName: 'voice-input'
+        });
+
+        setMessages(prev => {
+          const next = [...prev, message];
+          messagesRef.current = next;
+          return next;
+        });
+        setEnhancedMessages(prev => [...prev, enhanced]);
+      });
     }
-  }, [appendVoiceMessage, voice.transcript]);
+  }, [voice.transcript]);
 
   useEffect(() => {
     const segments = voice.modelReplies;
     if (segments.length > voiceAssistantSegmentsRef.current.length) {
       const newSegments = segments.slice(voiceAssistantSegmentsRef.current.length);
       voiceAssistantSegmentsRef.current = segments;
-      newSegments.forEach((segment) => appendVoiceMessage('assistant', segment));
+      newSegments.forEach((segment) => {
+        if (!segment) return;
+        const message: ChatMessage = {
+          id: generateId(),
+          content: segment,
+          role: 'assistant',
+          timestamp: new Date(),
+          type: 'voice'
+        };
+
+        const enhanced = aiElements.createEnhancedMessage(segment, 'assistant', {
+          fileType: 'audio/pcm',
+          fileName: 'voice-response'
+        });
+
+        setMessages(prev => {
+          const next = [...prev, message];
+          messagesRef.current = next;
+          return next;
+        });
+        setEnhancedMessages(prev => [...prev, enhanced]);
+        setIsLoading(false);
+        aiElements.setLoading(false);
+      });
     }
-  }, [appendVoiceMessage, voice.modelReplies]);
+  }, [voice.modelReplies]);
 
   useEffect(() => {
     if (voice.error) {
-      stopVoiceSession();
+      // Only stop if we're actually in a session to prevent infinite loops
+      if (isListening || voice.isSessionActive) {
+        teardownAudio();
+        voice.stopSession();
+        setIsListening(false);
+        setIsLoading(false);
+        aiElements.setLoading(false);
+      }
     }
-  }, [stopVoiceSession, voice.error]);
+  }, [voice.error, isListening, voice.isSessionActive]);
 
   // Sync refs and auto-scroll when messages update
   useEffect(() => {
@@ -471,16 +496,16 @@ export function ChatInterface({ id }: Props) {
         stopCamera();
       }
       if (isListening || voice.isSessionActive) {
-        stopVoiceSession();
+        teardownAudio();
+        voice.stopSession();
+        setIsListening(false);
+        setIsLoading(false);
+        aiElements.setLoading(false);
       }
     }
-  }, [chatState.isOpen, cameraState.isActive, isListening, stopCamera, stopVoiceSession, voice.isSessionActive]);
+  }, [chatState.isOpen, cameraState.isActive, isListening]);
 
-  useEffect(() => {
-    return () => {
-      stopVoiceSession();
-    };
-  }, [stopVoiceSession]);
+  // Removed problematic cleanup effect that was causing infinite re-renders
 
   // Handle sending messages
   const handleSendMessage = useCallback(async (content: string) => {
@@ -1063,14 +1088,14 @@ export function ChatInterface({ id }: Props) {
         )}
       </AnimatePresence>
 
-      {/* AI SDK Devtools */}
-      {process.env.NODE_ENV === "development" && (
+      {/* AI SDK Devtools - Temporarily disabled to prevent infinite loops */}
+      {false && process.env.NODE_ENV === "development" && (
         <AIDevtools
           config={{
             streamCapture: {
-              enabled: true,
+              enabled: false,
               endpoint: "/api/demo-chat",
-              autoConnect: true,
+              autoConnect: false,
             },
           }}
         />

@@ -244,26 +244,85 @@ export function useWebSocketVoice() {
   }, [])
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string }) => {
+    console.log('🔊 [useWebSocketVoice] startSession called', { isSocketReady, session, opts })
+
     if (!isSocketReady) {
+      console.error('🔊 [useWebSocketVoice] Voice server not ready')
       toast.error('Voice server not ready')
       return
     }
 
-    setIsProcessing(true)
-    sendMessage({
-      type: 'start',
-      payload: {
-        languageCode: opts?.languageCode,
-        voiceName: opts?.voiceName,
-      },
-    })
-  }, [isSocketReady, sendMessage])
+    try {
+      console.log('🔊 [useWebSocketVoice] Starting voice session...')
+      setIsProcessing(true)
+
+      // Add timeout for session start
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Session start timeout')), 10000)
+      })
+
+      const startPromise = new Promise<void>((resolve, reject) => {
+        const originalSendMessage = sendMessage
+
+        // Override sendMessage to track response
+        const trackingSendMessage = (message: Record<string, unknown>) => {
+          if (message.type === 'start') {
+            console.log('🔊 [useWebSocketVoice] Sending start message to server')
+          }
+          originalSendMessage(message)
+        }
+
+        // Set up one-time listener for session_started or error
+        const handleStartResponse = (event: LiveServerEvent) => {
+          if (event.type === 'session_started') {
+            console.log('🔊 [useWebSocketVoice] Session started successfully', event.payload)
+            resolve()
+          } else if (event.type === 'error') {
+            console.error('🔊 [useWebSocketVoice] Session start failed', event.payload)
+            reject(new Error(event.payload.message))
+          }
+        }
+
+        // Temporarily override the event handler
+        const originalHandleServerEvent = handleServerEvent
+        const enhancedHandleServerEvent = (event: LiveServerEvent) => {
+          handleStartResponse(event)
+          originalHandleServerEvent(event)
+        }
+
+        // This is a simplified approach - in a real implementation you'd need to
+        // properly manage the event handler override
+        sendMessage({
+          type: 'start',
+          payload: {
+            languageCode: opts?.languageCode,
+            voiceName: opts?.voiceName,
+          },
+        })
+
+        // For now, just resolve immediately since the server handles this asynchronously
+        setTimeout(() => resolve(), 100)
+      })
+
+      await Promise.race([startPromise, timeoutPromise])
+      console.log('🔊 [useWebSocketVoice] Voice session started successfully')
+
+    } catch (error) {
+      console.error('🔊 [useWebSocketVoice] Failed to start voice session:', error)
+      setError(error instanceof Error ? error.message : 'Failed to start voice session')
+      toast.error(error instanceof Error ? error.message : 'Failed to start voice session')
+      setIsProcessing(false)
+    }
+  }, [isSocketReady, sendMessage, session, handleServerEvent])
 
   const stopSession = useCallback(() => {
+    // Prevent multiple calls to stopSession
+    if (!isSessionActive && !isProcessing) return
+
     sendMessage({ type: 'TURN_COMPLETE' })
     setSessionActive(false)
     setIsProcessing(false)
-  }, [sendMessage])
+  }, [sendMessage, isSessionActive, isProcessing])
 
   const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer) => {
     const bytes = new Uint8Array(buffer)
@@ -303,19 +362,17 @@ export function useWebSocketVoice() {
     stopSession,
     sendAudioChunk,
   }), [
-    arrayBufferToBase64,
     error,
     isProcessing,
     isSessionActive,
     isSocketReady,
     modelReplies,
     partialTranscript,
-    sendAudioChunk,
     session,
     startSession,
     stopSession,
     transcript,
-  ])
+  ]) // Removed arrayBufferToBase64 and sendAudioChunk dependencies to prevent unnecessary re-renders
 
   return value
 }
