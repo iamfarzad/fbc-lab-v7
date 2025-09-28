@@ -98,6 +98,9 @@ Thumbs.db
 !README.md
 !CHANGELOG.md
 
+# Specific sensitive documentation files
+gemini_CLI.md
+
 # API keys and sensitive data
 cookies.txt
 *.key

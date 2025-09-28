@@ -13,6 +13,7 @@ dotenv.config();
 
 // Use PORT for Fly.io compatibility, fallback to 3001 for local development
 const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
+console.log(`🔧 Environment check: PORT=${process.env.PORT}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT}, Using: ${PORT}`);
 const IS_MOCK = (process.env.FBC_USE_MOCKS === '1' || process.env.LIVE_MOCK === '1');
 
 // Voice & Language Utilities
@@ -69,8 +70,9 @@ const healthServer = useTls
 
 const server = healthServer.listen(Number(PORT), '0.0.0.0', () => {
   const protocol = useTls ? 'HTTPS/WSS' : 'HTTP/WS';
-  console.info(`🚀 WebSocket server listening on port ${PORT}`);
+  console.info(`🚀 WebSocket server listening on port ${PORT} (0.0.0.0:${PORT})`);
   console.info(`🔐 Using ${protocol} protocol`);
+  console.info(`🌍 Environment: NODE_ENV=${process.env.NODE_ENV}, FLY_APP_NAME=${process.env.FLY_APP_NAME}`);
 });
 
 // Initialize WebSocket server bound to the HTTP(S) server
@@ -115,6 +117,8 @@ function safeSend(ws: WebSocket, data: any, isBinary = false) {
 }
 
 async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
+  console.info(`[${connectionId}] handleStart called with payload:`, JSON.stringify(payload));
+  
   // Prevent concurrent starts
   if (sessionStarting.has(connectionId)) {
     console.info(`[${connectionId}] start() already in progress; skipping duplicate call.`)
@@ -195,6 +199,10 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       }
     })
 
+    // Start the Live API session
+    await (session as any).start();
+    console.info(`[${connectionId}] Live API session started.`)
+
     activeSessions.set(connectionId, { ws, session });
     console.info(`[${connectionId}] Live API session established.`)
 
@@ -264,14 +272,18 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   ws.on('message', async (message: RawData) => {
     try {
       const parsedMessage = JSON.parse(message.toString());
+      console.info(`[${connectionId}] Received message type: ${parsedMessage.type}`);
       switch (parsedMessage.type) {
         case 'start':
+          console.info(`[${connectionId}] Handling start message`);
           await handleStart(connectionId, ws, parsedMessage.payload);
           break;
         case 'user_audio':
+          console.info(`[${connectionId}] Handling user_audio message`);
           await handleUserMessage(connectionId, ws, parsedMessage.payload);
           break;
         case 'TURN_COMPLETE': {
+          console.info(`[${connectionId}] Handling TURN_COMPLETE message`);
           if (IS_MOCK) {
             safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
             break
@@ -279,6 +291,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           const client = activeSessions.get(connectionId)
           if (!client) {
             console.warn(`[${connectionId}] TURN_COMPLETE received but no active session`)
+            console.warn(`[${connectionId}] Active sessions: ${Array.from(activeSessions.keys()).join(', ')}`)
             break
           }
           try {
@@ -290,6 +303,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           }
           break
         }
+        default:
+          console.warn(`[${connectionId}] Unknown message type: ${parsedMessage.type}`)
       }
     } catch (error) {
       console.error(`[${connectionId}] Error processing message:`, error);

@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
 
     estimatedTokens = 3000 // Fixed value for image analysis
-    const modelSelection = selectModelForFeature('image_analysis', 0)
+    const modelSelection = selectModelForFeature('image_analysis', 0, true)
     modelName = typeof modelSelection === 'string' ? modelSelection : modelSelection.model;
 
 
