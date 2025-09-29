@@ -17,6 +17,8 @@ kill_timeout = '5s'
 [env]
   NODE_ENV = 'production'
   PORT = '8080'
+  GEMINI_API_KEY = '${GEMINI_API_KEY}'
+  GEMINI_LIVE_MODEL = 'gemini-2.0-flash-live-001'
 
 [[services]]
   protocol = 'tcp'

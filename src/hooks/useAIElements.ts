@@ -1,15 +1,13 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { 
-  EnhancedChatMessage, 
-  AIElementConfig, 
-  ExtractedElements, 
-  MessageAction, 
-  Source, 
-  CodeBlock, 
-  Artifact,
+import { useState, useCallback } from 'react';
+import {
+  EnhancedChatMessage,
+  AIElementConfig,
+  ExtractedElements,
+  MessageAction,
+  Source,
+  CodeBlock,
   AIBaseElement,
-  ChatState,
-  ChatContext
+  ChatState
 } from '@/types/chat-enhanced';
 
 const defaultConfig: AIElementConfig = {

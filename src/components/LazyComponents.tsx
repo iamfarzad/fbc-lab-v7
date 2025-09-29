@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy } from 'react'
 
 // Lazy loaded components for better performance
 export const WorkSectionLazy = lazy(() => import('./WorkSection').then(mod => ({ default: mod.WorkSection })))
