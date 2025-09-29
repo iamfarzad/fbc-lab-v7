@@ -1,18 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { contextStorage } from '@/src/core/context/context-storage'
 
-// Local augmentation for analyze-image route
-type DBCtxLoose = Record<string, unknown>;
+// Type definitions
+interface AnalyzeImageRequest {
+  imageData: string
+  context?: string
+  timestamp: string | number
+}
 
-type AnalyzeImageAugment = {
-  preferences?: Record<string, unknown>;
-  webcamAnalysisCount?: number;
-  lastWebcamAnalysis?: string;
-};
+interface ImageAnalysisResult {
+  summary: string
+  context: string
+  timestamp: string | number
+  insights: string[]
+  recommendations: string[]
+  sessionId: string
+  metadata: {
+    hasContext: boolean
+    userPreferences: Record<string, unknown>
+    analysisType: string
+  }
+}
+
+interface AnalyzeImageResponse {
+  ok: boolean
+  analysis: ImageAnalysisResult
+  message: string
+}
+
+interface ContextData {
+  preferences?: Record<string, unknown>
+  webcamAnalysisCount?: number
+  lastWebcamAnalysis?: string
+  [key: string]: unknown
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageData, context, timestamp } = await request.json()
+    const { imageData, context, timestamp }: AnalyzeImageRequest = await request.json()
     const sessionId = request.headers.get('x-intelligence-session-id')
 
     if (!sessionId) {
@@ -26,7 +51,7 @@ export async function POST(request: NextRequest) {
     const currentContext = await contextStorage.get(sessionId)
 
     // Simulate AI analysis (in production, this would call actual AI service)
-    const analysis = {
+    const analysis: ImageAnalysisResult = {
       summary: `Webcam image captured at ${new Date(timestamp).toLocaleTimeString()}`,
       context: context || 'webcam_screenshot',
       timestamp,
@@ -49,28 +74,26 @@ export async function POST(request: NextRequest) {
 
     // Store analysis in context for future reference
     if (currentContext) {
-      // wherever you read the stored context:
-      const current = (currentContext as unknown as DBCtxLoose & AnalyzeImageAugment) ?? {};
-
-      // build a patch object that only uses the loose type (no cross-file types)
-      const patch: Partial<DBCtxLoose & AnalyzeImageAugment> = {
+      // Build a patch object with proper typing
+      const patch = {
         lastWebcamAnalysis: new Date().toISOString(),
-        webcamAnalysisCount: (Number(current?.webcamAnalysisCount) || 0) + 1,
-        // ...(prefs ? { preferences: prefs } : {}),
+        webcamAnalysisCount: (Number((currentContext as any)?.webcamAnalysisCount) || 0) + 1,
       };
 
       // when saving
       await contextStorage.update(
         sessionId,
-        patch as unknown as Partial<any> // avoid DatabaseConversationContext collision
+        patch as any
       );
     }
 
-    return NextResponse.json({
+    const response: AnalyzeImageResponse = {
       ok: true,
       analysis,
       message: 'Image analyzed successfully with AI context awareness'
-    })
+    }
+
+    return NextResponse.json(response)
 
   } catch (error) {
     console.error('Image analysis error:', error)

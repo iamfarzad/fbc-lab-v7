@@ -3,6 +3,33 @@ import { adminAuthMiddleware } from '@/app/api-utils/auth'
 import { adminRateLimit } from '@/app/api-utils/rate-limiting'
 import { supabaseService } from '@/src/core/supabase/client'
 
+// Type definitions for database schema
+interface ConversationRecord {
+  id: string
+  name: string | null
+  email: string | null
+  summary: string | null
+  lead_score: number | null
+  research_json: Record<string, unknown> | null
+  pdf_url: string | null
+  email_status: string | null
+  email_retries: number | null
+  created_at: string
+}
+
+interface ConversationResponse {
+  id: string
+  name: string | null
+  email: string | null
+  summary: string | null
+  leadScore: number | null
+  researchJson: Record<string, unknown> | null
+  pdfUrl: string | null
+  emailStatus: string | null
+  emailRetries: number | null
+  createdAt: string
+}
+
 function ensureSupabase() {
   const supabase = supabaseService
   if (!supabase || typeof supabase.from !== 'function') {
@@ -51,14 +78,14 @@ export async function GET(request: NextRequest) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,summary.ilike.%${search}%`)
     }
 
-    const { data, error } = await query
+    const { data, error } = await query as { data: ConversationRecord[] | null; error: any }
 
     if (error) {
       console.error('Admin conversations fetch error:', error)
       return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
     }
 
-    const conversations = (data ?? []).map((conv: any) => ({
+    const conversations: ConversationResponse[] = (data ?? []).map((conv: ConversationRecord) => ({
       id: conv.id,
       name: conv.name,
       email: conv.email,

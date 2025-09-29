@@ -9,6 +9,25 @@ import {
 } from 'ai-retry/retryables';
 import { multimodalContextManager } from '@/src/core/context/multimodal-context';
 
+// Type definitions
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface ChatRequestBody {
+  message?: string;
+  messages?: ChatMessage[];
+  sessionId?: string;
+}
+
+interface MultimodalContextResult {
+  multimodalContext: {
+    hasRecentImages: boolean;
+  };
+  systemPrompt: string;
+}
+
 // Create a retryable model with proper fallback strategies
 const retryableModel = createRetryable({
   // Primary model - most capable
@@ -35,8 +54,8 @@ const retryableModel = createRetryable({
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    let messages;
+    const body: ChatRequestBody = await req.json();
+    let messages: ChatMessage[];
 
     // Handle both formats: single message or messages array
     if (body.message) {
@@ -82,7 +101,7 @@ export async function POST(req: Request) {
     try {
       const sessionId = body.sessionId || req.headers.get('x-session-id')
       if (sessionId) {
-        const multimodalContext = await multimodalContextManager.prepareChatContext(sessionId, true, false)
+        const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(sessionId, true, false)
         if (multimodalContext.multimodalContext.hasRecentImages) {
           systemPrompt += '\n\n' + multimodalContext.systemPrompt
         }

@@ -40,14 +40,7 @@ interface ChatRequestBody {
   stream?: boolean
 }
 
-interface ChatResponse {
-  id: string
-  role: string
-  content: string
-  timestamp: string
-  type: string
-  metadata?: Record<string, unknown>
-}
+// ChatResponse interface removed - not used in this file
 
 interface MultimodalContextResult {
   multimodalContext: {

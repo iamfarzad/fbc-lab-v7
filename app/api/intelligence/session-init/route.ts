@@ -3,13 +3,48 @@ import { ContextStorage } from '@/src/core/context/context-storage'
 import { LeadResearchService, ResearchResult } from '@/src/core/intelligence/lead-research'
 import { getSupabase } from '@/src/core/supabase/server'
 
+// Type definitions
+interface ContextData {
+  email?: string
+  name?: string
+  company_url?: string
+  company_context?: Record<string, unknown> | null
+  person_context?: Record<string, unknown> | null
+  role?: string | null
+  role_confidence?: number | null
+  ai_capabilities_shown?: string[]
+}
+
+interface ContextSnapshot {
+  lead: { email: string; name: string }
+  company: Record<string, unknown> | null
+  person: Record<string, unknown> | null
+  role: string | null
+  roleConfidence: number | null
+  capabilities: string[]
+}
+
+interface SessionInitRequest {
+  sessionId?: string
+  email: string
+  name?: string
+  companyUrl?: string
+}
+
+interface SessionInitResponse {
+  sessionId: string
+  contextReady: boolean
+  context: ContextSnapshot | null
+  snapshot: ContextSnapshot | null
+}
+
 const contextStorage = new ContextStorage()
 const leadResearchService = new LeadResearchService()
 
 // In-flight dedupe for concurrent research per session (best-effort, dev-friendly)
-const researchInFlight = new Map<string, Promise<any>>()
+const researchInFlight = new Map<string, Promise<ResearchResult>>()
 
-function hasResearch(context: any) {
+function hasResearch(context: ContextData | null): boolean {
   return Boolean(
     context && (
       context.company_context || context.person_context || context.role || context.role_confidence != null
@@ -19,7 +54,7 @@ function hasResearch(context: any) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId: providedSessionId, email, name, companyUrl } = await req.json()
+    const { sessionId: providedSessionId, email, name, companyUrl }: SessionInitRequest = await req.json()
 
     if (!email) {
       return NextResponse.json(
@@ -47,7 +82,7 @@ export async function POST(req: NextRequest) {
     // Action logged
 
     // Check for existing context for idempotency
-    const existing = await contextStorage.get(sessionId)
+    const existing: ContextData | null = await contextStorage.get(sessionId)
 
     // If no record yet, persist the bare identifiers
     if (!existing) {
@@ -73,16 +108,19 @@ export async function POST(req: NextRequest) {
 
       // If we already have research for this session, short‑circuit and return it
       if (hasResearch(existing)) {
-        const snapshot = {
+        const snapshot: ContextSnapshot = {
+          lead: { email: existing.email || email, name: existing.name || name || 'Unknown' },
           company: existing.company_context ?? null,
           person: existing.person_context ?? null,
           role: existing.role ?? null,
           roleConfidence: existing.role_confidence ?? null,
+          capabilities: existing.ai_capabilities_shown || []
         }
 
-        const response = {
+        const response: SessionInitResponse = {
           sessionId,
           contextReady: true,
+          context: snapshot,
           snapshot,
         }
 

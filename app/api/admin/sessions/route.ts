@@ -4,6 +4,25 @@ import { adminRateLimit } from '@/app/api-utils/rate-limiting'
 import { adminChatService } from '@/src/core/admin/admin-chat-service'
 import { supabaseService } from '@/src/core/supabase/client'
 
+// Type definitions for admin sessions
+interface AdminSessionRecord {
+  id: string
+  admin_id: string | null
+  session_name: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface AdminSessionResponse {
+  id: string
+  adminId: string | null
+  sessionName: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 function ensureSupabase() {
   const supabase = supabaseService
   if (!supabase || typeof supabase.from !== 'function') {
@@ -32,7 +51,7 @@ export async function GET(request: NextRequest) {
     ensureSupabase()
     const { searchParams } = new URL(request.url)
     const adminId = searchParams.get('adminId') ?? undefined
-    const sessions = await adminChatService.getAdminSessions(adminId)
+    const sessions = await adminChatService.getAdminSessions(adminId) as AdminSessionResponse[]
     return NextResponse.json({ sessions })
   } catch (error) {
     console.error('Admin sessions GET error:', error)

@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   // }
 
   try {
-    const body = await request.json()
+    const body = await request.json() as { monthlyBudget: number }
     const { monthlyBudget } = body
 
     // In production, you would save this to a database

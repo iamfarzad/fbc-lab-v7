@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export function GET() {
   // TODO: Add proper authentication when Clerk is configured
   // const { userId } = auth()
   
