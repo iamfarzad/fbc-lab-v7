@@ -66,6 +66,12 @@ export function useWebSocketVoice() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const connectionIdRef = useRef<string | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  
+  // Voice Activity Detection (VAD) refs
+  const vadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastAudioTimeRef = useRef<number>(0)
+  const isUserSpeakingRef = useRef<boolean>(false)
+  const VAD_SILENCE_TIMEOUT = 2500 // 2.5 seconds of silence before TURN_COMPLETE
 
   const serverUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined
@@ -86,6 +92,14 @@ export function useWebSocketVoice() {
     setPartialTranscript('')
     audioQueueRef.current = []
     isPlayingRef.current = false
+    
+    // Clear VAD timers
+    if (vadTimeoutRef.current) {
+      clearTimeout(vadTimeoutRef.current)
+      vadTimeoutRef.current = null
+    }
+    isUserSpeakingRef.current = false
+    lastAudioTimeRef.current = 0
   }, [])
 
   const playNextAudio = useCallback(async () => {
@@ -121,6 +135,7 @@ export function useWebSocketVoice() {
     audioQueueRef.current.push(chunk)
     void playNextAudio()
   }, [playNextAudio])
+
 
   const handleServerEvent = useCallback((event: LiveServerEvent) => {
     switch (event.type) {
@@ -243,6 +258,28 @@ export function useWebSocketVoice() {
     wsRef.current.send(JSON.stringify(message))
   }, [])
 
+  // Voice Activity Detection functions
+  const resetVADTimeout = useCallback(() => {
+    if (vadTimeoutRef.current) {
+      clearTimeout(vadTimeoutRef.current)
+    }
+    vadTimeoutRef.current = setTimeout(() => {
+      if (isUserSpeakingRef.current && isSessionActive && !isProcessing) {
+        console.log('🔇 VAD: User stopped speaking, sending TURN_COMPLETE')
+        isUserSpeakingRef.current = false
+        sendMessage({ type: 'TURN_COMPLETE' })
+        setIsProcessing(true)
+      }
+    }, VAD_SILENCE_TIMEOUT)
+  }, [isSessionActive, isProcessing, sendMessage])
+
+  const onUserAudioDetected = useCallback(() => {
+    const now = Date.now()
+    lastAudioTimeRef.current = now
+    isUserSpeakingRef.current = true
+    resetVADTimeout()
+  }, [resetVADTimeout])
+
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string }) => {
     console.log('🔊 [useWebSocketVoice] startSession called', { isSocketReady, session, opts })
 
@@ -339,6 +376,10 @@ export function useWebSocketVoice() {
     if (!isSessionActive) {
       // Queue audio until session start returns; server already buffers on its side.
     }
+    
+    // Trigger VAD detection
+    onUserAudioDetected()
+    
     const base64 = arrayBufferToBase64(chunk)
     sendMessage({
       type: 'user_audio',
@@ -348,7 +389,7 @@ export function useWebSocketVoice() {
       },
     })
     setIsProcessing(true)
-  }, [arrayBufferToBase64, isSessionActive, sendMessage])
+  }, [arrayBufferToBase64, isSessionActive, sendMessage, onUserAudioDetected])
 
   const value = useMemo(() => ({
     session,
