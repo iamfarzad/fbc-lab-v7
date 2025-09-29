@@ -269,7 +269,7 @@ export function ChatInterface({ id }: Props) {
     if (hasInitialisedRef.current) return;
     try {
       setContextReady(false);
-      const response = await fetch('/api/intelligence/session-init', {
+      const response = await fetch('/api/intelligence/session-init-simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
