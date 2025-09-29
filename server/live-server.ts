@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { RawData } from 'ws'
-import { GoogleGenAI, Modality } from '@google/genai'
+import { GoogleGenAI } from '@google/genai'
 import { v4 as uuidv4 } from 'uuid'
 import { Buffer } from 'buffer'
 import * as https from 'https'
@@ -56,15 +56,20 @@ const healthServer = useTls
         res.writeHead(200, { 'Content-Type': 'text/plain' })
         res.end('OK')
       } else {
-        res.writeHead(404).end()
+        res.writeHead(404, { 'Content-Type': 'text/plain' })
+        res.end('Not Found')
       }
     })
   : http.createServer((req, res) => {
       if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'text/plain' })
         res.end('OK')
+      } else if (req.url === '/') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' })
+        res.end('WebSocket Server Running - Connect via WebSocket')
       } else {
-        res.writeHead(404).end()
+        res.writeHead(404, { 'Content-Type': 'text/plain' })
+        res.end('Not Found')
       }
     });
 
@@ -80,6 +85,15 @@ wss = new WebSocketServer({
   server,
   perMessageDeflate: false,
   maxPayload: 10 * 1024 * 1024,
+  verifyClient: (info: { origin: string; req: http.IncomingMessage; secure: boolean }) => {
+    // Log connection attempts for debugging
+    console.info(`🔌 WebSocket connection attempt from ${info.origin || 'unknown origin'}`)
+    return true // Accept all connections for now
+  },
+  handleProtocols: (protocols: Set<string>) => {
+    // Handle any subprotocols if needed
+    return protocols.values().next().value || false
+  }
 })
 
 // Keep connections alive
@@ -154,34 +168,34 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     const voiceName = requestedVoice || VOICE_BY_LANG[lang] || 'Puck'
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const model = "gemini-2.5-flash-native-audio-preview-09-2025"
 
-    const config = {
-      response_modalities: ["AUDIO"],
-      system_instruction: `You are a helpful assistant.`,
-    }
+    // Use a Live-supported model. Allow override via env.
+    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-preview-09-2025'
 
     console.info(`[${connectionId}] Connecting to Live API with model: ${model}`)
 
-    const session = await ai.live.connect({
+    let isOpen = false
+
+    const session: any = await ai.live.connect({
       model,
       callbacks: {
-        onopen: () => console.info(`[${connectionId}] Live API session opened`),
+        onopen: () => {
+          isOpen = true
+          console.info(`[${connectionId}] Live API session opened`)
+        },
         onmessage: (message: any) => {
-          console.info(`[${connectionId}] Received message from Live API`)
-          if (message.serverContent?.modelTurn?.parts) {
+          // Handle text + audio parts from Live server messages
+          if (message?.serverContent?.modelTurn?.parts) {
             for (const part of message.serverContent.modelTurn.parts) {
               if (part.text) {
                 safeSend(ws, JSON.stringify({ type: 'text', payload: { content: part.text } }))
               }
+              // For native audio models, audio may arrive as inlineData
               if (part.inlineData?.data) {
-                const audioData = Buffer.from(part.inlineData.data, 'base64').toString('base64')
+                const audioBase64 = part.inlineData.data
                 safeSend(ws, JSON.stringify({
                   type: 'audio',
-                  payload: {
-                    audioData: audioData,
-                    mimeType: 'audio/pcm;rate=24000'
-                  }
+                  payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' }
                 }))
               }
             }
@@ -192,6 +206,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
           safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live API error' } }))
         },
         onclose: () => {
+          isOpen = false
           console.info(`[${connectionId}] Live API session closed`)
           activeSessions.delete(connectionId)
           safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'live_api_closed' } }))
@@ -199,10 +214,29 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       }
     })
 
-    // Start the Live API session
-    // Note: The session is already started when we call ai.live.connect()
-    // No need to call session.start() as it doesn't exist
-    console.info(`[${connectionId}] Live API session started.`)
+    // Apply compatibility shim for session.start() method
+    // Gemini Live API session is already active on connect(), but some code expects a start() method
+    if (typeof session.start !== 'function') {
+      session.start = async () => {
+        // No-op. Session is already active on connect.
+        if (!isOpen) {
+          // Wait a microtask to allow onopen to flip in edge cases.
+          await Promise.resolve()
+        }
+      }
+    }
+
+    // Convenience helpers
+    session.isOpen = () => isOpen
+    session.waitUntilOpen = async (retries = 50, delayMs = 50) => {
+      for (let i = 0; i < retries; i++) {
+        if (isOpen) return
+        await new Promise((r) => setTimeout(r, delayMs))
+      }
+      if (!isOpen) throw new Error('Live session failed to open in time')
+    }
+
+    console.info(`[${connectionId}] Live API session established and ready`)
 
     activeSessions.set(connectionId, { ws, session });
     console.info(`[${connectionId}] Live API session established.`)
@@ -239,7 +273,7 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
     try {
       // Convert base64 to buffer and send to Live API
       const audioBuffer = Buffer.from(payload.audioData, 'base64')
-      await client.session.send_realtime_input({
+      await client.session.sendRealtimeInput({
         audio: audioBuffer
       })
       console.info(`[${connectionId}] Audio sent to Live API (${audioBuffer.length} bytes)`)
@@ -296,11 +330,11 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             break
           }
           try {
-            await client.session.send_realtime_input({ turnComplete: true })
-            console.info(`[${connectionId}] TURN_COMPLETE sent to Live API`)
+            await client.session.sendClientContent({ turnComplete: true })
+            console.info(`[${connectionId}] turnComplete sent to Live API`)
             safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
           } catch (e) {
-            console.error(`[${connectionId}] Failed to send TURN_COMPLETE to Live API:`, e)
+            console.error(`[${connectionId}] Failed to send turnComplete to Live API:`, e)
           }
           break
         }
