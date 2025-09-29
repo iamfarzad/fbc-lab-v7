@@ -12,8 +12,11 @@ export default defineConfig([
     extends: [
       js.configs.recommended,
       tseslint.configs.recommendedTypeChecked,
-      reactHooks.configs['recommended-latest'],
     ],
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
@@ -30,6 +33,7 @@ export default defineConfig([
       'prefer-const': 'warn',
       'no-useless-escape': 'warn',
       'react-refresh/only-export-components': 'warn',
+      ...reactHooks.configs['recommended-latest'].rules,
     },
   },
 ])

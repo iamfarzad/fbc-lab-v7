@@ -15,21 +15,27 @@ interface ChatMessage {
   content: string
 }
 
+interface IntelligenceContext {
+  lead?: { name: string; email: string }
+  company?: { name: string; industry?: string; size?: string }
+  person?: { role?: string; seniority?: string }
+}
+
+interface MultimodalData {
+  audioData?: Uint8Array
+  imageData?: Uint8Array
+  videoData?: boolean
+}
+
+interface ChatContext {
+  intelligenceContext?: IntelligenceContext
+  sessionId?: string
+  multimodalData?: MultimodalData
+}
+
 interface ChatRequestBody {
   messages: ChatMessage[]
-  context?: {
-    intelligenceContext?: {
-      lead?: { name: string; email: string }
-      company?: { name: string; industry?: string; size?: string }
-      person?: { role?: string; seniority?: string }
-    }
-    sessionId?: string
-    multimodalData?: {
-      audioData?: Uint8Array
-      imageData?: Uint8Array
-      videoData?: boolean
-    }
-  }
+  context?: ChatContext
   mode?: 'standard' | 'admin' | 'realtime' | 'multimodal'
   stream?: boolean
 }
@@ -41,6 +47,13 @@ interface ChatResponse {
   timestamp: string
   type: string
   metadata?: Record<string, unknown>
+}
+
+interface MultimodalContextResult {
+  multimodalContext: {
+    hasRecentImages: boolean
+  }
+  systemPrompt: string
 }
 
 let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
@@ -76,7 +89,7 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
     console.log('[UNIFIED_AI_SDK] Request:', reqId)
 
-    const body = await req.json()
+    const body: ChatRequestBody = await req.json()
     const { messages, context, mode = 'standard', stream = true } = body
     const model = getModel()
 
@@ -99,19 +112,19 @@ Response style: Be concise, actionable, and data-driven.`
 
     // Add intelligence context if available
     if (context?.intelligenceContext) {
-      const intCtx = context.intelligenceContext
+      const intCtx: IntelligenceContext = context.intelligenceContext
       let contextData = '\n\nPERSONALIZED CONTEXT:\n'
-      
+
       if (intCtx.lead) {
         contextData += `User: ${intCtx.lead.name} (${intCtx.lead.email})\n`
       }
-      
+
       if (intCtx.company) {
         contextData += `Company: ${intCtx.company.name || 'Unknown'}\n`
         if (intCtx.company.industry) contextData += `Industry: ${intCtx.company.industry}\n`
         if (intCtx.company.size) contextData += `Size: ${intCtx.company.size}\n`
       }
-      
+
       if (intCtx.person) {
         if (intCtx.person.role) contextData += `Role: ${intCtx.person.role}\n`
         if (intCtx.person.seniority) contextData += `Seniority: ${intCtx.person.seniority}\n`
@@ -123,7 +136,7 @@ Response style: Be concise, actionable, and data-driven.`
     // Add multimodal context from conversation history
     if (context?.sessionId) {
       try {
-        const multimodalContext = await multimodalContextManager.prepareChatContext(context.sessionId, true, false)
+        const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(context.sessionId, true, false)
 
         if (multimodalContext.multimodalContext.hasRecentImages) {
           systemPrompt += '\n\n' + multimodalContext.systemPrompt
@@ -135,28 +148,29 @@ Response style: Be concise, actionable, and data-driven.`
 
     // Add multimodal context from direct input
     if (context?.multimodalData) {
-      let multimodalContext = '\n\nMULTIMODAL INPUT:\n'
+      const multimodalData: MultimodalData = context.multimodalData
+      let multimodalContextText = '\n\nMULTIMODAL INPUT:\n'
 
-      if (context.multimodalData.audioData) {
-        multimodalContext += `Audio input received (${context.multimodalData.audioData.length} bytes)\n`
+      if (multimodalData.audioData) {
+        multimodalContextText += `Audio input received (${multimodalData.audioData.length} bytes)\n`
       }
 
-      if (context.multimodalData.imageData) {
-        multimodalContext += `Image input received (${context.multimodalData.imageData.length} bytes)\n`
+      if (multimodalData.imageData) {
+        multimodalContextText += `Image input received (${multimodalData.imageData.length} bytes)\n`
       }
 
-      if (context.multimodalData.videoData) {
-        multimodalContext += `Video input received\n`
+      if (multimodalData.videoData) {
+        multimodalContextText += `Video input received\n`
       }
 
-      systemPrompt += multimodalContext
+      systemPrompt += multimodalContextText
     }
 
     // Convert messages to AI SDK format
     const aiMessages = messages.map((msg: ChatMessage) => ({
-      role: msg.role === 'assistant' ? 'assistant' : msg.role,
+      role: msg.role as 'user' | 'assistant' | 'system',
       content: msg.content
-    }))
+    })) as Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
 
     // Handle streaming vs non-streaming
     if (stream !== false) {
