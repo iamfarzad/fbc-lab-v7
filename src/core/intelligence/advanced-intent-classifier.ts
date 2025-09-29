@@ -316,15 +316,14 @@ export class AdvancedIntentClassifier {
   }
 
   private async analyzeConversationalFlow(context: IntentContext): Promise<Partial<IntentClassificationResult>> {
-    const { message, conversationHistory = [] } = context;
+    const { message } = context;
 
     // Analyze message patterns
-    const messageLength = message.length;
     const hasQuestions = /\?/.test(message);
     const hasExclamations = /!/.test(message);
     const wordCount = message.split(' ').length;
 
-    let flowAnalysis: Partial<IntentClassificationResult> = {
+    const flowAnalysis: Partial<IntentClassificationResult> = {
       confidence: 0,
       reasoning: [],
       context: {

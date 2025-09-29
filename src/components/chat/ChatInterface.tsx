@@ -219,7 +219,7 @@ export function ChatInterface({ id }: Props) {
   const [isVoiceSupported, setIsVoiceSupported] = useState(false);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const captureContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | AudioWorkletNode | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const voiceUserSegmentsRef = useRef<string[]>([]);
   const voiceAssistantSegmentsRef = useRef<string[]>([]);
@@ -323,9 +323,14 @@ export function ChatInterface({ id }: Props) {
   }, []);
 
   const handleAudioProcess = useCallback((event: any) => {
-    if (!voice.isSessionActive) return;
+    console.log('🎤 ScriptProcessorNode audio process, session active:', voice.isSessionActive);
+    if (!voice.isSessionActive) {
+      console.log('🎤 Session not active, skipping audio processing');
+      return;
+    }
     const channelData = event.inputBuffer.getChannelData(0);
     const pcmBuffer = downsampleToPCM16(channelData, event.inputBuffer.sampleRate, TARGET_VOICE_SAMPLE_RATE);
+            console.log('🎤 ScriptProcessorNode sending audio chunk, size:', pcmBuffer.byteLength);
     voice.sendAudioChunk(pcmBuffer, `audio/pcm;rate=${TARGET_VOICE_SAMPLE_RATE}`);
   }, [voice]);
 
@@ -348,17 +353,46 @@ export function ChatInterface({ id }: Props) {
       const source = audioContext.createMediaStreamSource(stream);
       sourceNodeRef.current = source;
 
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-      processor.onaudioprocess = handleAudioProcess;
+      // Use AudioWorkletNode instead of deprecated ScriptProcessorNode
+      try {
+        await audioContext.audioWorklet.addModule('/audio-processor.js');
+        const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+        processorRef.current = processor;
+        
+        // Handle audio data from the worklet
+        processor.port.onmessage = (event) => {
+          console.log('🎤 AudioWorklet message received:', event.data.type);
+          if (event.data.type === 'audioData' && voice.isSessionActive) {
+            console.log('🎤 Processing audio data, session active:', voice.isSessionActive);
+            const channelData = event.data.data;
+            const pcmBuffer = downsampleToPCM16(channelData, audioContext.sampleRate, TARGET_VOICE_SAMPLE_RATE);
+            console.log('🎤 Sending audio chunk, size:', pcmBuffer.byteLength);
+            voice.sendAudioChunk(pcmBuffer, `audio/pcm;rate=${TARGET_VOICE_SAMPLE_RATE}`);
+          } else {
+            console.log('🎤 Audio data received but session not active or wrong type:', {
+              type: event.data.type,
+              sessionActive: voice.isSessionActive
+            });
+          }
+        };
 
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+      } catch (workletError) {
+        console.warn('AudioWorklet not supported, falling back to ScriptProcessorNode:', workletError);
+        
+        // Fallback to ScriptProcessorNode for older browsers
+        const processor = audioContext.createScriptProcessor(4096, 1, 1);
+        processorRef.current = processor;
+        processor.onaudioprocess = handleAudioProcess;
+        source.connect(processor);
+        processor.connect(audioContext.destination);
+      }
     } catch (error) {
       teardownAudio();
       throw error;
     }
-  }, [handleAudioProcess, teardownAudio]);
+  }, [handleAudioProcess, teardownAudio, voice]);
 
   const startVoiceSession = useCallback(async () => {
     if (!isVoiceSupported) {

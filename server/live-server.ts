@@ -170,14 +170,21 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     // Use a Live-supported model. Allow override via env.
-    const model = process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-preview-09-2025'
+    const model = `models/${process.env.GEMINI_LIVE_MODEL || 'gemini-2.0-flash-live-001'}`
 
     console.info(`[${connectionId}] Connecting to Live API with model: ${model}`)
 
     let isOpen = false
 
+    // Create config object matching official documentation
+    const liveConfig = {
+      responseModalities: ['AUDIO'] as any,
+      systemInstruction: 'You are a helpful assistant and answer in a friendly tone.'
+    }
+
     const session: any = await ai.live.connect({
       model,
+      config: liveConfig,  // ← Pass config as separate parameter
       callbacks: {
         onopen: () => {
           isOpen = true
@@ -271,12 +278,14 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
     }
 
     try {
-      // Convert base64 to buffer and send to Live API
-      const audioBuffer = Buffer.from(payload.audioData, 'base64')
-      await client.session.sendRealtimeInput({
-        audio: audioBuffer
+      // Send audio in the correct format matching official documentation
+      await client.session.send({
+        input: {
+          data: payload.audioData,  // ← Keep as base64 string
+          mimeType: payload.mimeType || 'audio/pcm;rate=16000'
+        }
       })
-      console.info(`[${connectionId}] Audio sent to Live API (${audioBuffer.length} bytes)`)
+      console.info(`[${connectionId}] Audio sent to Live API (${payload.audioData.length} base64 chars)`)
     } catch (e) {
       console.error(`[${connectionId}] Failed to send audio to Live API:`, e)
       safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Failed to send audio to Live API' } }))

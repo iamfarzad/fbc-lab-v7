@@ -276,6 +276,7 @@ export function useWebSocketVoice() {
         const handleStartResponse = (event: LiveServerEvent) => {
           if (event.type === 'session_started') {
             console.log('🔊 [useWebSocketVoice] Session started successfully', event.payload)
+            setSessionActive(true) // Set session as active
             resolve()
           } else if (event.type === 'error') {
             console.error('🔊 [useWebSocketVoice] Session start failed', event.payload)

@@ -19,7 +19,7 @@ export interface ToolSuggestion {
   reasoning: string[];
   contextMatch: number;
   urgency: 'low' | 'medium' | 'high';
-  suggestedParameters?: Record<string, any>;
+  suggestedParameters?: Record<string, unknown>;
 }
 
 export interface ToolSuggestionResult {
@@ -38,7 +38,7 @@ export interface SuggestionContext {
   intent?: string;
   userRole?: string;
   conversationHistory?: string[];
-  currentContext?: Record<string, any>;
+  currentContext?: Record<string, unknown>;
   availableTools?: string[];
   sessionId?: string;
   timestamp: Date;
@@ -454,7 +454,7 @@ export class EnhancedToolSuggestionEngine {
   }
 
   private async analyzeContextualRelevance(context: SuggestionContext): Promise<Partial<ToolSuggestionResult>> {
-    const { message, userRole, conversationHistory = [] } = context;
+    const { userRole, conversationHistory = [] } = context;
     const suggestions: ToolSuggestion[] = [];
 
     // Role-based tool suggestions
@@ -498,7 +498,6 @@ export class EnhancedToolSuggestionEngine {
 
   private async analyzeComplexityAndUrgency(context: SuggestionContext): Promise<Partial<ToolSuggestionResult>> {
     const { message } = context;
-    const messageLower = message.toLowerCase();
 
     // Analyze complexity
     const complexityPatterns = this.contextPatterns.get('complex') || [];
@@ -733,9 +732,8 @@ export class EnhancedToolSuggestionEngine {
   }
 
   // Method to update tool effectiveness based on usage feedback
-  updateToolEffectiveness(toolId: string, feedback: 'effective' | 'ineffective', usageContext: string) {
+  updateToolEffectiveness(_toolId: string, feedback: 'effective' | 'ineffective', usageContext: string) {
     logger.info('Tool effectiveness feedback received', {
-      toolId,
       feedback,
       usageContext,
       type: 'tool_feedback'

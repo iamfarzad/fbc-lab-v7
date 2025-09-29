@@ -6,6 +6,49 @@ import { supabaseService, createLeadSummary } from '@/core/supabase/client'
 import { finalizeLeadSession } from '../workflows/finalizeLeadSession'
 import type { LeadContext, CompanyContext, PersonContext } from '../context/context-types'
 
+// Type definitions for API responses
+interface PerplexityResearchData {
+  company: {
+    name: string | null
+    domain: string | null
+    industry: string | null
+    size: string | null
+    summary: string | null
+    website: string | null
+    linkedin: string | null
+  }
+  person: {
+    fullName: string | null
+    role: string | null
+    seniority: string | null
+    profileUrl: string | null
+    company: string | null
+  }
+  role: string | null
+  confidence: number
+}
+
+interface GeminiGenerateContentResult {
+  text?: string | (() => string)
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{ text?: string }>
+    }
+  }>
+}
+
+interface LeadSummaryData {
+  email: string
+  name: string
+  company: string
+  industry?: string | null
+  company_size?: string | null
+  notes: string
+  status: string
+  lead_score: number
+  user_id?: string | null
+}
+
 export interface ResearchResult {
   company: CompanyContext
   person: PersonContext

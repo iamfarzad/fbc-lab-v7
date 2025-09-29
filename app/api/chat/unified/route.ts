@@ -8,7 +8,40 @@ import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { multimodalContextManager } from '@/src/core/context/multimodal-context'
-import { getContextSnapshot } from '@/src/core/context/context-manager'
+
+// Type definitions
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
+interface ChatRequestBody {
+  messages: ChatMessage[]
+  context?: {
+    intelligenceContext?: {
+      lead?: { name: string; email: string }
+      company?: { name: string; industry?: string; size?: string }
+      person?: { role?: string; seniority?: string }
+    }
+    sessionId?: string
+    multimodalData?: {
+      audioData?: Uint8Array
+      imageData?: Uint8Array
+      videoData?: boolean
+    }
+  }
+  mode?: 'standard' | 'admin' | 'realtime' | 'multimodal'
+  stream?: boolean
+}
+
+interface ChatResponse {
+  id: string
+  role: string
+  content: string
+  timestamp: string
+  type: string
+  metadata?: Record<string, unknown>
+}
 
 let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
 
@@ -120,7 +153,7 @@ Response style: Be concise, actionable, and data-driven.`
     }
 
     // Convert messages to AI SDK format
-    const aiMessages = messages.map((msg: any) => ({
+    const aiMessages = messages.map((msg: ChatMessage) => ({
       role: msg.role === 'assistant' ? 'assistant' : msg.role,
       content: msg.content
     }))

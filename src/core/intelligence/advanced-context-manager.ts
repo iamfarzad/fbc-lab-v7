@@ -54,7 +54,7 @@ export interface ConversationTopic {
 
 export interface ContextUpdate {
   type: 'message' | 'entity' | 'topic' | 'summary' | 'metadata';
-  data: any;
+  data: unknown;
   timestamp: Date;
   importance: number;
 }
@@ -150,19 +150,19 @@ export class AdvancedContextManager {
       // Apply update based on type
       switch (update.type) {
         case 'message':
-          context = await this.updateWithMessage(context, update.data);
+          context = await this.updateWithMessage(context, update.data as ConversationMessage);
           break;
         case 'entity':
-          context = await this.updateWithEntity(context, update.data);
+          context = await this.updateWithEntity(context, update.data as ConversationEntity);
           break;
         case 'topic':
-          context = await this.updateWithTopic(context, update.data);
+          context = await this.updateWithTopic(context, update.data as ConversationTopic);
           break;
         case 'summary':
-          context = await this.updateWithSummary(context, update.data);
+          context = await this.updateWithSummary(context, update.data as string);
           break;
         case 'metadata':
-          context = await this.updateWithMetadata(context, update.data);
+          context = await this.updateWithMetadata(context, update.data as Partial<ConversationContext['metadata']>);
           break;
       }
 

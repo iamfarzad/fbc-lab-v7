@@ -251,12 +251,9 @@ export class EnhancedRoleDetector {
     }
 
     // Company size indicators from domain
-    let companySize = 'unknown';
     if (emailDomain.includes('gmail.com') || emailDomain.includes('yahoo.com')) {
-      companySize = 'small'; // Likely startup or individual
       reasoning.push('Personal email domain suggests small company or startup');
     } else if (this.isFortune500Company(emailDomain)) {
-      companySize = 'enterprise';
       reasoning.push('Fortune 500 company domain detected');
     }
 
@@ -273,7 +270,7 @@ export class EnhancedRoleDetector {
   }
 
   private async analyzeCompanySignals(context: RoleContext): Promise<Partial<RoleDetectionResult>> {
-    const { companyName, companyUrl, industry } = context;
+    const { companyUrl, industry } = context;
     const reasoning: string[] = [];
     let confidence = 0;
 
@@ -333,7 +330,7 @@ export class EnhancedRoleDetector {
   }
 
   private async analyzeIndustryContext(context: RoleContext): Promise<Partial<RoleDetectionResult>> {
-    const { companyName, industry } = context;
+    const { industry } = context;
     const reasoning: string[] = [];
 
     // Industry-specific role detection
@@ -464,7 +461,7 @@ export class EnhancedRoleDetector {
     return { confidence: 0.2, reasoning };
   }
 
-  private isFortune500Company(domain: string): boolean {
+  private isFortune500Company(_domain: string): boolean {
     // This would typically check against a database of Fortune 500 companies
     // For now, return false (would need actual implementation)
     return false;
