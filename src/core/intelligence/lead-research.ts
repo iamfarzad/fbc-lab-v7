@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import { GoogleGroundingProvider } from './providers/search/google-grounding'
 import { streamPerplexity } from './providers/perplexity'
+import { jsonrepair } from 'jsonrepair'
 import { recordCapabilityUsed } from '@/core/context/capabilities'
 import { supabaseService, createLeadSummary } from '@/core/supabase/client'
 import { finalizeLeadSession } from '../workflows/finalizeLeadSession'
@@ -341,11 +342,14 @@ Return structured data only.`
       // Remove any trailing commas before closing braces/brackets
       fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1')
 
+      // Quote unquoted keys
+      fixedJson = fixedJson.replace(/([a-zA-Z0-9_]+)\s*:/g, '"$1":')
+
       // Fix unquoted string values (e.g., "full": Farzadat -> "full": "Farzadat")
-      fixedJson = fixedJson.replace(/:\s*([-0-9a-zA-Z_][a-zA-Z0-9_]*)\s*(?=[,}])/g, ': "$1"')
+      fixedJson = fixedJson.replace(/:\s*([-\.0-9a-zA-Z_][a-zA-Z0-9_]*)\s*(?=[,}])/g, ': "$1"')
 
       // Fix unquoted string values with spaces and special characters
-      fixedJson = fixedJson.replace(/:\s*([-0-9a-zA-Z_][a-zA-Z0-9_\s&\-\.,\(\)\/\+#\'\"@!?;:*]*)\s*(?=[,}])/g, (match, value) => {
+      fixedJson = fixedJson.replace(/:\s*([-\.0-9a-zA-Z_][a-zA-Z0-9_\s&\-\.,\(\)\/\+#\'\"@!?;:*]*)\s*(?=[,}])/g, (match, value) => {
         // Don't quote if it's already a valid JSON value (number, boolean, null)
         if (/^(true|false|null|-?\d+(\.\d+)?)$/.test(value.trim())) {
           return match
@@ -360,27 +364,13 @@ Return structured data only.`
 
       let researchData
       try {
-        researchData = JSON.parse(fixedJson)
-      } catch (parseError) {
-        console.error('Failed to parse Perplexity JSON response:', parseError)
-        console.error('Original JSON:', jsonMatch[0])
-        console.error('Fixed JSON:', fixedJson)
-        console.error('Raw response text:', text.substring(0, 500))
-
-        // Try more aggressive cleaning
-        try {
-          // Remove everything before the first { and after the last }
-          const start = text.indexOf('{')
-          const last = text.lastIndexOf('}')
-          if (start !== -1 && last !== -1 && start < last) {
-            const extracted = text.substring(start, last + 1)
-            console.log('Trying extracted JSON:', extracted)
-            researchData = JSON.parse(extracted)
-          }
-        } catch (secondError) {
-          console.error('Secondary parsing also failed:', secondError)
-          return null
-        }
+        let toRepair = jsonMatch ? jsonMatch[0] : text
+        const repaired = jsonrepair(toRepair)
+        researchData = JSON.parse(repaired)
+      } catch (repairError) {
+        console.error('Failed to repair and parse Perplexity JSON:', repairError)
+        console.error('Original text:', text.substring(0, 500))
+        return null
       }
       const citationObjects = citations.map((uri) => ({ uri }))
 

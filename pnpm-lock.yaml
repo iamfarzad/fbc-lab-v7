@@ -116,6 +116,9 @@ importers:
       ical-generator:
         specifier: ^9.0.0
         version: 9.0.0(@types/node@20.19.17)(dayjs@1.11.18)
+      jsonrepair:
+        specifier: ^3.13.1
+        version: 3.13.1
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.2
@@ -5110,6 +5113,10 @@ packages:
   jsonparse@1.3.1:
     resolution: {integrity: sha512-POQXvpdL69+CluYsillJ7SUhKvytYjW9vG/GKpnf+xP8UWgYEM/RaMzHHofbALDiKbbP1W8UEYmgGl39WkPZsg==}
     engines: {'0': node >= 0.2.0}
+
+  jsonrepair@3.13.1:
+    resolution: {integrity: sha512-WJeiE0jGfxYmtLwBTEk8+y/mYcaleyLXWaqp5bJu0/ZTSeG0KQq/wWQ8pmnkKenEdN6pdnn6QtcoSUkbqDHWNw==}
+    hasBin: true
 
   jsonwebtoken@9.0.2:
     resolution: {integrity: sha512-PRp66vJ865SSqOlgqS8hujT5U4AOgMfhrwYIuIhfKaoSCZcirrmASQr8CX7cUg+RMih+hgznrjp99o+W4pJLHQ==}
@@ -13138,6 +13145,8 @@ snapshots:
       graceful-fs: 4.2.11
 
   jsonparse@1.3.1: {}
+
+  jsonrepair@3.13.1: {}
 
   jsonwebtoken@9.0.2:
     dependencies:

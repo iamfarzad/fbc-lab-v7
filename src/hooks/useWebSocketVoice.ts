@@ -66,12 +66,17 @@ export function useWebSocketVoice() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const connectionIdRef = useRef<string | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  
+
   // Voice Activity Detection (VAD) refs
   const vadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastAudioTimeRef = useRef<number>(0)
   const isUserSpeakingRef = useRef<boolean>(false)
   const VAD_SILENCE_TIMEOUT = 2500 // 2.5 seconds of silence before TURN_COMPLETE
+
+  // Session state refs to handle race conditions
+  const isSessionActiveRef = useRef<boolean>(false)
+  const pendingAudioBufferRef = useRef<ArrayBuffer[]>([])
+  const sessionStartPromiseRef = useRef<Promise<void> | null>(null)
 
   const serverUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined
@@ -92,7 +97,7 @@ export function useWebSocketVoice() {
     setPartialTranscript('')
     audioQueueRef.current = []
     isPlayingRef.current = false
-    
+
     // Clear VAD timers
     if (vadTimeoutRef.current) {
       clearTimeout(vadTimeoutRef.current)
@@ -100,6 +105,11 @@ export function useWebSocketVoice() {
     }
     isUserSpeakingRef.current = false
     lastAudioTimeRef.current = 0
+
+    // Clear session state refs
+    isSessionActiveRef.current = false
+    pendingAudioBufferRef.current = []
+    sessionStartPromiseRef.current = null
   }, [])
 
   const playNextAudio = useCallback(async () => {
@@ -152,12 +162,31 @@ export function useWebSocketVoice() {
           mock: event.payload.mock,
         })
         setSessionActive(true)
+        isSessionActiveRef.current = true
         setIsProcessing(false)
         setError(null)
+
+        // Process any buffered audio data now that session is active
+        if (pendingAudioBufferRef.current.length > 0) {
+          console.log('🔊 Processing buffered audio data:', pendingAudioBufferRef.current.length, 'chunks')
+          pendingAudioBufferRef.current.forEach((buffer, index) => {
+            setTimeout(() => {
+              sendAudioChunk(buffer, `audio/pcm;rate=16000`)
+            }, index * 10) // Small delay between chunks to avoid overwhelming
+          })
+          pendingAudioBufferRef.current = []
+        }
+
+        // Resolve session start promise if it exists
+        if (sessionStartPromiseRef.current) {
+          sessionStartPromiseRef.current()
+          sessionStartPromiseRef.current = null
+        }
         break
       }
       case 'session_closed': {
         setSessionActive(false)
+        isSessionActiveRef.current = false
         break
       }
       case 'input_transcript': {
@@ -240,6 +269,11 @@ export function useWebSocketVoice() {
       setError('Failed to connect to live server')
     }
   }, [handleServerEvent, resetState, serverUrl])
+
+  // Sync session active ref with state
+  useEffect(() => {
+    isSessionActiveRef.current = isSessionActive
+  }, [isSessionActive])
 
   useEffect(() => {
     connectWebSocket()
@@ -373,13 +407,20 @@ export function useWebSocketVoice() {
 
   const sendAudioChunk = useCallback((chunk: ArrayBuffer, mimeType: string) => {
     if (!chunk || !mimeType) return
-    if (!isSessionActive) {
-      // Queue audio until session start returns; server already buffers on its side.
+
+    // Check if session is logically active (either React state or ref)
+    const sessionActive = isSessionActive || isSessionActiveRef.current
+
+    if (!sessionActive) {
+      // Buffer audio until session becomes active
+      pendingAudioBufferRef.current.push(chunk)
+      console.log('🔊 Buffering audio chunk, total buffered:', pendingAudioBufferRef.current.length)
+      return
     }
-    
+
     // Trigger VAD detection
     onUserAudioDetected()
-    
+
     const base64 = arrayBufferToBase64(chunk)
     sendMessage({
       type: 'user_audio',

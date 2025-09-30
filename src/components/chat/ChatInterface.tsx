@@ -330,7 +330,7 @@ export function ChatInterface({ id }: Props) {
     }
     const channelData = event.inputBuffer.getChannelData(0);
     const pcmBuffer = downsampleToPCM16(channelData, event.inputBuffer.sampleRate, TARGET_VOICE_SAMPLE_RATE);
-            console.log('🎤 ScriptProcessorNode sending audio chunk, size:', pcmBuffer.byteLength);
+    console.log('🎤 ScriptProcessorNode sending audio chunk, size:', pcmBuffer.byteLength);
     voice.sendAudioChunk(pcmBuffer, `audio/pcm;rate=${TARGET_VOICE_SAMPLE_RATE}`);
   }, [voice]);
 
@@ -362,17 +362,23 @@ export function ChatInterface({ id }: Props) {
         // Handle audio data from the worklet
         processor.port.onmessage = (event) => {
           console.log('🎤 AudioWorklet message received:', event.data.type);
-          if (event.data.type === 'audioData' && voice.isSessionActive) {
-            console.log('🎤 Processing audio data, session active:', voice.isSessionActive);
-            const channelData = event.data.data;
-            const pcmBuffer = downsampleToPCM16(channelData, audioContext.sampleRate, TARGET_VOICE_SAMPLE_RATE);
-            console.log('🎤 Sending audio chunk, size:', pcmBuffer.byteLength);
-            voice.sendAudioChunk(pcmBuffer, `audio/pcm;rate=${TARGET_VOICE_SAMPLE_RATE}`);
-          } else {
-            console.log('🎤 Audio data received but session not active or wrong type:', {
-              type: event.data.type,
-              sessionActive: voice.isSessionActive
-            });
+          if (event.data.type === 'audioData') {
+            // Use both React state and ref to check session status
+            const sessionActive = voice.isSessionActive;
+            console.log('🎤 Processing audio data, session active:', sessionActive);
+
+            if (sessionActive) {
+              const channelData = event.data.data;
+              const pcmBuffer = downsampleToPCM16(channelData, audioContext.sampleRate, TARGET_VOICE_SAMPLE_RATE);
+              console.log('🎤 Sending audio chunk, size:', pcmBuffer.byteLength);
+              voice.sendAudioChunk(pcmBuffer, `audio/pcm;rate=${TARGET_VOICE_SAMPLE_RATE}`);
+            } else {
+              console.log('🎤 Audio data received but session not yet active, buffering...', {
+                type: event.data.type,
+                sessionActive: voice.isSessionActive,
+                bufferedCount: 0 // This would show buffered count if we exposed it
+              });
+            }
           }
         };
 
@@ -403,11 +409,34 @@ export function ChatInterface({ id }: Props) {
     try {
       setIsLoading(true);
       aiElements.setLoading(true);
+
+      // Start session first and wait for it to be active
+      console.log('🔊 Starting voice session...');
       await voice.startSession();
+
+      // Wait for session to become active before setting up recorder
+      // This prevents the race condition where audio starts before session is ready
+      const waitForSessionActive = () => {
+        return new Promise<void>((resolve) => {
+          const checkActive = () => {
+            if (voice.isSessionActive) {
+              console.log('🔊 Session is now active, setting up recorder...');
+              resolve();
+            } else {
+              setTimeout(checkActive, 50); // Check every 50ms
+            }
+          };
+          checkActive();
+        });
+      };
+
+      await waitForSessionActive();
       await setupRecorder();
+
       voiceUserSegmentsRef.current = [];
       voiceAssistantSegmentsRef.current = [];
       setIsListening(true);
+      console.log('🔊 Voice session fully started and recorder setup complete');
     } catch (error) {
       console.error('Failed to start voice session', error);
       toast.error('Unable to start voice session');

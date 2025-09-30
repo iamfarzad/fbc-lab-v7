@@ -64,6 +64,7 @@
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.23.19",
     "ical-generator": "^9.0.0",
+    "jsonrepair": "^3.13.1",
     "jsonwebtoken": "^9.0.2",
     "lru-cache": "^11.2.2",
     "lucide-react": "^0.544.0",
