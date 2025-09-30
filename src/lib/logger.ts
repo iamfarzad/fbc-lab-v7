@@ -20,34 +20,37 @@ const winstonLogger: Logger = createWinstonLogger({
     version: process.env.npm_package_version || '1.0.0'
   },
   transports: [
-    // Write all logs with importance level of `error` or less to `error.log`
-    new transports.File({
-      filename: 'logs/error.log',
-      level: 'error',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    }),
-    // Write all logs with importance level of `info` or less to `combined.log`
-    new transports.File({
-      filename: 'logs/combined.log',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    }),
+    // Only use file transports in development, not in serverless environments
+    ...(process.env.NODE_ENV !== 'production' && !process.env.VERCEL ? [
+      // Write all logs with importance level of `error` or less to `error.log`
+      new transports.File({
+        filename: 'logs/error.log',
+        level: 'error',
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      }),
+      // Write all logs with importance level of `info` or less to `combined.log`
+      new transports.File({
+        filename: 'logs/combined.log',
+        maxsize: 5242880, // 5MB
+        maxFiles: 5,
+      }),
+    ] : []),
   ],
 });
 
-// If we're not in production, log to the console with colors
-if (process.env.NODE_ENV !== 'production') {
-  winstonLogger.add(new transports.Console({
-    format: format.combine(
-      format.colorize(),
-      format.simple(),
-      format.printf(({ timestamp, level, message, service }) => {
-        return `${timestamp} [${service}] ${level}: ${message}`;
-      })
-    )
-  }));
-}
+// Always add console transport for serverless environments
+// In development: colored console + files
+// In production/serverless: console only (Vercel captures console logs)
+winstonLogger.add(new transports.Console({
+  format: format.combine(
+    ...(process.env.NODE_ENV !== 'production' ? [format.colorize()] : []),
+    format.simple(),
+    format.printf(({ timestamp, level, message, service }) => {
+      return `${timestamp} [${service}] ${level}: ${message}`;
+    })
+  )
+}));
 
 // Enhanced logger interface with performance tracking
 export interface LoggerContext {
