@@ -342,10 +342,10 @@ Return structured data only.`
       fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1')
 
       // Fix unquoted string values (e.g., "full": Farzadat -> "full": "Farzadat")
-      fixedJson = fixedJson.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=[,}])/g, ': "$1"')
+      fixedJson = fixedJson.replace(/:\s*([-0-9a-zA-Z_][a-zA-Z0-9_]*)\s*(?=[,}])/g, ': "$1"')
 
       // Fix unquoted string values with spaces and special characters
-      fixedJson = fixedJson.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_\s&\-\.,\(\)]*)\s*(?=[,}])/g, (match, value) => {
+      fixedJson = fixedJson.replace(/:\s*([-0-9a-zA-Z_][a-zA-Z0-9_\s&\-\.,\(\)\/\+#\'\"@!?;:*]*)\s*(?=[,}])/g, (match, value) => {
         // Don't quote if it's already a valid JSON value (number, boolean, null)
         if (/^(true|false|null|-?\d+(\.\d+)?)$/.test(value.trim())) {
           return match
