@@ -53,6 +53,14 @@ let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
 
 const getModel = () => {
   const apiKey = process.env.GEMINI_API_KEY
+  const googleApiKey = process.env.GOOGLE_API_KEY
+  const googleGenApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+
+  console.log('[DEBUG] Environment variables:', {
+    GEMINI_API_KEY: apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT SET',
+    GOOGLE_API_KEY: googleApiKey ? `${googleApiKey.substring(0, 10)}...` : 'NOT SET',
+    GOOGLE_GENERATIVE_AI_API_KEY: googleGenApiKey ? `${googleGenApiKey.substring(0, 10)}...` : 'NOT SET'
+  })
 
   if (!apiKey) {
     throw new Error(
@@ -169,6 +177,15 @@ Response style: Be concise, actionable, and data-driven.`
     if (stream !== false) {
       // For streaming, use direct Google model (ai-retry doesn't support streaming)
       const apiKey = process.env.GEMINI_API_KEY
+      const googleApiKey = process.env.GOOGLE_API_KEY
+      const googleGenApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+      
+      console.log('[DEBUG] Streaming environment variables:', {
+        GEMINI_API_KEY: apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT SET',
+        GOOGLE_API_KEY: googleApiKey ? `${googleApiKey.substring(0, 10)}...` : 'NOT SET',
+        GOOGLE_GENERATIVE_AI_API_KEY: googleGenApiKey ? `${googleGenApiKey.substring(0, 10)}...` : 'NOT SET'
+      })
+      
       if (!apiKey) {
         throw new Error('Missing GEMINI_API_KEY environment variable')
       }
