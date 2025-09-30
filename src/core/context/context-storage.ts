@@ -3,7 +3,7 @@ import { logger } from '@/src/lib/logger'
 import { MultimodalContext, CompanyContext, PersonContext, DatabaseConversationContext } from './context-types'
 
 // Extended database interface for context storage
-interface ExtendedDatabaseConversationContext extends DatabaseConversationContext {
+interface ExtendedDatabaseConversationContext extends Omit<DatabaseConversationContext, 'company_context' | 'person_context'> {
   email: string
   name?: string | null
   company_url?: string | null

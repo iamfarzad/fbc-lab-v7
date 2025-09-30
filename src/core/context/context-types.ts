@@ -95,8 +95,8 @@ export interface DatabaseConversationContext {
   session_id: string
   email: string
   name?: string | null
-  company_context?: CompanyContext | null
-  person_context?: PersonContext | null
+  company_context?: Json | null
+  person_context?: Json | null
   role?: string | null
   role_confidence?: number | null
   intent_data?: Json | null
