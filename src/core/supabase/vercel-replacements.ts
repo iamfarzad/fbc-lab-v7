@@ -68,9 +68,9 @@ export interface CronJobLog {
 // ============================================================================
 
 export class FeatureFlagsManager {
-  private supabase: any
+  private supabase: ReturnType<typeof getSupabaseServer>
 
-  constructor(supabase: any) {
+  constructor(supabase: ReturnType<typeof getSupabaseServer>) {
     this.supabase = supabase
   }
 

@@ -168,7 +168,11 @@ Response style: Be concise, actionable, and data-driven.`
     // Handle streaming vs non-streaming
     if (stream !== false) {
       // For streaming, use direct Google model (ai-retry doesn't support streaming)
-      const streamingModel = google('gemini-2.5-flash', { apiKey })
+      const apiKey = process.env.GEMINI_API_KEY
+      if (!apiKey) {
+        throw new Error('Missing GEMINI_API_KEY environment variable')
+      }
+      const streamingModel = google('gemini-2.5-flash')
       
       // Streaming response using AI SDK
       const result = streamText({
@@ -334,7 +338,7 @@ export function GET(req: NextRequest) {
         return NextResponse.json({
           status: 'operational',
           provider: 'unified-ai-sdk',
-          version: '2.0.0',
+          version: '2.0.1',
           backend: 'AI SDK Tools',
           timestamp: new Date().toISOString()
         })

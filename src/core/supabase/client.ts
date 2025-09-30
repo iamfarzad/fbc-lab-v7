@@ -1,6 +1,27 @@
 import { getSupabaseServer, getSupabaseService } from '@/src/lib/supabase';
 import { Database } from '../database.types'
 
+// Type definitions for Supabase operations
+interface SupabaseAuthUser {
+  id: string
+  email?: string
+  [key: string]: unknown
+}
+
+interface SupabaseAuthResponse {
+  data: {
+    user: SupabaseAuthUser | null
+  }
+  error: Error | null
+}
+
+interface SupabaseError {
+  code: string
+  message: string
+  details?: string
+  name?: string
+}
+
 // Improved Supabase Client Setup with TypeScript types and error handling
 export const supabase = getSupabaseServer();
 
@@ -8,17 +29,17 @@ export const supabase = getSupabaseServer();
 export const supabaseService = getSupabaseService();
 
 // Safe authentication utility for server-side API routes
-export async function getSafeUser() {
+export async function getSafeUser(): Promise<{ user: SupabaseAuthUser | null; error: Error | null }> {
   try {
     const { data: { user }, error } = await supabase.auth.getUser()
-    return { user, error: null }
+    return { user: user as SupabaseAuthUser | null, error: null }
   } catch (error) {
     // Handle AuthSessionMissingError gracefully - this is expected in server-side API routes
-    if (error && typeof error === 'object' && 'name' in error && (error as any).name === 'AuthSessionMissingError') {
+    if (error && typeof error === 'object' && 'name' in error && (error as SupabaseError).name === 'AuthSessionMissingError') {
       // This is expected behavior in server-side API routes
       return { user: null, error: null }
     }
-    return { user: null, error }
+    return { user: null, error: error as Error }
   }
 }
 

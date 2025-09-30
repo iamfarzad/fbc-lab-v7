@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
-import { GoogleGroundingProvider, GroundedAnswer } from './providers/search/google-grounding'
+import { GoogleGroundingProvider } from './providers/search/google-grounding'
 import { streamPerplexity } from './providers/perplexity'
 import { recordCapabilityUsed } from '@/core/context/capabilities'
 import { supabaseService, createLeadSummary } from '@/core/supabase/client'
