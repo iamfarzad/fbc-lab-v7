@@ -37,7 +37,8 @@ interface ContextData {
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageData, context, timestamp }: AnalyzeImageRequest = await request.json()
+    const body = await request.json() as AnalyzeImageRequest
+    const { imageData, context, timestamp } = body
     const sessionId = request.headers.get('x-intelligence-session-id')
 
     if (!sessionId) {
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       metadata: {
         hasContext: !!currentContext,
-        userPreferences: (currentContext as any)?.preferences || {},
+        userPreferences: (currentContext as Record<string, unknown>)?.preferences || {},
         analysisType: 'visual_content'
       }
     }
@@ -77,13 +78,13 @@ export async function POST(request: NextRequest) {
       // Build a patch object with proper typing
       const patch = {
         lastWebcamAnalysis: new Date().toISOString(),
-        webcamAnalysisCount: (Number((currentContext as any)?.webcamAnalysisCount) || 0) + 1,
+        webcamAnalysisCount: (Number((currentContext as Record<string, unknown>)?.webcamAnalysisCount) || 0) + 1,
       };
 
       // when saving
       await contextStorage.update(
         sessionId,
-        patch as any
+        patch as Partial<DatabaseConversationContext>
       );
     }
 

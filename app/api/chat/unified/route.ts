@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
     console.log('[UNIFIED_AI_SDK] Request:', reqId)
 
-    const body: ChatRequestBody = await req.json()
+    const body = await req.json() as ChatRequestBody
     const { messages, context, mode = 'standard', stream = true } = body
     const model = getModel()
 
@@ -163,7 +163,7 @@ Response style: Be concise, actionable, and data-driven.`
     const aiMessages = messages.map((msg: ChatMessage) => ({
       role: msg.role as 'user' | 'assistant' | 'system',
       content: msg.content
-    })) as Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+    }))
 
     // Handle streaming vs non-streaming
     if (stream !== false) {
@@ -171,7 +171,7 @@ Response style: Be concise, actionable, and data-driven.`
       const streamingModel = google('gemini-2.5-flash')
       
       // Streaming response using AI SDK
-      const result = await streamText({
+      const result = streamText({
         model: streamingModel,
         system: systemPrompt,
         messages: aiMessages,
@@ -310,7 +310,7 @@ Response style: Be concise, actionable, and data-driven.`
 /**
  * GET handler for capabilities and status
  */
-export async function GET(req: NextRequest) {
+export function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const action = searchParams.get('action')

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = supabaseService
-  if (!supabase || typeof supabase.from !== 'function') {
+  if (!supabase || typeof (supabase as any)?.from !== 'function') {
     return NextResponse.json(
       {
         disabled: true,
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     const daysBack = period === '1d' ? 1 : period === '30d' ? 30 : period === '90d' ? 90 : 7
     const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('lead_summaries')
       .select('*')
       .gte('created_at', startDate.toISOString())

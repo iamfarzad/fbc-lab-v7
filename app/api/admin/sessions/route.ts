@@ -25,7 +25,7 @@ interface AdminSessionResponse {
 
 function ensureSupabase() {
   const supabase = supabaseService
-  if (!supabase || typeof supabase.from !== 'function') {
+  if (!supabase || typeof (supabase as any)?.from !== 'function') {
     throw new Error('Supabase service client unavailable. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.')
   }
   return supabase
@@ -110,7 +110,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 })
     }
 
-    await supabase
+    await (supabase as any)
       .schema('admin')
       .from('admin_sessions')
       .update({ is_active: false })

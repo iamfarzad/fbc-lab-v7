@@ -1,3 +1,5 @@
+import type { Json } from '../database.types';
+
 /** Basic lead/person/company context used across chat + intelligence layers. */
 export interface LeadContext {
   email: string;
@@ -90,8 +92,24 @@ export interface ContextSnapshot {
 
 /** Database conversation context interface */
 export interface DatabaseConversationContext {
-  // New optional fields used by analyze-image route:
-  preferences?: Record<string, unknown>;
-  webcamAnalysisCount?: number;
-  lastWebcamAnalysis?: string; // ISO string or Date
+  session_id: string
+  email: string
+  name?: string | null
+  company_context?: Json | null
+  person_context?: Json | null
+  role?: string | null
+  role_confidence?: number | null
+  intent_data?: Json | null
+  ai_capabilities_shown?: string[] | null
+  last_user_message?: string | null
+  company_url?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  
+  // Additional fields for backward compatibility
+  preferences?: Record<string, unknown>
+  webcamAnalysisCount?: number
+  lastWebcamAnalysis?: string
+  multimodal_context?: Json | null
+  tool_outputs?: Json | null
 }

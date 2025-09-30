@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const context = await contextStorage.get(sessionId)
+    const context = await contextStorage.get(sessionId) as Record<string, unknown> | null
 
     // If no context exists, create default context for new session
     let contextData = context
@@ -106,13 +106,13 @@ export async function GET(req: NextRequest) {
 
     // Return merged context snapshot
     const snapshot = {
-      lead: { email: contextData.email || '', name: contextData.name || '' },
+      lead: { email: (contextData.email as string) || '', name: (contextData.name as string) || '' },
       company: contextData.company_context,
       person: contextData.person_context,
-      role: contextData.role || '',
-      roleConfidence: contextData.role_confidence || 0,
+      role: (contextData.role as string) || '',
+      roleConfidence: (contextData.role_confidence as number) || 0,
       intent: contextData.intent_data,
-      capabilities: contextData.ai_capabilities_shown || []
+      capabilities: (contextData.ai_capabilities_shown as string[]) || []
     }
 
     // Generate ETag for caching

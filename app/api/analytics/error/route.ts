@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json() as {
+      errorId: string
+      message: string
+      stack: string
+      componentStack: string
+      timestamp: string
+      userAgent: string
+      url: string
+      source: string
+    };
     const { errorId, message, stack, componentStack, timestamp, userAgent, url, source } = body;
 
     // Log the error to console for debugging

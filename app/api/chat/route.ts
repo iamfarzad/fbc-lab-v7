@@ -54,7 +54,7 @@ const retryableModel = createRetryable({
 
 export async function POST(req: Request) {
   try {
-    const body: ChatRequestBody = await req.json();
+    const body = await req.json() as ChatRequestBody;
     let messages: ChatMessage[];
 
     // Handle both formats: single message or messages array

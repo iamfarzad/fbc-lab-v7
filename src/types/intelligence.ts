@@ -11,9 +11,9 @@ export interface ContextSnapshot {
 }
 
 export interface IntentResult {
-  type: 'consulting' | 'workshop' | 'other' | string; // Allow string for extensibility
+  type: string; // Simplified to avoid redundant type constituents
   confidence: number;
-  slots: Record<string, any>;
+  slots: Record<string, unknown>;
 }
 
 export interface ResearchResult {

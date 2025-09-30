@@ -1,8 +1,26 @@
 import { getSupabaseService } from '@/src/lib/supabase'
 import { logger } from '@/src/lib/logger'
-import { MultimodalContext } from './context-types'
+import { MultimodalContext, CompanyContext, PersonContext, DatabaseConversationContext } from './context-types'
 
-// Conversation context interface (replacing deleted conversation-memory)
+// Extended database interface for context storage
+interface ExtendedDatabaseConversationContext extends DatabaseConversationContext {
+  email: string
+  name?: string | null
+  company_url?: string | null
+  role?: string | null
+  role_confidence?: number | null
+  ai_capabilities_shown?: string[] | null
+  company_context?: CompanyContext | null
+  person_context?: PersonContext | null
+  intent_data?: Record<string, unknown> | null
+  last_user_message?: string | null
+  multimodal_context?: string | MultimodalContext
+  tool_outputs?: Record<string, unknown> | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+// Additional type definitions for context storage
 interface ConversationContext {
   sessionId: string
   messageCount: number
@@ -12,26 +30,14 @@ interface ConversationContext {
   topics: string[]
   sentiment: 'positive' | 'neutral' | 'negative'
   stage: string
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
 }
 
-// Database-compatible interface for conversation contexts
-interface DatabaseConversationContext {
-  session_id: string
-  email: string
-  name?: string | null
-  company_url?: string | null
-  role?: string | null
-  role_confidence?: number | null
-  ai_capabilities_shown?: string[] | null
-  company_context?: any
-  person_context?: any
-  intent_data?: any
-  last_user_message?: string | null
-  multimodal_context?: string | MultimodalContext
-  tool_outputs?: any
-  created_at?: string | null
-  updated_at?: string | null
+interface IntentData {
+  primaryIntent?: string
+  confidence?: number
+  entities?: string[]
+  [key: string]: unknown
 }
 
 // Type-safe conversion for multimodal context storage
@@ -67,17 +73,17 @@ export class ContextStorage {
 
   async store(sessionId: string, payload: Partial<DatabaseConversationContext>): Promise<void> {
     try {
-      const dataToStore: DatabaseConversationContext = {
+      const dataToStore = {
         session_id: sessionId,
         email: payload.email || 'unknown@example.com', // Required field
         ...payload,
         updated_at: new Date().toISOString()
-      }
+      } as DatabaseConversationContext & { updated_at: string }
 
       // Handle multimodal context
-      if (dataToStore.multimodal_context) {
+      if ((dataToStore as any).multimodal_context) {
         // Convert to storable format (JSON string for DB)
-        dataToStore.multimodal_context = toStorable(dataToStore.multimodal_context as unknown as MultimodalContext)
+        (dataToStore as any).multimodal_context = toStorable((dataToStore as any).multimodal_context as unknown as MultimodalContext)
       }
 
       // Try Supabase first, fallback to in-memory
@@ -85,15 +91,15 @@ export class ContextStorage {
         try {
           const { error } = await this.supabase
             .from('conversation_contexts')
-            .upsert(dataToStore)
+            .upsert(dataToStore as any)
 
           if (error) {
             // If the column doesn't exist, try without multimodal_context
             if (error.message?.includes('multimodal_context') || error.message?.includes('tool_outputs')) {
-              const { multimodal_context, tool_outputs, ...dataWithoutExtras } = dataToStore
+              const { multimodal_context, tool_outputs, ...dataWithoutExtras } = dataToStore as any
               const { error: retryError } = await this.supabase
                 .from('conversation_contexts')
-                .upsert(dataWithoutExtras as any)
+                .upsert(dataWithoutExtras)
 
               if (retryError) {
                 throw retryError

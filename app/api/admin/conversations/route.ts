@@ -32,7 +32,7 @@ interface ConversationResponse {
 
 function ensureSupabase() {
   const supabase = supabaseService
-  if (!supabase || typeof supabase.from !== 'function') {
+  if (!supabase || typeof (supabase as any)?.from !== 'function') {
     throw new Error('Supabase service client unavailable. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.')
   }
   return supabase
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
     }
 
-    let query = supabase
+    let query = (supabase as any)
       .from('conversations')
       .select('*')
       .gte('created_at', startDate.toISOString())
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,summary.ilike.%${search}%`)
     }
 
-    const { data, error } = await query as { data: ConversationRecord[] | null; error: any }
+    const { data, error } = await query as { data: ConversationRecord[] | null; error: unknown }
 
     if (error) {
       console.error('Admin conversations fetch error:', error)

@@ -1,4 +1,4 @@
-export async function GET() {
+export function GET() {
   // Return simple analytics data as JSON
   const analyticsData = {
     title: 'Real-time Analytics',
