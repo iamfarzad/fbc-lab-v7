@@ -168,7 +168,7 @@ Response style: Be concise, actionable, and data-driven.`
     // Handle streaming vs non-streaming
     if (stream !== false) {
       // For streaming, use direct Google model (ai-retry doesn't support streaming)
-      const streamingModel = google('gemini-2.5-flash')
+      const streamingModel = google('gemini-2.5-flash', { apiKey })
       
       // Streaming response using AI SDK
       const result = streamText({
