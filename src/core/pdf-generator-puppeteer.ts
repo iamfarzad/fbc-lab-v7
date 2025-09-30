@@ -39,7 +39,7 @@ export async function generatePdfWithPuppeteer(
   outputPath: string,
   mode: Mode = 'client',
   language: string = 'en'
-) {
+): Promise<Uint8Array> {
   const usePdfLib = process.env.PDF_USE_PDFLIB === 'true'
 
   if (!usePdfLib) {
@@ -77,7 +77,7 @@ export async function generatePdfWithPuppeteer(
     }
   }
 
-  await generatePdfWithPdfLib(summaryData, outputPath, mode, language)
+  return await generatePdfWithPdfLib(summaryData, outputPath, mode, language)
 }
 
 async function generatePdfWithPdfLib(
@@ -154,7 +154,17 @@ async function generatePdfWithPdfLib(
   })
 
   const pdfBytes = await pdfDoc.save()
-  await fs.promises.writeFile(outputPath, pdfBytes)
+  
+  // In serverless environments (like Vercel), we can't write to filesystem
+  // Instead, we'll return the PDF bytes directly for email attachment
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    // Store PDF bytes in memory or return them directly
+    return pdfBytes
+  } else {
+    // Only write to filesystem in development
+    await fs.promises.writeFile(outputPath, pdfBytes)
+    return pdfBytes
+  }
 
   async function writeParagraph(text: string, size = 11) {
     const translated = await translateText(text)
@@ -198,7 +208,13 @@ async function generatePdfWithPdfLib(
 export function generatePdfPath(sessionId: string, leadName: string) {
   const sanitizedName = leadName.replace(/[^a-zA-Z0-9]/g, '_') || 'lead'
   const timestamp = new Date().toISOString().split('T')[0]
-  return `/tmp/FB-c_Summary_${sanitizedName}_${timestamp}_${sessionId}.pdf`
+  
+  // In serverless environments, we don't use file paths
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    return `FB-c_Summary_${sanitizedName}_${timestamp}_${sessionId}.pdf`
+  } else {
+    return `/tmp/FB-c_Summary_${sanitizedName}_${timestamp}_${sessionId}.pdf`
+  }
 }
 
 export function sanitizeTextForPdf(text: string) {

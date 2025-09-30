@@ -36,12 +36,12 @@ export async function finalizeLeadSession(ctx: LeadContext) {
       email: ctx.email
     })
 
-    const pdfUrl = await generateLeadPdf(ctx, conversation.id)
-    if (pdfUrl) {
-      await updatePdfUrl(conversation.id, pdfUrl)
+    const { pdfPath, pdfBytes } = await generateLeadPdf(ctx, conversation.id)
+    if (pdfPath) {
+      await updatePdfUrl(conversation.id, pdfPath)
     }
 
-    const emailSent = await sendLeadEmail(ctx.email, ctx, pdfUrl, conversation.id)
+    const emailSent = await sendLeadEmail(ctx.email, ctx, pdfPath, conversation.id, pdfBytes)
     await updateEmailStatus(conversation.id, emailSent ? 'sent' : 'failed')
 
     return conversation
@@ -58,11 +58,11 @@ export async function finalizeLeadSession(ctx: LeadContext) {
   }
 }
 
-async function generateLeadPdf(ctx: LeadContext, conversationId: string) {
+async function generateLeadPdf(ctx: LeadContext, conversationId: string): Promise<{ pdfPath: string | null; pdfBytes?: Uint8Array }> {
   try {
     const pdfPath = generatePdfPath(conversationId, ctx.name)
 
-    await generatePdfWithPuppeteer(
+    const pdfBytes: Uint8Array | undefined = await generatePdfWithPuppeteer(
       {
         leadInfo: {
           name: ctx.name,
@@ -89,7 +89,7 @@ async function generateLeadPdf(ctx: LeadContext, conversationId: string) {
       'internal'
     )
 
-    return pdfPath
+    return { pdfPath, pdfBytes }
   } catch (error) {
     logger.error('Lead PDF generation failed', error)
     throw error
@@ -100,11 +100,12 @@ async function sendLeadEmail(
   recipient: string,
   ctx: LeadContext,
   pdfPath: string | null,
-  conversationId: string
+  conversationId: string,
+  pdfBytes?: Uint8Array
 ) {
   const subject = 'Your Personalized AI Strategy Summary - F.B/c'
   const html = buildLeadEmailHtml(ctx, pdfPath)
-  const attachments = await buildAttachments(pdfPath)
+  const attachments = await buildAttachments(pdfPath, pdfBytes)
 
   for (let attempt = 0; attempt <= 2; attempt += 1) {
     try {
@@ -138,18 +139,34 @@ async function sendLeadEmail(
   return false
 }
 
-async function buildAttachments(pdfPath: string | null) {
-  if (!pdfPath) return undefined
+async function buildAttachments(pdfPath: string | null, pdfBytes?: Uint8Array) {
+  if (!pdfPath && !pdfBytes) return undefined
 
   try {
-    const content = await fs.promises.readFile(pdfPath)
-    return [
-      {
-        filename: 'AI_Strategy_Summary.pdf',
-        content,
-        contentType: 'application/pdf'
-      }
-    ]
+    // In serverless environments, use the PDF bytes directly
+    if (pdfBytes) {
+      return [
+        {
+          filename: 'AI_Strategy_Summary.pdf',
+          content: Buffer.from(pdfBytes),
+          contentType: 'application/pdf'
+        }
+      ]
+    }
+    
+    // In development, read from file system
+    if (pdfPath && !process.env.VERCEL && process.env.NODE_ENV !== 'production') {
+      const content = await fs.promises.readFile(pdfPath)
+      return [
+        {
+          filename: 'AI_Strategy_Summary.pdf',
+          content,
+          contentType: 'application/pdf'
+        }
+      ]
+    }
+    
+    return undefined
   } catch (error) {
     logger.warn('Unable to attach PDF to email', error)
     return undefined

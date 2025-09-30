@@ -1,6 +1,38 @@
 import { supabaseService } from '../supabase/client'
 import type { ConversationRecord } from '../types/conversations'
 
+// Type definitions for database operations
+interface ConversationInsertData {
+  name: string | null
+  email: string
+  summary: string | null
+  lead_score: number | null
+  research_json: Record<string, unknown> | null
+  pdf_url: string | null
+  email_status: string
+  email_retries: number
+}
+
+interface ConversationUpdateData {
+  pdf_url?: string
+  email_status?: string
+  email_retries?: number
+}
+
+interface FailedEmailData {
+  conversation_id: string
+  recipient_email: string
+  failure_reason: string
+  retries: number
+  email_content?: Record<string, unknown>
+  failed_at: string
+}
+
+interface SupabaseResponse<T> {
+  data: T | null
+  error: Error | null
+}
+
 function ensureService() {
   if (!supabaseService) {
     throw new Error('Supabase service client is not configured')
@@ -10,20 +42,22 @@ function ensureService() {
 }
 
 // Insert a new conversation record
-export async function saveConversation(record: ConversationRecord) {
+export async function saveConversation(record: ConversationRecord): Promise<ConversationRecord> {
   const service = ensureService()
+  const insertData: ConversationInsertData = {
+    name: record.name,
+    email: record.email,
+    summary: record.summary,
+    lead_score: record.leadScore,
+    research_json: record.researchJson,
+    pdf_url: record.pdfUrl,
+    email_status: record.emailStatus ?? 'pending',
+    email_retries: record.emailRetries ?? 0
+  }
+
   const { data, error } = await service
     .from('conversations')
-    .insert({
-      name: record.name,
-      email: record.email,
-      summary: record.summary,
-      lead_score: record.leadScore,
-      research_json: record.researchJson,
-      pdf_url: record.pdfUrl,
-      email_status: record.emailStatus ?? 'pending',
-      email_retries: record.emailRetries ?? 0
-    })
+    .insert(insertData)
     .select()
     .single()
 
@@ -32,7 +66,7 @@ export async function saveConversation(record: ConversationRecord) {
     throw error
   }
 
-  return data
+  return data as ConversationRecord
 }
 
 // Update only the PDF URL after generation
@@ -127,19 +161,21 @@ export async function logFailedEmail(
   recipientEmail: string,
   failureReason: string,
   retries: number,
-  emailContent?: any
-) {
+  emailContent?: Record<string, unknown>
+): Promise<FailedEmailData> {
   const service = ensureService()
+  const insertData: FailedEmailData = {
+    conversation_id: conversationId,
+    recipient_email: recipientEmail,
+    failure_reason: failureReason,
+    retries,
+    email_content: emailContent,
+    failed_at: new Date().toISOString()
+  }
+
   const { data, error } = await service
     .from('failed_emails')
-    .insert({
-      conversation_id: conversationId,
-      recipient_email: recipientEmail,
-      failure_reason: failureReason,
-      retries,
-      email_content: emailContent,
-      failed_at: new Date().toISOString()
-    })
+    .insert(insertData)
     .select()
     .single()
 
@@ -148,7 +184,7 @@ export async function logFailedEmail(
     throw error
   }
 
-  return data
+  return data as FailedEmailData
 }
 
 // Get failed conversations with full context
