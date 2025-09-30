@@ -50,7 +50,12 @@ export async function POST(req: NextRequest) {
 
     if (!email) {
       return NextResponse.json(
-        { error: 'Missing required field: email' },
+        {
+          error: 'Missing required field: email',
+          message: 'Email address is required to initialize the AI consultation session',
+          required: ['email'],
+          suggestion: 'Please provide a valid email address to continue'
+        },
         { status: 400 }
       )
     }
@@ -192,7 +197,11 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('❌ Session init failed', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error during session initialization',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        suggestion: 'Please try again or contact support if the issue persists'
+      },
       { status: 500 }
     )
   }

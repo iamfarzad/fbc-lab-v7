@@ -208,6 +208,11 @@ export function ChatInterface({ id }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
   const [contextReady, setContextReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [email, setEmail] = useState('');
+  const [currentContext, setCurrentContext] = useState<{
+    company?: { name?: string };
+    person?: { fullName?: string; role?: string };
+  } | null>(null);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
     // Check localStorage for terms acceptance
     if (typeof window !== 'undefined') {
@@ -292,6 +297,7 @@ export function ChatInterface({ id }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: sessionIdRef.current,
+          email: email || 'anonymous@example.com', // Fallback for anonymous users
           consentGiven: true
         })
       });
@@ -301,8 +307,18 @@ export function ChatInterface({ id }: Props) {
         return;
       }
 
+      const data = await response.json();
       hasInitialisedRef.current = true;
       setContextReady(true);
+
+      // Set current context from session data
+      if (data.context) {
+        setCurrentContext({
+          company: data.context.company ? { name: data.context.company.name } : undefined,
+          person: data.context.person ? { fullName: data.context.person.fullName, role: data.context.role } : undefined
+        });
+      }
+
       await fetchSuggestions();
     } catch (error) {
       console.warn('Session initialisation failed', error);
@@ -311,7 +327,14 @@ export function ChatInterface({ id }: Props) {
 
 
   const handleTermsAcceptance = async () => {
-    if (!agreed) return;
+    if (!agreed || !email.trim()) return;
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      console.warn('Invalid email format');
+      return;
+    }
 
     // Store acceptance in localStorage
     if (typeof window !== 'undefined') {
@@ -672,9 +695,7 @@ export function ChatInterface({ id }: Props) {
         content: assistantContent || 'I had trouble generating a response. Could you try again?',
         role: 'assistant',
         timestamp: new Date(),
-        metadata: response.metadata?.research ? {
-          research: response.metadata.research
-        } : undefined
+        metadata: undefined
       };
 
       const enhancedAiMessage = aiElements.createEnhancedMessage(aiResponse.content, 'assistant');
@@ -703,7 +724,7 @@ export function ChatInterface({ id }: Props) {
         content: 'I apologize, but I encountered an error. Please try again.',
         role: 'assistant',
         timestamp: new Date(),
-        metadata: { error: true }
+        metadata: {}
       };
 
       const enhancedErrorMessage = aiElements.createEnhancedMessage(
@@ -1017,7 +1038,26 @@ export function ChatInterface({ id }: Props) {
                                 <div className="text-center">
                                   <h3 className="text-lg font-semibold text-foreground mb-2">Terms & Conditions</h3>
                                   <p className="text-sm text-muted-foreground">
-                                    To provide personalized AI guidance, please accept our terms for research and data processing.
+                                    To provide personalized AI guidance, please provide your email and accept our terms for research and data processing.
+                                  </p>
+                                </div>
+
+                                {/* Email Input */}
+                                <div className="space-y-2">
+                                  <label htmlFor="email-input" className="text-sm font-medium text-foreground">
+                                    Email Address
+                                  </label>
+                                  <input
+                                    id="email-input"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="your.email@company.com"
+                                    className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    required
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    We'll use this to research your company and provide tailored AI guidance.
                                   </p>
                                 </div>
 
@@ -1056,7 +1096,7 @@ export function ChatInterface({ id }: Props) {
 
                                 <button
                                   onClick={handleTermsAcceptance}
-                                  disabled={!agreed}
+                                  disabled={!agreed || !email.trim()}
                                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-md text-sm font-medium transition-colors"
                                 >
                                   Continue to AI Consultation

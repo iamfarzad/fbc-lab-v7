@@ -10,8 +10,15 @@ const contextStorage = new ContextStorage()
 const Body = z.object({ sessionId: z.string().min(1), stage: z.string().optional() })
 
 export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimit: { windowMs: 3000, max: 5 }, handler: async ({ body, req }) => {
-  const raw = await contextStorage.get(body.sessionId)
-  if (!raw) return NextResponse.json({ ok: false, error: 'Context not found' } satisfies ToolRunResult, { status: 404 })
+  try {
+    const raw = await contextStorage.get(body.sessionId)
+    if (!raw) {
+      console.warn(`Suggestions API: Context not found for sessionId: ${body.sessionId}`)
+      return NextResponse.json({
+        ok: false,
+        error: `Session context not found for sessionId: ${body.sessionId}. Please ensure you've initialized the session first. Try refreshing the page or reinitializing the chat session.`
+      } satisfies ToolRunResult, { status: 404 })
+    }
   const snapshot: ContextSnapshot = {
     lead: { email: (raw.email ?? '').toString(), name: (raw.name ?? '').toString() },
     company: (raw.company_context && Object.keys(raw.company_context as any).length > 0) ? raw.company_context as any : undefined,
@@ -31,8 +38,15 @@ export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimi
       suggestions.unshift({ id: 'video2app', label: 'Turn video into app blueprint', action: 'run_tool', capability: 'video2app' })
     }
   } catch {}
-  // Back-compat: keep top-level suggestions array
-  return NextResponse.json({ ok: true, output: { suggestions }, suggestions } as any)
+    // Back-compat: keep top-level suggestions array
+    return NextResponse.json({ ok: true, output: { suggestions }, suggestions } as any)
+  } catch (error) {
+    console.error('❌ Suggestions API error:', error)
+    return NextResponse.json({
+      ok: false,
+      error: `Internal server error while generating suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
+    } satisfies ToolRunResult, { status: 500 })
+  }
 }})
 
 // Add GET handler for compatibility
