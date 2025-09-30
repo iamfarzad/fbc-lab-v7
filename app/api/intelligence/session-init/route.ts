@@ -129,9 +129,9 @@ export async function POST(req: NextRequest) {
       if (!hasResearch(existing)) {
         // Action logged
         if (!researchInFlight.has(sessionId)) {
-          const p = leadResearchService
-            .researchLead({ email, name, companyUrl, sessionId })
-            .finally(() => researchInFlight.delete(sessionId))
+        const p = leadResearchService
+          .researchLead(email, name, companyUrl, sessionId)
+          .finally(() => researchInFlight.delete(sessionId))
           researchInFlight.set(sessionId, p)
         }
         researchResult = await researchInFlight.get(sessionId)!

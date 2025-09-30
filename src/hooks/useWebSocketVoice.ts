@@ -76,7 +76,7 @@ export function useWebSocketVoice() {
   // Session state refs to handle race conditions
   const isSessionActiveRef = useRef<boolean>(false)
   const pendingAudioBufferRef = useRef<ArrayBuffer[]>([])
-  const sessionStartPromiseRef = useRef<Promise<void> | null>(null)
+  const sessionStartResolveRef = useRef<(() => void) | null>(null)
 
   const serverUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined
@@ -109,7 +109,7 @@ export function useWebSocketVoice() {
     // Clear session state refs
     isSessionActiveRef.current = false
     pendingAudioBufferRef.current = []
-    sessionStartPromiseRef.current = null
+    sessionStartResolveRef.current = null
   }, [])
 
   const playNextAudio = useCallback(async () => {
@@ -178,9 +178,9 @@ export function useWebSocketVoice() {
         }
 
         // Resolve session start promise if it exists
-        if (sessionStartPromiseRef.current) {
-          sessionStartPromiseRef.current()
-          sessionStartPromiseRef.current = null
+        if (sessionStartResolveRef.current) {
+          sessionStartResolveRef.current()
+          sessionStartResolveRef.current = null
         }
         break
       }

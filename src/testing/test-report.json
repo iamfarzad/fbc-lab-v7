@@ -1,368 +1,394 @@
 {
-  "timestamp": "2025-09-27T10:46:57.814Z",
-  "duration": 13669,
-  "totalTests": 60,
-  "passedTests": 54,
-  "failedTests": 6,
-  "successRate": "90.0",
+  "timestamp": "2025-09-30T13:21:40.577Z",
+  "duration": 3286,
+  "totalTests": 64,
+  "passedTests": 59,
+  "failedTests": 5,
+  "successRate": "92.2",
   "results": [
     {
       "test": "WebSocket - Live Server (port 3001)",
-      "details": "Connected successfully",
-      "timestamp": "2025-09-27T10:46:44.046Z"
+      "passed": false,
+      "details": "Command failed: node \"/Users/farzad/fbc_lab_v7/src/testing/temp-script.js\"\nfile:///Users/farzad/fbc_lab_v7/src/testing/temp-script.js:6\n            return new Promise((resolve, reject) => {\n            ^^^^^^\n\nSyntaxError: Illegal return statement\n    at compileSourceTextModule (node:internal/modules/esm/utils:357:16)\n    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:109:18)\n    at #translate (node:internal/modules/esm/loader:575:20)\n    at afterLoad (node:internal/modules/esm/loader:625:29)\n    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:630:12)\n    at #createModuleJob (node:internal/modules/esm/loader:654:36)\n    at #getJobFromResolveResult (node:internal/modules/esm/loader:354:34)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:319:41)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:696:25)\n\nNode.js v24.8.0\n",
+      "timestamp": "2025-09-30T13:21:37.234Z"
     },
     {
       "test": "WebSocket - WebRTC Signaling (port 3002)",
-      "details": "Connected successfully",
-      "timestamp": "2025-09-27T10:46:44.148Z"
+      "passed": false,
+      "details": "Command failed: node \"/Users/farzad/fbc_lab_v7/src/testing/temp-script.js\"\nfile:///Users/farzad/fbc_lab_v7/src/testing/temp-script.js:6\n            return new Promise((resolve, reject) => {\n            ^^^^^^\n\nSyntaxError: Illegal return statement\n    at compileSourceTextModule (node:internal/modules/esm/utils:357:16)\n    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:109:18)\n    at #translate (node:internal/modules/esm/loader:575:20)\n    at afterLoad (node:internal/modules/esm/loader:625:29)\n    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:630:12)\n    at #createModuleJob (node:internal/modules/esm/loader:654:36)\n    at #getJobFromResolveResult (node:internal/modules/esm/loader:354:34)\n    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:319:41)\n    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:696:25)\n\nNode.js v24.8.0\n",
+      "timestamp": "2025-09-30T13:21:37.296Z"
     },
     {
       "test": "React Analysis - ContactSection.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.269Z"
+      "timestamp": "2025-09-30T13:21:37.367Z"
     },
     {
       "test": "React Analysis - Navigation.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.271Z"
+      "timestamp": "2025-09-30T13:21:37.368Z"
     },
     {
       "test": "React Analysis - ThemeSwitcher.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.272Z"
+      "timestamp": "2025-09-30T13:21:37.368Z"
     },
     {
       "test": "React Analysis - AdminDashboard.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.272Z"
+      "timestamp": "2025-09-30T13:21:37.369Z"
     },
     {
       "test": "React Analysis - branch.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.272Z"
+      "timestamp": "2025-09-30T13:21:37.369Z"
     },
     {
       "test": "React Analysis - code-block.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.273Z"
+      "timestamp": "2025-09-30T13:21:37.369Z"
     },
     {
       "test": "React Analysis - conversation.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.273Z"
+      "timestamp": "2025-09-30T13:21:37.369Z"
     },
     {
       "test": "React Analysis - enhanced-message.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.273Z"
+      "timestamp": "2025-09-30T13:21:37.370Z"
     },
     {
       "test": "React Analysis - inline-citation.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.274Z"
+      "timestamp": "2025-09-30T13:21:37.370Z"
     },
     {
       "test": "React Analysis - prompt-input.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.274Z"
+      "timestamp": "2025-09-30T13:21:37.371Z"
     },
     {
       "test": "React Analysis - reasoning.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.274Z"
+      "timestamp": "2025-09-30T13:21:37.371Z"
     },
     {
       "test": "React Analysis - tool.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.275Z"
+      "timestamp": "2025-09-30T13:21:37.372Z"
     },
     {
       "test": "React Analysis - web-preview.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.275Z"
+      "timestamp": "2025-09-30T13:21:37.373Z"
     },
     {
       "test": "React Analysis - ChatInterface.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.278Z"
+      "timestamp": "2025-09-30T13:21:37.377Z"
     },
     {
       "test": "React Analysis - MeetingOverlay.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.279Z"
+      "timestamp": "2025-09-30T13:21:37.377Z"
     },
     {
       "test": "React Analysis - page-shell.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.279Z"
+      "timestamp": "2025-09-30T13:21:37.378Z"
     },
     {
       "test": "React Analysis - avatar.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.279Z"
+      "timestamp": "2025-09-30T13:21:37.378Z"
     },
     {
       "test": "React Analysis - badge.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.280Z"
+      "timestamp": "2025-09-30T13:21:37.378Z"
     },
     {
       "test": "React Analysis - button.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.280Z"
+      "timestamp": "2025-09-30T13:21:37.379Z"
     },
     {
       "test": "React Analysis - card.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.280Z"
+      "timestamp": "2025-09-30T13:21:37.379Z"
     },
     {
       "test": "React Analysis - carousel.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.281Z"
+      "timestamp": "2025-09-30T13:21:37.379Z"
     },
     {
       "test": "React Analysis - dropdown-menu.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.281Z"
+      "timestamp": "2025-09-30T13:21:37.380Z"
     },
     {
       "test": "React Analysis - error-boundary.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.281Z"
+      "timestamp": "2025-09-30T13:21:37.380Z"
     },
     {
       "test": "React Analysis - hover-card.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.281Z"
+      "timestamp": "2025-09-30T13:21:37.381Z"
     },
     {
       "test": "React Analysis - input.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.281Z"
+      "timestamp": "2025-09-30T13:21:37.381Z"
     },
     {
       "test": "React Analysis - progress.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.282Z"
+      "timestamp": "2025-09-30T13:21:37.381Z"
     },
     {
       "test": "React Analysis - scroll-area.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.282Z"
+      "timestamp": "2025-09-30T13:21:37.382Z"
     },
     {
       "test": "React Analysis - select.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.282Z"
+      "timestamp": "2025-09-30T13:21:37.382Z"
     },
     {
       "test": "React Analysis - tabs.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.282Z"
+      "timestamp": "2025-09-30T13:21:37.382Z"
     },
     {
       "test": "React Analysis - textarea.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.282Z"
+      "timestamp": "2025-09-30T13:21:37.382Z"
     },
     {
       "test": "React Analysis - tooltip.tsx",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.282Z"
+      "timestamp": "2025-09-30T13:21:37.382Z"
     },
     {
       "test": "React Analysis - capability-registry.ts",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.283Z"
+      "timestamp": "2025-09-30T13:21:37.383Z"
     },
     {
       "test": "React Analysis - useAIElements.ts",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.283Z"
+      "timestamp": "2025-09-30T13:21:37.383Z"
     },
     {
       "test": "React Analysis - useConversationalIntelligence.ts",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.283Z"
+      "timestamp": "2025-09-30T13:21:37.383Z"
     },
     {
       "test": "React Analysis - useUnifiedChat.ts",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.284Z"
+      "timestamp": "2025-09-30T13:21:37.384Z"
     },
     {
       "test": "React Analysis - useWebSocketVoice.ts",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.287Z"
+      "timestamp": "2025-09-30T13:21:37.390Z"
     },
     {
       "test": "React Analysis - run-tests.ts",
       "passed": false,
       "details": "Pattern /useState.*setState.*useState.*setState/gs: 1 occurrences, Pattern /componentDidUpdate.*setState/g: 1 occurrences, Pattern /shouldComponentUpdate.*true/g: 1 occurrences",
-      "timestamp": "2025-09-27T10:46:44.289Z"
+      "timestamp": "2025-09-30T13:21:37.392Z"
     },
     {
       "test": "React Analysis - test-config.ts",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.290Z"
+      "timestamp": "2025-09-30T13:21:37.393Z"
     },
     {
       "test": "React Analysis - chat-enhanced.ts",
       "passed": true,
       "details": "No infinite loop patterns detected",
-      "timestamp": "2025-09-27T10:46:44.291Z"
+      "timestamp": "2025-09-30T13:21:37.395Z"
     },
     {
       "test": "API - POST /api/chat/unified",
       "passed": false,
       "details": "Status: 500",
-      "timestamp": "2025-09-27T10:46:44.760Z"
+      "timestamp": "2025-09-30T13:21:38.524Z"
     },
     {
       "test": "API - GET /api/intelligence/context",
       "passed": true,
       "details": "Status: 400",
-      "timestamp": "2025-09-27T10:46:45.530Z"
+      "timestamp": "2025-09-30T13:21:38.829Z"
     },
     {
       "test": "API - POST /api/intelligence/intent",
       "passed": true,
       "details": "Status: 400",
-      "timestamp": "2025-09-27T10:46:45.652Z"
+      "timestamp": "2025-09-30T13:21:39.243Z"
     },
     {
       "test": "API - GET /api/admin/stats",
       "passed": true,
       "details": "Status: 401",
-      "timestamp": "2025-09-27T10:46:45.703Z"
+      "timestamp": "2025-09-30T13:21:39.270Z"
     },
     {
       "test": "Performance - AnalyticsDashboard.tsx",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.746Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
     },
     {
       "test": "Performance - LazyComponents.tsx",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.746Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
     },
     {
       "test": "Performance - WorkshopsSection.tsx",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.746Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
     },
     {
       "test": "Performance - AdminDashboard.tsx",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.747Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
     },
     {
       "test": "Performance - error-boundary.tsx",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.747Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
     },
     {
       "test": "Performance - retry-model.ts",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.747Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
     },
     {
       "test": "Performance - error-handler.ts",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.748Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
     },
     {
       "test": "Performance - multimodal-context.ts",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.748Z"
+      "timestamp": "2025-09-30T13:21:39.303Z"
+    },
+    {
+      "test": "Performance - advanced-context-manager.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-30T13:21:39.304Z"
+    },
+    {
+      "test": "Performance - enhanced-tool-suggestion-engine.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-30T13:21:39.304Z"
     },
     {
       "test": "Performance - admin.ts",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.748Z"
+      "timestamp": "2025-09-30T13:21:39.304Z"
+    },
+    {
+      "test": "Performance - api-middleware.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-30T13:21:39.304Z"
+    },
+    {
+      "test": "Performance - logger.ts",
+      "passed": true,
+      "details": "Performance monitoring detected",
+      "timestamp": "2025-09-30T13:21:39.304Z"
     },
     {
       "test": "Performance - run-tests.ts",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.748Z"
+      "timestamp": "2025-09-30T13:21:39.304Z"
     },
     {
       "test": "Performance - test-config.ts",
       "passed": true,
       "details": "Performance monitoring detected",
-      "timestamp": "2025-09-27T10:46:45.748Z"
+      "timestamp": "2025-09-30T13:21:39.304Z"
     },
     {
       "test": "Performance - Page Load",
-      "passed": false,
-      "details": "Load time: 4443ms",
-      "timestamp": "2025-09-27T10:46:50.191Z"
+      "passed": true,
+      "details": "Load time: 254ms",
+      "timestamp": "2025-09-30T13:21:39.558Z"
     },
     {
       "test": "Error Scenario - Invalid API Endpoint",
       "passed": true,
       "details": "Handled correctly",
-      "timestamp": "2025-09-27T10:46:57.280Z"
+      "timestamp": "2025-09-30T13:21:39.647Z"
     },
     {
       "test": "Error Scenario - WebSocket Connection Failure",
       "passed": true,
       "details": "Handled correctly",
-      "timestamp": "2025-09-27T10:46:57.282Z"
+      "timestamp": "2025-09-30T13:21:39.648Z"
     },
     {
       "test": "Error Scenario - Rate Limiting",
       "passed": false,
       "details": "Not handled properly",
-      "timestamp": "2025-09-27T10:46:57.660Z"
+      "timestamp": "2025-09-30T13:21:40.458Z"
     }
   ]
 }

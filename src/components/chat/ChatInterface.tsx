@@ -40,6 +40,7 @@ import { useWebSocketVoice } from "@/hooks/useWebSocketVoice";
 // UI Components
 import { Button } from "@/components/ui/button";
 import { MeetingOverlay } from "@/components/meeting/MeetingOverlay";
+import { Badge } from "@/components/ui/badge";
 
 // Icons
 import {
@@ -58,6 +59,7 @@ import {
   Plus,
   RotateCcw,
   FileText,
+  ExternalLink,
 } from "lucide-react";
 
 const DEFAULT_SUGGESTIONS = [
@@ -205,6 +207,14 @@ export function ChatInterface({ id }: Props) {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>(DEFAULT_SUGGESTIONS);
   const [contextReady, setContextReady] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
+    // Check localStorage for terms acceptance
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('fbc-terms-accepted') === 'true';
+    }
+    return false;
+  });
   const sessionIdRef = useRef<string>(id || generateId());
   const hasInitialisedRef = useRef(false);
   const messagesRef = useRef<ChatMessage[]>([]);
@@ -267,6 +277,14 @@ export function ChatInterface({ id }: Props) {
 
   const initialiseSession = useCallback(async () => {
     if (hasInitialisedRef.current) return;
+
+    // For inline terms acceptance, we don't need to show a modal
+    // Terms acceptance is handled inline in the chat interface
+    if (!hasAcceptedTerms) {
+      return; // Wait for user to accept terms inline
+    }
+
+    // Initialize session after terms acceptance
     try {
       setContextReady(false);
       const response = await fetch('/api/intelligence/session-init', {
@@ -274,8 +292,7 @@ export function ChatInterface({ id }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: sessionIdRef.current,
-          email: 'guest@farzadbayat.com',
-          name: 'Website Visitor'
+          consentGiven: true
         })
       });
 
@@ -290,7 +307,27 @@ export function ChatInterface({ id }: Props) {
     } catch (error) {
       console.warn('Session initialisation failed', error);
     }
-  }, [fetchSuggestions]);
+  }, [hasAcceptedTerms, fetchSuggestions]);
+
+
+  const handleTermsAcceptance = async () => {
+    if (!agreed) return;
+
+    // Store acceptance in localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('fbc-terms-accepted', 'true');
+    }
+
+    setHasAcceptedTerms(true);
+    setAgreed(false);
+
+    // Initialize session if not already done
+    if (!hasInitialisedRef.current) {
+      await initialiseSession();
+    }
+
+    toast.success('Welcome to F.B/c AI! Your personalized consultation begins now.');
+  };
 
   useEffect(() => {
     if (chatState.isOpen) {
@@ -606,7 +643,10 @@ export function ChatInterface({ id }: Props) {
     try {
       const payload = {
         messages: nextMessages.map(({ role, content }) => ({ role, content })),
-        context: { sessionId: sessionIdRef.current },
+        context: {
+          sessionId: sessionIdRef.current,
+          enhancedResearch: true // Enable automatic enhanced grounding research
+        },
         mode: 'standard',
         stream: false
       };
@@ -631,7 +671,10 @@ export function ChatInterface({ id }: Props) {
         id: data?.id ?? generateId(),
         content: assistantContent || 'I had trouble generating a response. Could you try again?',
         role: 'assistant',
-        timestamp: new Date()
+        timestamp: new Date(),
+        metadata: response.metadata?.research ? {
+          research: response.metadata.research
+        } : undefined
       };
 
       const enhancedAiMessage = aiElements.createEnhancedMessage(aiResponse.content, 'assistant');
@@ -659,7 +702,8 @@ export function ChatInterface({ id }: Props) {
         id: generateId(),
         content: 'I apologize, but I encountered an error. Please try again.',
         role: 'assistant',
-        timestamp: new Date()
+        timestamp: new Date(),
+        metadata: { error: true }
       };
 
       const enhancedErrorMessage = aiElements.createEnhancedMessage(
@@ -939,34 +983,125 @@ export function ChatInterface({ id }: Props) {
                   </div>
                 )}
 
+                {/* Enhanced Research Status Indicator */}
+                {sessionIdRef.current && (
+                  <div className="px-4 py-2 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span>Enhanced Research Active</span>
+                      <Badge variant="secondary" className="text-xs">
+                        Auto-grounding + URL context
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+
                 {/* Messages Area */}
                 <div className="flex-1 overflow-hidden relative">
                   <Conversation className="h-full">
                     <ConversationContent className="px-6 py-8 space-y-6">
                       {messages.length === 0 ? (
-                        <ConversationEmptyState
-                          title="Welcome to F.B/c AI"
-                          description={contextReady
-                            ? 'Ask about consulting, workshops, or implementation to begin.'
-                            : 'Gathering company intelligence tailored to you...'}
-                          icon={<MessageCircle className="h-6 w-6 text-muted-foreground" />}
-                        >
-                          <div className="mt-4 flex flex-wrap justify-center gap-2">
-                            {suggestions.map((suggestion, index) => (
-                            <Suggestion
-                              key={index}
-                              suggestion={suggestion}
-                              onClick={() => {
-                                if (suggestion.toLowerCase().includes("schedule")) {
-                                  openMeeting();
-                                } else {
-                                  void handleSendMessage(suggestion);
-                                }
-                              }}
-                            />
-                            ))}
-                          </div>
-                        </ConversationEmptyState>
+                        <div className="flex flex-col items-center justify-center h-full space-y-6">
+                          <ConversationEmptyState
+                            title={`Welcome to F.B/c AI${contextReady && currentContext?.person?.fullName ? `, ${currentContext.person.fullName}` : ''}`}
+                            description={contextReady
+                              ? `I'm here to help you navigate AI strategy and implementation. Based on your ${currentContext?.company?.name || 'organization'}, I can provide tailored guidance.`
+                              : 'Gathering company intelligence tailored to you...'}
+                            icon={<MessageCircle className="h-6 w-6 text-muted-foreground" />}
+                          />
+
+                          {/* Inline Terms Acceptance */}
+                          {!hasAcceptedTerms && (
+                            <div className="max-w-md mx-auto p-6 bg-card border border-border rounded-lg shadow-sm">
+                              <div className="space-y-4">
+                                <div className="text-center">
+                                  <h3 className="text-lg font-semibold text-foreground mb-2">Terms & Conditions</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    To provide personalized AI guidance, please accept our terms for research and data processing.
+                                  </p>
+                                </div>
+
+                                <div className="space-y-3 text-sm text-muted-foreground">
+                                  <div className="flex items-start space-x-2">
+                                    <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                                    <p>We'll use your information to research your company and role for tailored suggestions</p>
+                                  </div>
+                                  <div className="flex items-start space-x-2">
+                                    <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                                    <p>Your data is protected under GDPR and used only for AI personalization</p>
+                                  </div>
+                                  <div className="flex items-start space-x-2">
+                                    <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                                    <p>You can request data deletion at any time</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center space-x-2 pt-2">
+                                  <input
+                                    type="checkbox"
+                                    id="inline-terms"
+                                    checked={agreed}
+                                    onChange={(e) => {
+                                      setAgreed(e.target.checked);
+                                      if (e.target.checked) {
+                                        handleTermsAcceptance();
+                                      }
+                                    }}
+                                    className="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary"
+                                  />
+                                  <label htmlFor="inline-terms" className="text-sm text-foreground cursor-pointer">
+                                    I accept the terms and conditions for AI-powered personalization
+                                  </label>
+                                </div>
+
+                                <button
+                                  onClick={handleTermsAcceptance}
+                                  disabled={!agreed}
+                                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                >
+                                  Continue to AI Consultation
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Show suggestions only after terms acceptance */}
+                          {hasAcceptedTerms && (
+                            <div className="max-w-md mx-auto">
+                              <p className="text-sm text-muted-foreground text-center mb-4">
+                                What would you like to explore today?
+                              </p>
+                              <div className="grid grid-cols-1 gap-2">
+                                {contextReady && currentContext?.person?.role && (
+                                  <button
+                                    onClick={() => handleSendMessage(`As ${currentContext.person.role} at ${currentContext.company?.name}, what AI strategy would you recommend?`)}
+                                    className="w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors"
+                                  >
+                                    🤖 AI strategy for {currentContext.person.role}s
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleSendMessage('What AI consulting services do you offer?')}
+                                  className="w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors"
+                                >
+                                  💼 Consulting services overview
+                                </button>
+                                <button
+                                  onClick={() => handleSendMessage('Tell me about your workshops')}
+                                  className="w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors"
+                                >
+                                  🎓 Workshop and training options
+                                </button>
+                                <button
+                                  onClick={() => handleSendMessage('How can AI help my business?')}
+                                  className="w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors"
+                                >
+                                  🚀 AI implementation guidance
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         enhancedMessages.map((message) => (
                           <EnhancedMessage
@@ -1150,6 +1285,7 @@ export function ChatInterface({ id }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
 
       {/* AI SDK Devtools - Temporarily disabled to prevent infinite loops */}
       {false && process.env.NODE_ENV === "development" && (

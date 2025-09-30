@@ -16,6 +16,10 @@ import { promisify } from 'util';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const execAsync = promisify(exec);
 
@@ -70,7 +74,7 @@ class TestRunner {
         // Create a simple WebSocket test
         const testScript = `
           try {
-            const WebSocket = require('ws');
+            const { default: WebSocket } = await import('ws');
             const ws = new WebSocket('${test.url}');
             
             return new Promise((resolve, reject) => {
@@ -494,10 +498,7 @@ class TestRunner {
   }
 }
 
-// Run the tests
-if (require.main === module) {
-  const runner = new TestRunner();
-  runner.runAllTests().catch(console.error);
-}
+const runner = new TestRunner();
+runner.runAllTests().catch(console.error);
 
 export default TestRunner;

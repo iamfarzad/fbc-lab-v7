@@ -35,4 +35,15 @@ export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimi
   return NextResponse.json({ ok: true, output: { suggestions }, suggestions } as any)
 }})
 
-
+// Add GET handler for compatibility
+export async function GET(request: NextRequest) {
+  return NextResponse.json({
+    message: 'Suggestions API - Use POST method',
+    methods: ['POST'],
+    required: ['sessionId'],
+    example: {
+      sessionId: 'your-session-id',
+      stage: 'optional-stage'
+    }
+  })
+}

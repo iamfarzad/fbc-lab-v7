@@ -8,6 +8,8 @@ import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { multimodalContextManager } from '@/src/core/context/multimodal-context'
+import { GoogleGroundingProvider } from '@/src/core/intelligence/providers/search/google-grounding'
+import { ContextStorage } from '@/src/core/context/context-storage'
 
 // Type definitions
 interface ChatMessage {
@@ -31,6 +33,7 @@ interface ChatContext {
   intelligenceContext?: IntelligenceContext
   sessionId?: string
   multimodalData?: MultimodalData
+  enhancedResearch?: boolean // Enable enhanced grounding research
 }
 
 interface ChatRequestBody {
@@ -50,6 +53,8 @@ interface MultimodalContextResult {
 }
 
 let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
+const contextStorage = new ContextStorage()
+const groundingProvider = new GoogleGroundingProvider()
 
 const getModel = () => {
   const apiKey = process.env.GEMINI_API_KEY
@@ -95,7 +100,41 @@ export async function POST(req: NextRequest) {
     const model = getModel()
 
     // Build system prompt based on mode and context
-    let systemPrompt = "You are F.B/c AI, a helpful business assistant."
+    let systemPrompt = `You are F.B/c AI, the intelligent assistant for Farzad Bayat's AI consulting practice.
+
+MISSION: "Helping organizations navigate the AI landscape through strategic consulting, hands-on workshops, and practical implementation guidance."
+
+PERSONALITY:
+- Strategic & Insightful: Provide actionable business intelligence
+- Professional yet approachable: Expert guidance with warm engagement
+- Context-aware: Use research data to personalize every interaction
+- Progressive: Guide users through 16 AI capabilities systematically
+- Mission-driven: Always connect responses to business value and AI strategy
+
+CORE CAPABILITIES (Progressive Discovery):
+1. ROI Analysis - Calculate AI investment returns
+2. Document Analysis - Process and understand documents
+3. Image Analysis - Visual content understanding
+4. Screenshot Capture - Screen content analysis
+5. Voice Integration - Audio conversations and processing
+6. Screen Sharing - Real-time screen collaboration
+7. Webcam Integration - Video conversations and analysis
+8. Translation - Multi-language communication
+9. Web Search - Research and information gathering
+10. URL Context - Website content analysis
+11. Lead Research - Company and person intelligence
+12. Meeting Scheduling - Calendar and booking integration
+13. PDF Export - Generate strategy summaries
+14. Calculator - Mathematical and financial computations
+15. Code Analysis - Programming and development support
+16. Video to App - Video content transformation
+
+RESPONSE STYLE:
+- Always connect to business outcomes and strategic value
+- Use company/person research to personalize responses
+- Guide users progressively through capabilities based on context
+- Reference specific industries and roles when known
+- End with actionable next steps or capability suggestions`
     
     if (mode === 'admin') {
       systemPrompt = `You are F.B/c AI Admin Assistant, specialized in business intelligence and management.
@@ -132,6 +171,62 @@ Response style: Be concise, actionable, and data-driven.`
       }
 
       systemPrompt += contextData
+    }
+
+    // Add enhanced research context (combines search grounding + URL context)
+    let enhancedResearchContext = ''
+    let researchMetadata = null
+    if (context?.enhancedResearch !== false && context?.sessionId) {
+      try {
+        // Get current context for research
+        const currentContext = await contextStorage.get(context.sessionId)
+        const researchContext = {
+          email: currentContext?.email,
+          company: currentContext?.company_context?.name,
+          industry: currentContext?.company_context?.industry,
+          previousUrls: [] // Could be expanded to track conversation URLs
+        }
+
+        // Get the latest user message for research
+        const latestMessage = messages[messages.length - 1]
+        if (latestMessage?.role === 'user') {
+          console.log('🔍 Performing enhanced research for query:', latestMessage.content)
+
+          const researchResult = await groundingProvider.comprehensiveResearch(
+            latestMessage.content,
+            researchContext
+          )
+
+          researchMetadata = {
+            query: latestMessage.content,
+            urlsUsed: researchResult.urlsUsed,
+            citationCount: researchResult.allCitations.length,
+            searchGroundingUsed: researchResult.searchGrounding.citations.length,
+            urlContextUsed: researchResult.urlContext.length
+          }
+
+          enhancedResearchContext = `
+ENHANCED RESEARCH CONTEXT (Automatically Generated):
+Query: ${latestMessage.content}
+
+${researchResult.combinedAnswer}
+
+Sources Used (${researchResult.urlsUsed.length} URLs analyzed):
+${researchResult.urlsUsed.map((url, i) => `${i + 1}. ${url}`).join('\n')}
+
+Citations: ${researchResult.allCitations.length} sources processed
+`
+          console.log(`✅ Enhanced research completed: ${researchResult.allCitations.length} citations from ${researchResult.urlsUsed.length} URLs`)
+        }
+      } catch (error) {
+        console.warn('Enhanced research failed:', error)
+        researchMetadata = { error: 'Enhanced research failed' }
+        // Continue without enhanced context
+      }
+    }
+
+    if (enhancedResearchContext) {
+      systemPrompt += '\n\n' + enhancedResearchContext
     }
 
     // Add multimodal context from conversation history
@@ -275,7 +370,8 @@ Response style: Be concise, actionable, and data-driven.`
           'x-fbc-endpoint': 'unified-ai-sdk',
           'x-request-id': reqId,
           'X-Chat-Mode': mode,
-          'X-Session-Id': context?.sessionId || 'anonymous'
+          'X-Session-Id': context?.sessionId || 'anonymous',
+          'X-Enhanced-Research': researchMetadata ? 'true' : 'false'
         }
       })
 
@@ -297,13 +393,15 @@ Response style: Be concise, actionable, and data-driven.`
         metadata: {
           mode,
           tokensUsed: result.usage?.totalTokens || 0,
-          reqId
+          reqId,
+          research: researchMetadata
         }
       }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
           'x-fbc-endpoint': 'unified-ai-sdk',
-          'x-request-id': reqId
+          'x-request-id': reqId,
+          'X-Enhanced-Research': researchMetadata ? 'true' : 'false'
         }
       })
     }

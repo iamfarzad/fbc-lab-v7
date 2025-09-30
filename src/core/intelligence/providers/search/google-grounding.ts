@@ -3,6 +3,14 @@ import { GoogleGenAI } from '@google/genai'
 export type GroundedCitation = { uri: string; title?: string; description?: string; source?: 'url' | 'search' }
 export type GroundedAnswer = { text: string; citations: GroundedCitation[]; raw?: unknown }
 
+export interface EnhancedResearchResult {
+  searchGrounding: GroundedAnswer
+  urlContext: GroundedAnswer[]
+  combinedAnswer: string
+  allCitations: GroundedCitation[]
+  urlsUsed: string[]
+}
+
 export class GoogleGroundingProvider {
   private genAI: GoogleGenAI | null = null
 
@@ -164,5 +172,204 @@ export class GoogleGroundingProvider {
   async searchRole(name: string, domain: string): Promise<GroundedAnswer> {
     const query = `What is ${name}'s current role and position at ${domain}? Find their professional title, seniority level, and responsibilities.`
     return this.groundedAnswer(query)
+  }
+
+  /**
+   * Perform comprehensive research using both search grounding and URL context
+   */
+  async comprehensiveResearch(
+    query: string,
+    context: { email?: string; company?: string; industry?: string; previousUrls?: string[] } = {}
+  ): Promise<EnhancedResearchResult> {
+    console.log('🔍 Starting comprehensive research for:', query)
+
+    // Step 1: Generate search queries based on context
+    const searchQueries = this.generateSearchQueries(query, context)
+
+    // Step 2: Perform parallel search grounding
+    const searchPromises = searchQueries.map(q => this.groundedAnswer(q))
+    const searchResults = await Promise.allSettled(searchPromises)
+
+    // Step 3: Extract and discover relevant URLs from search results
+    const discoveredUrls = this.discoverRelevantUrls(searchResults, context)
+
+    // Step 4: Fetch URL context for discovered URLs
+    const urlContextPromises = discoveredUrls.slice(0, 5).map(url =>
+      this.groundedAnswer(query, [url])
+    )
+    const urlResults = await Promise.allSettled(urlContextPromises)
+
+    // Step 5: Combine and synthesize results
+    const searchGrounding = this.selectBestSearchResult(searchResults)
+    const urlContexts = this.filterSuccessfulUrlResults(urlResults)
+
+    // Step 6: Generate combined answer using both sources
+    const combinedAnswer = await this.generateCombinedAnswer(query, searchGrounding, urlContexts, context)
+
+    // Step 7: Collect all citations
+    const allCitations = this.collectAllCitations(searchGrounding, urlContexts)
+
+    return {
+      searchGrounding,
+      urlContext: urlContexts,
+      combinedAnswer,
+      allCitations,
+      urlsUsed: discoveredUrls.slice(0, 5)
+    }
+  }
+
+  private generateSearchQueries(query: string, context: any): string[] {
+    const queries = [query] // Original query
+
+    // Add context-specific queries
+    if (context.company) {
+      queries.push(`${query} ${context.company} industry trends`)
+      queries.push(`${query} ${context.company} best practices`)
+    }
+
+    if (context.industry) {
+      queries.push(`${query} ${context.industry} insights`)
+      queries.push(`${query} ${context.industry} news`)
+    }
+
+    // Add previous conversation context if available
+    if (context.previousUrls?.length > 0) {
+      queries.push(`${query} related to ${context.previousUrls.join(' ')}`)
+    }
+
+    return queries.slice(0, 3) // Limit to 3 queries for performance
+  }
+
+  private discoverRelevantUrls(searchResults: PromiseSettledResult<GroundedAnswer>[], context: any): string[] {
+    const urls = new Set<string>()
+
+    for (const result of searchResults) {
+      if (result.status === 'fulfilled') {
+        // Extract URLs from citations
+        for (const citation of result.value.citations) {
+          if (citation.uri.startsWith('http')) {
+            urls.add(citation.uri)
+          }
+        }
+
+        // Look for URLs in the response text
+        const urlRegex = /https?:\/\/[^\s]+/g
+        const matches = result.value.text.match(urlRegex)
+        if (matches) {
+          for (const match of matches) {
+            urls.add(match.trim())
+          }
+        }
+      }
+    }
+
+    // Filter for relevance
+    const relevantUrls = Array.from(urls).filter(url => {
+      // Exclude social media, images, and other non-content URLs
+      const excludePatterns = [
+        /\/cdn\//, /\.(jpg|png|gif|svg|ico|css|js)$/,
+        /twitter\.com/, /facebook\.com/, /linkedin\.com\/share/,
+        /youtube\.com/, /vimeo\.com/
+      ]
+
+      return !excludePatterns.some(pattern => pattern.test(url))
+    })
+
+    return relevantUrls.slice(0, 8) // Limit to top 8 URLs
+  }
+
+  private selectBestSearchResult(searchResults: PromiseSettledResult<GroundedAnswer>[]): GroundedAnswer {
+    // Find the most successful search result
+    for (const result of searchResults) {
+      if (result.status === 'fulfilled' && result.value.citations.length > 0) {
+        return result.value
+      }
+    }
+
+    // Fallback to first successful result
+    for (const result of searchResults) {
+      if (result.status === 'fulfilled') {
+        return result.value
+      }
+    }
+
+    // Ultimate fallback
+    return {
+      text: 'Unable to retrieve search results at this time.',
+      citations: []
+    }
+  }
+
+  private filterSuccessfulUrlResults(urlResults: PromiseSettledResult<GroundedAnswer>[]): GroundedAnswer[] {
+    return urlResults
+      .filter((result): result is PromiseFulfilledResult<GroundedAnswer> =>
+        result.status === 'fulfilled' && result.value.citations.length > 0
+      )
+      .map(result => result.value)
+  }
+
+  private async generateCombinedAnswer(
+    originalQuery: string,
+    searchGrounding: GroundedAnswer,
+    urlContexts: GroundedAnswer[],
+    context: any
+  ): Promise<string> {
+    const prompt = `
+You are an expert research assistant. I need you to synthesize information from multiple sources to provide the most accurate and comprehensive answer.
+
+ORIGINAL QUERY: ${originalQuery}
+
+${context.company ? `COMPANY CONTEXT: ${context.company}` : ''}
+${context.industry ? `INDUSTRY CONTEXT: ${context.industry}` : ''}
+
+SEARCH RESULTS:
+${searchGrounding.text}
+
+${urlContexts.length > 0 ? `ADDITIONAL CONTEXT FROM URLs:
+${urlContexts.map((ctx, i) => `Source ${i + 1}: ${ctx.text}`).join('\n\n')}` : ''}
+
+Please provide a comprehensive, well-grounded response that:
+1. Directly answers the original query
+2. Incorporates relevant information from all sources
+3. Cites sources appropriately
+4. Prioritizes accuracy and usefulness
+5. Uses specific facts and data when available
+
+If there are conflicting information between sources, mention this and explain your reasoning for which source to prioritize.
+`
+
+    try {
+      if (!this.genAI) {
+        return searchGrounding.text // Fallback if no API key
+      }
+
+      const response = await this.genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: prompt }]}],
+      })
+
+      return typeof response.text === 'function' ? response.text() : response.text || 'Unable to generate response'
+    } catch (error) {
+      console.error('Failed to generate combined answer:', error)
+      return searchGrounding.text // Fallback to search result
+    }
+  }
+
+  private collectAllCitations(searchGrounding: GroundedAnswer, urlContexts: GroundedAnswer[]): GroundedCitation[] {
+    const allCitations = new Map<string, GroundedCitation>()
+
+    // Add search citations
+    for (const citation of searchGrounding.citations) {
+      allCitations.set(citation.uri, { ...citation, source: 'search' })
+    }
+
+    // Add URL context citations
+    for (const urlContext of urlContexts) {
+      for (const citation of urlContext.citations) {
+        allCitations.set(citation.uri, { ...citation, source: 'url' })
+      }
+    }
+
+    return Array.from(allCitations.values())
   }
 }
