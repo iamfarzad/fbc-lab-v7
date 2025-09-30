@@ -52,11 +52,11 @@ interface MultimodalContextResult {
 let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
 
 const getModel = () => {
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
 
   if (!apiKey) {
     throw new Error(
-      'Missing Google Generative AI API key. Add GOOGLE_GENERATIVE_AI_API_KEY to your .env.local file and restart the dev server.'
+      'Missing Google Generative AI API key. Add GEMINI_API_KEY to your .env.local file and restart the dev server.'
     )
   }
 
@@ -291,14 +291,14 @@ Response style: Be concise, actionable, and data-driven.`
     console.error('[UNIFIED_AI_SDK] Error:', error)
 
     const message = error instanceof Error ? error.message : 'Internal server error'
-    const status = message.includes('GOOGLE_GENERATIVE_AI_API_KEY') ? 503 : 500
+    const status = message.includes('GEMINI_API_KEY') ? 503 : 500
 
     return NextResponse.json(
       {
         error: message,
         resolution:
-          message.includes('GOOGLE_GENERATIVE_AI_API_KEY')
-            ? 'Create a .env.local file at the project root and set GOOGLE_GENERATIVE_AI_API_KEY before retrying.'
+          message.includes('GEMINI_API_KEY')
+            ? 'Create a .env.local file at the project root and set GEMINI_API_KEY before retrying.'
             : undefined,
         timestamp: new Date().toISOString()
       },
