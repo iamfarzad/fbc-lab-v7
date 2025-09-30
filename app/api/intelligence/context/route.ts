@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    const context = await contextStorage.get(sessionId) as Record<string, unknown> | null
+    const context = await contextStorage.get(sessionId)
 
     // If no context exists, create default context for new session
     let contextData = context

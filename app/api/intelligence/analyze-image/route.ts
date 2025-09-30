@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { contextStorage } from '@/src/core/context/context-storage'
+import { DatabaseConversationContext } from '@/src/core/context/context-types'
 
 // Type definitions
 interface AnalyzeImageRequest {
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       sessionId,
       metadata: {
         hasContext: !!currentContext,
-        userPreferences: (currentContext as Record<string, unknown>)?.preferences || {},
+        userPreferences: (currentContext as any)?.preferences || {},
         analysisType: 'visual_content'
       }
     }
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       // Build a patch object with proper typing
       const patch = {
         lastWebcamAnalysis: new Date().toISOString(),
-        webcamAnalysisCount: (Number((currentContext as Record<string, unknown>)?.webcamAnalysisCount) || 0) + 1,
+        webcamAnalysisCount: (Number((currentContext as any)?.webcamAnalysisCount) || 0) + 1,
       };
 
       // when saving

@@ -12,10 +12,10 @@ interface ExtendedDatabaseConversationContext extends DatabaseConversationContex
   ai_capabilities_shown?: string[] | null
   company_context?: CompanyContext | null
   person_context?: PersonContext | null
-  intent_data?: Record<string, unknown> | null
+  intent_data?: any | null
   last_user_message?: string | null
-  multimodal_context?: string | MultimodalContext
-  tool_outputs?: Record<string, unknown> | null
+  multimodal_context?: any
+  tool_outputs?: any | null
   created_at?: string | null
   updated_at?: string | null
 }

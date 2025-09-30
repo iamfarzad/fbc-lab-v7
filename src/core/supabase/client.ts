@@ -22,7 +22,7 @@ interface SupabaseError {
   name?: string
 }
 
-// Improved Supabase Client Setup with TypeScript types and error handling
+// Type-safe Supabase client setup
 export const supabase = getSupabaseServer();
 
 // Service Role Client for API operations (bypasses RLS) - only available server-side
@@ -80,7 +80,7 @@ export async function createLeadSummary(
 }
 
 // Comprehensive Error Handling
-export function handleSupabaseError(error: any) {
+export function handleSupabaseError(error: SupabaseError): { message: string; code: string; details: string } {
   const errorMap: Record<string, string> = {
     'PGRST116': 'Permission denied. Check user authentication.',
     'PGRST000': 'Database operation failed',

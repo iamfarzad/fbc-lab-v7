@@ -23,7 +23,7 @@ export const POST = withApiGuard({
     try {
       if (!sessionId) return NextResponse.json({ ok: false, error: 'missing_session' } satisfies ToolRunResult, { status: 400 })
       const existing = await storage.get(sessionId)
-      const prev = (existing?.tool_outputs?.education as any) || { completed: [], xp: 0, badges: [] }
+      const prev = (existing?.tool_outputs as any)?.education || { completed: [], xp: 0, badges: [] }
       const completed = Array.isArray(prev.completed) ? prev.completed : []
       interface CompletedStep {
         moduleId: string;
@@ -33,8 +33,8 @@ export const POST = withApiGuard({
         completed.push({ moduleId: body.moduleId, stepId: body.stepId })
       }
       const xp = (typeof prev.xp === 'number' ? prev.xp : 0) + body.xp
-      const education = { ...prev, completed, xp }
-      const tool_outputs = { ...(existing?.tool_outputs || {}), education }
+      const education = { completed, xp, badges: (prev as any)?.badges || [] }
+      const tool_outputs = { ...(existing?.tool_outputs as any || {}), education }
       const snippet = `Education: ${body.moduleTitle || body.moduleId} → ${body.stepTitle || body.stepId} (+${body.xp} XP)`
       const last_user_message = `${(existing?.last_user_message || '').toString()}\n\n${snippet}`.trim()
       await storage.update(sessionId, { tool_outputs, last_user_message })

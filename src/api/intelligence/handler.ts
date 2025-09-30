@@ -57,8 +57,8 @@ export async function handleIntelligence(body: IntelligenceRequest): Promise<unk
         const contextStorage = new ContextStorage()
 
         await contextStorage.update(sessionId, {
-          company_context: result.company,
-          person_context: result.person,
+          company_context: result.company as any,
+          person_context: result.person as any,
           role: result.role,
           role_confidence: result.confidence
         })

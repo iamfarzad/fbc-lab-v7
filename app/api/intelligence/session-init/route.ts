@@ -2,18 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ContextStorage } from '@/src/core/context/context-storage'
 import { LeadResearchService, ResearchResult } from '@/src/core/intelligence/lead-research'
 import { getSupabase } from '@/src/core/supabase/server'
+import { DatabaseConversationContext } from '@/src/core/context/context-types'
 
 // Type definitions
-interface ContextData {
-  email?: string
-  name?: string
-  company_url?: string
-  company_context?: Record<string, unknown> | null
-  person_context?: Record<string, unknown> | null
-  role?: string | null
-  role_confidence?: number | null
-  ai_capabilities_shown?: string[]
-}
+type ContextData = Partial<DatabaseConversationContext>
 
 interface ContextSnapshot {
   lead: { email: string; name: string }
@@ -110,8 +102,8 @@ export async function POST(req: NextRequest) {
       if (hasResearch(existing)) {
         const snapshot: ContextSnapshot = {
           lead: { email: existing.email || email, name: existing.name || name || 'Unknown' },
-          company: existing.company_context ?? null,
-          person: existing.person_context ?? null,
+          company: existing.company_context as any ?? null,
+          person: existing.person_context as any ?? null,
           role: existing.role ?? null,
           roleConfidence: existing.role_confidence ?? null,
           capabilities: existing.ai_capabilities_shown || []
@@ -148,8 +140,8 @@ export async function POST(req: NextRequest) {
       // Update context with research results when available
       if (researchResult) {
         await contextStorage.update(sessionId, {
-          company_context: researchResult.company,
-          person_context: researchResult.person,
+          company_context: researchResult.company as any,
+          person_context: researchResult.person as any,
           role: researchResult.role,
           role_confidence: researchResult.confidence
         })
