@@ -96,14 +96,20 @@ wss = new WebSocketServer({
   }
 })
 
-// Keep connections alive
+// Keep connections alive with heartbeat pings
 const pingInterval = setInterval(() => {
   wss.clients.forEach((ws) => {
     if (ws.readyState === WebSocket.OPEN) {
-      try { ws.ping(); } catch {}
+      try {
+        ws.ping();
+        // Also send a lightweight heartbeat message for additional reliability
+        ws.send(JSON.stringify({ type: 'heartbeat', timestamp: Date.now() }));
+      } catch (error) {
+        console.warn('Failed to send ping to client:', error);
+      }
     }
   })
-}, 25_000)
+}, 25_000) // 25 seconds - well within the 600s idle timeout
 server.on('close', () => clearInterval(pingInterval))
 
 // Error handlers
@@ -345,6 +351,11 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           } catch (e) {
             console.error(`[${connectionId}] Failed to send turnComplete to Live API:`, e)
           }
+          break
+        }
+        case 'heartbeat_ack': {
+          // Client acknowledged heartbeat - connection is healthy
+          console.info(`[${connectionId}] Heartbeat acknowledged by client`)
           break
         }
         default:

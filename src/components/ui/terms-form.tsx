@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -20,6 +19,10 @@ export function TermsForm({ open, onAccept, onDecline }: TermsFormProps) {
     if (agreed && email) {
       onAccept(name, email);
     }
+  };
+
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAgreed(e.target.checked);
   };
 
   return (
@@ -57,10 +60,12 @@ export function TermsForm({ open, onAccept, onDecline }: TermsFormProps) {
             We use your information to provide tailored suggestions. Your data is protected under GDPR.
           </p>
           <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="terms" 
+            <input 
+              type="checkbox"
+              id="terms"
               checked={agreed}
-              onCheckedChange={(checked) => setAgreed(!!checked)}
+              onChange={handleCheckboxChange}
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
             />
             <Label htmlFor="terms" className="text-sm">
               I accept the terms and conditions

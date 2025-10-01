@@ -21,6 +21,7 @@ type LiveServerEvent =
   | { type: 'model_text'; payload: { text: string } }
   | { type: 'text'; payload: { content: string } }
   | { type: 'audio'; payload: { audioData: string; mimeType?: string } }
+  | { type: 'heartbeat'; payload?: { timestamp: number } }
   | { type: 'turn_complete' }
   | { type: 'error'; payload: { message: string; detail?: unknown } }
 
@@ -211,6 +212,11 @@ export function useWebSocketVoice() {
           data: event.payload.audioData,
           mimeType: event.payload.mimeType ?? 'audio/pcm;rate=24000',
         })
+        break
+      }
+      case 'heartbeat': {
+        // Server heartbeat - respond with client heartbeat for bidirectional keepalive
+        sendMessage({ type: 'heartbeat_ack', timestamp: Date.now() })
         break
       }
       case 'turn_complete': {

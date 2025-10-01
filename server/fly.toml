@@ -30,8 +30,10 @@ kill_timeout = '5s'
   [[services.ports]]
     port = 443
     handlers = ['tls', 'http']
-    # HTTPS with WebSocket upgrade support
-    
+    [services.ports.http_options]
+      response = { timeout = 600 }
+      idle_timeout = 600
+
   [[services.ports]]
     port = 80
     handlers = ['http']
