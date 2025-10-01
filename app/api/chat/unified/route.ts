@@ -182,8 +182,8 @@ Response style: Be concise, actionable, and data-driven.`
         const currentContext = await contextStorage.get(context.sessionId)
         const researchContext = {
           email: currentContext?.email,
-          company: currentContext?.company_context?.name,
-          industry: currentContext?.company_context?.industry,
+          company: (currentContext?.company_context as any)?.name,
+          industry: (currentContext?.company_context as any)?.industry,
           previousUrls: [] // Could be expanded to track conversation URLs
         }
 

@@ -16,7 +16,7 @@ export function useChatIntelligence(id?: string | null) {
     }
     return false;
   });
-  const [suggestions, setSuggestions] = useState<string[]>(CHAT_CONSTANTS.DEFAULT_SUGGESTIONS);
+  const [suggestions, setSuggestions] = useState<string[]>([...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]);
 
   const sessionIdRef = useRef<string>(id || '');
   const hasInitialisedRef = useRef(false);
@@ -31,14 +31,14 @@ export function useChatIntelligence(id?: string | null) {
       });
 
       if (!response.ok) {
-        setSuggestions(CHAT_CONSTANTS.DEFAULT_SUGGESTIONS);
+        setSuggestions([...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]);
         return;
       }
 
       const data = await response.json();
       const raw = Array.isArray(data?.suggestions) ? data.suggestions : data?.output?.suggestions;
       if (!Array.isArray(raw) || raw.length === 0) {
-        setSuggestions(CHAT_CONSTANTS.DEFAULT_SUGGESTIONS);
+        setSuggestions([...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]);
         return;
       }
 
@@ -49,7 +49,7 @@ export function useChatIntelligence(id?: string | null) {
       );
     } catch (error) {
       console.warn('Suggestion fetch failed', error);
-      setSuggestions(CHAT_CONSTANTS.DEFAULT_SUGGESTIONS);
+      setSuggestions([...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]);
     }
   }, []);
 

@@ -37,7 +37,7 @@ const http = createServer()
 const wss = new WebSocketServer({ server: http, path: '/v1/live', perMessageDeflate: false })
 
 wss.on('connection', (ws, req) => {
-  // @ts-ignore
+  // @ts-expect-error - req.socket may not have setNoDelay method in all environments
   req.socket.setNoDelay?.(true)
   let lang = 'en-US'
   let voice = 'Puck'
@@ -46,7 +46,12 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', async raw => {
     let msg: any
-    try { msg = JSON.parse(raw.toString()) } catch { msg = {} }
+    try {
+      const rawStr = String(raw);
+      msg = JSON.parse(rawStr);
+    } catch {
+      msg = { type: 'unknown' };
+    }
 
     if (msg?.type === 'start') {
       lang = msg.payload?.languageCode || lang

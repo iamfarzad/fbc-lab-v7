@@ -309,7 +309,7 @@ class TestRunner {
         name: 'WebSocket Connection Failure',
         test: async () => {
           try {
-            const WebSocket = require('ws');
+            const { default: WebSocket } = await import('ws');
             const ws = new WebSocket('ws://localhost:9999'); // Non-existent port
             await new Promise((resolve, reject) => {
               ws.on('error', reject);

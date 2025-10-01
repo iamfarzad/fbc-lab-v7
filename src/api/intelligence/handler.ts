@@ -44,12 +44,12 @@ export async function handleIntelligence(body: IntelligenceRequest): Promise<unk
       // Use the actual LeadResearchService instead of the simple mock
       const { LeadResearchService } = await import('../../core/intelligence/lead-research')
       const leadResearchService = new LeadResearchService()
-      const result = await leadResearchService.researchLead({
+      const result = await leadResearchService.researchLead(
         email,
-        ...(name ? { name } : {}),
-        ...(companyUrl ? { companyUrl } : {}),
-        ...(sessionId ? { sessionId } : {})
-      })
+        name,
+        companyUrl,
+        sessionId
+      )
 
       // Store in context if sessionId provided
       if (sessionId) {
@@ -84,8 +84,7 @@ export async function handleIntelligence(body: IntelligenceRequest): Promise<unk
         person: result.person,
         role: result.role,
         scores: { confidence: result.confidence },
-        citations: result.citations || [],
-        provider: result.provider || 'unknown'
+        citations: result.citations || []
       }}
     }
 

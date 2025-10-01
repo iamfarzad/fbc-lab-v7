@@ -322,7 +322,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   ws.on('message', async (message: RawData) => {
     try {
       const parsedMessage = JSON.parse(message.toString());
-      console.info(`[${connectionId}] Received message type: ${parsedMessage.type}`);
+      const messageType = String(parsedMessage?.type || 'unknown');
+      console.info(`[${connectionId}] Received message type: ${messageType}`);
       switch (parsedMessage.type) {
         case 'start':
           console.info(`[${connectionId}] Handling start message`);

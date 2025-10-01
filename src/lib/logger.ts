@@ -11,7 +11,11 @@ const winstonLogger: Logger = createWinstonLogger({
     format.json(),
     format.printf(({ timestamp, level, message, service, ...meta }) => {
       const metaStr = Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : '';
-      return `${timestamp} [${service || 'APP'}] ${level.toUpperCase()}: ${message}${metaStr}`;
+      const timestampStr = String(timestamp || '');
+      const serviceStr = String(service || 'APP');
+      const levelStr = String(level || 'INFO').toUpperCase();
+      const messageStr = String(message || '');
+      return `${timestampStr} [${serviceStr}] ${levelStr}: ${messageStr}${metaStr}`;
     })
   ),
   defaultMeta: {
@@ -47,7 +51,11 @@ winstonLogger.add(new transports.Console({
     ...(process.env.NODE_ENV !== 'production' ? [format.colorize()] : []),
     format.simple(),
     format.printf(({ timestamp, level, message, service }) => {
-      return `${timestamp} [${service}] ${level}: ${message}`;
+      const timestampStr = String(timestamp || '');
+      const serviceStr = String(service || '');
+      const levelStr = String(level || '');
+      const messageStr = String(message || '');
+      return `${timestampStr} [${serviceStr}] ${levelStr}: ${messageStr}`;
     })
   )
 }));

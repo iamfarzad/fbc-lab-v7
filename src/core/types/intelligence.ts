@@ -43,7 +43,7 @@ export interface IntelligenceContext {
 }
 
 // Legacy alias for backward compatibility
-export interface ContextSnapshot extends IntelligenceContext {}
+export type ContextSnapshot = IntelligenceContext
 
 // Intent detection
 export interface IntentResult {

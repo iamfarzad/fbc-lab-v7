@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 type WebcamState = 
   | 'idle' 
@@ -40,7 +40,6 @@ export function useWebcam({
   autoStart = false,
   facingMode = 'user'
 }: UseWebcamProps = {}) {
-  const { toast } = useToast()
   const [state, setState] = useState<WebcamState>('idle')
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)
@@ -123,11 +122,7 @@ export function useWebcam({
       setError(errorMessage)
       setState(errorState)
       
-      toast({
-        title: 'Camera Error',
-        description: errorMessage,
-        variant: 'destructive'
-      })
+      toast.error(errorMessage)
       
       return null
     }

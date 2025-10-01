@@ -16,13 +16,16 @@ export async function POST(req: NextRequest) {
 
     const { text } = await generateText({
       model: google('gemini-1.5-pro-latest'),
-      prompt: 'Analyze this webcam image for business context or consulting insights. Describe key elements and suggest relevant AI responses.',
-      maxTokens: 300,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Analyze this webcam image for business context or consulting insights. Describe key elements and suggest relevant AI responses.' },
+            { type: 'image', image: `data:${mimeType};base64,${base64}` }
+          ]
+        }
+      ],
       temperature: 0.7,
-      image: {
-        data: base64,
-        mimeType,
-      },
     });
 
     return NextResponse.json({ analysis: text });

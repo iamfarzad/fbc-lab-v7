@@ -34,11 +34,13 @@ export async function POST(request: Request) {
     const summaryData = {
       leadInfo: leadData,
       conversationHistory: activities,
-      leadEmail: leadEmail || leadData.email
+      leadEmail: leadEmail || leadData.email,
+      sessionId: leadData.sessionId || 'export'
     };
 
-    // Generate PDF
-    const pdfBuffer = await generatePdfWithPuppeteer(summaryData);
+    // Generate PDF with temporary path
+    const tempPath = `/tmp/summary-${Date.now()}.pdf`;
+    const pdfBuffer = await generatePdfWithPuppeteer(summaryData, tempPath);
 
     return new NextResponse(pdfBuffer, {
       status: 200,

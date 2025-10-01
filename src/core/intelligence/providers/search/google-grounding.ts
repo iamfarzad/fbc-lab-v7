@@ -348,7 +348,7 @@ If there are conflicting information between sources, mention this and explain y
         contents: [{ role: 'user', parts: [{ text: prompt }]}],
       })
 
-      return typeof response.text === 'function' ? response.text() : response.text || 'Unable to generate response'
+      return response.text || 'Unable to generate response'
     } catch (error) {
       console.error('Failed to generate combined answer:', error)
       return searchGrounding.text // Fallback to search result

@@ -37,12 +37,14 @@ export async function POST(request: Request) {
     const summaryData = {
       leadInfo: leadData,
       conversationHistory: activities,
-      leadName: leadName || leadData.name
+      leadName: leadName || leadData.name,
+      sessionId: leadData.sessionId || 'email-summary'
     };
 
-    // Generate PDF
-    const pdfBuffer = await generatePdfWithPuppeteer(summaryData);
-    const pdfBase64 = pdfBuffer.toString('base64');
+    // Generate PDF with temporary path
+    const tempPath = `/tmp/summary-${Date.now()}.pdf`;
+    const pdfBuffer = await generatePdfWithPuppeteer(summaryData, tempPath);
+    const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
 
     if (!process.env.RESEND_API_KEY) {
       // Fallback: return PDF directly
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     // Send email via Resend
-    const { data, error } = await resend.emails.send({
+    const { data, error: emailError } = await resend.emails.send({
       from: 'F.B/c AI <ai@fbc.com>',
       to: [toEmail],
       subject: 'Your AI Consultation Summary',
@@ -70,7 +72,9 @@ export async function POST(request: Request) {
       ]
     });
 
-    if (error) throw error;
+    if (emailError) {
+      throw new Error(emailError.message || 'Failed to send email');
+    }
 
     return NextResponse.json({ success: true, messageId: data?.id });
   } catch (error) {

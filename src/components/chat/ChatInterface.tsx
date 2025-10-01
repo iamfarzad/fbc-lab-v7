@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Camera, Monitor, X, MessageCircle } from "lucide-react";
 
 // Core chat components - clean imports
 import { ChatContainer } from "./components/ChatContainer";
@@ -32,7 +35,7 @@ import { useWebSocketVoice } from "@/hooks/useWebSocketVoice";
 import { MeetingOverlay } from "@/components/meeting/MeetingOverlay";
 
 // Main chat interface - clean and structured
-export function ChatInterface({ id }: ChatInterfaceProps) {
+export function ChatInterface({ id }: { id?: string | null }) {
   // Extract state management to hooks
   const chatStateHook = useChatState();
   const messagesHook = useChatMessages();

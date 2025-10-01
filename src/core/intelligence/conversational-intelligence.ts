@@ -57,7 +57,7 @@ export class ConversationalIntelligence {
 
   async initSession(input: { sessionId: string; email: string; name?: string; companyUrl?: string }): Promise<ContextSnapshot | null> {
     const { sessionId, email, name, companyUrl } = input
-    const researchResult = await this.research.researchLead({ email, name, companyUrl, sessionId })
+    const researchResult = await this.research.researchLead(email, name, companyUrl, sessionId)
     const role = await detectRole({
       company: {
         ...(researchResult.company?.summary ? { summary: researchResult.company.summary } : {}),
@@ -79,7 +79,7 @@ export class ConversationalIntelligence {
   }
 
   async researchLead(input: { sessionId: string; email: string; name?: string; companyUrl?: string }) {
-    return this.research.researchLead(input)
+    return this.research.researchLead(input.email, input.name, input.companyUrl, input.sessionId)
   }
 
   // 🔧 PATCH: unknown → guard
