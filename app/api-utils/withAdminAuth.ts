@@ -6,12 +6,13 @@ export function withAdminAuth(handler: (req: NextRequest) => Promise<Response | 
     try {
       // tolerate tests passing plain objects
       role = (req as any)?.headers?.get ? (req as any).headers.get('x-user-role') || '' : ''
-    } catch {}
+    } catch {
+      // Ignore header access failure; defaults keep role empty
+    }
     if (role.toLowerCase() !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     return handler(req)
   }
 }
-
 

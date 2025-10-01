@@ -4,16 +4,6 @@ import { adminRateLimit } from '@/app/api-utils/rate-limiting'
 import { adminChatService } from '@/src/core/admin/admin-chat-service'
 import { supabaseService } from '@/src/core/supabase/client'
 
-// Type definitions for admin sessions
-interface AdminSessionRecord {
-  id: string
-  admin_id: string | null
-  session_name: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
 interface AdminSessionResponse {
   id: string
   adminId: string | null

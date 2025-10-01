@@ -67,6 +67,7 @@ export function withApiGuard<TSchema extends z.ZodTypeAny>(opts: {
       res.headers.set('x-request-id', requestId)
       return res
     } catch (_e) {
+      void _e
       return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500, headers: { 'x-request-id': requestId } })
     }
   }
@@ -79,5 +80,4 @@ function getClientIp(req: NextRequest): string {
   if (rip && rip.trim()) return rip
   try { return new URL(req.url).hostname || 'ip' } catch { return 'ip' }
 }
-
 

@@ -74,7 +74,6 @@ class AdminMonitoringService {
 
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      // eslint-disable-next-line no-console
       console.info('🔍 Admin Action:', {
         timestamp: logEntry.timestamp,
         user: userEmail,
@@ -248,6 +247,7 @@ class AdminMonitoringService {
   }
 
   private async sendToMonitoringService(_logEntry: AdminLogEntry) {
+    void _logEntry
     // TODO: Implement external monitoring service integration
     // Examples: Sentry, LogRocket, DataDog, etc.
     try {
@@ -257,7 +257,6 @@ class AdminMonitoringService {
       //   body: JSON.stringify(_logEntry)
       // })
     } catch (_error) {
-      // eslint-disable-next-line no-console
       console.error('Failed to send log to monitoring service:', _error)
     }
   }

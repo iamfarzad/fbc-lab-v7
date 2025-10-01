@@ -189,7 +189,9 @@ export function withAdminAuth(handler: (req: NextRequest) => Promise<Response | 
     try {
       // tolerate tests passing plain objects
       role = (req as any)?.headers?.get ? (req as any).headers.get('x-user-role') || '' : ''
-    } catch {}
+    } catch {
+      // Ignore header access failures; fall back to default role
+    }
     if (role.toLowerCase() !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
@@ -204,6 +206,7 @@ export function withApiGuard(_options: {
   requireSession?: boolean
   rateLimit?: { windowMs: number; max: number }
 } = {}) {
+  void _options
   return function(handler: (req: NextRequest) => Promise<Response | NextResponse>) {
     return async function(req: NextRequest) {
       // For now, just pass through to the handler

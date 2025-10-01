@@ -16,7 +16,6 @@ export function createRateLimit(config: RateLimitConfig) {
       : getClientIp(request);
     
     const now = Date.now();
-    const _windowStart = now - config.windowMs;
     
     // Get current rate limit data
     const current = rateLimitStore.get(key);

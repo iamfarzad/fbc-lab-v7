@@ -29,18 +29,18 @@ interface AnalyzeImageResponse {
   message: string
 }
 
-interface ContextData {
-  preferences?: Record<string, unknown>
-  webcamAnalysisCount?: number
-  lastWebcamAnalysis?: string
-  [key: string]: unknown
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json() as AnalyzeImageRequest
     const { imageData, context, timestamp } = body
     const sessionId = request.headers.get('x-intelligence-session-id')
+
+    if (!imageData) {
+      return NextResponse.json(
+        { ok: false, error: 'Image data missing' },
+        { status: 400 }
+      )
+    }
 
     if (!sessionId) {
       return NextResponse.json(
