@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import type { ToolRunResult, ContextSnapshot, IntentResult } from '@/src/core/types/intelligence'
 import { z } from 'zod'
 import { ContextStorage } from '@/src/core/context/context-storage'
@@ -9,7 +9,7 @@ const contextStorage = new ContextStorage()
 
 const Body = z.object({ sessionId: z.string().min(1), stage: z.string().optional() })
 
-export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimit: { windowMs: 3000, max: 5 }, handler: async ({ body, req }) => {
+export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimit: { windowMs: 3000, max: 5 }, handler: async ({ body }) => {
   try {
     const raw = await contextStorage.get(body.sessionId)
     if (!raw) {
@@ -37,7 +37,9 @@ export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimi
     if (yt.test(lastUser) && !suggestions.some(s => s.capability === 'video2app')) {
       suggestions.unshift({ id: 'video2app', label: 'Turn video into app blueprint', action: 'run_tool', capability: 'video2app' })
     }
-  } catch {}
+  } catch {
+    // Ignore heuristic enrichment failures; base suggestions already computed
+  }
     // Back-compat: keep top-level suggestions array
     return NextResponse.json({ ok: true, output: { suggestions }, suggestions } as any)
   } catch (error) {
@@ -50,7 +52,7 @@ export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimi
 }})
 
 // Add GET handler for compatibility
-export async function GET(request: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     message: 'Suggestions API - Use POST method',
     methods: ['POST'],

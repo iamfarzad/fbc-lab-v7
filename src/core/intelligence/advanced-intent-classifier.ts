@@ -225,7 +225,7 @@ export class AdvancedIntentClassifier {
     // Score each intent category based on keyword matches
     const intentScores = this.intentCategories.map(category => {
       let score = 0;
-      let matchedKeywords: string[] = [];
+      const matchedKeywords: string[] = [];
 
       // Direct keyword matches
       category.keywords.forEach(keyword => {
@@ -285,6 +285,7 @@ export class AdvancedIntentClassifier {
 
   private async analyzeContextualPatterns(context: IntentContext): Promise<Partial<IntentClassificationResult>> {
     const { message, conversationHistory = [] } = context;
+    void message
 
     // Analyze conversation flow
     if (conversationHistory.length > 0) {
@@ -494,6 +495,10 @@ export class AdvancedIntentClassifier {
     if (hasQuestion && hasTechnicalTerms) {
       confidence = Math.min(confidence + 0.15, 1.0);
       reasoning.push('Technical question pattern detected');
+    }
+
+    if (!hasQuestion && hasExclamation) {
+      reasoning.push('Exclamatory tone detected; potential urgency noted');
     }
 
     return {

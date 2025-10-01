@@ -29,15 +29,8 @@ export function normalizePerson(p: {
   }
 }
 
-function extractRole(text?: string | null): string | null {
-  if (!text) return null
-  const m = text.match(/(cto|ceo|founder|vp engineering|head of [^,\n]+)/i)
-  return m ? m[1] ?? null : null
-}
-
 export function extractLinkedInProfile(url: string): string | null {
-  const m = /https?:\/\/([\w.]*linkedin\.com\/in\/[^\/?#]+)/i.exec(url)
-  return m ? m[1] ?? null : null
+  const match = /https?:\/\/([\w.]*linkedin\.com\/in\/[^/?#]+)/i.exec(url)
+  return match ? match[1] ?? null : null
 }
-
 

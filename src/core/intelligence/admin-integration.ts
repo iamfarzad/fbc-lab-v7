@@ -27,6 +27,7 @@ export class AdminIntelligenceHandler {
     sessionId: string,
     userMessage?: string
   ): Promise<AdminIntelligenceContext> {
+    void userMessage
     const leadResearch: ResearchResult[] = []
     let adminContext = ''
 
@@ -76,6 +77,7 @@ export class AdminIntelligenceHandler {
    * Get intelligence context for a single lead
    */
   async getLeadIntelligence(email: string, name?: string, companyUrl?: string): Promise<ResearchResult> {
+    void companyUrl
     return intelligenceService.researchLead?.({ sessionId: 'temp', email, name } as any)
   }
 
@@ -83,6 +85,7 @@ export class AdminIntelligenceHandler {
    * Initialize intelligence session for admin
    */
   async initAdminIntelligenceSession(sessionId: string, email: string, name?: string, companyUrl?: string) {
+    void companyUrl
     return intelligenceService.initSession({
       sessionId,
       email,
@@ -100,5 +103,4 @@ export class AdminIntelligenceHandler {
 
 // Export singleton instance
 export const adminIntelligenceHandler = new AdminIntelligenceHandler()
-
 

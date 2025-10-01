@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { ToolRunResult } from '@/src/core/types/intelligence'
 import { ContextStorage } from '@/src/core/context/context-storage'
-import { validateRequest, sessionInitSchema } from '@/src/core/validation/index'
-import { withApiMiddleware, ApiResponses, getCacheHeaders } from '@/src/lib/api-middleware'
-import { vercelCache, CacheUtils, CACHE_CONFIGS } from '@/src/lib/vercel-cache'
-import { logger } from '@/src/lib/logger'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -145,6 +141,7 @@ export async function GET(req: NextRequest) {
     return response
 
   } catch (error) {
+    console.error('Context GET error:', error)
     return NextResponse.json({ ok: false, error: 'Internal server error' } satisfies ToolRunResult, { status: 500 })
   }
 }

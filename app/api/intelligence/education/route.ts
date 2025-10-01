@@ -40,9 +40,9 @@ export const POST = withApiGuard({
       await storage.update(sessionId, { tool_outputs, last_user_message })
       return NextResponse.json({ ok: true, output: { xp: education.xp, completed: education.completed } } satisfies ToolRunResult)
     } catch (e: unknown) {
+      console.error('Education POST error:', e)
       return NextResponse.json({ ok: false, error: 'server_error' } satisfies ToolRunResult, { status: 500 })
     }
   }
 })
-
 

@@ -538,6 +538,7 @@ export class EnhancedToolSuggestionEngine {
     const combinedSuggestions: ToolSuggestion[] = [];
 
     for (const [toolId, toolSuggestions] of toolGroups.entries()) {
+      void toolId
       const tool = toolSuggestions[0].tool;
       const avgConfidence = toolSuggestions.reduce((sum, s) => sum + s.confidence, 0) / toolSuggestions.length;
       const allReasoning = toolSuggestions.flatMap(s => s.reasoning);

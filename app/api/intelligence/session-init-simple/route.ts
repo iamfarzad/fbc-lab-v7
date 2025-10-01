@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId: providedSessionId, email, name, companyUrl } = await req.json()
+    const { sessionId: providedSessionId, email } = await req.json()
 
     if (!email) {
       return NextResponse.json(

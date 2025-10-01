@@ -14,6 +14,7 @@ export class SimpleIntelligenceService {
     name?: string
   }): Promise<ContextSnapshot> {
     const { sessionId, email, name } = input
+    void sessionId
 
     // Build basic context - can be enhanced later
     const context: ContextSnapshot = {
@@ -34,14 +35,15 @@ export class SimpleIntelligenceService {
     name?: string
   }): Promise<ResearchResult> {
     // Simple mock research result - can be enhanced with actual research
-    const email = input.email || '';
+    const { sessionId, email = '', name } = input
+    void sessionId
     const company: CompanyContext = {
       name: 'Unknown Company',
       domain: email.split('@')[1] || 'unknown.com'
     }
 
     const person: PersonContext = {
-      fullName: input.name || email.split('@')[0] || 'Unknown Person'
+      fullName: name || email.split('@')[0] || 'Unknown Person'
     }
 
     return {
@@ -74,4 +76,3 @@ export class SimpleIntelligenceService {
 
 // Export singleton instance for compatibility
 export const intelligenceService = new SimpleIntelligenceService()
-

@@ -12,17 +12,6 @@ import {
   MultimodalChatLazy 
 } from "@/components/LazyComponents"
 
-// Page loading fallback
-const PageSkeleton = () => (
-  <div className="min-h-screen bg-background animate-pulse">
-    <div className="h-16 bg-muted/20" />
-    <div className="space-y-8 p-8">
-      <div className="h-32 bg-muted/10 rounded" />
-      <div className="h-24 bg-muted/10 rounded" />
-    </div>
-  </div>
-)
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground">

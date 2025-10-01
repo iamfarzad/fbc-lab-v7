@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/src/core/database.types';
 
 // 🔧 MASTER FLOW: Soft-gated env checking for build compatibility

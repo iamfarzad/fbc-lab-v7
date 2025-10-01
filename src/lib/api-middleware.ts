@@ -135,7 +135,7 @@ export async function withRequestLogging(
           hasBody: true
         });
       } catch (error) {
-        requestLogger.debug('Failed to log response body');
+        requestLogger.debug('Failed to log response body', { error });
       }
     }
 

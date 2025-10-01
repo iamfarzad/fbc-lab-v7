@@ -74,7 +74,9 @@ export async function POST(req: NextRequest) {
           name: name ? String(name) : null,
           company_url: companyUrl ? String(companyUrl) : null,
         }, { onConflict: 'session_id' })
-    } catch {}
+    } catch {
+      // Ignore Supabase availability issues; context store handles persistence fallback
+    }
 
     // Action logged
 

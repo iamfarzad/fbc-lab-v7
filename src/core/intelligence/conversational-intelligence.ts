@@ -25,20 +25,6 @@ interface AdvancedIntentResult {
   }
 }
 
-// Type definitions for API responses
-interface ResearchResult {
-  company?: {
-    summary?: string
-    industry?: string
-  }
-  person?: {
-    role?: string
-    seniority?: string
-  }
-  role?: string
-  confidence?: number
-}
-
 interface RoleDetectionInput {
   company?: {
     summary?: string
@@ -117,6 +103,7 @@ export class ConversationalIntelligence {
   }
 
   async suggestTools(context: ContextSnapshot, intent: AdvancedIntentResult, stage: string): Promise<Suggestion[]> {
+    void stage
     // Convert advanced intent result to legacy format for compatibility
     const legacyIntent = this.convertToLegacyIntent(intent)
     return suggestTools(context as any, legacyIntent)

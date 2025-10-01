@@ -1,11 +1,12 @@
 // Model selection based on features and token requirements
-import { estimateTokens as estimateTokensBase, getModelForUseCase, AVAILABLE_MODELS, UseCase } from './models'
+import { estimateTokens as estimateTokensBase, getModelForUseCase, UseCase } from './models'
 
 export function selectModelForFeature(
   feature: string,
   estimatedTokens: number,
   hasSession: boolean
 ): { model: string; reason: string } {
+  void hasSession
   // Map feature names to use cases
   const useCaseMap: Record<string, UseCase> = {
     'image_analysis': 'image_analysis',
@@ -27,6 +28,7 @@ export function selectModelForFeature(
       reason: `Optimized for ${useCase} with ${estimatedTokens} estimated tokens`
     }
   } catch (error) {
+    console.warn('Model selection fallback triggered:', error)
     // Fallback to simple selection
     if (estimatedTokens > 8000) {
       return {

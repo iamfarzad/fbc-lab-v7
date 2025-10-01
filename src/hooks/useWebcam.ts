@@ -40,6 +40,7 @@ export function useWebcam({
   autoStart = false,
   facingMode = 'user'
 }: UseWebcamProps = {}) {
+  void onAIAnalysis
   const [state, setState] = useState<WebcamState>('idle')
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [capturedImage, setCapturedImage] = useState<string | null>(null)

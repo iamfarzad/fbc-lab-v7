@@ -8,13 +8,6 @@ interface SupabaseAuthUser {
   [key: string]: unknown
 }
 
-interface SupabaseAuthResponse {
-  data: {
-    user: SupabaseAuthUser | null
-  }
-  error: Error | null
-}
-
 interface SupabaseError {
   code: string
   message: string
@@ -51,11 +44,11 @@ export async function createLeadSummary(
   const { user, error: userError } = await getSafeUser()
   
   if (userError) {
-    // Error: Auth error
+    throw userError
   }
 
   if (!user) {
-    // Action logged
+    console.warn('createLeadSummary called without authenticated user context')
   }
 
   // Automatically set user_id if not provided

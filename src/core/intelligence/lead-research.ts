@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
-import { GoogleGroundingProvider, GroundedAnswer } from './providers/search/google-grounding'
+import { GoogleGroundingProvider } from './providers/search/google-grounding'
 
 export interface ResearchResult {
   company: CompanyContext
@@ -43,6 +43,7 @@ export class LeadResearchService {
   }
 
   async researchLead(email: string, name?: string, companyUrl?: string, sessionId?: string): Promise<ResearchResult> {
+    void sessionId
     const cacheKey = this.generateCacheKey(email, name, companyUrl)
 
     // Check cache first

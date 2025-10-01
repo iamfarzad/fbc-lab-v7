@@ -241,6 +241,7 @@ export class GoogleGroundingProvider {
   }
 
   private discoverRelevantUrls(searchResults: PromiseSettledResult<GroundedAnswer>[], context: any): string[] {
+    void context
     const urls = new Set<string>()
 
     for (const result of searchResults) {

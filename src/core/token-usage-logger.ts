@@ -8,6 +8,7 @@ export async function enforceBudgetAndLog(
   outputTokens: number,
   isTool: boolean = false
 ): Promise<{ allowed: boolean; reason?: string }> {
+  void isTool
   // Simple implementation - in production this would check actual budgets
   const totalTokens = inputTokens + outputTokens
 

@@ -315,6 +315,7 @@ export class EnhancedRoleDetector {
   }
 
   private async analyzeBehavioralPatterns(context: RoleContext): Promise<Partial<RoleDetectionResult>> {
+    void context
     // This would analyze conversation patterns, tool usage, etc.
     // For now, return basic behavioral indicators
     return {
@@ -462,6 +463,7 @@ export class EnhancedRoleDetector {
   }
 
   private isFortune500Company(_domain: string): boolean {
+    void _domain
     // This would typically check against a database of Fortune 500 companies
     // For now, return false (would need actual implementation)
     return false;

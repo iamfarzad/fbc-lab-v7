@@ -231,6 +231,7 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
 
   // Add typing user
   const addTypingUser = useCallback((userId: string, userName: string) => {
+    void userName
     setChatState(prev => ({
       ...prev,
       typingUsers: [...prev.typingUsers.filter(u => u !== userId), userId]

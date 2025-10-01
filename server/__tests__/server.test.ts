@@ -1,7 +1,7 @@
 describe('Language Utilities', () => {
   // Test the BCP47 validation function directly
   function isBcp47(s?: string): boolean {
-    return typeof s === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z]{2}|\-[A-Za-z]{4})?(-[A-Za-z]{2}|\-[0-9]{3})?$/.test(s);
+    return typeof s === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z]{2}|-[A-Za-z]{4})?(-[A-Za-z]{2}|-[0-9]{3})?$/.test(s);
   }
 
   it('should validate BCP47 language codes correctly', () => {

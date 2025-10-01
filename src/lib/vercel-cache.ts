@@ -147,7 +147,7 @@ export class VercelCache {
       // Note: Vercel KV doesn't have native tag-based invalidation
       // We'll implement a simple pattern-based approach
       const pattern = `fbc_cache:*:*`;
-      const keys = await kv.keys(pattern);
+      await kv.keys(pattern);
 
       // For now, we'll do selective invalidation based on common patterns
       // In production, consider using a more sophisticated tagging system

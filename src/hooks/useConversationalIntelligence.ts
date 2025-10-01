@@ -3,7 +3,7 @@
 // TODO: Remove after deprecation window (2-3 days)
 
 import { useUnifiedChat } from './useUnifiedChat'
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef } from 'react'
 
 export interface IntelligenceContext {
   lead: { email: string; name: string }
@@ -47,6 +47,7 @@ export function useConversationalIntelligence() {
       console.log('Unified chat message:', message)
     }
   } as any)
+  void unifiedChat
 
   // Multimodal state tracking
   const [activeModalities, setActiveModalities] = useState<{
@@ -75,6 +76,7 @@ export function useConversationalIntelligence() {
       opts?: { force?: boolean; ttlMs?: number }
     ): Promise<void> => {
       if (!sessionId) return
+      void opts
 
       setIsLoading(true)
       setError(null)

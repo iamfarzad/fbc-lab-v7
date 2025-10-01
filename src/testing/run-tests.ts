@@ -12,7 +12,6 @@
  */
 
 import { exec } from 'child_process';
-import { promisify } from 'util';
 import fs from 'fs';
 import fsPromises from 'fs/promises';
 import path from 'path';
@@ -20,8 +19,6 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const execAsync = promisify(exec);
 
 class TestRunner {
   private results: any[] = [];
@@ -143,7 +140,7 @@ class TestRunner {
             /shouldComponentUpdate.*true/g // shouldComponentUpdate always returning true
           ];
           
-          let issues = [];
+          const issues: string[] = [];
           for (const pattern of patterns) {
             const matches = content.match(pattern);
             if (matches) {
@@ -270,6 +267,9 @@ class TestRunner {
       // Test basic application performance
       const startTime = Date.now();
       const response = await fetch('http://localhost:3000');
+      if (!response.ok) {
+        throw new Error(`Unexpected status ${response.status} when loading homepage`);
+      }
       const loadTime = Date.now() - startTime;
       
       this.results.push({
@@ -301,7 +301,7 @@ class TestRunner {
       {
         name: 'Invalid API Endpoint',
         test: async () => {
-          const response = await fetch('http://localhost:3000/api/nonexistent');
+      const response = await fetch('http://localhost:3000/api/nonexistent');
           return response.status === 404;
         }
       },
@@ -424,7 +424,7 @@ class TestRunner {
       const tempFile = path.join(__dirname, 'temp-script.js');
       fs.writeFileSync(tempFile, script);
       
-      const child = exec(`node "${tempFile}"`, (error, stdout, stderr) => {
+      exec(`node "${tempFile}"`, (error, stdout, stderr) => {
         // Clean up temp file with proper callback
         if (fs.existsSync(tempFile)) {
           fs.unlink(tempFile, () => {});

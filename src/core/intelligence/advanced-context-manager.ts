@@ -278,7 +278,6 @@ export class AdvancedContextManager {
 
   private extractEntities(content: string): ConversationEntity[] {
     const entities: ConversationEntity[] = [];
-    const contentLower = content.toLowerCase();
 
     // Extract emails
     const emailMatches = content.match(this.entityPatterns.get('email')?.[0] || /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g) || [];

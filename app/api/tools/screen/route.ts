@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenAI } from '@google/genai'
 import { createOptimizedConfig } from '@/src/core/gemini-config-enhanced'
 import { selectModelForFeature } from '@/src/core/model-selector'
-import { estimateTokens, UseCase } from '@/src/core/models'
 import { enforceBudgetAndLog } from '@/src/core/token-usage-logger'
 
 import { ScreenShareSchema } from '@/src/core/services/tool-service'
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
     // 📊 Performance Monitoring: Start tracking
     operationId = `screen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-    const metrics = performanceMonitor.startOperation(operationId)
+    performanceMonitor.startOperation(operationId)
 
     const body = await req.json()
     const validatedData = ScreenShareSchema.parse(body)
@@ -75,7 +74,9 @@ export async function POST(req: NextRequest) {
             image.length,
             image
           )
-        } catch {}
+        } catch {
+          // Ignore capability tracking failures in mock mode
+        }
       }
 
       return NextResponse.json(response, { status: 200 })
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
       analysisResult = result.candidates?.[0]?.content?.parts?.map(p => (p as any).text).filter(Boolean).join(' ') || result.candidates?.[0]?.content?.parts?.[0]?.text || 'Analysis completed'
 
     } catch (e) {
+      console.error('Screen analysis generation failed:', e)
       return NextResponse.json({ ok: false, error: 'AI analysis failed' }, { status: 500 })
 
     }
@@ -151,7 +153,9 @@ export async function POST(req: NextRequest) {
           image.length,
           image
         )
-      } catch {}
+      } catch {
+        // Context enrichment is best-effort; ignore downstream errors
+      }
     }
 
     // 📊 Performance Monitoring: Complete successful operation
