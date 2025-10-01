@@ -119,7 +119,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
               onToggleExpand={chatStateHook.toggleExpand}
               onToggleChat={chatStateHook.toggleChat}
               onOpenMeeting={openMeeting}
-              currentContext={intelligenceHook.currentContext}
+              // Removed currentContext prop - not supported by ChatHeader
             />
 
             {/* Video/Screen Area for expanded mode */}

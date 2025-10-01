@@ -1,5 +1,4 @@
 const TOKEN_PREFIX = 'fbctoken:'
-const TOKEN_SEPARATOR = '.'
 
 export interface JWTPayload {
   userId: string

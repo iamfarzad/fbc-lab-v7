@@ -24,7 +24,6 @@ import {
   Monitor,
   MonitorOff,
   Settings,
-  RotateCcw,
   FileText,
 } from "lucide-react";
 

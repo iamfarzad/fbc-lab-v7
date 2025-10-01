@@ -1,6 +1,5 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ChatState } from "../types/chatTypes";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import {
@@ -8,7 +7,6 @@ import {
   Expand,
   Shrink,
   X,
-  Settings,
 } from "lucide-react";
 
 interface ChatHeaderProps {
@@ -17,10 +15,6 @@ interface ChatHeaderProps {
   onToggleExpand: () => void;
   onToggleChat: () => void;
   onOpenMeeting: () => void;
-  currentContext: {
-    company?: { name?: string };
-    person?: { fullName?: string; role?: string };
-  } | null;
 }
 
 export function ChatHeader({
@@ -28,8 +22,7 @@ export function ChatHeader({
   onToggleMinimize,
   onToggleExpand,
   onToggleChat,
-  onOpenMeeting,
-  currentContext
+  onOpenMeeting
 }: ChatHeaderProps) {
   return (
     <div className={`${
@@ -113,6 +106,4 @@ export function ChatHeader({
     </div>
   );
 }
-
-
 

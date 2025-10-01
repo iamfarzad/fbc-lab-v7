@@ -1,44 +1,6 @@
 import { getSupabaseService } from '@/src/lib/supabase'
 import { logger } from '@/src/lib/logger'
-import { MultimodalContext, CompanyContext, PersonContext, DatabaseConversationContext } from './context-types'
-
-// Extended database interface for context storage
-interface ExtendedDatabaseConversationContext extends Omit<DatabaseConversationContext, 'company_context' | 'person_context'> {
-  email: string
-  name?: string | null
-  company_url?: string | null
-  role?: string | null
-  role_confidence?: number | null
-  ai_capabilities_shown?: string[] | null
-  company_context?: CompanyContext | null
-  person_context?: PersonContext | null
-  intent_data?: any | null
-  last_user_message?: string | null
-  multimodal_context?: any
-  tool_outputs?: any | null
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-// Additional type definitions for context storage
-interface ConversationContext {
-  sessionId: string
-  messageCount: number
-  lastUserMessage?: string
-  lastAssistantMessage?: string
-  conversationSummary?: string
-  topics: string[]
-  sentiment: 'positive' | 'neutral' | 'negative'
-  stage: string
-  metadata: Record<string, unknown>
-}
-
-interface IntentData {
-  primaryIntent?: string
-  confidence?: number
-  entities?: string[]
-  [key: string]: unknown
-}
+import { MultimodalContext, DatabaseConversationContext } from './context-types'
 
 // Type-safe conversion for multimodal context storage
 type StorableMultimodal = string | MultimodalContext;
@@ -96,7 +58,7 @@ export class ContextStorage {
           if (error) {
             // If the column doesn't exist, try without multimodal_context
             if (error.message?.includes('multimodal_context') || error.message?.includes('tool_outputs')) {
-              const { multimodal_context, tool_outputs, ...dataWithoutExtras } = dataToStore as any
+              const { multimodal_context: _multimodal, tool_outputs: _toolOutputs, ...dataWithoutExtras } = dataToStore as any
               const { error: retryError } = await this.supabase
                 .from('conversation_contexts')
                 .upsert(dataWithoutExtras)

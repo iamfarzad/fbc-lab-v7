@@ -13,12 +13,6 @@ interface ConversationInsertData {
   email_retries: number
 }
 
-interface ConversationUpdateData {
-  pdf_url?: string
-  email_status?: string
-  email_retries?: number
-}
-
 interface FailedEmailData {
   conversation_id: string
   recipient_email: string
@@ -26,11 +20,6 @@ interface FailedEmailData {
   retries: number
   email_content?: Record<string, unknown>
   failed_at: string
-}
-
-interface SupabaseResponse<T> {
-  data: T | null
-  error: Error | null
 }
 
 function ensureService() {

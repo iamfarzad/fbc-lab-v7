@@ -22,8 +22,8 @@ export async function recordCapabilityUsed(sessionId: string, capabilityName: st
       return
     }
     // Warning log removed - could add proper error handling here
-  } catch (e) {
-    // Warning log removed - could add proper error handling here
+  } catch (error) {
+    console.warn(`[capabilities] RPC append_capability_if_missing failed for ${capabilityName}`, error)
   }
 
   // Fallback (legacy): write to capability_usage (if exists) and update array locally

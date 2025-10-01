@@ -18,6 +18,8 @@ export async function checkDemoAccess(
   feature: DemoFeature,
   tokens: number
 ): Promise<DemoAccessCheck> {
+  void sessionId
+  void tokens
   // Simple demo limits - in production this would be more sophisticated
   const limits = {
     chat_messages: { limit: 50, resetHours: 24 },

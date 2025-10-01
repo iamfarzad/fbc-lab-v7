@@ -473,18 +473,18 @@ export class AdvancedIntentClassifier {
 
     // Boost confidence for clear patterns
     if (message.includes('?') && message.length > 20) {
-      confidence = Math.min(confidence + 0.2, 1.0);
-      reasoning.push('Clear question format boosts confidence');
+      confidence = Math.min(confidence + 0.2, 1.0)
+      reasoning = [...reasoning, 'Clear question format boosts confidence']
     }
 
     // Adjust based on message length and complexity
     const wordCount = message.split(' ').length;
     if (wordCount > 100) {
-      confidence = Math.min(confidence + 0.1, 1.0);
-      reasoning.push('Detailed message suggests clear intent');
+      confidence = Math.min(confidence + 0.1, 1.0)
+      reasoning = [...reasoning, 'Detailed message suggests clear intent']
     } else if (wordCount < 5) {
-      confidence = Math.max(confidence - 0.1, 0.1);
-      reasoning.push('Brief message reduces confidence');
+      confidence = Math.max(confidence - 0.1, 0.1)
+      reasoning = [...reasoning, 'Brief message reduces confidence']
     }
 
     // Check for mixed signals
@@ -494,11 +494,11 @@ export class AdvancedIntentClassifier {
 
     if (hasQuestion && hasTechnicalTerms) {
       confidence = Math.min(confidence + 0.15, 1.0);
-      reasoning.push('Technical question pattern detected');
+      reasoning = [...reasoning, 'Technical question pattern detected']
     }
 
     if (!hasQuestion && hasExclamation) {
-      reasoning.push('Exclamatory tone detected; potential urgency noted');
+      reasoning = [...reasoning, 'Exclamatory tone detected; potential urgency noted']
     }
 
     return {

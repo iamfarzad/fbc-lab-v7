@@ -59,6 +59,7 @@ type AttachmentsContext = {
 
 const AttachmentsContext = createContext<AttachmentsContext | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePromptInputAttachments = () => {
   const context = useContext(AttachmentsContext);
 

@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/ai-elements/loader";
-// Removed EnhancedMessage import - using AI SDK artifacts instead
+// Removed EnhancedMessage - causing infinite loops with Radix UI
 import {
   Conversation,
   ConversationContent,

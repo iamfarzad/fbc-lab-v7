@@ -79,23 +79,6 @@ export function makeTextEntry(text: string, metadata?: ConversationEntry['metada
   };
 }
 
-// Helper: reading metadata from AudioEntry
-function readEntryMetadata(entry: unknown): Record<string, unknown> | undefined {
-  const o = entry as { metadata?: unknown };
-  return (o && typeof o === 'object' && 'metadata' in o && typeof o.metadata === 'object' && o.metadata !== null)
-    ? (o.metadata as Record<string, unknown>)
-    : undefined;
-}
-
-// Helper: creating a new AudioEntry (don't specify unknown keys like "id")
-function makeAudioEntry(mimeType: string, data: string, durationMs?: number): AudioEntry {
-  return {
-    mimeType,
-    data,
-    ...(durationMs !== undefined ? { durationMs } : {}),
-  };
-}
-
 // Coerce strings to a minimal MultimodalContext
 function ensureContext(ctx: unknown): MultimodalContext {
   if (typeof ctx === 'string') {
@@ -214,14 +197,14 @@ export class MultimodalContextManager {
       timestamp: new Date().toISOString(),
       modality: 'audio', // not 'voice'
       content: transcription,
-      metadata: { duration, transcription }
+      metadata: { duration, transcription, ...(metadata ?? {}) }
     }
 
     context.conversationHistory.push(convEntry)
 
     // Add to audio context
     const audioEntry: AudioEntry = {
-      mimeType: 'audio/wav', // or whatever is appropriate
+      mimeType: metadata?.format ?? 'audio/wav',
       data: transcription, // store transcription as data for now
       durationMs: duration
     }

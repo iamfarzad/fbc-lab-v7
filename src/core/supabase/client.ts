@@ -25,6 +25,9 @@ export const supabaseService = getSupabaseService();
 export async function getSafeUser(): Promise<{ user: SupabaseAuthUser | null; error: Error | null }> {
   try {
     const { data: { user }, error } = await supabase.auth.getUser()
+    if (error) {
+      return { user: null, error }
+    }
     return { user: user as SupabaseAuthUser | null, error: null }
   } catch (error) {
     // Handle AuthSessionMissingError gracefully - this is expected in server-side API routes

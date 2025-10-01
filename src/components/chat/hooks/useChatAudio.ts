@@ -55,6 +55,35 @@ export function useChatAudio() {
     voice.sendAudioChunk(pcmBuffer, `audio/pcm;rate=${CHAT_CONSTANTS.AUDIO.TARGET_VOICE_SAMPLE_RATE}`);
   }, [voice, downsampleToPCM16]);
 
+  // Teardown audio resources
+  const teardownAudio = useCallback(() => {
+    try {
+      processorRef.current?.disconnect();
+    } catch (error) {
+      console.warn('Failed to disconnect audio processor', error);
+    }
+    processorRef.current = null;
+
+    try {
+      sourceNodeRef.current?.disconnect();
+    } catch (error) {
+      console.warn('Failed to disconnect audio source node', error);
+    }
+    sourceNodeRef.current = null;
+
+    if (captureContextRef.current) {
+      captureContextRef.current.close().catch(() => undefined);
+      captureContextRef.current = null;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+      mediaStreamRef.current = null;
+    }
+  }, []);
+
   // Setup audio recorder
   const setupRecorder = useCallback(async () => {
     try {
@@ -91,7 +120,8 @@ export function useChatAudio() {
 
         source.connect(processor);
         processor.connect(audioContext.destination);
-      } catch (workletError) {
+      } catch (error) {
+        console.warn('AudioWorklet unavailable, falling back to ScriptProcessorNode', error);
         // Fallback to ScriptProcessorNode for older browsers
         const processor = audioContext.createScriptProcessor(4096, 1, 1);
         processorRef.current = processor;
@@ -103,33 +133,9 @@ export function useChatAudio() {
       teardownAudio();
       throw error;
     }
-  }, [handleAudioProcess, voice, downsampleToPCM16]);
+  }, [handleAudioProcess, voice, downsampleToPCM16, teardownAudio]);
 
   // Teardown audio resources
-  const teardownAudio = useCallback(() => {
-    try {
-      processorRef.current?.disconnect();
-    } catch {}
-    processorRef.current = null;
-
-    try {
-      sourceNodeRef.current?.disconnect();
-    } catch {}
-    sourceNodeRef.current = null;
-
-    if (captureContextRef.current) {
-      captureContextRef.current.close().catch(() => undefined);
-      captureContextRef.current = null;
-    }
-
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => {
-        track.stop();
-      });
-      mediaStreamRef.current = null;
-    }
-  }, []);
-
   // Start voice session
   const startVoiceSession = useCallback(async () => {
     if (!isVoiceSupported) {
@@ -182,5 +188,3 @@ export function useChatAudio() {
     stopVoiceSession,
   };
 }
-
-

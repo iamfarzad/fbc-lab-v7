@@ -1,6 +1,4 @@
 import { supabaseService } from '../supabase/client'
-import type { Database } from '../database.types'
-
 type AdminMessageType = 'user' | 'assistant' | 'system'
 
 type AdminConversationRow = {
@@ -311,7 +309,12 @@ export class AdminChatService {
         similarity_threshold: 0.6
       })
 
-    return (data || []).map((msg: unknown) => {
+    const rows = (data || []).filter((msg: unknown) => {
+      if (!adminId) return true
+      return (msg as { admin_id?: string }).admin_id === adminId
+    })
+
+    return rows.map((msg: unknown) => {
       const m = msg as { id?: string; session_id?: string; conversation_id?: string; admin_id?: string; message_type?: string; message_content?: string; [k: string]: unknown }
       return {
         id: m.id,
