@@ -11,11 +11,7 @@
     }
   },
   "env": {
-    "GEMINI_API_KEY": "@gemini-api-key",
-    "SUPABASE_URL": "@supabase-url",
-    "SUPABASE_ANON_KEY": "@supabase-anon-key",
-    "RESEND_API_KEY": "@resend-api-key",
-    "NEXT_PUBLIC_LIVE_SERVER_URL": "@live-server-url"
+    "GEMINI_API_KEY": "GEMINI_API_KEY"
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
