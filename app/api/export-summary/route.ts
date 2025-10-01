@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
-    const { sessionId, leadEmail } = await request.json();
+    const { sessionId, leadEmail, artifacts = [], research = [] } = await request.json();
     if (!sessionId) {
       return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
     }
@@ -35,7 +35,9 @@ export async function POST(request: Request) {
       leadInfo: leadData,
       conversationHistory: activities,
       leadEmail: leadEmail || leadData.email,
-      sessionId: leadData.sessionId || 'export'
+      sessionId: leadData.sessionId || sessionId,
+      researchHighlights: research,
+      artifactInsights: artifacts
     };
 
     // Generate PDF with temporary path

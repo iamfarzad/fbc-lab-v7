@@ -64,6 +64,25 @@ export interface EnhancedChatMessage {
       url: string;
       thumbnail?: string;
     }>;
+    researchSummary?: {
+      query?: string;
+      combinedAnswer?: string;
+      urlsUsed?: string[];
+      citationCount?: number;
+      searchGroundingUsed?: number;
+      urlContextUsed?: number;
+      error?: string;
+      [key: string]: any;
+    };
+    toolInvocations?: Array<{
+      toolCallId?: string;
+      name?: string;
+      arguments?: Record<string, any>;
+      result?: unknown;
+      state?: string;
+      [key: string]: any;
+    }>;
+    annotations?: Array<Record<string, any>>;
   };
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error' | 'failed';
   error?: string;

@@ -80,10 +80,10 @@ export function ChatInput({
   };
 
   return (
-    <div className="border-t border-border bg-card safe-area-inset-bottom">
+    <div className={`border-t border-border ${CHAT_CONSTANTS.STYLING.CARD} safe-area-inset-bottom`}>
       <div className="flex items-center gap-2 p-4">
         <PromptInput
-          className="mx-2 sm:mx-4 my-2 sm:my-4 flex flex-col gap-2 rounded-3xl border border-border/60 bg-background/95 px-3 pb-2 pt-3 shadow-lg backdrop-blur"
+          className={`mx-2 sm:mx-4 my-2 sm:my-4 flex flex-col gap-2 rounded-3xl border border-border/60 ${CHAT_CONSTANTS.STYLING.GLASS} px-3 pb-2 pt-3 shadow-lg`}
           accept="image/*,.pdf"
           onSubmit={async (message, event) => {
             event.preventDefault();
@@ -99,7 +99,7 @@ export function ChatInput({
         >
           <PromptInputBody className="flex flex-col gap-2">
             <PromptInputTextarea
-              className="rounded-2xl bg-transparent px-2 sm:px-4 text-base sm:text-base leading-relaxed placeholder:text-muted-foreground/70 font-sans"
+              className={`rounded-2xl bg-transparent px-2 sm:px-4 text-base sm:text-base leading-relaxed placeholder:text-muted-foreground/70 ${CHAT_CONSTANTS.STYLING.FONT_SANS}`}
               value={getInputDisplayValue()}
               onChange={(e) => onInputChange(e.target.value)}
               placeholder={getPlaceholder()}
@@ -124,7 +124,7 @@ export function ChatInput({
                 {/* Upload/Attachment button */}
                 <PromptInputActionMenu>
                   <PromptInputActionMenuTrigger
-                    className="h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors hover-scale focus-ring-offset interactive border border-border/60 bg-background"
+                    className={`h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE} border border-border/60 bg-background`}
                     aria-label="Upload files"
                   >
                     <Plus className={CHAT_CONSTANTS.ICONS.SMALL} aria-hidden="true" />
@@ -143,7 +143,7 @@ export function ChatInput({
                 {/* Voice button */}
                 <PromptInputButton
                   variant={isListening ? 'default' : 'ghost'}
-                  className="h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors hover-scale focus-ring-offset interactive"
+                  className={`h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
                   onClick={onToggleVoice}
                   aria-label={isListening ? 'Stop voice conversation' : 'Start voice conversation'}
                   title={isListening ? 'Stop voice conversation' : 'Start voice conversation'}
@@ -158,7 +158,7 @@ export function ChatInput({
                 {/* Camera button */}
                 <PromptInputButton
                   variant={cameraState ? 'default' : 'ghost'}
-                  className="h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors hover-scale focus-ring-offset interactive"
+                  className={`h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
                   onClick={onToggleCamera}
                   aria-label={`${cameraState ? 'Disable' : 'Enable'} camera`}
                   title={`${cameraState ? 'Disable' : 'Enable'} camera`}
@@ -173,7 +173,7 @@ export function ChatInput({
                 {/* Screen share button */}
                 <PromptInputButton
                   variant={isScreenSharing ? 'default' : 'ghost'}
-                  className="h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors hover-scale focus-ring-offset interactive"
+                  className={`h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
                   onClick={onToggleScreenShare}
                   aria-label="Toggle screen share"
                   title="Toggle screen share"
@@ -188,7 +188,7 @@ export function ChatInput({
                 {/* Settings button */}
                 <PromptInputButton
                   variant="ghost"
-                  className="h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors hover-scale focus-ring-offset interactive"
+                  className={`h-8 sm:h-9 rounded-full px-2 sm:px-3 text-xs sm:text-sm transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
                   onClick={onToggleSettings}
                   aria-label="Chat settings"
                   title="Chat settings"
@@ -198,7 +198,7 @@ export function ChatInput({
               </PromptInputTools>
 
               <PromptInputSubmit
-                className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors hover-scale focus-ring-offset interactive"
+                className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
                 variant="ghost"
                 status={isLoading ? 'submitted' : undefined}
                 disabled={isLoading || !getInputDisplayValue().trim()}

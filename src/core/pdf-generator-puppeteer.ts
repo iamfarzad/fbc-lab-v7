@@ -4,6 +4,29 @@ import { fileURLToPath } from 'url'
 import puppeteer from 'puppeteer'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
+interface ResearchHighlight {
+  messageId: string
+  timestamp: string | Date
+  query?: string
+  combinedAnswer?: string
+  urlsUsed?: string[]
+  citationCount?: number
+  searchGroundingUsed?: number
+  urlContextUsed?: number
+  error?: string
+}
+
+interface ArtifactInsight {
+  id: string
+  type: string
+  status?: string
+  payload?: Record<string, any> | null
+  createdAt?: number
+  updatedAt?: number
+  version?: number
+  error?: string
+}
+
 interface SummaryData {
   leadInfo: {
     name: string
@@ -23,6 +46,8 @@ interface SummaryData {
     ai_capabilities_shown?: string
   }
   sessionId: string
+  researchHighlights?: ResearchHighlight[]
+  artifactInsights?: ArtifactInsight[]
 }
 
 type Mode = 'client' | 'internal'
@@ -77,14 +102,12 @@ export async function generatePdfWithPuppeteer(
     }
   }
 
-  return await generatePdfWithPdfLib(summaryData, outputPath, mode, language)
+  return await generatePdfWithPdfLib(summaryData, outputPath)
 }
 
 async function generatePdfWithPdfLib(
   summaryData: SummaryData,
-  outputPath: string,
-  mode: Mode,
-  language: string
+  outputPath: string
 ) {
   const pdfDoc = await PDFDocument.create()
   let page = pdfDoc.addPage([595.28, 841.89])
@@ -113,6 +136,20 @@ async function generatePdfWithPdfLib(
     ensureRoom()
   }
 
+  const toPrintable = (value: unknown) => {
+    if (value == null) return ''
+    if (typeof value === 'string') return sanitizeTextForPdf(value)
+    if (value instanceof Date) return value.toISOString()
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value)
+    }
+    try {
+      return sanitizeTextForPdf(JSON.stringify(value, null, 2))
+    } catch {
+      return '[unserializable payload]'
+    }
+  }
+
   writeLine('F.B/c AI Consulting', 20, true)
   writeLine('AI-Powered Lead Summary', 12)
   cursorY -= 8
@@ -135,6 +172,58 @@ async function generatePdfWithPdfLib(
     writeLine('Consultant Brief', 14, true)
     await writeParagraph(summaryData.leadResearch.consultant_brief)
     cursorY -= 4
+  }
+
+  if (summaryData.researchHighlights && summaryData.researchHighlights.length > 0) {
+    writeLine('Research Highlights', 14, true)
+    for (const [index, highlight] of summaryData.researchHighlights.entries()) {
+      const label = highlight.query ? `Query: ${highlight.query}` : `Insight ${index + 1}`
+      writeLine(label, 11, true)
+      if (highlight.combinedAnswer) {
+        await writeParagraph(highlight.combinedAnswer)
+      }
+      if (highlight.urlsUsed && highlight.urlsUsed.length > 0) {
+        writeLine('Sources:', 11, true)
+        for (const url of highlight.urlsUsed) {
+          writeLine(`• ${url}`)
+        }
+      }
+      const metrics: string[] = []
+      if (typeof highlight.citationCount === 'number') {
+        metrics.push(`Citations: ${highlight.citationCount}`)
+      }
+      if (typeof highlight.searchGroundingUsed === 'number') {
+        metrics.push(`Search Grounding: ${highlight.searchGroundingUsed}`)
+      }
+      if (typeof highlight.urlContextUsed === 'number') {
+        metrics.push(`URL Context: ${highlight.urlContextUsed}`)
+      }
+      if (metrics.length > 0) {
+        writeLine(metrics.join(' • '))
+      }
+      if (highlight.error) {
+        writeLine(`Note: ${highlight.error}`)
+      }
+      cursorY -= 4
+    }
+  }
+
+  if (summaryData.artifactInsights && summaryData.artifactInsights.length > 0) {
+    writeLine('Generated Artifacts', 14, true)
+    for (const artifact of summaryData.artifactInsights) {
+      const heading = `${artifact.type || 'Artifact'} ${artifact.status ? `(${artifact.status})` : ''}`.trim()
+      writeLine(heading, 11, true)
+      if (artifact.error) {
+        writeLine(`Error: ${artifact.error}`)
+      }
+      if (artifact.payload) {
+        const preview = toPrintable(artifact.payload)
+        if (preview) {
+          await writeParagraph(preview.length > 2000 ? `${preview.slice(0, 2000)}…` : preview)
+        }
+      }
+      cursorY -= 4
+    }
   }
 
   cursorY = Math.max(cursorY, 60)
@@ -233,6 +322,73 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
   const translatedSummary = await translateText(summaryData.leadResearch?.conversation_summary || '')
   const translatedBrief = await translateText(summaryData.leadResearch?.consultant_brief || '')
 
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  const toPrintableHtml = (value: unknown) => {
+    if (value == null) return ''
+    if (typeof value === 'string') return sanitizeTextForPdf(value)
+    if (value instanceof Date) return value.toISOString()
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value)
+    }
+    try {
+      return sanitizeTextForPdf(JSON.stringify(value, null, 2))
+    } catch {
+      return '[unserializable payload]'
+    }
+  }
+
+  const researchSection = (summaryData.researchHighlights && summaryData.researchHighlights.length > 0)
+    ? `<section class="section">
+      <h2>Research Highlights</h2>
+      ${summaryData.researchHighlights.map((highlight, index) => {
+        const sources = Array.isArray(highlight.urlsUsed)
+          ? `<ul>${highlight.urlsUsed.map(url => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a></li>`).join('')}</ul>`
+          : ''
+        const metrics = [
+          typeof highlight.citationCount === 'number' ? `Citations: ${highlight.citationCount}` : '',
+          typeof highlight.searchGroundingUsed === 'number' ? `Search Grounding: ${highlight.searchGroundingUsed}` : '',
+          typeof highlight.urlContextUsed === 'number' ? `URL Context: ${highlight.urlContextUsed}` : ''
+        ].filter(Boolean).join(' • ')
+        const answer = highlight.combinedAnswer ? `<p>${escapeHtml(highlight.combinedAnswer)}</p>` : ''
+        const metricBlock = metrics ? `<p><strong>${metrics}</strong></p>` : ''
+        const note = highlight.error ? `<p>Note: ${escapeHtml(highlight.error)}</p>` : ''
+        return `<article>
+          <h3>${escapeHtml(highlight.query || `Insight ${index + 1}`)}</h3>
+          ${answer}
+          ${metricBlock}
+          ${sources}
+          ${note}
+        </article>`
+      }).join('')}
+    </section>`
+    : ''
+
+  const artifactsSection = (summaryData.artifactInsights && summaryData.artifactInsights.length > 0)
+    ? `<section class="section">
+      <h2>Generated Artifacts</h2>
+      ${summaryData.artifactInsights.map((artifact) => {
+        const payloadPreview = artifact.payload
+          ? escapeHtml(toPrintableHtml(artifact.payload))
+          : 'No payload data'
+        const status = artifact.status ? `<p><strong>Status:</strong> ${escapeHtml(artifact.status)}</p>` : ''
+        const error = artifact.error ? `<p><strong>Error:</strong> ${escapeHtml(artifact.error)}</p>` : ''
+        return `<article>
+          <h3>${escapeHtml(artifact.type || 'Artifact')}</h3>
+          ${status}
+          ${error}
+          <pre>${payloadPreview}</pre>
+        </article>`
+      }).join('')}
+    </section>`
+    : ''
+
   return `<!DOCTYPE html>
 <html lang="${language}">
 <head>
@@ -270,6 +426,10 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
       <p>${translatedBrief || 'We have compiled the key findings and recommendations for your team.'}</p>
     </section>
 
+    ${researchSection}
+
+    ${artifactsSection}
+
     <footer class="footer">
       <p>F.B/c • AI Consulting & Strategy • www.farzadbayat.com</p>
     </footer>
@@ -297,4 +457,3 @@ export function resolveAssetPath(relativePath: string) {
   
   return path.resolve(currentDir, relativePath)
 }
-

@@ -1,144 +1,147 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { generateId } from "ai";
-import { useAIElements } from "@/hooks/useAIElements";
+import { useUnifiedChat } from "@/hooks/useUnifiedChat";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
-import { CHAT_CONSTANTS } from "../constants/chatConstants";
+
+export interface ResearchSummary {
+  messageId: string;
+  timestamp: Date;
+  query?: string;
+  combinedAnswer?: string;
+  urlsUsed?: string[];
+  citationCount?: number;
+  searchGroundingUsed?: number;
+  urlContextUsed?: number;
+  error?: string;
+}
+
+export interface ExportSummaryRequest {
+  sessionId: string;
+  artifacts?: Array<Record<string, any>>;
+  research?: ResearchSummary[];
+}
 
 export function useChatMessages() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
-  const [enhancedMessages, setEnhancedMessages] = useState<EnhancedChatMessage[]>([]);
+  const [sessionId] = useState(() => crypto.randomUUID());
 
-  const messagesRef = useRef<ChatMessage[]>([]);
-  const sessionIdRef = useRef<string>(generateId());
-
-  // Enhanced AI elements for advanced features
-  const aiElements = useAIElements({
-    showReasoning: true,
-    showSources: true,
-    showActions: true,
-    showCodeBlocks: true,
-    showArtifacts: true,
-    enableReactions: true,
-    enableReadReceipts: true,
-    enableTypingIndicators: true
+  // Use unified chat hook with store integration
+  const unifiedChat = useUnifiedChat({
+    sessionId,
+    mode: 'standard',
+    context: {
+      sessionId,
+      enhancedResearch: true
+    },
+    onError: (error) => {
+      console.error('Chat error:', error);
+      toast.error('Failed to send message. Please try again.');
+    }
   });
+
+  // Convert unified messages to chat messages
+  const messages = useMemo<ChatMessage[]>(() =>
+    unifiedChat.messages.map(msg => ({
+      id: msg.id,
+      content: msg.content,
+      role: msg.role === 'system' ? 'assistant' : msg.role,
+      timestamp: msg.timestamp,
+      type: (msg.type as ChatMessage['type']) || 'text',
+      metadata: msg.metadata
+    })),
+    [unifiedChat.messages]
+  );
+
+  const enhancedMessages = useMemo<EnhancedChatMessage[]>(() =>
+    unifiedChat.messages.map(msg => {
+      const timestamp = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp);
+
+      const researchMetadata = (msg.metadata?.research ?? null) as Record<string, any> | null;
+      const toolInvocations = Array.isArray(msg.metadata?.toolInvocations)
+        ? (msg.metadata!.toolInvocations as Array<Record<string, any>>)
+        : undefined;
+      const annotations = Array.isArray(msg.metadata?.annotations)
+        ? (msg.metadata!.annotations as Array<Record<string, any>>)
+        : undefined;
+
+      const mappedSources = Array.isArray(researchMetadata?.urlsUsed)
+        ? researchMetadata!.urlsUsed.map((url: string, index: number) => ({
+            id: `${msg.id}-source-${index}`,
+            title: url.replace(/^https?:\/\//, ''),
+            url
+          }))
+        : undefined;
+
+      const metadata: EnhancedChatMessage['metadata'] | undefined = researchMetadata || toolInvocations || annotations
+        ? {
+            sources: mappedSources,
+            researchSummary: researchMetadata || undefined,
+            toolInvocations,
+            annotations
+          }
+        : undefined;
+
+      const status = msg.metadata?.error
+        ? 'error'
+        : msg.metadata?.isStreaming && !msg.metadata?.isComplete
+          ? 'sending'
+          : msg.metadata?.isComplete
+            ? 'delivered'
+            : 'sent';
+
+      return {
+        id: msg.id,
+        content: msg.content,
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        timestamp,
+        type: msg.type === 'tool' ? 'code' : 'text',
+        metadata,
+        status,
+        error: msg.metadata?.error ? msg.metadata?.errorMessage || 'An error occurred' : undefined,
+        isStreaming: Boolean(msg.metadata?.isStreaming && !msg.metadata?.isComplete)
+      };
+    }),
+    [unifiedChat.messages]
+  );
+
+  const researchSummaries = useMemo<ResearchSummary[]>(() =>
+    unifiedChat.messages
+      .filter(message => message.metadata?.research)
+      .map(message => {
+        const research = message.metadata?.research as Record<string, any>;
+        const timestamp = message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp);
+        return {
+          messageId: message.id,
+          timestamp,
+          query: research?.query,
+          combinedAnswer: research?.combinedAnswer,
+          urlsUsed: Array.isArray(research?.urlsUsed) ? research.urlsUsed : undefined,
+          citationCount: typeof research?.citationCount === 'number' ? research.citationCount : undefined,
+          searchGroundingUsed: typeof research?.searchGroundingUsed === 'number' ? research.searchGroundingUsed : undefined,
+          urlContextUsed: typeof research?.urlContextUsed === 'number' ? research.urlContextUsed : undefined,
+          error: typeof research?.error === 'string' ? research.error : undefined
+        } satisfies ResearchSummary;
+      }),
+    [unifiedChat.messages]
+  );
 
   // Handle sending messages
   const handleSendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return;
+    if (!content.trim() || unifiedChat.isLoading) return;
 
-    const trimmed = content.trim();
-    const normalized = trimmed.toLowerCase();
-
-    const userMessage: ChatMessage = {
-      id: generateId(),
-      content: trimmed,
-      role: 'user',
-      timestamp: new Date(),
-      type: 'text'
-    };
-
-    const enhancedUserMessage = aiElements.createEnhancedMessage(trimmed, 'user');
-
-    const priorMessages = messagesRef.current;
-    const nextMessages = [...priorMessages, userMessage];
-    setMessages(nextMessages);
-    messagesRef.current = nextMessages;
-    setEnhancedMessages(prev => [...prev, enhancedUserMessage]);
     setInputValue('');
-    setIsLoading(true);
-    aiElements.setLoading(true);
-
-    try {
-      const payload = {
-        messages: nextMessages.map(({ role, content }) => ({ role, content })),
-        context: {
-          sessionId: sessionIdRef.current,
-          enhancedResearch: true
-        },
-        mode: 'standard',
-        stream: false
-      };
-
-      const response = await fetch('/api/chat/unified', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-intelligence-session-id': sessionIdRef.current
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Chat request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      const assistantContent = (typeof data === 'string' ? data : data?.content) || '';
-
-      const aiResponse: ChatMessage = {
-        id: data?.id ?? generateId(),
-        content: assistantContent || 'I had trouble generating a response. Could you try again?',
-        role: 'assistant',
-        timestamp: new Date(),
-      };
-
-      const enhancedAiMessage = aiElements.createEnhancedMessage(aiResponse.content, 'assistant');
-
-      setMessages(prev => {
-        const updated = [...prev, aiResponse];
-        messagesRef.current = updated;
-        return updated;
-      });
-      setEnhancedMessages(prev => [...prev, enhancedAiMessage]);
-      aiElements.setLoading(false);
-      setIsLoading(false);
-
-      setTimeout(() => {
-        aiElements.updateMessageStatus(enhancedAiMessage.id, 'delivered');
-        setTimeout(() => {
-          aiElements.updateMessageStatus(enhancedAiMessage.id, 'read');
-        }, 500);
-      }, 300);
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage: ChatMessage = {
-        id: generateId(),
-        content: 'I apologize, but I encountered an error. Please try again.',
-        role: 'assistant',
-        timestamp: new Date(),
-      };
-
-      const enhancedErrorMessage = aiElements.createEnhancedMessage(
-        'I apologize, but I encountered an error. Please try again.',
-        'assistant'
-      );
-
-      setMessages(prev => {
-        const updated = [...prev, errorMessage];
-        messagesRef.current = updated;
-        return updated;
-      });
-      setEnhancedMessages(prev => [...prev, enhancedErrorMessage]);
-      aiElements.setLoading(false);
-      setIsLoading(false);
-      aiElements.setError('Failed to process message');
-    }
-  }, [aiElements, isLoading]);
+    await unifiedChat.sendMessage(content.trim());
+  }, [unifiedChat]);
 
   // Handle PDF export
-  const handleExportSummary = useCallback(async (sessionId: string) => {
-    if (!sessionId) return;
+  const handleExportSummary = useCallback(async (request: ExportSummaryRequest | null | undefined) => {
+    if (!request?.sessionId) return;
     try {
       const response = await fetch('/api/export-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId })
+        body: JSON.stringify(request)
       });
       if (response.ok) {
         const blob = await response.blob();
@@ -161,14 +164,14 @@ export function useChatMessages() {
   return {
     messages,
     enhancedMessages,
-    isLoading,
+    researchSummaries,
+    isLoading: unifiedChat.isLoading || unifiedChat.isStreaming,
     inputValue,
     setInputValue,
     handleSendMessage,
     handleExportSummary,
-    sessionId: sessionIdRef.current,
+    sessionId
   };
 }
-
 
 

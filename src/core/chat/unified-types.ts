@@ -58,10 +58,21 @@ export interface UnifiedChatReturn {
   isLoading: boolean
   isStreaming: boolean
   error: Error | null
+  context: UnifiedContext
   sendMessage: (content: string) => Promise<void>
   addMessage: (message: Omit<UnifiedMessage, 'id'>) => UnifiedMessage
   clearMessages: () => void
   updateContext: (context: Partial<UnifiedContext>) => void
+  stop: () => Promise<void>
+  regenerate: () => Promise<void>
+  resumeStream: () => Promise<void>
+  addToolResult: (
+    toolCallId: string,
+    result: unknown,
+    metadata?: Record<string, unknown>
+  ) => Promise<void>
+  setMessages: (messages: UnifiedMessage[]) => void
+  clearError: () => void
 }
 
 export interface UnifiedChatRequest {

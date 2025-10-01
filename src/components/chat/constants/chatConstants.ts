@@ -57,6 +57,40 @@ export const CHAT_CONSTANTS = {
     MUTED: "bg-muted text-muted-foreground",
     SUCCESS: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
     ERROR: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
+    // Monochrome design system colors
+    GUNMETAL: "bg-[#2C3539] text-[#E5E5E5]",
+    SILVER: "bg-[#E5E5E5] text-[#2C3539]",
+    GREY: "bg-[#808080] text-[#E5E5E5]",
+    LIGHT_GREY: "bg-[#A0A0A0] text-[#2C3539]",
+    DARK_GREY: "bg-[#606060] text-[#E5E5E5]",
+  },
+
+  // Design system styling classes
+  STYLING: {
+    // Container styles
+    CONTAINER: "bg-background border border-border backdrop-blur-sm bg-opacity-95",
+    CARD: "bg-card border border-border shadow-sm",
+    GLASS: "bg-background/80 backdrop-blur border border-border/20",
+    
+    // Button styles
+    BUTTON_PRIMARY: "btn btn-primary",
+    BUTTON_SECONDARY: "btn btn-secondary", 
+    BUTTON_GHOST: "btn btn-ghost",
+    
+    // Message styles
+    MESSAGE_USER: "message-bubble message-user",
+    MESSAGE_ASSISTANT: "message-bubble message-assistant",
+    
+    // Interactive states
+    HOVER_LIFT: "hover-lift",
+    HOVER_SCALE: "hover-scale",
+    FOCUS_RING: "focus-ring",
+    INTERACTIVE: "interactive",
+    
+    // Typography
+    FONT_MONO: "font-mono",
+    FONT_SANS: "font-sans",
+    FONT_DISPLAY: "font-display",
   },
 
   // Icons sizing

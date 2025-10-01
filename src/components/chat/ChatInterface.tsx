@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
+import { useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,8 +12,6 @@ import { ChatContainer } from "./components/ChatContainer";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
 import { ChatInput } from "./components/ChatInput";
-import { ChatTermsAcceptance } from "./components/ChatTermsAcceptance";
-import { ChatSuggestions } from "./components/ChatSuggestions";
 
 // Hooks - extracted logic
 import { useChatState } from "./hooks/useChatState";
@@ -22,17 +19,13 @@ import { useChatMessages } from "./hooks/useChatMessages";
 import { useChatAudio } from "./hooks/useChatAudio";
 import { useChatIntelligence } from "./hooks/useChatIntelligence";
 
-// Types
-import { ChatMessage } from "./types/chatTypes";
-
 // Constants - centralized configuration
 import { CHAT_CONSTANTS } from "./constants/chatConstants";
 
 // Utils
-import { generateId } from "ai";
 import { useAIElements } from "@/hooks/useAIElements";
-import { useWebSocketVoice } from "@/hooks/useWebSocketVoice";
 import { MeetingOverlay } from "@/components/meeting/MeetingOverlay";
+import { AIDevtools } from "@ai-sdk-tools/devtools";
 
 // Main chat interface - clean and structured
 export function ChatInterface({ id }: { id?: string | null }) {
@@ -175,13 +168,15 @@ export function ChatInterface({ id }: { id?: string | null }) {
             <ChatMessages
               messages={messagesHook.messages}
               enhancedMessages={messagesHook.enhancedMessages}
+              researchSummaries={messagesHook.researchSummaries}
               isLoading={messagesHook.isLoading}
               contextReady={intelligenceHook.contextReady}
               currentContext={intelligenceHook.currentContext}
               hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
               onSendMessage={messagesHook.handleSendMessage}
               onOpenMeeting={openMeeting}
-              onExportSummary={() => messagesHook.handleExportSummary(intelligenceHook.sessionId)}
+              sessionId={messagesHook.sessionId || intelligenceHook.sessionId || ''}
+              onExportSummary={messagesHook.handleExportSummary}
               aiElements={aiElements}
             />
 
@@ -211,6 +206,19 @@ export function ChatInterface({ id }: { id?: string | null }) {
         open={isMeetingOpen}
         onClose={() => setIsMeetingOpen(false)}
       />
+
+      {/* AI SDK Devtools - Development Only */}
+      {process.env.NODE_ENV === 'development' && (
+        <AIDevtools
+          config={{
+            streamCapture: {
+              enabled: true,
+              endpoint: '/api/chat/unified',
+              autoConnect: true
+            }
+          }}
+        />
+      )}
     </ErrorBoundary>
   );
 }

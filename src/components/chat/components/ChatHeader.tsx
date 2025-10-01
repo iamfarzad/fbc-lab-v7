@@ -34,16 +34,16 @@ export function ChatHeader({
   return (
     <div className={`${
       chatState.isExpanded ? 'pt-10 sm:pt-16' : 'pt-4'
-    } pb-4 px-4 sm:px-6 border-b border-border/60 bg-card/95 flex items-center justify-between backdrop-blur ${
+    } pb-4 px-4 sm:px-6 border-b border-border/60 ${CHAT_CONSTANTS.STYLING.GLASS} flex items-center justify-between ${
       chatState.isExpanded ? 'safe-area-inset-top' : ''
     }`}>
       <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border/50 text-xs font-medium text-primary font-mono">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-full border border-border/50 text-xs font-medium text-primary ${CHAT_CONSTANTS.STYLING.FONT_MONO}`}>
           F•B
         </div>
         <div className="space-y-0.5">
-          <p className="text-sm font-semibold font-mono">F.B/c Assistant</p>
-          <p className="text-xs text-muted-foreground font-sans">
+          <p className={`text-sm font-semibold ${CHAT_CONSTANTS.STYLING.FONT_MONO}`}>F.B/c Assistant</p>
+          <p className={`text-xs text-muted-foreground ${CHAT_CONSTANTS.STYLING.FONT_SANS}`}>
             Strategic AI guidance tailored to your session
           </p>
         </div>
@@ -53,7 +53,7 @@ export function ChatHeader({
         <Button
           variant="secondary"
           size="sm"
-          className="hidden sm:inline-flex h-8 px-3 font-medium hover-scale focus-ring-offset interactive"
+          className={`hidden sm:inline-flex h-8 px-3 font-medium ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
           onClick={onOpenMeeting}
           aria-label="Book a strategy call"
         >
@@ -66,7 +66,7 @@ export function ChatHeader({
               variant="ghost"
               size="sm"
               onClick={onToggleExpand}
-              className="h-6 w-6 p-0 touch-manipulation transition-colors hover-scale focus-ring-offset interactive"
+              className={`h-6 w-6 p-0 touch-manipulation transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
               title="Expand chat interface"
               aria-label="Expand chat"
             >
@@ -79,7 +79,7 @@ export function ChatHeader({
               variant="ghost"
               size="sm"
               onClick={onToggleExpand}
-              className="h-8 w-8 sm:h-6 sm:w-6 p-0 touch-manipulation transition-colors hover-scale focus-ring-offset interactive"
+              className={`h-8 w-8 sm:h-6 sm:w-6 p-0 touch-manipulation transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
               title="Exit fullscreen mode"
               aria-label="Exit fullscreen"
             >
@@ -91,7 +91,7 @@ export function ChatHeader({
             variant="ghost"
             size="sm"
             onClick={onToggleMinimize}
-            className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation transition-colors hover-scale focus-ring-offset interactive`}
+            className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
             title="Minimize chat"
             aria-label="Minimize chat"
           >
@@ -102,7 +102,7 @@ export function ChatHeader({
             variant="ghost"
             size="sm"
             onClick={onToggleChat}
-            className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation transition-colors hover-scale focus-ring-offset interactive`}
+            className={`${chatState.isExpanded ? 'h-8 w-8 sm:h-6 sm:w-6' : 'h-6 w-6'} p-0 touch-manipulation transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
             title="Close chat"
             aria-label="Close chat"
           >

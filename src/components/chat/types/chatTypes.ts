@@ -10,6 +10,7 @@ export interface ChatMessage {
   metadata?: {
     fileName?: string;
     fileType?: string;
+    [key: string]: any;
   };
 }
 

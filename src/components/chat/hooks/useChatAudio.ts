@@ -138,22 +138,6 @@ export function useChatAudio() {
 
     try {
       await voice.startSession();
-
-      // Wait for session to become active before setting up recorder
-      const waitForSessionActive = () => {
-        return new Promise<void>((resolve) => {
-          const checkActive = () => {
-            if (voice.isSessionActive) {
-              resolve();
-            } else {
-              setTimeout(checkActive, 50);
-            }
-          };
-          checkActive();
-        });
-      };
-
-      await waitForSessionActive();
       await setupRecorder();
     } catch (error) {
       teardownAudio();
@@ -198,6 +182,5 @@ export function useChatAudio() {
     stopVoiceSession,
   };
 }
-
 
 

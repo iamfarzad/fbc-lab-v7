@@ -1,5 +1,19 @@
 import { createLogger as createWinstonLogger, format, transports, Logger } from 'winston';
 
+const safeToString = (value: unknown, fallback = ''): string => {
+  if (value == null) return fallback;
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return fallback || '[unserializable]';
+  }
+};
+
 // Create Winston logger instance
 const winstonLogger: Logger = createWinstonLogger({
   level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
@@ -11,10 +25,10 @@ const winstonLogger: Logger = createWinstonLogger({
     format.json(),
     format.printf(({ timestamp, level, message, service, ...meta }) => {
       const metaStr = Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : '';
-      const timestampStr = String(timestamp || '');
-      const serviceStr = String(service || 'APP');
-      const levelStr = String(level || 'INFO').toUpperCase();
-      const messageStr = String(message || '');
+      const timestampStr = safeToString(timestamp, '');
+      const serviceStr = safeToString(service, 'APP');
+      const levelStr = safeToString(level, 'INFO').toUpperCase();
+      const messageStr = safeToString(message, '');
       return `${timestampStr} [${serviceStr}] ${levelStr}: ${messageStr}${metaStr}`;
     })
   ),
@@ -51,10 +65,10 @@ winstonLogger.add(new transports.Console({
     ...(process.env.NODE_ENV !== 'production' ? [format.colorize()] : []),
     format.simple(),
     format.printf(({ timestamp, level, message, service }) => {
-      const timestampStr = String(timestamp || '');
-      const serviceStr = String(service || '');
-      const levelStr = String(level || '');
-      const messageStr = String(message || '');
+      const timestampStr = safeToString(timestamp, '');
+      const serviceStr = safeToString(service, '');
+      const levelStr = safeToString(level, '');
+      const messageStr = safeToString(message, '');
       return `${timestampStr} [${serviceStr}] ${levelStr}: ${messageStr}`;
     })
   )

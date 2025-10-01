@@ -312,14 +312,15 @@ Citations: ${researchResult.allCitations.length} sources processed
             controller.enqueue(encoder.encode(metaEvent))
 
             let fullContent = ''
+            const messageId = crypto.randomUUID() // Stable ID across chunks
             
             // Stream AI SDK response
             for await (const chunk of result.textStream) {
               fullContent += chunk
               
-              // Send as unified message format
+              // Send as unified message format with stable ID
               const messageData = {
-                id: crypto.randomUUID(),
+                id: messageId,
                 role: 'assistant',
                 content: fullContent,
                 timestamp: new Date().toISOString(),
@@ -335,9 +336,9 @@ Citations: ${researchResult.allCitations.length} sources processed
               controller.enqueue(encoder.encode(eventData))
             }
 
-            // Send completion event
+            // Send completion event with same ID
             const completionData = {
-              id: crypto.randomUUID(),
+              id: messageId,
               role: 'assistant',
               content: fullContent,
               timestamp: new Date().toISOString(),
@@ -346,7 +347,8 @@ Citations: ${researchResult.allCitations.length} sources processed
                 mode,
                 isComplete: true,
                 finalChunk: true,
-                reqId
+                reqId,
+                research: researchMetadata
               }
             }
             

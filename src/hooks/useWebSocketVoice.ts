@@ -78,6 +78,7 @@ export function useWebSocketVoice() {
   const isSessionActiveRef = useRef<boolean>(false)
   const pendingAudioBufferRef = useRef<ArrayBuffer[]>([])
   const sessionStartResolveRef = useRef<(() => void) | null>(null)
+  const sessionStartRejectRef = useRef<((error: Error) => void) | null>(null)
 
   const serverUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined
@@ -111,6 +112,7 @@ export function useWebSocketVoice() {
     isSessionActiveRef.current = false
     pendingAudioBufferRef.current = []
     sessionStartResolveRef.current = null
+    sessionStartRejectRef.current = null
   }, [])
 
   const playNextAudio = useCallback(async () => {
@@ -147,6 +149,67 @@ export function useWebSocketVoice() {
     void playNextAudio()
   }, [playNextAudio])
 
+  const sendMessage = useCallback((message: Record<string, unknown>) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
+    wsRef.current.send(JSON.stringify(message))
+  }, [])
+
+  const resetVADTimeout = useCallback(() => {
+    if (vadTimeoutRef.current) {
+      clearTimeout(vadTimeoutRef.current)
+    }
+    vadTimeoutRef.current = setTimeout(() => {
+      if (isUserSpeakingRef.current && isSessionActive && !isProcessing) {
+        console.log('🔇 VAD: User stopped speaking, sending TURN_COMPLETE')
+        isUserSpeakingRef.current = false
+        sendMessage({ type: 'TURN_COMPLETE' })
+        setIsProcessing(true)
+      }
+    }, VAD_SILENCE_TIMEOUT)
+  }, [isSessionActive, isProcessing, sendMessage])
+
+  const onUserAudioDetected = useCallback(() => {
+    const now = Date.now()
+    lastAudioTimeRef.current = now
+    isUserSpeakingRef.current = true
+    resetVADTimeout()
+  }, [resetVADTimeout])
+
+  const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer) => {
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.byteLength; i += 1) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    return btoa(binary)
+  }, [])
+
+  const sendAudioChunk = useCallback((chunk: ArrayBuffer, mimeType: string) => {
+    if (!chunk || !mimeType) return
+
+    // Check if session is logically active (either React state or ref)
+    const sessionActive = isSessionActive || isSessionActiveRef.current
+
+    if (!sessionActive) {
+      // Buffer audio until session becomes active
+      pendingAudioBufferRef.current.push(chunk)
+      console.log('🔊 Buffering audio chunk, total buffered:', pendingAudioBufferRef.current.length)
+      return
+    }
+
+    // Trigger VAD detection
+    onUserAudioDetected()
+
+    const base64 = arrayBufferToBase64(chunk)
+    sendMessage({
+      type: 'user_audio',
+      payload: {
+        audioData: base64,
+        mimeType,
+      },
+    })
+    setIsProcessing(true)
+  }, [arrayBufferToBase64, isSessionActive, onUserAudioDetected, sendMessage])
 
   const handleServerEvent = useCallback((event: LiveServerEvent) => {
     switch (event.type) {
@@ -182,6 +245,7 @@ export function useWebSocketVoice() {
         if (sessionStartResolveRef.current) {
           sessionStartResolveRef.current()
           sessionStartResolveRef.current = null
+          sessionStartRejectRef.current = null
         }
         break
       }
@@ -228,10 +292,16 @@ export function useWebSocketVoice() {
         setError(message)
         toast.error(message)
         setIsProcessing(false)
+
+        if (sessionStartRejectRef.current) {
+          sessionStartRejectRef.current(new Error(message))
+          sessionStartResolveRef.current = null
+          sessionStartRejectRef.current = null
+        }
         break
       }
     }
-  }, [enqueueAudio])
+  }, [enqueueAudio, sendAudioChunk, sendMessage])
 
   const connectWebSocket = useCallback(() => {
     if (!serverUrl || wsRef.current) return
@@ -292,97 +362,68 @@ export function useWebSocketVoice() {
       wsRef.current = null
     }
   }, [connectWebSocket])
-
-  const sendMessage = useCallback((message: Record<string, unknown>) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return
-    wsRef.current.send(JSON.stringify(message))
-  }, [])
-
-  // Voice Activity Detection functions
-  const resetVADTimeout = useCallback(() => {
-    if (vadTimeoutRef.current) {
-      clearTimeout(vadTimeoutRef.current)
-    }
-    vadTimeoutRef.current = setTimeout(() => {
-      if (isUserSpeakingRef.current && isSessionActive && !isProcessing) {
-        console.log('🔇 VAD: User stopped speaking, sending TURN_COMPLETE')
-        isUserSpeakingRef.current = false
-        sendMessage({ type: 'TURN_COMPLETE' })
-        setIsProcessing(true)
-      }
-    }, VAD_SILENCE_TIMEOUT)
-  }, [isSessionActive, isProcessing, sendMessage])
-
-  const onUserAudioDetected = useCallback(() => {
-    const now = Date.now()
-    lastAudioTimeRef.current = now
-    isUserSpeakingRef.current = true
-    resetVADTimeout()
-  }, [resetVADTimeout])
-
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string }) => {
     console.log('🔊 [useWebSocketVoice] startSession called', { isSocketReady, session, opts })
 
-    if (!isSocketReady) {
+    if (!isSocketReady || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.error('🔊 [useWebSocketVoice] Voice server not ready')
       toast.error('Voice server not ready')
       return
     }
 
+    if (isSessionActiveRef.current) {
+      console.log('🔊 [useWebSocketVoice] Session already active, skipping new start request')
+      return
+    }
+
+    if (sessionStartResolveRef.current || sessionStartRejectRef.current) {
+      console.warn('🔊 [useWebSocketVoice] Session start already in progress')
+      return
+    }
+
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
     try {
       console.log('🔊 [useWebSocketVoice] Starting voice session...')
       setIsProcessing(true)
 
-      // Add timeout for session start
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Session start timeout')), 10000)
-      })
-
       const startPromise = new Promise<void>((resolve, reject) => {
-        const originalSendMessage = sendMessage
-
-        // Override sendMessage to track response
-        const trackingSendMessage = (message: Record<string, unknown>) => {
-          if (message.type === 'start') {
-            console.log('🔊 [useWebSocketVoice] Sending start message to server')
+        sessionStartResolveRef.current = () => {
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
           }
-          originalSendMessage(message)
+          sessionStartResolveRef.current = null
+          sessionStartRejectRef.current = null
+          resolve()
         }
 
-        // Set up one-time listener for session_started or error
-        const handleStartResponse = (event: LiveServerEvent) => {
-          if (event.type === 'session_started') {
-            console.log('🔊 [useWebSocketVoice] Session started successfully', event.payload)
-            setSessionActive(true) // Set session as active
-            resolve()
-          } else if (event.type === 'error') {
-            console.error('🔊 [useWebSocketVoice] Session start failed', event.payload)
-            reject(new Error(event.payload.message))
+        sessionStartRejectRef.current = (error: Error) => {
+          if (timeoutId) {
+            clearTimeout(timeoutId)
+            timeoutId = null
           }
+          sessionStartResolveRef.current = null
+          sessionStartRejectRef.current = null
+          reject(error)
         }
-
-        // Temporarily override the event handler
-        const originalHandleServerEvent = handleServerEvent
-        const enhancedHandleServerEvent = (event: LiveServerEvent) => {
-          handleStartResponse(event)
-          originalHandleServerEvent(event)
-        }
-
-        // This is a simplified approach - in a real implementation you'd need to
-        // properly manage the event handler override
-        sendMessage({
-          type: 'start',
-          payload: {
-            languageCode: opts?.languageCode,
-            voiceName: opts?.voiceName,
-          },
-        })
-
-        // For now, just resolve immediately since the server handles this asynchronously
-        setTimeout(() => resolve(), 100)
       })
 
-      await Promise.race([startPromise, timeoutPromise])
+      timeoutId = setTimeout(() => {
+        if (sessionStartRejectRef.current) {
+          sessionStartRejectRef.current(new Error('Session start timeout'))
+        }
+      }, 10_000)
+
+      sendMessage({
+        type: 'start',
+        payload: {
+          languageCode: opts?.languageCode,
+          voiceName: opts?.voiceName,
+        },
+      })
+
+      await startPromise
       console.log('🔊 [useWebSocketVoice] Voice session started successfully')
 
     } catch (error) {
@@ -390,8 +431,15 @@ export function useWebSocketVoice() {
       setError(error instanceof Error ? error.message : 'Failed to start voice session')
       toast.error(error instanceof Error ? error.message : 'Failed to start voice session')
       setIsProcessing(false)
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+      sessionStartResolveRef.current = null
+      sessionStartRejectRef.current = null
     }
-  }, [isSocketReady, sendMessage, session, handleServerEvent])
+  }, [isSocketReady, sendMessage, session])
 
   const stopSession = useCallback(() => {
     // Prevent multiple calls to stopSession
@@ -401,42 +449,6 @@ export function useWebSocketVoice() {
     setSessionActive(false)
     setIsProcessing(false)
   }, [sendMessage, isSessionActive, isProcessing])
-
-  const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer) => {
-    const bytes = new Uint8Array(buffer)
-    let binary = ''
-    for (let i = 0; i < bytes.byteLength; i += 1) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    return btoa(binary)
-  }, [])
-
-  const sendAudioChunk = useCallback((chunk: ArrayBuffer, mimeType: string) => {
-    if (!chunk || !mimeType) return
-
-    // Check if session is logically active (either React state or ref)
-    const sessionActive = isSessionActive || isSessionActiveRef.current
-
-    if (!sessionActive) {
-      // Buffer audio until session becomes active
-      pendingAudioBufferRef.current.push(chunk)
-      console.log('🔊 Buffering audio chunk, total buffered:', pendingAudioBufferRef.current.length)
-      return
-    }
-
-    // Trigger VAD detection
-    onUserAudioDetected()
-
-    const base64 = arrayBufferToBase64(chunk)
-    sendMessage({
-      type: 'user_audio',
-      payload: {
-        audioData: base64,
-        mimeType,
-      },
-    })
-    setIsProcessing(true)
-  }, [arrayBufferToBase64, isSessionActive, sendMessage, onUserAudioDetected])
 
   const value = useMemo(() => ({
     session,
@@ -458,10 +470,11 @@ export function useWebSocketVoice() {
     modelReplies,
     partialTranscript,
     session,
+    sendAudioChunk,
     startSession,
     stopSession,
     transcript,
-  ]) // Removed arrayBufferToBase64 and sendAudioChunk dependencies to prevent unnecessary re-renders
+  ])
 
   return value
 }

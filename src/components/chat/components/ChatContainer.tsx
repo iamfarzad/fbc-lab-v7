@@ -13,8 +13,9 @@ export function ChatContainer({ chatState, children }: ChatContainerProps) {
 
   const getContainerClasses = () => {
     const baseClasses = [
-      "fixed z-[100] bg-background border border-border",
-      "flex flex-col transition-all duration-300 safe-area-inset-bottom backdrop-blur-sm bg-opacity-95"
+      "fixed z-[100]",
+      CHAT_CONSTANTS.STYLING.CONTAINER,
+      "flex flex-col transition-all duration-300 safe-area-inset-bottom"
     ];
 
     if (chatState.isMinimized) {
