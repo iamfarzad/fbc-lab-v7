@@ -29,8 +29,8 @@ try {
   const wav = readFileSync(wavPath)
   PCM = pcmFromWav(wav)
   console.info(`Loaded PCM fixture from ${wavPath} (${PCM.length} bytes)`) 
-} catch (e) {
-  console.warn(`⚠️ Mock PCM fixture missing at ${wavPath}. Audio streaming will be skipped.`)
+} catch (error) {
+  console.warn(`⚠️ Mock PCM fixture missing at ${wavPath}. Audio streaming will be skipped.`, error)
 }
 
 const http = createServer()
@@ -46,8 +46,12 @@ wss.on('connection', (ws, req) => {
   ws.on('message', async raw => {
     let msg: any
     try {
-      const rawStr = String(raw);
-      msg = JSON.parse(rawStr);
+      const rawStr = typeof raw === 'string'
+        ? raw
+        : Buffer.isBuffer(raw)
+          ? raw.toString('utf8')
+          : ''
+      msg = rawStr ? JSON.parse(rawStr) : { type: 'unknown' }
     } catch {
       msg = { type: 'unknown' };
     }
@@ -97,5 +101,4 @@ wss.on('connection', (ws, req) => {
 
 const PORT = Number(process.env.MOCK_LIVE_PORT || 8787)
 http.listen(PORT, () => console.info(`Mock Live WS on :${PORT}`))
-
 

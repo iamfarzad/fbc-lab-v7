@@ -262,11 +262,20 @@ Citations: ${researchResult.allCitations.length} sources processed
       systemPrompt += multimodalContextText
     }
 
-    // Convert messages to AI SDK format
-    const aiMessages = messages.map((msg: ChatMessage) => ({
-      role: msg.role as 'user' | 'assistant' | 'system',
-      content: msg.content
-    }))
+    // Convert messages to AI SDK format and validate
+    const aiMessages = messages
+      .filter((msg: ChatMessage) => msg.content && msg.content.trim().length > 0)
+      .map((msg: ChatMessage) => ({
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content
+      }))
+
+    // Ensure we have at least one message
+    if (aiMessages.length === 0) {
+      return NextResponse.json({ 
+        error: 'No valid messages provided. Please ensure messages have content.' 
+      }, { status: 400 })
+    }
 
     // Handle streaming vs non-streaming
     if (stream !== false) {

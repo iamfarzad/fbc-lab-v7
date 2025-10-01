@@ -27,11 +27,18 @@ const VOICE_BY_LANG: Record<string, string> = {
 };
 
 function isBcp47(s?: string) {
-  return typeof s === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z]{2}|\-[A-Za-z]{4})?(-[A-Za-z]{2}|\-[0-9]{3})?$/.test(s);
+  return typeof s === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z]{2}|-[A-Za-z]{4})?(-[A-Za-z]{2}|-[0-9]{3})?$/.test(s)
+}
+
+const decodeRawMessage = (raw: RawData): string => {
+  if (typeof raw === 'string') return raw
+  if (Buffer.isBuffer(raw)) return raw.toString('utf8')
+  if (ArrayBuffer.isView(raw)) return Buffer.from(raw.buffer).toString('utf8')
+  if (raw instanceof ArrayBuffer) return Buffer.from(raw).toString('utf8')
+  return ''
 }
 
 // --- Server Setup ---
-let wss: WebSocketServer
 let sslOptions = {};
 const isLocalDev = process.env.NODE_ENV !== 'production' && !process.env.FLY_APP_NAME;
 
@@ -81,7 +88,7 @@ const server = healthServer.listen(Number(PORT), '0.0.0.0', () => {
 });
 
 // Initialize WebSocket server bound to the HTTP(S) server
-wss = new WebSocketServer({
+const wss = new WebSocketServer({
   server,
   perMessageDeflate: false,
   maxPayload: 10 * 1024 * 1024,
@@ -149,7 +156,9 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
   // Close existing session if any
   if (activeSessions.has(connectionId)) {
     console.info(`[${connectionId}] Session already exists. Closing old one.`);
-    try { activeSessions.get(connectionId)?.session?.close?.(); } catch {}
+    try { activeSessions.get(connectionId)?.session?.close?.() } catch (error) {
+      console.warn(`[${connectionId}] Failed to close previous session`, error)
+    }
   }
 
   if (IS_MOCK) {
@@ -305,7 +314,9 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
 function handleClose(connectionId: string) {
   const client = activeSessions.get(connectionId);
   if (client) {
-    try { client.session.close(); } catch {}
+    try { client.session.close() } catch (error) {
+      console.warn(`[${connectionId}] Failed to close session`, error)
+    }
     activeSessions.delete(connectionId);
   }
   console.info(`[${connectionId}] Session removed.`);
@@ -313,7 +324,9 @@ function handleClose(connectionId: string) {
 
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const connectionId = uuidv4();
-  try { (req.socket as any)?.setNoDelay?.(true) } catch {}
+  try { (req.socket as any)?.setNoDelay?.(true) } catch (error) {
+    console.warn(`[${connectionId}] Unable to disable socket delay`, error)
+  }
   console.info(`[${connectionId}] Client connected.`);
 
   // Acknowledge connection
@@ -321,7 +334,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
   ws.on('message', async (message: RawData) => {
     try {
-      const parsedMessage = JSON.parse(message.toString());
+      const rawString = decodeRawMessage(message)
+      const parsedMessage = rawString ? JSON.parse(rawString) : { type: 'unknown' }
       const messageType = String(parsedMessage?.type || 'unknown');
       console.info(`[${connectionId}] Received message type: ${messageType}`);
       switch (parsedMessage.type) {

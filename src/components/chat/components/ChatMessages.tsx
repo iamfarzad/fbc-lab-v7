@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/ai-elements/loader";
-import { EnhancedMessage } from "@/components/ai-elements/enhanced-message";
+// Removed EnhancedMessage import - using AI SDK artifacts instead
 import {
   Conversation,
   ConversationContent,
@@ -160,16 +160,19 @@ export function ChatMessages({
               )}
             </div>
           ) : (
+            // Use simple message rendering instead of EnhancedMessage to avoid infinite loops
             enhancedMessages.map((message) => (
-              <EnhancedMessage
-                key={message.id}
-                message={message}
-                config={aiElements.config}
-                onAction={aiElements.executeAction}
-                onReaction={(emoji) => {
-                  console.log('Reaction:', emoji, 'for message:', message.id);
-                }}
-              />
+              <div key={message.id} className="p-4 border rounded-lg">
+                <div className="font-medium text-sm text-muted-foreground mb-2">
+                  {message.role === 'user' ? 'You' : 'Assistant'}
+                </div>
+                <div className="text-sm">{message.content}</div>
+                {message.metadata?.sources && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    Research: {message.metadata.sources.length || 0} sources
+                  </div>
+                )}
+              </div>
             ))
           )}
 
