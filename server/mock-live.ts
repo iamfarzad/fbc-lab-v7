@@ -37,7 +37,6 @@ const http = createServer()
 const wss = new WebSocketServer({ server: http, path: '/v1/live', perMessageDeflate: false })
 
 wss.on('connection', (ws, req) => {
-  // @ts-expect-error - req.socket may not have setNoDelay method in all environments
   req.socket.setNoDelay?.(true)
   let lang = 'en-US'
   let voice = 'Puck'
