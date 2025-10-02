@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/tooltip"
 import { Sun, Moon, Monitor, Palette } from "lucide-react"
 
-export type ThemeVariant = "orange-light" | "orange-dark" | "monochrome-light" | "monochrome-dark" | "system"
+export type ThemeVariant = "orange-light" | "orange-dark" | "monochrome" | "monochrome-dark" | "system"
 
 interface ThemeSwitcherProps {
   className?: string
@@ -46,7 +46,7 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
     const root = document.documentElement
     
     // Remove all theme classes
-    root.classList.remove("orange-light", "orange-dark", "monochrome-light", "monochrome-dark")
+    root.classList.remove("orange-light", "orange-dark", "monochrome", "monochrome-dark")
     
     // Apply new theme
     switch (themeVariant) {
@@ -58,24 +58,30 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
         root.classList.remove("monochrome")
         root.classList.add("dark", "orange-dark")
         break
-      case "monochrome-light":
+      case "monochrome":
         root.classList.remove("dark")
-        root.classList.add("monochrome", "monochrome-light")
+        root.classList.add("monochrome")
         break
       case "monochrome-dark":
         root.classList.add("dark", "monochrome", "monochrome-dark")
         break
       case "system":
-        // Detect system preference
+        // Enhanced system preference detection like Midday
         const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
         const prefersMonochrome = window.matchMedia("(prefers-contrast: more)").matches
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        
+        // Apply reduced motion if preferred
+        if (prefersReducedMotion) {
+          root.classList.add("reduce-motion")
+        } else {
+          root.classList.remove("reduce-motion")
+        }
         
         if (prefersMonochrome) {
           root.classList.add("monochrome")
           if (prefersDark) {
             root.classList.add("dark", "monochrome-dark")
-          } else {
-            root.classList.add("monochrome-light")
           }
         } else {
           root.classList.remove("monochrome")
@@ -103,7 +109,7 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
         return <Sun className="h-4 w-4" />
       case "orange-dark":
         return <Moon className="h-4 w-4" />
-      case "monochrome-light":
+      case "monochrome":
         return <Palette className="h-4 w-4" />
       case "monochrome-dark":
         return <Palette className="h-4 w-4" />
@@ -121,7 +127,7 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
         return "Orange Light"
       case "orange-dark":
         return "Orange Dark"
-      case "monochrome-light":
+      case "monochrome":
         return "Monochrome Light"
       case "monochrome-dark":
         return "Monochrome Dark"
@@ -190,11 +196,11 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
           <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
             Monochrome Themes
           </div>
-          <DropdownMenuItem onClick={() => handleThemeChange("monochrome-light")}>
+          <DropdownMenuItem onClick={() => handleThemeChange("monochrome")}>
             <div className="flex items-center gap-2 w-full">
               <Palette className="h-4 w-4" />
               <span>Monochrome Light</span>
-              {theme === "monochrome-light" && (
+              {theme === "monochrome" && (
                 <div className="ml-auto h-2 w-2 rounded-full bg-gray-500"></div>
               )}
             </div>

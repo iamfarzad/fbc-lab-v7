@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ChatState } from "../types/chatTypes";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import {
@@ -8,51 +9,53 @@ import {
   Shrink,
   X,
 } from "lucide-react";
-
 interface ChatHeaderProps {
   chatState: ChatState;
   onToggleMinimize: () => void;
   onToggleExpand: () => void;
   onToggleChat: () => void;
-  onOpenMeeting: () => void;
 }
 
 export function ChatHeader({
   chatState,
   onToggleMinimize,
   onToggleExpand,
-  onToggleChat,
-  onOpenMeeting
+  onToggleChat
 }: ChatHeaderProps) {
   return (
-    <div className={`${
-      chatState.isExpanded ? 'pt-10 sm:pt-16' : 'pt-4'
-    } pb-4 px-4 sm:px-6 border-b border-border/60 ${CHAT_CONSTANTS.STYLING.GLASS} flex items-center justify-between ${
-      chatState.isExpanded ? 'safe-area-inset-top' : ''
-    }`}>
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4",
+        chatState.isExpanded
+          ? "safe-area-inset-top px-8 sm:px-12 pt-12 sm:pt-16 pb-6"
+          : chatState.isMinimized
+          ? "px-4 sm:px-6 py-3 border-b border-border/40 bg-card"
+          : "px-5 py-4 border-b border-border/40 bg-card"
+      )}
+    >
       <div className="flex items-center gap-3">
-        <div className={`flex h-8 w-8 items-center justify-center rounded-full border border-border/50 text-xs font-medium text-primary ${CHAT_CONSTANTS.STYLING.FONT_MONO}`}>
+        <div className={cn(
+          "flex items-center justify-center rounded-full bg-[hsl(var(--foreground))] text-[11px] font-semibold tracking-[0.3em] text-[hsl(var(--background))]",
+          chatState.isMinimized ? "h-7 w-7" : "h-9 w-9"
+        )}>
           F•B
         </div>
-        <div className="space-y-0.5">
-          <p className={`text-sm font-semibold ${CHAT_CONSTANTS.STYLING.FONT_MONO}`}>F.B/c Assistant</p>
-          <p className={`text-xs text-muted-foreground ${CHAT_CONSTANTS.STYLING.FONT_SANS}`}>
-            Strategic AI guidance tailored to your session
+        <div className={cn(
+          "space-y-1",
+          chatState.isMinimized && "hidden sm:block"
+        )}>
+          <p className="text-sm font-semibold tracking-[0.28em] uppercase text-foreground/80">
+            F.B/c Assistant
           </p>
+          {!chatState.isMinimized && (
+            <p className="text-xs text-muted-foreground/80 max-w-[16rem] leading-relaxed">
+              Strategic AI guidance, tailored to your current session.
+            </p>
+          )}
         </div>
       </div>
 
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Button
-          variant="secondary"
-          size="sm"
-          className={`hidden sm:inline-flex h-8 px-3 font-medium ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.FOCUS_RING} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
-          onClick={onOpenMeeting}
-          aria-label="Book a strategy call"
-        >
-          Book a call
-        </Button>
-
         <div className="flex items-center gap-1">
           {!chatState.isExpanded && (
             <Button
@@ -106,4 +109,3 @@ export function ChatHeader({
     </div>
   );
 }
-

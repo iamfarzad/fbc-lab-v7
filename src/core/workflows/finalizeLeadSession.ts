@@ -213,9 +213,20 @@ function extractCapabilities(ctx: LeadContext) {
 }
 
 function buildLeadEmailHtml(ctx: LeadContext, pdfUrl: string | null) {
+  const palette = {
+    background: '#0b0b0b',
+    surface: '#121212',
+    border: '#1d1d1d',
+    text: '#e6e6e6',
+    muted: '#9f9f9f',
+    accent: '#f2f2f2',
+    accentText: '#111111',
+    highlight: '#161616'
+  } as const
+
   const button = pdfUrl
     ? `<p><strong>📄 Your AI Strategy Summary PDF:</strong><br />
-         <span style="display:inline-block;padding:12px 24px;background:#ff5b04;color:#fff;border-radius:6px;">Attached to this email</span></p>`
+         <span style="display:inline-block;padding:12px 24px;background:${palette.accent};color:${palette.accentText};border-radius:6px;">Attached to this email</span></p>`
     : ''
 
   return `<!DOCTYPE html>
@@ -225,13 +236,15 @@ function buildLeadEmailHtml(ctx: LeadContext, pdfUrl: string | null) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your AI Strategy Summary - F.B/c</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #0b1220; margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: ${palette.text}; margin: 0; padding: 0; background: ${palette.background}; }
       .container { max-width: 600px; margin: 0 auto; padding: 24px; }
-      .header { background: linear-gradient(135deg, #ff5b04 0%, #ff7f11 100%); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
-      .content { background: white; padding: 30px; border: 1px solid #e5e7eb; }
-      .footer { background: #e3f2d2; padding: 20px; text-align: center; border-radius: 0 0 12px 12px; font-size: 14px; color: #4b5563; }
-      .highlight { background: #e3f2d2; padding: 16px; border-left: 4px solid #ff5b04; margin: 20px 0; }
-      .btn { display: inline-block; background: #ff5b04; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+      .header { background: linear-gradient(135deg, #111111 0%, #181818 100%); color: ${palette.text}; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; border: 1px solid ${palette.border}; }
+      .content { background: ${palette.surface}; padding: 30px; border: 1px solid ${palette.border}; border-top: none; }
+      .footer { background: ${palette.surface}; padding: 20px; text-align: center; border-radius: 0 0 12px 12px; font-size: 14px; color: ${palette.muted}; border: 1px solid ${palette.border}; border-top: none; }
+      .highlight { background: ${palette.highlight}; padding: 16px; border-left: 4px solid ${palette.border}; margin: 20px 0; }
+      .btn { display: inline-block; background: ${palette.accent}; color: ${palette.accentText}; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: 600; }
+      p, ul, li { color: ${palette.text}; }
+      strong { color: ${palette.accent}; }
     </style>
   </head>
   <body>
@@ -278,4 +291,3 @@ function buildLeadEmailHtml(ctx: LeadContext, pdfUrl: string | null) {
 }
 
 export default finalizeLeadSession
-

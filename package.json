@@ -37,6 +37,7 @@
     "@ai-sdk/openai": "^2.0.32",
     "@ai-sdk/react": "^2.0.49",
     "@google/genai": "^1.21.0",
+    "@google/generative-ai": "^0.24.1",
     "@nlux/react": "^2.17.1",
     "@nlux/themes": "^2.17.1",
     "@radix-ui/react-avatar": "^1.1.10",

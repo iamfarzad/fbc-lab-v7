@@ -8,6 +8,10 @@ import * as http from 'http'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as dotenv from 'dotenv'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -45,12 +49,12 @@ const isLocalDev = process.env.NODE_ENV !== 'production' && !process.env.FLY_APP
 if (isLocalDev) {
   try {
     sslOptions = {
-      key: fs.readFileSync(path.join(__dirname, '..', 'localhost-key.pem')),
-      cert: fs.readFileSync(path.join(__dirname, '..', 'localhost.pem')),
+      key: fs.readFileSync(path.join(__dirname, 'localhost-key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, 'localhost.pem')),
     };
     console.info('🔐 SSL certificates loaded for local development');
   } catch (error) {
-    console.warn('⚠️  SSL certificates not found. Run: mkcert localhost');
+    console.warn('⚠️  SSL certificates not found. Run: mkcert localhost', error);
     console.warn('Falling back to HTTP for local development');
   }
 }

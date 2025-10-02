@@ -389,6 +389,18 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
     </section>`
     : ''
 
+  const palette = {
+    background: '#0b0b0b',
+    surface: '#121212',
+    border: '#1d1d1d',
+    text: '#e6e6e6',
+    heading: '#f5f5f5',
+    muted: '#a0a0a0',
+    accent: '#f2f2f2',
+    accentText: '#111111',
+    highlight: '#161616'
+  } as const
+
   return `<!DOCTYPE html>
 <html lang="${language}">
 <head>
@@ -396,16 +408,20 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Strategy Summary</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #0b1220; margin: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: ${palette.text}; margin: 0; background: ${palette.background}; }
     .container { max-width: 720px; margin: 0 auto; padding: 32px; }
-    .header { background: linear-gradient(135deg, #ff5b04 0%, #ff7f11 100%); color: white; padding: 32px; border-radius: 16px; }
-    .section { margin-top: 32px; padding: 24px; border-radius: 12px; background: #f7f9fb; }
-    h1 { margin: 0 0 12px; font-size: 28px; }
-    h2 { margin: 0 0 16px; font-size: 20px; color: #14203b; }
-    p { margin: 0 0 12px; }
-    ul { margin: 0 0 12px 20px; padding: 0; }
-    .footer { margin-top: 32px; text-align: center; font-size: 14px; color: #4b5563; }
-    .badge { display: inline-block; padding: 8px 16px; border-radius: 999px; background: rgba(255, 91, 4, 0.1); color: #ff5b04; font-weight: 600; }
+    .header { background: linear-gradient(135deg, #111111 0%, #181818 100%); color: ${palette.heading}; padding: 32px; border-radius: 16px; border: 1px solid ${palette.border}; }
+    .section { margin-top: 32px; padding: 24px; border-radius: 12px; background: ${palette.surface}; border: 1px solid ${palette.border}; }
+    h1 { margin: 0 0 12px; font-size: 28px; color: ${palette.heading}; }
+    h2 { margin: 0 0 16px; font-size: 20px; color: ${palette.heading}; }
+    h3 { color: ${palette.heading}; }
+    p { margin: 0 0 12px; color: ${palette.text}; }
+    ul { margin: 0 0 12px 20px; padding: 0; color: ${palette.text}; }
+    li { margin-bottom: 6px; }
+    a { color: ${palette.accent}; }
+    pre { background: ${palette.highlight}; color: ${palette.text}; padding: 16px; border-radius: 8px; border: 1px solid ${palette.border}; font-family: 'JetBrains Mono', monospace; white-space: pre-wrap; }
+    .footer { margin-top: 32px; text-align: center; font-size: 14px; color: ${palette.muted}; }
+    .badge { display: inline-block; padding: 8px 16px; border-radius: 999px; background: ${palette.highlight}; color: ${palette.text}; font-weight: 600; border: 1px solid ${palette.border}; }
   </style>
 </head>
 <body>

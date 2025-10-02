@@ -5,6 +5,7 @@ import { CHAT_CONSTANTS } from "../constants/chatConstants";
 export function useChatIntelligence(id?: string | null) {
   const [contextReady, setContextReady] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [currentContext, setCurrentContext] = useState<{
     company?: { name?: string };
@@ -94,7 +95,7 @@ export function useChatIntelligence(id?: string | null) {
 
   // Handle terms acceptance
   const handleTermsAcceptance = useCallback(async () => {
-    if (!agreed || !email.trim()) return;
+    if (!agreed || !email.trim() || !name.trim()) return;
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -132,9 +133,11 @@ export function useChatIntelligence(id?: string | null) {
     hasAcceptedTerms,
     suggestions,
     agreed,
+    name,
     email,
     sessionId: sessionIdRef.current,
     setAgreed,
+    setName,
     setEmail,
     handleTermsAcceptance,
   };

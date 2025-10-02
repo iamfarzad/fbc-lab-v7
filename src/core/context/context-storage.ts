@@ -58,7 +58,9 @@ export class ContextStorage {
           if (error) {
             // If the column doesn't exist, try without multimodal_context
             if (error.message?.includes('multimodal_context') || error.message?.includes('tool_outputs')) {
-              const { multimodal_context: _multimodal, tool_outputs: _toolOutputs, ...dataWithoutExtras } = dataToStore as any
+              const dataWithoutExtras = { ...dataToStore } as Record<string, unknown>
+              delete dataWithoutExtras.multimodal_context
+              delete dataWithoutExtras.tool_outputs
               const { error: retryError } = await this.supabase
                 .from('conversation_contexts')
                 .upsert(dataWithoutExtras)
@@ -116,7 +118,7 @@ export class ContextStorage {
           if (data && typeof data.multimodal_context === 'string') {
             try {
               data.multimodal_context = JSON.parse(data.multimodal_context)
-            } catch (parseError) {
+            } catch {
               data.multimodal_context = undefined
             }
           }

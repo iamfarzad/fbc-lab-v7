@@ -15,7 +15,7 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
-      "group flex w-full items-end gap-2 py-4 midday-font-sans",
+      "group flex w-full items-end gap-2 py-4",
       from === "user" ? "is-user justify-end" : "is-assistant flex-row-reverse justify-start",
       className
     )}
@@ -24,18 +24,18 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
 );
 
 const messageContentVariants = cva(
-  "is-user:dark flex flex-col gap-2 overflow-hidden midday-rounded-lg text-sm midday-font-sans midday-shadow-sm",
+  "flex flex-col gap-2 overflow-hidden text-sm",
   {
     variants: {
       variant: {
         contained: [
           "max-w-[80%] px-4 py-3",
-          "group-[.is-user]:midday-message-user group-[.is-user]:midday-text-foreground",
-          "group-[.is-assistant]:midday-message-assistant group-[.is-assistant]:midday-text-foreground",
+          "group-[.is-user]:bg-[hsl(var(--chat-user-bg))] group-[.is-user]:text-[hsl(var(--chat-user-text))]",
+          "group-[.is-assistant]:bg-[hsl(var(--chat-assistant-bg))] group-[.is-assistant]:text-[hsl(var(--chat-assistant-text))] group-[.is-assistant]:border group-[.is-assistant]:border-[hsl(var(--chat-assistant-border))]",
         ],
         flat: [
-          "group-[.is-user]:max-w-[80%] group-[.is-user]:midday-bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:midday-text-foreground",
-          "group-[.is-assistant]:midday-text-foreground",
+          "group-[.is-user]:max-w-[80%]",
+          "group-[.is-assistant]:text-foreground",
         ],
       },
     },
@@ -73,8 +73,8 @@ export const MessageAvatar = ({
   className,
   ...props
 }: MessageAvatarProps) => (
-  <Avatar className={cn("size-8 ring-1 midday-border-secondary midday-shadow-sm", className)} {...props}>
+  <Avatar className={cn("size-8 ring-1 ring-border/40 shadow-sm", className)} {...props}>
     <AvatarImage alt="" className="mt-0 mb-0" src={src} />
-    <AvatarFallback className="midday-font-sans midday-text-muted">{name?.slice(0, 2) || "ME"}</AvatarFallback>
+    <AvatarFallback className="text-muted-foreground">{name?.slice(0, 2) || "ME"}</AvatarFallback>
   </Avatar>
 );

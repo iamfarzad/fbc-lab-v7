@@ -1,18 +1,10 @@
 import React, { useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader } from "@/components/ai-elements/loader";
-// Removed EnhancedMessage - causing infinite loops with Radix UI
-import {
-  Conversation,
-  ConversationContent,
-  ConversationEmptyState,
-  ConversationScrollButton
-} from "@/components/ai-elements/conversation";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
-import { MessageCircle, FileText, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle } from "lucide-react";
-import { useArtifacts } from "@ai-sdk-tools/artifacts/client";
+import { cn } from "@/lib/utils";
+import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle } from "lucide-react";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -20,8 +12,78 @@ import {
   ArtifactDescription,
   ArtifactContent
 } from "@/components/ai-elements/artifact";
-import type { ExportSummaryRequest, ResearchSummary } from "../hooks/useChatMessages";
+// Additional AI elements for enhanced functionality
+import {
+  Actions,
+  Action
+} from "@/components/ai-elements/actions";
+import {
+  Message,
+  MessageContent,
+  MessageAvatar
+} from "@/components/ai-elements/message";
+import {
+  Reasoning,
+  ReasoningTrigger,
+  ReasoningContent
+} from "@/components/ai-elements/reasoning";
+import {
+  Sources,
+  SourcesTrigger,
+  SourcesContent,
+  Source
+} from "@/components/ai-elements/sources";
+import {
+  Tool,
+  ToolHeader,
+  ToolContent,
+  ToolInput,
+  ToolOutput
+} from "@/components/ai-elements/tool";
+import {
+  CodeBlock,
+  CodeBlockCopyButton
+} from "@/components/ai-elements/code-block";
+import {
+  Context,
+  ContextTrigger,
+  ContextContent,
+  ContextContentHeader,
+  ContextContentBody,
+  ContextContentFooter
+} from "@/components/ai-elements/context";
+import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtStep,
+  ChainOfThoughtContent
+} from "@/components/ai-elements/chain-of-thought";
+import {
+  Image
+} from "@/components/ai-elements/image";
+import {
+  InlineCitation
+} from "@/components/ai-elements/inline-citation";
+import {
+  Task,
+  TaskItem,
+  TaskItemFile
+} from "@/components/ai-elements/task";
+import {
+  WebPreview,
+  WebPreviewBody,
+  WebPreviewUrl
+} from "@/components/ai-elements/web-preview";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton
+} from "@/components/ai-elements/conversation";
+import type { ResearchSummary } from "../hooks/useChatMessages";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
+import { ChatSuggestions } from "./ChatSuggestions";
+import { ChatTermsAcceptance } from "./ChatTermsAcceptance";
 
 type StreamedArtifact = {
   id: string;
@@ -35,6 +97,20 @@ type StreamedArtifact = {
   error?: string;
 };
 
+const MESSAGE_PRESENTATION = {
+  user: {
+    label: "You",
+    icon: MessageCircle,
+  },
+  assistant: {
+    label: "Assistant",
+    icon: Sparkles,
+  },
+} as const satisfies Record<EnhancedChatMessage["role"], {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}>;
+
 interface ChatMessagesProps {
   messages: ChatMessage[];
   enhancedMessages: EnhancedChatMessage[];
@@ -47,10 +123,32 @@ interface ChatMessagesProps {
   } | null;
   hasAcceptedTerms: boolean;
   onSendMessage: (message: string) => void;
-  onOpenMeeting: () => void;
-  sessionId: string;
-  onExportSummary: (request: ExportSummaryRequest) => void;
-  aiElements: any;
+  aiElements?: {
+    showReasoning: boolean;
+    showSources: boolean;
+    showActions: boolean;
+    showCodeBlocks: boolean;
+    showArtifacts: boolean;
+    showImages: boolean;
+    showInlineCitations: boolean;
+    showSuggestions: boolean;
+    showTasks: boolean;
+    showWebPreview: boolean;
+    enableReactions: boolean;
+    enableReadReceipts: boolean;
+    enableTypingIndicators: boolean;
+  };
+  isExpanded?: boolean;
+  isMinimized?: boolean;
+  artifacts: StreamedArtifact[];
+  // Terms acceptance props
+  name?: string;
+  email?: string;
+  agreed?: boolean;
+  onNameChange?: (name: string) => void;
+  onEmailChange?: (email: string) => void;
+  onAgreedChange?: (agreed: boolean) => void;
+  onAcceptTerms?: () => void;
 }
 
 export function ChatMessages({
@@ -62,56 +160,32 @@ export function ChatMessages({
   currentContext,
   hasAcceptedTerms,
   onSendMessage,
-  onOpenMeeting,
-  sessionId,
-  onExportSummary,
   aiElements,
+  isExpanded = false,
+  isMinimized = false,
+  artifacts,
+  name,
+  email,
+  agreed,
+  onNameChange,
+  onEmailChange,
+  onAgreedChange,
+  onAcceptTerms,
 }: ChatMessagesProps) {
-  const artifactsState = useArtifacts();
-
-  const streamedArtifacts = artifactsState.artifacts as StreamedArtifact[] | undefined;
-
-  const derivedResearchArtifacts = useMemo<StreamedArtifact[]>(() =>
-    researchSummaries.map((summary) => ({
-      id: `research-${summary.messageId}`,
-      type: "research-summary",
-      status: "complete",
-      payload: {
-        ...summary,
-        urlsUsed: summary.urlsUsed
-      },
-      createdAt: summary.timestamp.getTime(),
-      updatedAt: summary.timestamp.getTime(),
-      version: 1
-    })),
-    [researchSummaries]
-  );
-
-  const artifactCards = useMemo<StreamedArtifact[]>(() => {
-    if (streamedArtifacts && streamedArtifacts.length > 0) {
-      return streamedArtifacts;
-    }
-    return derivedResearchArtifacts;
-  }, [streamedArtifacts, derivedResearchArtifacts]);
-
-  const exportArtifacts = useMemo(() => (streamedArtifacts && streamedArtifacts.length > 0
-    ? streamedArtifacts
-    : derivedResearchArtifacts
-  ), [streamedArtifacts, derivedResearchArtifacts]);
-
-  const handleExportClick = () => {
-    if (!sessionId) return;
-    onExportSummary({
-      sessionId,
-      artifacts: exportArtifacts,
-      research: researchSummaries
-    });
-  };
+  // Don't render messages in minimized state
+  if (isMinimized) {
+    return null;
+  }
 
   return (
-    <div className="flex-1 overflow-hidden relative">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
       <Conversation className="h-full">
-        <ConversationContent className="px-6 py-8 space-y-6">
+        <ConversationContent
+          className={cn(
+            "px-6 sm:px-8 py-6 space-y-6 min-h-full",
+            isExpanded ? "mx-auto w-full max-w-3xl" : ""
+          )}
+        >
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full space-y-6">
               <ConversationEmptyState
@@ -122,104 +196,271 @@ export function ChatMessages({
                 icon={<MessageCircle className="h-6 w-6 text-muted-foreground" />}
               />
 
-              {/* Show suggestions only after terms acceptance */}
-              {hasAcceptedTerms && (
-                <div className="max-w-md mx-auto">
-                  <p className="text-sm text-muted-foreground text-center mb-4">
-                    What would you like to explore today?
-                  </p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {contextReady && currentContext?.person?.role && (
-                      <button
-                        onClick={() => onSendMessage(`As ${currentContext.person.role} at ${currentContext.company?.name}, what AI strategy would you recommend?`)}
-                        className={`w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors ${CHAT_CONSTANTS.STYLING.HOVER_SCALE} ${CHAT_CONSTANTS.STYLING.INTERACTIVE}`}
-                      >
-                        🤖 AI strategy for {currentContext.person.role}s
-                      </button>
-                    )}
-                    <button
-                      onClick={() => onSendMessage('What AI consulting services do you offer?')}
-                      className="w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors"
-                    >
-                      💼 Consulting services overview
-                    </button>
-                    <button
-                      onClick={() => onSendMessage('Tell me about your workshops')}
-                      className="w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors"
-                    >
-                      🎓 Workshop and training options
-                    </button>
-                    <button
-                      onClick={() => onSendMessage('How can AI help my business?')}
-                      className="w-full text-left p-3 bg-muted hover:bg-muted/80 rounded-lg text-sm transition-colors"
-                    >
-                      🚀 AI implementation guidance
-                    </button>
-                  </div>
-                </div>
+              {!hasAcceptedTerms ? (
+                <ChatTermsAcceptance
+                  name={name || ''}
+                  email={email || ''}
+                  agreed={agreed || false}
+                  onNameChange={onNameChange || (() => {})}
+                  onEmailChange={onEmailChange || (() => {})}
+                  onAgreedChange={onAgreedChange || (() => {})}
+                  onAcceptTerms={onAcceptTerms || (() => {})}
+                />
+              ) : (
+                <ChatSuggestions
+                  suggestions={CHAT_CONSTANTS.DEFAULT_SUGGESTIONS}
+                  contextReady={contextReady}
+                  currentContext={currentContext}
+                  onSendMessage={onSendMessage}
+                />
               )}
             </div>
           ) : (
-            // Use simple message rendering instead of EnhancedMessage to avoid infinite loops
-            enhancedMessages.map((message) => (
-              <div key={message.id} className="p-4 border rounded-lg">
-                <div className="font-medium text-sm text-muted-foreground mb-2">
-                  {message.role === 'user' ? 'You' : 'Assistant'}
-                </div>
-                <div className="text-sm">{message.content}</div>
-                {message.metadata?.sources && (
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Research: {message.metadata.sources.length || 0} sources
-                  </div>
-                )}
-              </div>
-            ))
+            enhancedMessages.map((message) => {
+              const meta = MESSAGE_PRESENTATION[message.role];
+              const Icon = meta.icon;
+              const isUserMessage = message.role === "user";
+              
+              // Use the user's name from terms acceptance for user messages
+              const userLabel = isUserMessage && name ? name : meta.label;
+
+              return (
+                <Message
+                  key={message.id}
+                  from={message.role}
+                  className={cn(
+                    "font-mono",
+                    isUserMessage ? "flex justify-end" : "flex justify-start"
+                  )}
+                >
+                  <MessageContent
+                    variant="flat"
+                    className={cn(
+                      "max-w-[80%] space-y-4 px-0 py-0 text-[13px] leading-relaxed rounded-none",
+                      "group-[.is-assistant]:mx-0 group-[.is-assistant]:bg-transparent group-[.is-assistant]:border-0 group-[.is-assistant]:shadow-none group-[.is-assistant]:rounded-none",
+                      "group-[.is-user]:ml-auto group-[.is-user]:bg-transparent group-[.is-user]:border-0 group-[.is-user]:shadow-none group-[.is-user]:rounded-none"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 text-[11px] uppercase tracking-[0.35em] text-muted-foreground/60",
+                        isUserMessage && "justify-end"
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5 text-muted-foreground/70" />
+                      <span>{userLabel}</span>
+                    </div>
+
+                    <div
+                      className={cn(
+                        "whitespace-pre-wrap text-[13px] leading-relaxed",
+                        isUserMessage
+                          ? "text-[hsl(var(--foreground))]"
+                          : "text-[hsl(var(--muted-foreground))]"
+                      )}
+                    >
+                      {message.content}
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Reasoning Display */}
+                      {aiElements?.showReasoning && message.metadata?.reasoning && (
+                        <Reasoning isStreaming={isLoading} defaultOpen={false}>
+                          <ReasoningTrigger />
+                          <ReasoningContent>{message.metadata.reasoning}</ReasoningContent>
+                        </Reasoning>
+                      )}
+
+                      {/* Chain of Thought Display */}
+                      {message.metadata?.chainOfThought && (
+                        <ChainOfThought defaultOpen={false}>
+                          <ChainOfThoughtHeader>AI Thinking Process</ChainOfThoughtHeader>
+                          <ChainOfThoughtContent>
+                            {message.metadata.chainOfThought.steps?.map((step, index) => (
+                              <ChainOfThoughtStep
+                                key={index}
+                                label={step.label}
+                                description={step.description}
+                                status={step.status}
+                                icon={step.icon}
+                              >
+                                {step.content}
+                              </ChainOfThoughtStep>
+                            ))}
+                          </ChainOfThoughtContent>
+                        </ChainOfThought>
+                      )}
+
+                      {/* Sources Display */}
+                      {aiElements?.showSources && message.metadata?.sources && message.metadata.sources.length > 0 && (
+                        <Sources>
+                          <SourcesTrigger count={message.metadata.sources.length} />
+                          <SourcesContent>
+                            {message.metadata.sources.map((source, index) => (
+                              <Source key={index} href={source.url} title={source.title}>
+                                {source.title}
+                              </Source>
+                            ))}
+                          </SourcesContent>
+                        </Sources>
+                      )}
+
+                      {/* Tool Usage Display */}
+                      {aiElements?.showActions && message.metadata?.tools && message.metadata.tools.length > 0 && (
+                        <div className="space-y-2">
+                          {message.metadata.tools.map((tool, index) => (
+                            <Tool key={index} defaultOpen={false}>
+                              <ToolHeader title={tool.name} type={tool.type} state={tool.state} />
+                              <ToolContent>
+                                {tool.input && <ToolInput input={tool.input} />}
+                                {tool.output && <ToolOutput output={tool.output} errorText={tool.error} />}
+                              </ToolContent>
+                            </Tool>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Code Blocks */}
+                      {aiElements?.showCodeBlocks && message.metadata?.codeBlocks && message.metadata.codeBlocks.length > 0 && (
+                        <div className="space-y-2">
+                          {message.metadata.codeBlocks.map((codeBlock, index) => (
+                            <CodeBlock
+                              key={index}
+                              code={codeBlock.code}
+                              language={codeBlock.language}
+                              showLineNumbers={codeBlock.showLineNumbers}
+                            >
+                              <CodeBlockCopyButton />
+                            </CodeBlock>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Context Usage Display */}
+                      {message.metadata?.contextUsage && (
+                        <Context
+                          usedTokens={message.metadata.contextUsage.usedTokens}
+                          maxTokens={message.metadata.contextUsage.maxTokens}
+                          usage={message.metadata.contextUsage.usage}
+                          modelId={message.metadata.contextUsage.modelId}
+                        >
+                          <ContextTrigger />
+                          <ContextContent>
+                            <ContextContentHeader />
+                            <ContextContentBody>
+                              <div className="space-y-2">
+                                <div className="text-xs text-muted-foreground">
+                                  Context: {message.metadata.contextUsage.usedTokens} / {message.metadata.contextUsage.maxTokens} tokens
+                                </div>
+                              </div>
+                            </ContextContentBody>
+                            <ContextContentFooter />
+                          </ContextContent>
+                        </Context>
+                      )}
+
+                      {/* Images Display */}
+                      {aiElements?.showImages && message.metadata?.images && message.metadata.images.length > 0 && (
+                        <div className="space-y-2">
+                          {message.metadata.images.map((image, index) => (
+                            <Image
+                              key={index}
+                              base64={image.base64}
+                              mediaType={image.mediaType}
+                              alt={image.alt || `Generated image ${index + 1}`}
+                              className="rounded-lg border"
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Inline Citations */}
+                      {aiElements?.showInlineCitations && message.metadata?.inlineCitations && message.metadata.inlineCitations.length > 0 && (
+                        <div className="space-y-1">
+                          {message.metadata.inlineCitations.map((citation, index) => (
+                            <InlineCitation key={index} href={citation.url} title={citation.title}>
+                              {citation.text}
+                            </InlineCitation>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Tasks Display */}
+                      {aiElements?.showTasks && message.metadata?.tasks && message.metadata.tasks.length > 0 && (
+                        <Task defaultOpen={false}>
+                          <div className="space-y-2">
+                            {message.metadata.tasks.map((task, index) => (
+                              <TaskItem key={index} status={task.status}>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{task.title}</span>
+                                  {task.files && task.files.length > 0 && (
+                                    <div className="flex gap-1">
+                                      {task.files.map((file, fileIndex) => (
+                                        <TaskItemFile key={fileIndex}>{file.name}</TaskItemFile>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {task.description && (
+                                  <p className="text-sm text-muted-foreground">{task.description}</p>
+                                )}
+                              </TaskItem>
+                            ))}
+                          </div>
+                        </Task>
+                      )}
+
+                      {/* Web Preview */}
+                      {aiElements?.showWebPreview && message.metadata?.webPreview && (
+                        <WebPreview>
+                          <WebPreviewUrl value={message.metadata.webPreview.url} readOnly />
+                          <WebPreviewBody
+                            src={message.metadata.webPreview.url}
+                            title={message.metadata.webPreview.title}
+                          />
+                        </WebPreview>
+                      )}
+
+                      {/* Message Actions */}
+                      {aiElements?.showActions && (
+                        <Actions>
+                          <Action tooltip="Copy message">Copy</Action>
+                          <Action tooltip="Regenerate response">Regenerate</Action>
+                        </Actions>
+                      )}
+                    </div>
+                  </MessageContent>
+                </Message>
+              );
+            })
           )}
 
-          {artifactCards.length > 0 && (
-            <section className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  AI Generated Insights
-                </h3>
+          {aiElements?.showArtifacts && artifacts.length > 0 && (
+            <section className={cn("space-y-5", isExpanded ? "mx-auto w-full max-w-3xl" : "")}
+            >
+              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-muted-foreground/75">
+                <Sparkles className="h-3.5 w-3.5 text-[hsl(var(--accent))]" />
+                <h3>AI Generated Insights</h3>
               </div>
 
               <div className="grid gap-4">
-                {artifactCards.map((artifact) => (
+                {artifacts.map((artifact) => (
                   <ArtifactCardView key={`${artifact.id}-${artifact.version ?? '1'}`} artifact={artifact} />
                 ))}
               </div>
             </section>
           )}
 
-          {messages.length > 0 && (
-            <div className={`rounded-2xl border border-border/60 ${CHAT_CONSTANTS.STYLING.CARD} p-4 text-sm text-muted-foreground`}>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Ready to explore next steps?</p>
-                  <p>Book a live strategy session with Farzad to map out your AI roadmap.</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={onOpenMeeting} className="sm:self-start">
-                    Schedule a call
-                  </Button>
-                  <Button
-                    onClick={handleExportClick}
-                    variant="outline"
-                    className="sm:self-start"
-                    disabled={!sessionId}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Export Summary
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {isLoading && (
-            <div className="flex justify-center py-6">
+            <div className="flex flex-col items-center justify-center py-6 space-y-3">
+              <div className="flex items-center gap-2 rounded-full border border-border/40 bg-card/80 px-4 py-2 text-xs text-muted-foreground shadow-[0_12px_32px_-24px_rgba(12,18,26,0.35)]">
+                <div className="flex items-center gap-1">
+                  <div className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse"></div>
+                  <div className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                  <div className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                </div>
+                <span className="tracking-[0.3em] uppercase">AI Thinking</span>
+              </div>
               <Loader />
             </div>
           )}
@@ -282,7 +523,7 @@ function ArtifactCardView({ artifact }: ArtifactCardViewProps) {
   };
 
   return (
-    <ArtifactCard className={`border-border/60 ${CHAT_CONSTANTS.STYLING.GLASS}`}>
+    <ArtifactCard className="rounded-[24px] border border-border/40 bg-card/95 shadow-[0_36px_90px_-70px_rgba(12,18,26,0.55)]">
       <ArtifactHeader className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-2">
           {type.includes('code') ? (

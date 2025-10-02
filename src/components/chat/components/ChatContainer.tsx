@@ -2,7 +2,6 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChatState } from "../types/chatTypes";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
-
 interface ChatContainerProps {
   chatState: ChatState;
   children: React.ReactNode;
@@ -12,23 +11,20 @@ export function ChatContainer({ chatState, children }: ChatContainerProps) {
   if (!chatState.isOpen) return null;
 
   const getContainerClasses = () => {
+    if (chatState.isExpanded) {
+      return "fixed inset-0 z-[100] flex flex-col bg-[hsl(var(--background))] text-[hsl(var(--foreground))] overflow-hidden";
+    }
+
     const baseClasses = [
-      "fixed z-[100]",
+      "fixed z-[100] flex flex-col transition-all duration-300 safe-area-inset-bottom",
       CHAT_CONSTANTS.STYLING.CONTAINER,
-      "flex flex-col transition-all duration-300 safe-area-inset-bottom"
     ];
 
     if (chatState.isMinimized) {
       baseClasses.push(
-        "bottom-16 right-4 sm:bottom-24 sm:right-6",
+        "bottom-4 right-4 sm:bottom-6 sm:right-6",
         CHAT_CONSTANTS.UI.CHAT_WIDTH.MINIMIZED,
         CHAT_CONSTANTS.UI.CHAT_HEIGHT.MINIMIZED
-      );
-    } else if (chatState.isExpanded) {
-      baseClasses.push(
-        "top-0 left-0 right-0 bottom-0 w-full flex items-center justify-center p-4",
-        CHAT_CONSTANTS.UI.CHAT_WIDTH.EXPANDED,
-        CHAT_CONSTANTS.UI.CHAT_HEIGHT.EXPANDED
       );
     } else {
       baseClasses.push(
@@ -55,6 +51,3 @@ export function ChatContainer({ chatState, children }: ChatContainerProps) {
     </AnimatePresence>
   );
 }
-
-
-

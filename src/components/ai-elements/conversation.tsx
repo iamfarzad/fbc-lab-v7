@@ -11,7 +11,7 @@ export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
 export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
-    className={cn("relative flex-1 overflow-y-auto midday-bg-background/50 midday-border-secondary", className)}
+    className={cn("relative flex-1 overflow-y-auto bg-transparent", className)}
     initial="smooth"
     resize="smooth"
     role="log"
@@ -27,7 +27,7 @@ export const ConversationContent = ({
   className,
   ...props
 }: ConversationContentProps) => (
-  <StickToBottom.Content className={cn("p-4 midday-font-sans", className)} {...props} />
+  <StickToBottom.Content className={cn("p-4", className)} {...props} />
 );
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
@@ -45,10 +45,10 @@ export const ConversationEmptyState = ({
   ...props
 }: ConversationEmptyStateProps) => (
   <div
-    className={cn(
-      "flex size-full flex-col items-center justify-center gap-3 p-8 text-center midday-transition",
-      className
-    )}
+      className={cn(
+        "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
+        className
+      )}
     {...props}
   >
     {children ?? (
@@ -81,7 +81,7 @@ export const ConversationScrollButton = ({
     !isAtBottom && (
       <Button
         className={cn(
-          "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full midday-btn midday-transition midday-hover-lift",
+          "absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-card border border-border/40 text-foreground shadow-sm hover:bg-card/80",
           className
         )}
         onClick={handleScrollToBottom}

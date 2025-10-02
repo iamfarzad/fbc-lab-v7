@@ -29,24 +29,24 @@ export const createRetryableGemini = () => {
   
   return createRetryable({
     // Primary model - most capable
-    model: google('gemini-2.5-flash'),
+    model: google('gemini-2.5-flash', { apiKey }),
     
     // Retry strategies with fallback models
     retries: [
       // Handle rate limiting with a faster model
-      serviceOverloaded(google('gemini-2.0-flash')),
+      serviceOverloaded(google('gemini-2.0-flash', { apiKey })),
       
       // Handle content filtering with a different model
-      contentFilterTriggered(google('gemini-2.5-pro')),
+      contentFilterTriggered(google('gemini-2.5-pro', { apiKey })),
       
       // Handle timeouts with a more reliable model
-      requestTimeout(google('gemini-2.5-pro')),
+      requestTimeout(google('gemini-2.5-pro', { apiKey })),
       
       // Handle other retryable errors
-      requestNotRetryable(google('gemini-2.0-flash')),
+      requestNotRetryable(google('gemini-2.0-flash', { apiKey })),
       
       // Final fallback to most available model
-      google('gemini-2.0-flash')
+      google('gemini-2.0-flash', { apiKey })
     ]
   });
 };
@@ -62,23 +62,23 @@ export const createRetryableGeminiStream = () => {
   }
   
   return createRetryable({
-    model: google('gemini-2.5-flash'), // Start with fastest for streaming
+    model: google('gemini-2.5-flash', { apiKey }), // Start with fastest for streaming
     
     retries: [
       // Rate limiting - try even faster model
-      serviceOverloaded(google('gemini-2.0-flash')),
+      serviceOverloaded(google('gemini-2.0-flash', { apiKey })),
       
       // Content filtering
-      contentFilterTriggered(google('gemini-2.5-flash')),
+      contentFilterTriggered(google('gemini-2.5-flash', { apiKey })),
       
       // Timeouts
-      requestTimeout(google('gemini-2.5-flash')),
+      requestTimeout(google('gemini-2.5-flash', { apiKey })),
       
       // Other errors
-      requestNotRetryable(google('gemini-2.0-flash')),
+      requestNotRetryable(google('gemini-2.0-flash', { apiKey })),
       
       // Final fallback
-      google('gemini-2.0-flash')
+      google('gemini-2.0-flash', { apiKey })
     ]
   });
 };
@@ -94,23 +94,23 @@ export const createRetryableGeminiReliable = () => {
   }
   
   return createRetryable({
-    model: google('gemini-2.5-pro'), // Most reliable
+    model: google('gemini-2.5-pro', { apiKey }), // Most reliable
     
     retries: [
       // Rate limiting - fallback to flash
-      serviceOverloaded(google('gemini-2.5-flash')),
+      serviceOverloaded(google('gemini-2.5-flash', { apiKey })),
       
       // Content filtering - try different model
-      contentFilterTriggered(google('gemini-2.0-flash')),
+      contentFilterTriggered(google('gemini-2.0-flash', { apiKey })),
       
       // Timeouts - try faster model
-      requestTimeout(google('gemini-2.5-flash')),
+      requestTimeout(google('gemini-2.5-flash', { apiKey })),
       
       // Other errors
-      requestNotRetryable(google('gemini-2.5-flash')),
+      requestNotRetryable(google('gemini-2.5-flash', { apiKey })),
       
       // Final fallback
-      google('gemini-2.5-flash')
+      google('gemini-2.5-flash', { apiKey })
     ]
   });
 };

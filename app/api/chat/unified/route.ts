@@ -7,6 +7,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
+
+// Configure Google SDK globally
+if (process.env.GEMINI_API_KEY) {
+  // Google SDK is configured via environment variable
+}
 import { multimodalContextManager } from '@/src/core/context/multimodal-context'
 import { GoogleGroundingProvider } from '@/src/core/intelligence/providers/search/google-grounding'
 import { ContextStorage } from '@/src/core/context/context-storage'
@@ -80,6 +85,121 @@ const getModel = () => {
   return cachedModel
 }
 
+// Function to parse structured AI response and extract metadata
+function parseStructuredResponse(content: string) {
+  const metadata: any = {}
+  
+  // Extract reasoning
+  const reasoningMatch = content.match(/<reasoning>(.*?)<\/reasoning>/s)
+  if (reasoningMatch) {
+    metadata.reasoning = reasoningMatch[1].trim()
+  }
+  
+  // Extract chain of thought
+  const chainMatch = content.match(/<chain_of_thought>(.*?)<\/chain_of_thought>/s)
+  if (chainMatch) {
+    const steps = chainMatch[1].trim().split('\n').map((step, index) => ({
+      label: `Step ${index + 1}`,
+      description: step.trim(),
+      content: step.trim(),
+      status: 'completed' as const,
+      icon: 'check'
+    }))
+    metadata.chainOfThought = { steps }
+  }
+  
+  // Extract code blocks
+  const codeMatches = content.match(/<code(?:\s+language="([^"]*)")?>(.*?)<\/code>/gs)
+  if (codeMatches) {
+    metadata.codeBlocks = codeMatches.map((match, index) => {
+      const languageMatch = match.match(/language="([^"]*)"/)
+      const codeMatch = match.match(/<code(?:\s+language="[^"]*")?>(.*?)<\/code>/s)
+      return {
+        code: codeMatch?.[1]?.trim() || '',
+        language: languageMatch?.[1] || 'text',
+        showLineNumbers: true
+      }
+    })
+  }
+  
+  // Extract sources
+  const sourcesMatch = content.match(/<sources>(.*?)<\/sources>/s)
+  if (sourcesMatch) {
+    const sources = sourcesMatch[1].trim().split('\n').map((source, index) => ({
+      id: `source-${index}`,
+      title: source.replace(/^[-*]\s*/, '').trim(),
+      url: source.includes('http') ? source : `#${source.replace(/^[-*]\s*/, '').trim()}`
+    }))
+    metadata.sources = sources
+  }
+  
+  // Extract images
+  const imageMatches = content.match(/<image>(.*?)<\/image>/gs)
+  if (imageMatches) {
+    metadata.images = imageMatches.map((match, index) => {
+      const imageData = match.replace(/<image>|<\/image>/g, '').trim()
+      return {
+        base64: imageData,
+        mediaType: 'image/png',
+        alt: `Generated image ${index + 1}`
+      }
+    })
+  }
+  
+  // Extract inline citations
+  const citationMatches = content.match(/<citation\s+href="([^"]*)"\s+title="([^"]*)">(.*?)<\/citation>/gs)
+  if (citationMatches) {
+    metadata.inlineCitations = citationMatches.map((match) => {
+      const hrefMatch = match.match(/href="([^"]*)"/)
+      const titleMatch = match.match(/title="([^"]*)"/)
+      const textMatch = match.match(/>(.*?)<\/citation>/s)
+      return {
+        url: hrefMatch?.[1] || '',
+        title: titleMatch?.[1] || '',
+        text: textMatch?.[1]?.trim() || ''
+      }
+    })
+  }
+  
+  // Extract tasks
+  const taskMatches = content.match(/<task\s+status="([^"]*)">(.*?)<\/task>/gs)
+  if (taskMatches) {
+    metadata.tasks = taskMatches.map((match) => {
+      const statusMatch = match.match(/status="([^"]*)"/)
+      const contentMatch = match.match(/>(.*?)<\/task>/s)
+      const lines = contentMatch?.[1]?.trim().split('\n') || []
+      const title = lines[0] || 'Task'
+      const description = lines.slice(1).join('\n').trim()
+      return {
+        title,
+        description,
+        status: statusMatch?.[1] || 'pending',
+        files: []
+      }
+    })
+  }
+  
+  // Extract web preview
+  const webPreviewMatch = content.match(/<web_preview\s+url="([^"]*)"\s+title="([^"]*)">(.*?)<\/web_preview>/s)
+  if (webPreviewMatch) {
+    metadata.webPreview = {
+      url: webPreviewMatch[1],
+      title: webPreviewMatch[2],
+      description: webPreviewMatch[3]?.trim()
+    }
+  }
+  
+  // Add context usage tracking
+  metadata.contextUsage = {
+    usedTokens: Math.floor(content.length / 4), // Rough token estimate
+    maxTokens: 8192,
+    usage: Math.floor(content.length / 4) / 8192,
+    modelId: 'gemini-2.5-flash'
+  }
+  
+  return metadata
+}
+
 // Node.js runtime for streaming compatibility
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -96,7 +216,18 @@ export async function POST(req: NextRequest) {
     console.log('[UNIFIED_AI_SDK] Request:', reqId)
 
     const body = await req.json() as ChatRequestBody
-    const { messages, context, mode = 'standard', stream = true } = body
+    const { messages: rawMessages, context, mode = 'standard', stream = true } = body
+
+    if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
+      return NextResponse.json({ ok: false, error: 'At least one message is required.' }, { status: 400 })
+    }
+
+    const hasEmptyContent = rawMessages.some((msg) => typeof msg?.content !== 'string' || msg.content.trim().length === 0)
+    if (hasEmptyContent) {
+      return NextResponse.json({ ok: false, error: 'Messages must include non-empty content.' }, { status: 400 })
+    }
+
+    const messages = rawMessages.map((msg) => ({ ...msg, content: msg.content.trim() }))
     const model = getModel()
 
     // Build system prompt based on mode and context
@@ -134,7 +265,56 @@ RESPONSE STYLE:
 - Use company/person research to personalize responses
 - Guide users progressively through capabilities based on context
 - Reference specific industries and roles when known
-- End with actionable next steps or capability suggestions`
+- End with actionable next steps or capability suggestions
+
+RESPONSE FORMAT:
+Structure your responses with clear sections and metadata:
+
+1. **Main Response**: Provide your primary answer
+2. **Reasoning**: Explain your thought process (use <reasoning> tags)
+3. **Chain of Thought**: Break down complex analysis into steps (use <chain_of_thought> tags)
+4. **Sources**: Reference any research or data used (use <sources> tags)
+5. **Code Blocks**: Format code examples properly (use <code> tags with language)
+6. **Context Usage**: Track token usage and model information
+
+Example format:
+<reasoning>
+I'm analyzing this request by considering the business context, available data, and strategic implications...
+</reasoning>
+
+<chain_of_thought>
+Step 1: Understanding the business need
+Step 2: Evaluating available options
+Step 3: Recommending the best approach
+</chain_of_thought>
+
+<code language="javascript">
+// Example code implementation
+function calculateROI(investment, returns) {
+  return (returns - investment) / investment * 100;
+}
+</code>
+
+<sources>
+- Industry research data
+- Best practices documentation
+- Case study examples
+</sources>
+
+<image>
+[Base64 encoded image data for visual content]
+</image>
+
+<citation href="https://example.com" title="Research Paper">According to recent studies</citation>
+
+<task status="completed">
+Implement AI strategy
+Review current systems and recommend improvements
+</task>
+
+<web_preview url="https://example.com" title="AI Implementation Guide">
+Preview of relevant website content for context
+</web_preview>`
     
     if (mode === 'admin') {
       systemPrompt = `You are F.B/c AI Admin Assistant, specialized in business intelligence and management.
@@ -345,6 +525,9 @@ Citations: ${researchResult.allCitations.length} sources processed
               controller.enqueue(encoder.encode(eventData))
             }
 
+            // Parse structured response for AI elements metadata
+            const structuredMetadata = parseStructuredResponse(fullContent)
+            
             // Send completion event with same ID
             const completionData = {
               id: messageId,
@@ -357,7 +540,8 @@ Citations: ${researchResult.allCitations.length} sources processed
                 isComplete: true,
                 finalChunk: true,
                 reqId,
-                research: researchMetadata
+                research: researchMetadata,
+                ...structuredMetadata
               }
             }
             
@@ -395,6 +579,9 @@ Citations: ${researchResult.allCitations.length} sources processed
         temperature: 0.7
       })
 
+      // Parse structured response for AI elements metadata
+      const structuredMetadata = parseStructuredResponse(result.text)
+
       return NextResponse.json({
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -405,7 +592,8 @@ Citations: ${researchResult.allCitations.length} sources processed
           mode,
           tokensUsed: result.usage?.totalTokens || 0,
           reqId,
-          research: researchMetadata
+          research: researchMetadata,
+          ...structuredMetadata
         }
       }, {
         headers: {

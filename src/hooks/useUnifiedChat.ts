@@ -365,13 +365,34 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
     }
   }, [options.context])
 
+  // Separate state and actions for stable syncing
+  const stateSyncData = useMemo(() => ({
+    id: options.sessionId || 'unified-session',
+    messages,
+    error: error ?? null,
+    status: chatStatus,
+    context: chatContextState,
+  }), [
+    options.sessionId,
+    messages,
+    error,
+    chatStatus,
+    chatContextState
+  ])
+
+  const actionsRef = useRef({
+    sendMessage,
+    regenerate,
+    stop,
+    resumeStream,
+    addToolResult,
+    setMessages: replaceMessages,
+    clearError
+  })
+
+  // Update actions ref when they change (stable via useCallback)
   useEffect(() => {
-    syncUnifiedChatStoreState({
-      id: options.sessionId || 'unified-session',
-      messages,
-      error: error ?? null,
-      status: chatStatus,
-      context: chatContextState,
+    actionsRef.current = {
       sendMessage,
       regenerate,
       stop,
@@ -379,21 +400,26 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       addToolResult,
       setMessages: replaceMessages,
       clearError
+    }
+  }, [sendMessage, regenerate, stop, resumeStream, addToolResult, replaceMessages, clearError])
+
+  // Sync state with stable dependencies to prevent infinite re-render loops
+  useEffect(() => {
+    syncUnifiedChatStoreState(stateSyncData, UNIFIED_CHAT_STORE_ID)
+  }, [options.sessionId, messages.length, error?.message, chatStatus, JSON.stringify(chatContextState)])
+
+  // Sync actions once on mount or when needed (avoid in loop)
+  useEffect(() => {
+    syncUnifiedChatStoreState({
+      sendMessage: actionsRef.current.sendMessage,
+      regenerate: actionsRef.current.regenerate,
+      stop: actionsRef.current.stop,
+      resumeStream: actionsRef.current.resumeStream,
+      addToolResult: actionsRef.current.addToolResult,
+      setMessages: actionsRef.current.setMessages,
+      clearError: actionsRef.current.clearError
     }, UNIFIED_CHAT_STORE_ID)
-  }, [
-    messages,
-    error,
-    chatStatus,
-    chatContextState,
-    sendMessage,
-    regenerate,
-    stop,
-    resumeStream,
-    addToolResult,
-    replaceMessages,
-    clearError,
-    options.sessionId
-  ])
+  }, []) // Run once on mount; actions are stable
 
   useEffect(() => () => {
     if (abortControllerRef.current) {

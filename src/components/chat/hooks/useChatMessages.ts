@@ -73,12 +73,31 @@ export function useChatMessages() {
           }))
         : undefined;
 
-      const metadata: EnhancedChatMessage['metadata'] | undefined = researchMetadata || toolInvocations || annotations
+      // Extract AI elements metadata
+      const reasoning = msg.metadata?.reasoning
+      const chainOfThought = msg.metadata?.chainOfThought
+      const contextUsage = msg.metadata?.contextUsage
+      const codeBlocks = msg.metadata?.codeBlocks
+      const aiSources = msg.metadata?.sources
+      const images = msg.metadata?.images
+      const inlineCitations = msg.metadata?.inlineCitations
+      const tasks = msg.metadata?.tasks
+      const webPreview = msg.metadata?.webPreview
+
+      const metadata: EnhancedChatMessage['metadata'] | undefined = researchMetadata || toolInvocations || annotations || reasoning || chainOfThought || contextUsage || codeBlocks || aiSources || images || inlineCitations || tasks || webPreview
         ? {
-            sources: mappedSources,
+            sources: mappedSources || aiSources,
             researchSummary: researchMetadata || undefined,
             toolInvocations,
-            annotations
+            annotations,
+            reasoning,
+            chainOfThought,
+            contextUsage,
+            codeBlocks,
+            images,
+            inlineCitations,
+            tasks,
+            webPreview
           }
         : undefined;
 

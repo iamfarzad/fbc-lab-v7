@@ -36,17 +36,17 @@ export const CHAT_CONSTANTS = {
     BOUNCE: 0.5,
   },
 
-  // UI dimensions
+  // UI dimensions - Grok-inspired sizing
   UI: {
     CHAT_WIDTH: {
-      NORMAL: "w-96",
+      NORMAL: "w-[420px] sm:w-[480px]",
       EXPANDED: "max-w-4xl w-full",
-      MINIMIZED: "w-72 sm:w-80",
+      MINIMIZED: "w-80 sm:w-96",
     },
     CHAT_HEIGHT: {
-      NORMAL: "h-[70vh] sm:h-[600px] max-h-[600px]",
+      NORMAL: "h-[75vh] sm:h-[650px] max-h-[650px]",
       EXPANDED: "h-screen",
-      MINIMIZED: "h-12",
+      MINIMIZED: "h-20 sm:h-24",
     },
   },
 
@@ -58,19 +58,19 @@ export const CHAT_CONSTANTS = {
     SUCCESS: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300",
     ERROR: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300",
     // Monochrome design system colors
-    GUNMETAL: "bg-[#2C3539] text-[#E5E5E5]",
-    SILVER: "bg-[#E5E5E5] text-[#2C3539]",
-    GREY: "bg-[#808080] text-[#E5E5E5]",
-    LIGHT_GREY: "bg-[#A0A0A0] text-[#2C3539]",
-    DARK_GREY: "bg-[#606060] text-[#E5E5E5]",
+    GUNMETAL: "bg-[hsl(var(--foreground))] text-[hsl(var(--muted))]",
+    SILVER: "bg-muted text-[hsl(var(--foreground))]",
+    GREY: "bg-[hsl(var(--muted-foreground))] text-[hsl(var(--muted))]",
+    LIGHT_GREY: "bg-muted text-[hsl(var(--foreground))]",
+    DARK_GREY: "bg-[hsl(var(--muted-foreground))] text-[hsl(var(--muted))]",
   },
 
   // Design system styling classes
   STYLING: {
     // Container styles
-    CONTAINER: "bg-background border border-border backdrop-blur-sm bg-opacity-95",
-    CARD: "bg-card border border-border shadow-sm",
-    GLASS: "bg-background/80 backdrop-blur border border-border/20",
+    CONTAINER: "rounded-[32px] bg-card border border-border/40 shadow-[0_24px_80px_-60px_rgba(12,18,26,0.45)] overflow-hidden",
+    CARD: "rounded-[28px] bg-card border border-border/30 shadow-[0_28px_80px_-60px_rgba(12,18,26,0.35)]",
+    GLASS: "bg-card/80 backdrop-blur border border-border/30",
     
     // Button styles
     BUTTON_PRIMARY: "btn btn-primary",
@@ -108,4 +108,3 @@ export const {
 } = CHAT_CONSTANTS;
 
 export const TARGET_VOICE_SAMPLE_RATE = CHAT_CONSTANTS.AUDIO.TARGET_VOICE_SAMPLE_RATE;
-
