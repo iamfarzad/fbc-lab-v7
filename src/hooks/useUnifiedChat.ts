@@ -265,8 +265,10 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       metadata: {}
     }
 
-    commitMessages(prev => [...prev, userMessage])
-    await runStream([...messagesRef.current], { requestId: crypto.randomUUID() })
+    const nextMessages = [...messagesRef.current, userMessage]
+    messagesRef.current = nextMessages
+    commitMessages(nextMessages)
+    await runStream(nextMessages, { requestId: crypto.randomUUID() })
   }, [commitMessages, runStream, isLoading, isStreaming])
 
   const clearMessages = useCallback(() => {

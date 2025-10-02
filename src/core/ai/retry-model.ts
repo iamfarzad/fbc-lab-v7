@@ -29,24 +29,24 @@ export const createRetryableGemini = () => {
   
   return createRetryable({
     // Primary model - most capable
-    model: google('gemini-2.5-flash', { apiKey }),
+    model: google('gemini-2.5-flash'),
     
     // Retry strategies with fallback models
     retries: [
       // Handle rate limiting with a faster model
-      serviceOverloaded(google('gemini-2.0-flash', { apiKey })),
+      serviceOverloaded(),
       
       // Handle content filtering with a different model
-      contentFilterTriggered(google('gemini-2.5-pro', { apiKey })),
+      contentFilterTriggered(),
       
       // Handle timeouts with a more reliable model
-      requestTimeout(google('gemini-2.5-pro', { apiKey })),
+      requestTimeout(),
       
       // Handle other retryable errors
-      requestNotRetryable(google('gemini-2.0-flash', { apiKey })),
+      requestNotRetryable(),
       
       // Final fallback to most available model
-      google('gemini-2.0-flash', { apiKey })
+      google('gemini-2.0-flash')
     ]
   });
 };
@@ -62,23 +62,23 @@ export const createRetryableGeminiStream = () => {
   }
   
   return createRetryable({
-    model: google('gemini-2.5-flash', { apiKey }), // Start with fastest for streaming
+    model: google('gemini-2.5-flash'), // Start with fastest for streaming
     
     retries: [
       // Rate limiting - try even faster model
-      serviceOverloaded(google('gemini-2.0-flash', { apiKey })),
+      serviceOverloaded(),
       
       // Content filtering
-      contentFilterTriggered(google('gemini-2.5-flash', { apiKey })),
+      contentFilterTriggered(),
       
       // Timeouts
-      requestTimeout(google('gemini-2.5-flash', { apiKey })),
+      requestTimeout(),
       
       // Other errors
-      requestNotRetryable(google('gemini-2.0-flash', { apiKey })),
+      requestNotRetryable(),
       
       // Final fallback
-      google('gemini-2.0-flash', { apiKey })
+      google('gemini-2.0-flash')
     ]
   });
 };
@@ -98,16 +98,16 @@ export const createRetryableGeminiReliable = () => {
     
     retries: [
       // Rate limiting - fallback to flash
-      serviceOverloaded(google('gemini-2.5-flash', { apiKey })),
+      serviceOverloaded(),
       
       // Content filtering - try different model
-      contentFilterTriggered(google('gemini-2.0-flash', { apiKey })),
+      contentFilterTriggered(),
       
       // Timeouts - try faster model
-      requestTimeout(google('gemini-2.5-flash', { apiKey })),
+      requestTimeout(),
       
       // Other errors
-      requestNotRetryable(google('gemini-2.5-flash', { apiKey })),
+      requestNotRetryable(),
       
       // Final fallback
       google('gemini-2.5-flash', { apiKey })

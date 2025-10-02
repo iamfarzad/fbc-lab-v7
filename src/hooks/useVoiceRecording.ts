@@ -1,108 +1,188 @@
-import { useState, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  start(): void
+  stop(): void
+  abort(): void
+  onresult: ((event: SpeechRecognitionEvent) => void) | null
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
+  onend: (() => void) | null
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number
+  results: SpeechRecognitionResultList
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string
+  message?: string
+}
+
+type RecognitionConstructor = new () => SpeechRecognition
+
+declare global {
+  interface Window {
+    SpeechRecognition?: RecognitionConstructor
+    webkitSpeechRecognition?: RecognitionConstructor
+  }
+}
+
+function getRecognitionConstructor(): RecognitionConstructor | null {
+  if (typeof window === 'undefined') return null
+  const ctor = (window.SpeechRecognition || window.webkitSpeechRecognition) as RecognitionConstructor | undefined
+  return ctor ?? null
+}
 
 export function useVoiceRecording() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcription, setTranscription] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const stopResolverRef = useRef<((value: string) => void) | null>(null)
+  const transcriptRef = useRef('')
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
-  const resolveStopRef = useRef<((value: string) => void) | null>(null);
+  const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [transcription, setTranscription] = useState('')
+  const [partialTranscript, setPartialTranscript] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSupported, setIsSupported] = useState(false)
+
+  const ensureRecognition = useCallback(() => {
+    const ctor = getRecognitionConstructor()
+    if (!ctor) {
+      setIsSupported(false)
+      setError('Speech recognition is not supported in this browser yet.')
+      return null
+    }
+
+    setIsSupported(true)
+
+    if (!recognitionRef.current) {
+      const recognition = new ctor()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'en-US'
+      recognitionRef.current = recognition
+    }
+
+    return recognitionRef.current
+  }, [])
+
+  const cleanupRecognition = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onresult = null
+        recognitionRef.current.onerror = null
+        recognitionRef.current.onend = null
+        recognitionRef.current.stop()
+      } catch (err) {
+        // Ignore stop errors during teardown
+      }
+    }
+    recognitionRef.current = null
+  }, [])
 
   const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      chunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setIsRecording(false);
-        mediaRecorderRef.current = null;
-        transcribeAudio(blob);
-        streamRef.current?.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-
-        // Resolve stop promise if set
-        if (resolveStopRef.current && transcription) {
-          const resolver = resolveStopRef.current;
-          resolveStopRef.current = null;
-          resolver(transcription || '');
-        }
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setError(null);
-    } catch (err: any) {
-      setError(`Microphone access failed: ${err.message}`);
-      console.error('Recording error:', err);
+    const recognition = ensureRecognition()
+    if (!recognition || isRecording) {
+      return
     }
-  }, []);
+
+    setError(null)
+    setTranscription('')
+    transcriptRef.current = ''
+    setPartialTranscript('')
+    setIsRecording(true)
+    setIsTranscribing(true)
+
+    recognition.onresult = (event) => {
+      let finalTranscript = ''
+      let interimTranscript = ''
+
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i]
+        if (result.isFinal) {
+          finalTranscript += result[0]?.transcript ?? ''
+        } else {
+          interimTranscript += result[0]?.transcript ?? ''
+        }
+      }
+
+      if (finalTranscript) {
+        transcriptRef.current += finalTranscript.trim()
+        setTranscription(prev => `${prev} ${finalTranscript}`.trim())
+      }
+
+      setPartialTranscript(interimTranscript.trim())
+    }
+
+    recognition.onerror = (event: RecognitionErrorEvent) => {
+      const errorCode = event.error || ''
+      const message = errorCode === 'not-allowed'
+        ? 'Microphone permission denied.'
+        : errorCode === 'no-speech'
+          ? 'No speech detected. Please try again.'
+        : event.message || 'Voice recognition error.'
+      setError(message)
+      setIsRecording(false)
+      setIsTranscribing(false)
+      stopResolverRef.current?.('')
+      stopResolverRef.current = null
+    }
+
+    recognition.onend = () => {
+      setIsRecording(false)
+      setIsTranscribing(false)
+      setPartialTranscript('')
+      if (stopResolverRef.current) {
+        stopResolverRef.current(transcriptRef.current.trim())
+        stopResolverRef.current = null
+      }
+    }
+
+    try {
+      recognition.start()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start voice recognition.'
+      setError(message)
+      setIsRecording(false)
+      setIsTranscribing(false)
+    }
+  }, [ensureRecognition, isRecording])
 
   const stopRecording = useCallback(async (): Promise<string> => {
-    return new Promise((resolve) => {
-      resolveStopRef.current = resolve;
-      if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-      } else {
-        resolve('');
-      }
-    });
-  }, [isRecording]);
-
-  const transcribeAudio = async (blob: Blob) => {
-    setIsTranscribing(true);
-    const formData = new FormData();
-    formData.append('audio', blob, 'recording.webm');
-
-    try {
-      const response = await fetch('/api/chat/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTranscription(data.transcription);
-
-        // Resolve stop promise if set
-        if (resolveStopRef.current) {
-          const resolver = resolveStopRef.current;
-          resolveStopRef.current = null;
-          resolver(data.transcription || '');
-        }
-      } else {
-        const errorText = await response.text();
-        setError(`Transcription failed: ${errorText}`);
-      }
-    } catch (err: any) {
-      setError(`Network error: ${err.message}`);
-    } finally {
-      setIsTranscribing(false);
+    const recognition = recognitionRef.current
+    if (!recognition || !isRecording) {
+      return transcriptRef.current.trim()
     }
-  };
+
+    return new Promise((resolve) => {
+      stopResolverRef.current = resolve
+      try {
+        recognition.stop()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to stop voice recognition.'
+        setError(message)
+        setIsRecording(false)
+        setIsTranscribing(false)
+        stopResolverRef.current = null
+        resolve(transcriptRef.current.trim())
+      }
+    })
+  }, [isRecording])
+
+  useEffect(() => cleanupRecognition, [cleanupRecognition])
 
   return {
     isRecording,
     isTranscribing,
     transcription,
+    partialTranscript,
     error,
+    isSupported,
     startRecording,
     stopRecording,
-    // Aliases for compatibility
-    isProcessing: isTranscribing,
-    transcript: transcription,
-    partialTranscript: '',
-  };
+  }
 }

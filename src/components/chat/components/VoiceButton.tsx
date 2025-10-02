@@ -3,7 +3,7 @@
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-// import { Spinner } from "@/components/ui/spinner";
+import { MicOff } from "lucide-react";
 import { useCallback } from "react";
 
 // Custom Voice Icon with smooth animation
@@ -148,21 +148,28 @@ export function VoiceButton({
 }: VoiceButtonProps) {
   const {
     isRecording,
-    isProcessing,
-    transcript,
+    isTranscribing,
+    transcription,
     partialTranscript,
     error: voiceError,
+    isSupported,
     startRecording,
     stopRecording,
   } = useVoiceRecording();
 
   const handleVoiceClick = useCallback(async () => {
+    if (!isSupported) {
+      console.warn('Speech recognition is not supported in this browser.');
+      return;
+    }
+
     if (isRecording) {
       // Stop recording and get transcript
       try {
         const finalTranscript = await stopRecording();
-        if (finalTranscript && onTranscriptUpdate) {
-          onTranscriptUpdate(finalTranscript);
+        const result = finalTranscript || transcription || partialTranscript;
+        if (result && onTranscriptUpdate) {
+          onTranscriptUpdate(result.trim());
         }
       } catch (error) {
         console.error("Failed to stop recording:", error);
@@ -208,41 +215,33 @@ export function VoiceButton({
     );
   }
 
-  // Show processing state
-  if (isProcessing) {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        disabled
-        className={cn("size-6 mr-2 opacity-50", className)}
-      >
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
-        </div>
-      </Button>
-    );
-  }
-
-
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon"
       onClick={handleVoiceClick}
-      disabled={disabled}
+      disabled={disabled || !isSupported || isTranscribing}
       className={cn(
         "size-6 mr-2 transition-all duration-300 hover:bg-transparent text-muted-foreground",
         isRecording &&
           "text-red-500 hover:text-red-500 [&_svg]:text-red-500 [&_svg]:hover:text-red-500",
-        disabled && "opacity-50",
+        (disabled || !isSupported) && "opacity-50",
         className,
       )}
-      title={isRecording ? "Stop voice recording" : "Start voice recording"}
+      title={
+        !isSupported
+          ? 'Voice capture is not supported in this browser yet.'
+          : isRecording
+            ? 'Stop voice recording'
+            : 'Start voice recording'
+      }
     >
-      <VoiceIcon size={size} isRecording={isRecording} />
+      {isSupported ? (
+        <VoiceIcon size={size} isRecording={isRecording || isTranscribing} />
+      ) : (
+        <MicOff className="h-3 w-3" aria-hidden="true" />
+      )}
     </Button>
   );
 }

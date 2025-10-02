@@ -11,8 +11,7 @@ import {
   PromptInputActionMenu,
   PromptInputActionMenuTrigger,
   PromptInputActionMenuContent,
-  PromptInputActionMenuItem,
-  PromptInputActionAddAttachments
+  PromptInputActionMenuItem
 } from "@/components/ai-elements/prompt-input";
 import { toast } from "sonner";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
@@ -42,10 +41,10 @@ interface ChatInputProps {
   isScreenSharing: boolean;
   onInputChange: (value: string) => void;
   onSendMessage: (message: string) => void;
-  onToggleVoice: () => void;
-  onToggleCamera: () => void;
-  onToggleScreenShare: () => void;
-  onToggleSettings: () => void;
+  onToggleVoice: () => void | Promise<void>;
+  onToggleCamera: () => void | Promise<void>;
+  onToggleScreenShare: () => void | Promise<void>;
+  onToggleSettings: () => void | Promise<void>;
   isExpanded?: boolean;
   isMinimized?: boolean;
   // New props for action buttons
@@ -112,12 +111,14 @@ export function ChatInput({
           onSubmit={async (message, event) => {
             event.preventDefault();
 
+            const text = message.text?.trim();
+
             if (message.files && message.files.length > 0) {
-              toast.info('File analysis is coming soon. The attachment was noted but not yet processed.');
+              toast.info('File uploads are not yet supported in this build. Your file selection was cleared.');
             }
 
-            if (message.text) {
-              onSendMessage(message.text);
+            if (text) {
+              onSendMessage(text);
             }
           }}
         >
@@ -177,7 +178,12 @@ export function ChatInput({
                   <Plus className={cn("text-foreground/70", isExpanded ? "h-4 w-4" : "h-3 w-3")} aria-hidden="true" />
                 </PromptInputActionMenuTrigger>
                 <PromptInputActionMenuContent align="start" className="rounded-2xl border border-border/40 bg-background/95 shadow-lg">
-                  <PromptInputActionAddAttachments label="Upload photos & files" />
+                  <PromptInputActionMenuItem
+                    onClick={() => toast.info('File uploads are coming soon. Contact us for bespoke document reviews.')}
+                  >
+                    <Plus className={`mr-2 ${CHAT_CONSTANTS.ICONS.SMALL}`} />
+                    Upload photos & files (coming soon)
+                  </PromptInputActionMenuItem>
                   <PromptInputActionMenuItem
                     onClick={() => toast.info('PDF summaries are on the roadmap. Stay tuned!')}
                   >

@@ -83,6 +83,53 @@ export interface EnhancedChatMessage {
       [key: string]: any;
     }>;
     annotations?: Array<Record<string, any>>;
+    // Added missing fields
+    chainOfThought?: {
+      steps?: Array<{
+        label: string;
+        description: string;
+        content: string;
+        status: 'completed' | string;
+        icon: string;
+      }>;
+    };
+    tools?: Array<{
+      name: string;
+      type: string;
+      state: string;
+      input?: Record<string, any>;
+      output?: any;
+      error?: string;
+    }>;
+    contextUsage?: {
+      usedTokens: number;
+      maxTokens: number;
+      usage: number;
+      modelId: string;
+    };
+    images?: Array<{
+      base64: string;
+      mediaType: string;
+      alt: string;
+    }>;
+    inlineCitations?: Array<{
+      url: string;
+      title: string;
+      text: string;
+    }>;
+    tasks?: Array<{
+      title: string;
+      description?: string;
+      status: 'pending' | 'in_progress' | 'completed' | 'failed';
+      files?: Array<{
+        name: string;
+      }>;
+    }>;
+    webPreview?: {
+      url: string;
+      title: string;
+      description?: string;
+    };
   };
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error' | 'failed';
   error?: string;

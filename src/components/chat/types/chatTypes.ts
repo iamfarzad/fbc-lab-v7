@@ -23,6 +23,10 @@ export interface ChatState {
   isCameraActive: boolean;
   isListening: boolean;
   showSettings: boolean;
+  screenShareStream: MediaStream | null;
+  cameraStream: MediaStream | null;
+  screenShareError: string | null;
+  cameraError: string | null;
 }
 
 // Component props interfaces
@@ -64,6 +68,5 @@ export interface EnhancedMessagesState {
   messages: EnhancedChatMessage[];
   isMeetingOpen: boolean;
 }
-
 
 
