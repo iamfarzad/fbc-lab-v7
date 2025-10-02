@@ -3,6 +3,8 @@
  * Maintains compatibility while using AI SDK backend
  */
 
+import type { ChatAttachment } from '@/types/attachments'
+
 export interface UnifiedMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -19,6 +21,7 @@ export interface UnifiedMessage {
     errorMessage?: string
     toolCalls?: number
     usage?: any
+    attachments?: ChatAttachment[]
     [key: string]: any
   }
 }
@@ -40,6 +43,7 @@ export interface UnifiedContext {
     imageData?: string | Uint8Array
     videoData?: string | Uint8Array
   }
+  attachments?: ChatAttachment[]
   [key: string]: any
 }
 

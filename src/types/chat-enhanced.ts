@@ -63,6 +63,10 @@ export interface EnhancedChatMessage {
       size: number;
       url: string;
       thumbnail?: string;
+      analysis?: string;
+      summary?: string;
+      pages?: number;
+      uploadedAt?: string;
     }>;
     researchSummary?: {
       query?: string;

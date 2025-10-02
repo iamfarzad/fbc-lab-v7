@@ -118,7 +118,7 @@ export function useVoiceRecording() {
       setPartialTranscript(interimTranscript.trim())
     }
 
-    recognition.onerror = (event: RecognitionErrorEvent) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       const errorCode = event.error || ''
       const message = errorCode === 'not-allowed'
         ? 'Microphone permission denied.'

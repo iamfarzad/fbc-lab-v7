@@ -1,5 +1,5 @@
 import { ContextStorage } from './context-storage'
-import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext } from './context-types'
+import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry } from './context-types'
 
 // Define a local alias for the allowed modalities so we don't widen to string[]
 type Modality = 'text' | 'video' | 'image' | 'audio';
@@ -55,6 +55,7 @@ export function createInitialContext(sessionId: string, leadContext?: Partial<Le
     conversationHistory: [],
     visualContext: [],
     audioContext: [],
+    uploadContext: [],
     leadContext: {
       email: leadContext?.email ?? '',
       name: leadContext?.name ?? '',
@@ -102,6 +103,7 @@ function ensureContext(ctx: unknown): MultimodalContext {
     conversationHistory: obj.conversationHistory || [],
     visualContext: obj.visualContext || [],
     audioContext: asAudioEntries(obj.audioContext || []),
+    uploadContext: obj.uploadContext || [],
     leadContext: obj.leadContext || { email: '', name: '', company: '' },
     metadata: obj.metadata || {
       createdAt: new Date().toISOString(),
@@ -148,6 +150,7 @@ export class MultimodalContextManager {
       conversationHistory: [],
       visualContext: [],
       audioContext: [],
+      uploadContext: [],
       leadContext: leadContext ?? { name: '', email: '', company: '' },
       metadata: {
         createdAt: new Date().toISOString(),
@@ -259,6 +262,40 @@ export class MultimodalContextManager {
     // Action logged
   }
 
+  async addUploadEntry(sessionId: string, payload: {
+    id: string
+    filename: string
+    mimeType: string
+    size: number
+    analysis: string
+    summary?: string
+    dataUrl?: string
+    pages?: number
+  }): Promise<void> {
+    const context = await this.getOrCreateContext(sessionId)
+
+    const entryTimestamp = new Date().toISOString()
+    const uploadEntry = {
+      id: payload.id,
+      timestamp: entryTimestamp,
+      filename: payload.filename,
+      mimeType: payload.mimeType,
+      size: payload.size,
+      analysis: payload.analysis,
+      summary: payload.summary,
+      dataUrl: payload.dataUrl,
+      pages: payload.pages
+    }
+
+    context.uploadContext = context.uploadContext || []
+    context.uploadContext.push(uploadEntry)
+    context.metadata.lastUpdated = entryTimestamp
+    context.metadata.modalitiesUsed = coerceModalities([...context.metadata.modalitiesUsed, 'text'])
+    context.metadata.totalTokens += Math.ceil(payload.analysis.length / 4)
+
+    await this.saveContext(sessionId, context)
+  }
+
   async getContext(sessionId: string): Promise<MultimodalContext | null> {
     // Check memory first
     if (this.activeContexts.has(sessionId)) {
@@ -333,12 +370,14 @@ export class MultimodalContextManager {
     conversationHistory: ConversationEntry[]
     visualContext: VisualEntry[]
     audioContext: AudioEntry[]
+    uploadContext: UploadEntry[]
     summary: {
       totalMessages: number
       modalitiesUsed: Modality[]
       lastActivity: string
       recentVisualAnalyses: number
       recentAudioEntries: number
+      recentUploads: number
     }
   }> {
     const context = await this.getOrCreateContext(sessionId)
@@ -347,29 +386,34 @@ export class MultimodalContextManager {
         conversationHistory: [],
         visualContext: [],
         audioContext: [],
+        uploadContext: [],
         summary: {
           totalMessages: 0,
           modalitiesUsed: [],
           lastActivity: '',
           recentVisualAnalyses: 0,
-          recentAudioEntries: 0
+          recentAudioEntries: 0,
+          recentUploads: 0
         }
       }
     }
 
     const recentVisual = includeRecentVisual ? context.visualContext.slice(-3) : []
     const recentAudio = includeRecentAudio ? asAudioEntries(context.audioContext).slice(-3) : []
+    const recentUploads = context.uploadContext ? context.uploadContext.slice(-3) : []
 
     return {
       conversationHistory: context.conversationHistory.slice(-10), // Last 10 messages
       visualContext: recentVisual,
       audioContext: recentAudio,
+      uploadContext: recentUploads,
       summary: {
         totalMessages: context.conversationHistory.length,
         modalitiesUsed: context.metadata.modalitiesUsed,
         lastActivity: context.metadata.lastUpdated,
         recentVisualAnalyses: recentVisual.length,
-        recentAudioEntries: recentAudio.length
+        recentAudioEntries: recentAudio.length,
+        recentUploads: recentUploads.length
       }
     }
   }
@@ -382,6 +426,8 @@ export class MultimodalContextManager {
       hasRecentImages: boolean
       hasRecentAudio: boolean
       recentAnalyses: string[]
+      recentUploads: string[]
+      hasRecentUploads: boolean
     }
   }> {
     const context = await this.getConversationContext(sessionId, includeVisual, includeAudio)
@@ -389,20 +435,32 @@ export class MultimodalContextManager {
     // Build system prompt with multimodal context
     let systemPrompt = "You are F.B/c AI, a helpful business assistant with multimodal capabilities."
 
-    if (context.summary.recentVisualAnalyses > 0 || context.summary.recentAudioEntries > 0) {
+    if (context.summary.recentVisualAnalyses > 0 || context.summary.recentAudioEntries > 0 || context.summary.recentUploads > 0) {
       systemPrompt += "\n\nYou have access to recent multimodal context from this conversation:"
     }
 
     const multimodalContext = {
       hasRecentImages: context.visualContext.length > 0,
       hasRecentAudio: context.audioContext.length > 0,
-      recentAnalyses: context.visualContext.map(v => v.analysis).slice(-2) // Last 2 analyses
+      recentAnalyses: context.visualContext.map(v => v.analysis).slice(-2), // Last 2 analyses
+      recentUploads: context.uploadContext.map(entry => entry.analysis).slice(-2),
+      hasRecentUploads: context.uploadContext.length > 0
     }
 
     if (multimodalContext.hasRecentImages) {
       systemPrompt += `\n\nRecent visual analyses (${context.visualContext.length} items):`
       multimodalContext.recentAnalyses.forEach((analysis, i) => {
         systemPrompt += `\n${i + 1}. ${analysis.substring(0, 200)}${analysis.length > 200 ? '...' : ''}`
+      })
+    }
+
+    if (multimodalContext.hasRecentUploads) {
+      const formatSize = (size: number) => `${Math.round((size / 1024) * 10) / 10} KB`
+      systemPrompt += `\n\nRecent document uploads (${context.uploadContext.length} items):`
+      context.uploadContext.forEach((upload, index) => {
+        const summarySnippet = upload.summary ? ` Summary sample: ${upload.summary.substring(0, 140)}${upload.summary.length > 140 ? '...' : ''}` : ''
+        const pageInfo = upload.pages ? `, ${upload.pages} page${upload.pages === 1 ? '' : 's'}` : ''
+        systemPrompt += `\n${index + 1}. ${upload.filename} (${upload.mimeType || 'unknown'}, ${formatSize(upload.size)}${pageInfo}) — ${upload.analysis}.${summarySnippet}`
       })
     }
 

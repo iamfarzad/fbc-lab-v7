@@ -34,16 +34,16 @@ export const createRetryableGemini = () => {
     // Retry strategies with fallback models
     retries: [
       // Handle rate limiting with a faster model
-      serviceOverloaded(),
+      serviceOverloaded(google('gemini-2.0-flash')),
       
       // Handle content filtering with a different model
-      contentFilterTriggered(),
+      contentFilterTriggered(google('gemini-2.5-pro')),
       
       // Handle timeouts with a more reliable model
-      requestTimeout(),
+      requestTimeout(google('gemini-2.5-pro')),
       
       // Handle other retryable errors
-      requestNotRetryable(),
+      requestNotRetryable(google('gemini-2.0-flash')),
       
       // Final fallback to most available model
       google('gemini-2.0-flash')
@@ -66,16 +66,16 @@ export const createRetryableGeminiStream = () => {
     
     retries: [
       // Rate limiting - try even faster model
-      serviceOverloaded(),
+      serviceOverloaded(google('gemini-2.0-flash')),
       
       // Content filtering
-      contentFilterTriggered(),
+      contentFilterTriggered(google('gemini-2.5-flash')),
       
       // Timeouts
-      requestTimeout(),
+      requestTimeout(google('gemini-2.5-flash')),
       
       // Other errors
-      requestNotRetryable(),
+      requestNotRetryable(google('gemini-2.0-flash')),
       
       // Final fallback
       google('gemini-2.0-flash')
@@ -98,16 +98,16 @@ export const createRetryableGeminiReliable = () => {
     
     retries: [
       // Rate limiting - fallback to flash
-      serviceOverloaded(),
+      serviceOverloaded(google('gemini-2.5-flash', { apiKey })),
       
       // Content filtering - try different model
-      contentFilterTriggered(),
+      contentFilterTriggered(google('gemini-2.0-flash', { apiKey })),
       
       // Timeouts - try faster model
-      requestTimeout(),
+      requestTimeout(google('gemini-2.5-flash', { apiKey })),
       
       // Other errors
-      requestNotRetryable(),
+      requestNotRetryable(google('gemini-2.5-flash', { apiKey })),
       
       // Final fallback
       google('gemini-2.5-flash', { apiKey })

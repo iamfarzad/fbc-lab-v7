@@ -48,8 +48,10 @@ import {
   useState,
 } from "react";
 
+export type PromptInputFile = FileUIPart & { id: string; file: File; size: number };
+
 type AttachmentsContext = {
-  files: (FileUIPart & { id: string })[];
+  files: PromptInputFile[];
   add: (files: File[] | FileList) => void;
   remove: (id: string) => void;
   clear: () => void;
@@ -73,7 +75,7 @@ export const usePromptInputAttachments = () => {
 };
 
 export type PromptInputAttachmentProps = HTMLAttributes<HTMLDivElement> & {
-  data: FileUIPart & { id: string };
+  data: PromptInputFile;
   className?: string;
 };
 
@@ -120,11 +122,8 @@ export function PromptInputAttachment({
   );
 }
 
-export type PromptInputAttachmentsProps = Omit<
-  HTMLAttributes<HTMLDivElement>,
-  "children"
-> & {
-  children: (attachment: FileUIPart & { id: string }) => React.ReactNode;
+export type PromptInputAttachmentsProps = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
+  children: (attachment: PromptInputFile) => React.ReactNode;
 };
 
 export function PromptInputAttachments({
@@ -195,7 +194,7 @@ export const PromptInputActionAddAttachments = ({
 
 export type PromptInputMessage = {
   text?: string;
-  files?: FileUIPart[];
+  files?: PromptInputFile[];
 };
 
 export type PromptInputProps = Omit<
@@ -298,7 +297,7 @@ export const PromptInput = ({
             message: "Too many files. Some were not added.",
           });
         }
-        const next: (FileUIPart & { id: string })[] = [];
+        const next: PromptInputFile[] = [];
         for (const file of capped) {
           next.push({
             id: nanoid(),
@@ -306,6 +305,8 @@ export const PromptInput = ({
             url: URL.createObjectURL(file),
             mediaType: file.type,
             filename: file.name,
+            file,
+            size: file.size,
           });
         }
         return prev.concat(next);

@@ -62,12 +62,25 @@ export interface VisualEntry {
   };
 }
 
+export interface UploadEntry {
+  id: string;
+  timestamp: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  analysis: string;
+  summary?: string;
+  dataUrl?: string;
+  pages?: number;
+}
+
 /** In-memory multimodal context stored per session. */
 export interface MultimodalContext {
   sessionId: string;
   conversationHistory: ConversationEntry[];
   visualContext: VisualEntry[];
   audioContext: unknown[]; // refine later
+  uploadContext: UploadEntry[];
   /** Required; callers can pass an empty object with empty strings. */
   leadContext: LeadContext;
   metadata: {
