@@ -22,6 +22,15 @@ interface ChatMessage {
   content: string
 }
 
+interface UnifiedMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: Date
+  type?: 'text' | 'tool' | 'multimodal' | 'meta'
+  metadata?: Record<string, any>
+}
+
 interface IntelligenceContext {
   lead?: { name: string; email: string }
   company?: { name: string; industry?: string; size?: string }
@@ -42,7 +51,7 @@ interface ChatContext {
 }
 
 interface ChatRequestBody {
-  messages: ChatMessage[]
+  messages: UnifiedMessage[]
   context?: ChatContext
   mode?: 'standard' | 'admin' | 'realtime' | 'multimodal'
   stream?: boolean
@@ -227,7 +236,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Messages must include non-empty content.' }, { status: 400 })
     }
 
-    const messages = rawMessages.map((msg) => ({ ...msg, content: msg.content.trim() }))
+    // Convert UnifiedMessage to ChatMessage format for AI SDK
+    const messages: ChatMessage[] = rawMessages.map((msg) => ({
+      role: msg.role,
+      content: msg.content.trim()
+    }))
     const model = getModel()
 
     // Build system prompt based on mode and context
