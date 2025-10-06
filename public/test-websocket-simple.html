@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Server WebSocket Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .session-started { background-color: #d1ecf1; color: #0c5460; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        #log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 2px 0;
+        }
+        .log-send { color: #007bff; }
+        .log-receive { color: #28a745; }
+        .log-error { color: #dc3545; }
+        .log-info { color: #6c757d; }
+    </style>
+</head>
+<body>
+    <h1>Voice Server WebSocket Test</h1>
+    
+    <div class="container">
+        <h2>Connection Status</h2>
+        <div id="status" class="status disconnected">Disconnected</div>
+        <button id="connectBtn" onclick="testConnection()">Test WebSocket Connection</button>
+        <button id="closeBtn" onclick="closeConnection()" disabled>Close Connection</button>
+    </div>
+    
+    <div class="container">
+        <h2>Messages</h2>
+        <div id="messages">
+            <p><strong>Received Messages:</strong></p>
+            <div id="received">No messages yet...</div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>Live Log</h2>
+        <div id="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectTimeout = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(status, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = status;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function updateReceived(message) {
+            const receivedDiv = document.getElementById('received');
+            receivedDiv.innerHTML = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+        }
+
+        function testConnection() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected', 'info');
+                return;
+            }
+
+            log('Attempting to connect to ws://localhost:3001...', 'info');
+            updateStatus('Connecting...', 'disconnected');
+
+            try {
+                ws = new WebSocket('ws://localhost:3001');
+
+                ws.onopen = function(event) {
+                    log('WebSocket connected successfully', 'info');
+                    updateStatus('Connected', 'connected');
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('closeBtn').disabled = false;
+
+                    // Send start message
+                    const startMessage = { type: 'start' };
+                    ws.send(JSON.stringify(startMessage));
+                    log('Sent: ' + JSON.stringify(startMessage), 'send');
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log('Received: ' + JSON.stringify(data), 'receive');
+                        updateReceived(data);
+
+                        if (data.type === 'session_started') {
+                            updateStatus('Session Started', 'session-started');
+                            log('Live API session opened (mock mode)', 'info');
+                        } else if (data.type === 'transcript') {
+                            log('Transcript received: ' + data.text, 'receive');
+                        } else if (data.type === 'response') {
+                            log('AI Response received: ' + data.text, 'receive');
+                        }
+                    } catch (error) {
+                        log('Error parsing message: ' + error.message, 'error');
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    log('WebSocket error: ' + error, 'error');
+                    updateStatus('Error', 'error');
+                };
+
+                ws.onclose = function(event) {
+                    log('WebSocket closed. Code: ' + event.code + ', Reason: ' + event.reason, 'info');
+                    updateStatus('Disconnected', 'disconnected');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('closeBtn').disabled = true;
+                    ws = null;
+                };
+
+            } catch (error) {
+                log('Error creating WebSocket: ' + error.message, 'error');
+                updateStatus('Error', 'error');
+            }
+        }
+
+        function closeConnection() {
+            if (ws) {
+                ws.close();
+                log('Connection closed by user', 'info');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Auto-connect on page load
+        window.onload = function() {
+            log('Page loaded. Ready to test WebSocket connection.', 'info');
+        };
+    </script>
+</body>
+</html>

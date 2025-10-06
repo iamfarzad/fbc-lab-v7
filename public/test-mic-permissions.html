@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Microphone Permission Test</title>
+</head>
+<body>
+    <h1>Microphone Permission Test</h1>
+    <button id="testMic">Test Microphone</button>
+    <div id="status"></div>
+    <div id="audioInfo"></div>
+
+    <script>
+        document.getElementById('testMic').onclick = async () => {
+            const status = document.getElementById('status');
+            const audioInfo = document.getElementById('audioInfo');
+            
+            try {
+                status.textContent = 'Requesting microphone access...';
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: 1,
+                        sampleRate: 24000,
+                        sampleSize: 16,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                
+                status.textContent = '✅ Microphone access granted!';
+                status.style.color = 'green';
+                
+                const audioTrack = stream.getAudioTracks()[0];
+                audioInfo.innerHTML = `
+                    <h3>Audio Track Info:</h3>
+                    <p><strong>Label:</strong> ${audioTrack.label}</p>
+                    <p><strong>Enabled:</strong> ${audioTrack.enabled}</p>
+                    <p><strong>Muted:</strong> ${audioTrack.muted}</p>
+                    <p><strong>Ready State:</strong> ${audioTrack.readyState}</p>
+                `;
+                
+                // Test AudioWorkletNode
+                try {
+                    const audioContext = new AudioContext({ sampleRate: 24000 });
+                    await audioContext.audioWorklet.addModule('/audio-processor.js');
+                    const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+                    
+                    audioInfo.innerHTML += '<p><strong>AudioWorkletNode:</strong> ✅ Loaded successfully!</p>';
+                    
+                    const source = audioContext.createMediaStreamSource(stream);
+                    source.connect(processor);
+                    
+                    processor.port.onmessage = (event) => {
+                        if (event.data.type === 'audioData') {
+                            audioInfo.innerHTML += '<p><strong>Audio Data:</strong> ✅ Receiving audio chunks!</p>';
+                        }
+                    };
+                    
+                } catch (error) {
+                    audioInfo.innerHTML += `<p><strong>AudioWorkletNode Error:</strong> ❌ ${error.message}</p>`;
+                }
+                
+            } catch (error) {
+                status.textContent = `❌ Microphone access denied: ${error.message}`;
+                status.style.color = 'red';
+            }
+        };
+    </script>
+</body>
+</html>
+
