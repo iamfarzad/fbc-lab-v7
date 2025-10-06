@@ -14,7 +14,7 @@ export type LiveConnectOptions = {
  */
 export async function connectLive({ apiKey, model, config }: LiveConnectOptions) {
   const genAI = new GoogleGenAI({ apiKey })
-  const liveModel = model ?? 'gemini-2.5-flash-native-audio-preview-09-2025'
+  const liveModel = model ?? 'gemini-2.0-flash-live-001'
 
   let isOpen = false
 

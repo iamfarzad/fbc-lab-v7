@@ -8,9 +8,9 @@ import { ContactSection } from "@/components/ContactSection"
 import { Footer } from "@/components/Footer"
 import { 
   WorkSectionLazy, 
-  WorkshopsSectionLazy, 
-  MultimodalChatLazy 
+  WorkshopsSectionLazy
 } from "@/components/LazyComponents"
+import { ChatInterface } from "@/components/chat/ChatInterface"
 
 export default function Home() {
   return (
@@ -42,14 +42,8 @@ export default function Home() {
       </main>
       <Footer />
       
-      {/* Chat widget */}
-      <Suspense fallback={
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-12 h-12 bg-primary rounded-full animate-pulse" />
-      }>
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
-          <MultimodalChatLazy />
-        </div>
-      </Suspense>
+      {/* Chat Interface with Voice Functionality */}
+      <ChatInterface />
     </div>
   )
 }

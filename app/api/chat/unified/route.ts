@@ -203,7 +203,7 @@ function parseStructuredResponse(content: string) {
     usedTokens: Math.floor(content.length / 4), // Rough token estimate
     maxTokens: 8192,
     usage: Math.floor(content.length / 4) / 8192,
-    modelId: 'gemini-2.5-flash'
+    modelId: 'gemini-flash-latest'
   }
   
   return metadata
@@ -486,7 +486,7 @@ Citations: ${researchResult.allCitations.length} sources processed
       if (!apiKey) {
         throw new Error('Missing GEMINI_API_KEY environment variable')
       }
-      const streamingModel = google('gemini-2.5-flash')
+      const streamingModel = google('gemini-flash-lite-latest')
       
       // Streaming response using AI SDK
       const result = streamText({

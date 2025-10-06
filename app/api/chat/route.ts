@@ -28,26 +28,26 @@ interface MultimodalContextResult {
   systemPrompt: string;
 }
 
-// Create a retryable model with proper fallback strategies
+// Create a retryable model with proper fallback strategies using latest models
 const retryableModel = createRetryable({
-  // Primary model - most capable
-  model: google('gemini-2.5-flash'),
-  
+  // Primary model - latest 2.5 Flash for improved efficiency
+  model: google('gemini-flash-latest'),
+
   // Retry strategies with fallback models
   retries: [
-    // Handle rate limiting with a faster model
-    serviceOverloaded(google('gemini-2.0-flash')),
-    
-    // Handle content filtering with a different model
+    // Handle rate limiting with cost-effective Flash-Lite
+    serviceOverloaded(google('gemini-flash-lite-latest')),
+
+    // Handle content filtering with Pro model
     contentFilterTriggered(google('gemini-2.5-pro')),
-    
-    // Handle timeouts with a more reliable model
+
+    // Handle timeouts with reliable Pro model
     requestTimeout(google('gemini-2.5-pro')),
-    
-    // Handle other retryable errors
-    requestNotRetryable(google('gemini-2.0-flash')),
-    
-    // Final fallback to most available model
+
+    // Handle other retryable errors with Flash-Lite
+    requestNotRetryable(google('gemini-flash-lite-latest')),
+
+    // Final fallback to legacy model if needed
     google('gemini-2.0-flash')
   ]
 });

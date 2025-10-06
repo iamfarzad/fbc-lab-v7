@@ -252,7 +252,13 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
     }
   }, [options, commitMessages])
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (
+    content: string,
+    options: {
+      metadata?: UnifiedMessage['metadata']
+      contextPatch?: Partial<UnifiedContext>
+    } = {}
+  ) => {
     if (!content.trim() || isLoading || isStreaming) return
 
     const trimmed = content.trim()
@@ -262,12 +268,17 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       content: trimmed,
       timestamp: new Date(),
       type: 'text',
-      metadata: {}
+      metadata: options.metadata ?? {}
     }
 
     const nextMessages = [...messagesRef.current, userMessage]
     messagesRef.current = nextMessages
     commitMessages(nextMessages)
+
+    if (options.contextPatch && Object.keys(options.contextPatch).length > 0) {
+      setChatContextState(prev => ({ ...prev, ...options.contextPatch! }))
+    }
+
     await runStream(nextMessages, { requestId: crypto.randomUUID() })
   }, [commitMessages, runStream, isLoading, isStreaming])
 
@@ -361,10 +372,23 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
     return 'ready' as const
   }, [error, isStreaming, isLoading])
 
+  const lastContextRef = useRef<string | null>(null)
+
   useEffect(() => {
-    if (options.context) {
-      setChatContextState(prev => ({ ...prev, ...options.context! }))
+    if (!options.context) {
+      if (lastContextRef.current !== null) {
+        lastContextRef.current = null
+      }
+      return
     }
+
+    const serialized = JSON.stringify(options.context)
+    if (serialized === lastContextRef.current) {
+      return
+    }
+
+    lastContextRef.current = serialized
+    setChatContextState(prev => ({ ...prev, ...options.context! }))
   }, [options.context])
 
   // Separate state and actions for stable syncing
