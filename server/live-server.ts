@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { RawData } from 'ws'
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, LiveServerToolCall, Modality } from '@google/genai'
+import { GenAILiveClient } from './genai-live-client.js'
 import { v4 as uuidv4 } from 'uuid'
 import { Buffer } from 'buffer'
 import * as https from 'https'
@@ -15,19 +16,26 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
+// Determine if running in local development
+const hasFlyEnv = process.env.FLY_APP_NAME && process.env.FLY_APP_NAME.length > 0;
+const explicitProdEnv = process.env.NODE_ENV === 'production';
+const isLocalDev = !hasFlyEnv && !explicitProdEnv;
+
 // Use PORT for Fly.io compatibility, fallback to 3001 for local development
 const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
-console.log(`🔧 Environment check: PORT=${process.env.PORT}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT}, Using: ${PORT}`);
+console.log(`🔧 Environment check: PORT=${process.env.PORT || 'undefined'}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT || 'undefined'}, Using: ${PORT}`);
+console.log(`🌍 Environment: NODE_ENV=${process.env.NODE_ENV || 'undefined'}, FLY_APP_NAME=${process.env.FLY_APP_NAME || 'undefined'}`);
+console.log(`🏷️  Mode: ${isLocalDev ? 'LOCAL DEVELOPMENT' : 'PRODUCTION (Fly.io)'}`);
 const IS_MOCK = (process.env.FBC_USE_MOCKS === '1' || process.env.LIVE_MOCK === '1');
 
 // Voice & Language Utilities
 const VOICE_BY_LANG: Record<string, string> = {
-  'en-US': 'Puck',
-  'en-GB': 'Puck',
-  'nb-NO': 'Puck',
-  'sv-SE': 'Puck',
-  'de-DE': 'Puck',
-  'es-ES': 'Puck',
+  'en-US': 'Zephyr',
+  'en-GB': 'Zephyr',
+  'nb-NO': 'Zephyr',
+  'sv-SE': 'Zephyr',
+  'de-DE': 'Zephyr',
+  'es-ES': 'Zephyr',
 };
 
 function isBcp47(s?: string) {
@@ -44,7 +52,6 @@ const decodeRawMessage = (raw: RawData): string => {
 
 // --- Server Setup ---
 let sslOptions = {};
-const isLocalDev = process.env.NODE_ENV !== 'production' && !process.env.FLY_APP_NAME;
 
 if (isLocalDev) {
   try {
@@ -133,7 +140,7 @@ nodeProcess?.on('unhandledRejection', (reason: unknown) => {
 })
 
 // Store active Live API sessions
-const activeSessions = new Map<string, { ws: WebSocket; session: any }>();
+const activeSessions = new Map<string, { ws: WebSocket; session: any; audioBuffer: ArrayBuffer[]; audioTimeout?: NodeJS.Timeout }>();
 const sessionStarting = new Set<string>()
 
 // Helper function for safe WebSocket sends
@@ -145,6 +152,32 @@ function safeSend(ws: WebSocket, data: any, isBinary = false) {
   } catch (e) {
     console.error('safeSend error:', e)
   }
+}
+
+// PCM to WAV conversion utility
+function pcmToWav(pcmData: ArrayBuffer, sampleRate: number, channels: number, bitDepth: number): Buffer {
+  const bytesPerSample = bitDepth / 8;
+  const blockAlign = channels * bytesPerSample;
+  
+  const wavHeader = Buffer.alloc(44);
+  const wavData = Buffer.from(pcmData);
+  
+  // WAV header
+  wavHeader.write('RIFF', 0); // ChunkID
+  wavHeader.writeUInt32LE(36 + wavData.length, 4); // ChunkSize
+  wavHeader.write('WAVE', 8); // Format
+  wavHeader.write('fmt ', 12); // Subchunk1ID
+  wavHeader.writeUInt32LE(16, 16); // Subchunk1Size
+  wavHeader.writeUInt16LE(1, 20); // AudioFormat (PCM)
+  wavHeader.writeUInt16LE(channels, 22); // NumChannels
+  wavHeader.writeUInt32LE(sampleRate, 24); // SampleRate
+  wavHeader.writeUInt32LE(sampleRate * channels * bytesPerSample, 28); // ByteRate
+  wavHeader.writeUInt16LE(blockAlign, 32); // BlockAlign
+  wavHeader.writeUInt16LE(bitDepth, 34); // BitsPerSample
+  wavHeader.write('data', 36); // Subchunk2ID
+  wavHeader.writeUInt32LE(wavData.length, 40); // Subchunk2Size
+  
+  return Buffer.concat([wavHeader, wavData]);
 }
 
 async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
@@ -160,7 +193,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
   // Close existing session if any
   if (activeSessions.has(connectionId)) {
     console.info(`[${connectionId}] Session already exists. Closing old one.`);
-    try { activeSessions.get(connectionId)?.session?.close?.() } catch (error) {
+    try { activeSessions.get(connectionId)?.session?.disconnect?.() } catch (error) {
       console.warn(`[${connectionId}] Failed to close previous session`, error)
     }
   }
@@ -168,7 +201,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
   if (IS_MOCK) {
     // Mock session: immediately report started without touching Gemini
     safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: payload?.languageCode || 'en-US', voiceName: payload?.voiceName || 'Puck', mock: true } }));
-    activeSessions.set(connectionId, { ws, session: {} as any });
+    activeSessions.set(connectionId, { ws, session: {} as any, audioBuffer: [] });
     sessionStarting.delete(connectionId)
     return
   }
@@ -186,89 +219,171 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     const requestedVoice = typeof payload?.voiceName === 'string' ? payload.voiceName : undefined
     const voiceName = requestedVoice || VOICE_BY_LANG[lang] || 'Puck'
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    // Use the exact working sandbox pattern
+    const client = new GenAILiveClient(
+      process.env.GEMINI_API_KEY,
+      process.env.GEMINI_LIVE_MODEL || 'gemini-2.0-flash-live-001'
+    );
 
-    // Use a Live-supported model. Allow override via env.
-    const model = `models/${process.env.GEMINI_LIVE_MODEL || 'gemini-2.0-flash-live-001'}`
+    console.info(`[${connectionId}] 🔍 Using GenAILiveClient pattern from working sandbox`);
 
-    console.info(`[${connectionId}] Connecting to Live API with model: ${model}`)
+    // Set up event handlers exactly like the sandbox
+    client.on('log', (log) => {
+      console.info(`[${connectionId}] 📋 Client log:`, JSON.stringify(log, null, 2));
+    });
 
-    let isOpen = false
+    client.on('setupcomplete', () => {
+      console.info(`[${connectionId}] ✅ SETUP COMPLETE RECEIVED! Session ready for audio`);
+      console.info(`[${connectionId}] 📤 Sending session_started message to client`);
+      safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: lang, voiceName } }));
+      console.info(`[${connectionId}] ✅ session_started message sent successfully`);
+    });
 
-    // Create config object matching official documentation
-    const liveConfig = {
-      responseModalities: ['AUDIO'] as any,
-      systemInstruction: 'You are a helpful assistant and answer in a friendly tone.'
-    }
-
-    const session: any = await ai.live.connect({
-      model,
-      config: liveConfig,  // ← Pass config as separate parameter
-      callbacks: {
-        onopen: () => {
-          isOpen = true
-          console.info(`[${connectionId}] Live API session opened`)
-        },
-        onmessage: (message: any) => {
-          // Handle text + audio parts from Live server messages
-          if (message?.serverContent?.modelTurn?.parts) {
-            for (const part of message.serverContent.modelTurn.parts) {
-              if (part.text) {
-                safeSend(ws, JSON.stringify({ type: 'text', payload: { content: part.text } }))
-              }
-              // For native audio models, audio may arrive as inlineData
-              if (part.inlineData?.data) {
-                const audioBase64 = part.inlineData.data
-                safeSend(ws, JSON.stringify({
-                  type: 'audio',
-                  payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' }
-                }))
-              }
-            }
+    client.on('content', (content) => {
+      console.info(`[${connectionId}] 📨 Received content:`, JSON.stringify(content, null, 2));
+      if (content.modelTurn?.parts) {
+        for (const part of content.modelTurn.parts) {
+          if (part.text) {
+            console.info(`[${connectionId}] 📝 Text response: ${part.text}`);
+            safeSend(ws, JSON.stringify({ type: 'text', payload: { content: part.text } }))
           }
-        },
-        onerror: (error: any) => {
-          console.error(`[${connectionId}] Live API error:`, error)
-          safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live API error' } }))
-        },
-        onclose: () => {
-          isOpen = false
-          console.info(`[${connectionId}] Live API session closed`)
-          activeSessions.delete(connectionId)
-          safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'live_api_closed' } }))
         }
       }
-    })
+    });
 
-    // Apply compatibility shim for session.start() method
-    // Gemini Live API session is already active on connect(), but some code expects a start() method
-    if (typeof session.start !== 'function') {
-      session.start = async () => {
-        // No-op. Session is already active on connect.
-        if (!isOpen) {
-          // Wait a microtask to allow onopen to flip in edge cases.
-          await Promise.resolve()
+    client.on('audio', async (audioData: ArrayBuffer) => {
+      console.info(`[${connectionId}] 🔊 Audio response received (${audioData.byteLength} bytes)`);
+      
+      const client = activeSessions.get(connectionId);
+      if (!client) return;
+      
+      // Buffer audio chunks - don't send immediately, wait for turn completion
+      client.audioBuffer.push(audioData);
+      console.info(`[${connectionId}] 📊 Buffered audio chunk: ${audioData.byteLength} bytes (total: ${client.audioBuffer.length} chunks)`);
+    });
+
+    client.on('turncomplete', () => {
+      console.info(`[${connectionId}] 🔄 Turn completed`);
+      
+      const client = activeSessions.get(connectionId);
+      if (client && client.audioBuffer.length > 0) {
+        try {
+          console.info(`[${connectionId}] 🎵 Sending combined audio at turn completion: ${client.audioBuffer.length} chunks`);
+          
+          // Combine all buffered chunks
+          const totalLength = client.audioBuffer.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+          const combinedBuffer = new ArrayBuffer(totalLength);
+          const combinedView = new Uint8Array(combinedBuffer);
+          
+          let offset = 0;
+          for (const chunk of client.audioBuffer) {
+            const chunkView = new Uint8Array(chunk);
+            combinedView.set(chunkView, offset);
+            offset += chunkView.length;
+          }
+          
+          // Convert combined PCM to WAV format for browser compatibility
+          const wavBuffer = pcmToWav(combinedBuffer, 24000, 1, 16);
+          const base64Audio = wavBuffer.toString('base64');
+          
+          safeSend(ws, JSON.stringify({
+            type: 'audio',
+            payload: { audioData: base64Audio, mimeType: 'audio/wav' }
+          }));
+          
+          console.info(`[${connectionId}] 📤 Sent complete WAV audio at turn completion: ${wavBuffer.length} bytes from ${client.audioBuffer.length} chunks`);
+          
+          // Clear buffer after sending
+          client.audioBuffer = [];
+        } catch (error) {
+          console.error(`[${connectionId}] Error sending complete audio at turn completion:`, error);
+          client.audioBuffer = [];
         }
       }
-    }
+      
+      safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
+    });
 
-    // Convenience helpers
-    session.isOpen = () => isOpen
-    session.waitUntilOpen = async (retries = 50, delayMs = 50) => {
-      for (let i = 0; i < retries; i++) {
-        if (isOpen) return
-        await new Promise((r) => setTimeout(r, delayMs))
+    client.on('inputTranscription', (text, isFinal) => {
+      console.info(`[${connectionId}] 📝 Input transcription: ${text} (final: ${isFinal})`);
+      safeSend(ws, JSON.stringify({ 
+        type: 'input_transcript', 
+        payload: { text, final: isFinal } 
+      }))
+    });
+
+    client.on('outputTranscription', (text, isFinal) => {
+      console.info(`[${connectionId}] 📝 Output transcription: ${text} (final: ${isFinal})`);
+      safeSend(ws, JSON.stringify({ 
+        type: 'output_transcript', 
+        payload: { text, final: isFinal } 
+      }))
+    });
+
+    client.on('error', (error) => {
+      console.error(`[${connectionId}] 🔥 Client error:`, error);
+      safeSend(ws, JSON.stringify({ type: 'error', payload: { message: `Client error: ${error.message}` } }))
+    });
+
+    client.on('toolcall', (toolCall: LiveServerToolCall) => {
+      console.info(`[${connectionId}] 🔧 Tool call received:`, JSON.stringify(toolCall, null, 2));
+      
+      // Handle tool calls like the sandbox does
+      const functionResponses: any[] = [];
+
+      for (const fc of toolCall.functionCalls || []) {
+        console.info(`[${connectionId}] 🛠️ Executing function: ${fc.name} with args:`, JSON.stringify(fc.args, null, 2));
+        
+        // Prepare a simple response for each function call
+        functionResponses.push({
+          id: fc.id,
+          name: fc.name,
+          response: { result: 'ok' }, // Simple, hard-coded function response like sandbox
+        });
       }
-      if (!isOpen) throw new Error('Live session failed to open in time')
+
+      console.info(`[${connectionId}] 📤 Sending tool response:`, JSON.stringify(functionResponses, null, 2));
+      client.sendToolResponse({ functionResponses: functionResponses });
+    });
+
+    client.on('close', (event: CloseEvent) => {
+      console.warn(`[${connectionId}] ⚠️ Client closed:`, event);
+      activeSessions.delete(connectionId);
+      safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'client_closed', event } }))
+    });
+
+    // Create EXACT configuration matching the working sandbox
+    const liveConfig: any = {
+      responseModalities: [Modality.AUDIO],  // Use Modality.AUDIO, not 'AUDIO' string
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: voiceName,
+          },
+        },
+      },
+      inputAudioTranscription: {},  // EMPTY OBJECTS, not undefined
+      outputAudioTranscription: {}, // EMPTY OBJECTS, not undefined
+      systemInstruction: {
+        parts: [{ text: 'You are a helpful assistant and answer in a friendly tone.' }]
+      },
+      tools: []  // Start with no tools to eliminate this as the issue
+    };
+
+    console.info(`[${connectionId}] 📋 Connecting with config:`, JSON.stringify(liveConfig, null, 2));
+
+    // Connect using the sandbox pattern
+    const connected = await client.connect(liveConfig);
+    
+    if (!connected) {
+      throw new Error('Failed to connect to GenAI Live API');
     }
 
-    console.info(`[${connectionId}] Live API session established and ready`)
+    console.info(`[${connectionId}] ✅ GenAILiveClient connected successfully`);
+    console.info(`[${connectionId}] ⏳ Waiting for setupComplete before sending session_started`);
 
-    activeSessions.set(connectionId, { ws, session });
-    console.info(`[${connectionId}] Live API session established.`)
-
-    // Send session started message to client
-    safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: lang, voiceName } }));
+    activeSessions.set(connectionId, { ws, session: client, audioBuffer: [] });
+    console.info(`[${connectionId}] Live API session established using GenAILiveClient pattern`);
 
   } catch (error) {
     console.error(`[${connectionId}] Failed to start Live API session:`, error);
@@ -297,14 +412,23 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
     }
 
     try {
-      // Send audio in the correct format matching official documentation
-      await client.session.send({
-        input: {
-          data: payload.audioData,  // ← Keep as base64 string
-          mimeType: payload.mimeType || 'audio/pcm;rate=16000'
-        }
-      })
-      console.info(`[${connectionId}] Audio sent to Live API (${payload.audioData.length} base64 chars)`)
+      console.info(`[${connectionId}] 🎤 Processing audio for turn-based conversation`);
+      
+      // For gemini-2.0-flash-live-001, use continuous streaming approach
+      const audioBase64 = payload.audioData;
+      
+      console.info(`[${connectionId}] 🎤 Sending audio chunk: ${audioBase64.length} chars, MIME: ${payload.mimeType}`);
+      
+      // Use the correct approach from the working sandbox
+      if (typeof client.session.sendRealtimeInput === 'function') {
+        await client.session.sendRealtimeInput([{
+          mimeType: 'audio/pcm;rate=16000',  // Use PCM format like sandbox, not WebM
+          data: audioBase64
+        }]);
+        console.info(`[${connectionId}] ✅ Audio chunk sent using sendRealtimeInput() with PCM format`);
+      } else {
+        throw new Error('Session does not have a valid audio sending method');
+      }
     } catch (e) {
       console.error(`[${connectionId}] Failed to send audio to Live API:`, e)
       safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Failed to send audio to Live API' } }))
@@ -318,9 +442,20 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
 function handleClose(connectionId: string) {
   const client = activeSessions.get(connectionId);
   if (client) {
-    try { client.session.close() } catch (error) {
-      console.warn(`[${connectionId}] Failed to close session`, error)
-    }
+    try { 
+      // Check if session exists and has a close method
+      if (client.session && typeof client.session.close === 'function') {
+        client.session.close();
+      } else if (client.session && typeof client.session.destroy === 'function') {
+        client.session.destroy();
+      } else if (client.session && typeof client.session.end === 'function') {
+        client.session.end();
+      }
+      // If no close method exists, just log and continue
+      console.log(`[${connectionId}] Session cleanup completed`);
+  } catch (error) {
+    console.warn(`[${connectionId}] Session cleanup failed (non-critical):`, error instanceof Error ? error.message : String(error))
+  }
     activeSessions.delete(connectionId);
   }
   console.info(`[${connectionId}] Session removed.`);
@@ -364,9 +499,38 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             break
           }
           try {
-            await client.session.sendClientContent({ turnComplete: true })
-            console.info(`[${connectionId}] turnComplete sent to Live API`)
-            safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
+            // Try different methods for turn completion
+            let turnCompleteSent = false;
+            
+            if (typeof client.session.sendClientContent === 'function') {
+              await client.session.sendClientContent({ turnComplete: true });
+              turnCompleteSent = true;
+              console.info(`[${connectionId}] turnComplete sent using sendClientContent() method`);
+            } else if (typeof client.session.send === 'function') {
+              await client.session.send({
+                clientContent: {
+                  turnComplete: true
+                }
+              });
+              turnCompleteSent = true;
+              console.info(`[${connectionId}] turnComplete sent using send() method`);
+            } else if (typeof client.session.sendRealtimeInput === 'function') {
+              await client.session.sendRealtimeInput({
+                clientContent: {
+                  turnComplete: true
+                }
+              });
+              turnCompleteSent = true;
+              console.info(`[${connectionId}] turnComplete sent using sendRealtimeInput() method`);
+            }
+            
+            if (turnCompleteSent) {
+              console.info(`[${connectionId}] turnComplete sent to Live API`)
+              safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
+            } else {
+              console.warn(`[${connectionId}] No turn complete method found on session`);
+              safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
+            }
           } catch (e) {
             console.error(`[${connectionId}] Failed to send turnComplete to Live API:`, e)
           }
@@ -387,6 +551,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
   ws.on('close', (code: number, reason: Buffer) => {
     console.info(`[${connectionId}] WebSocket closed. Code: ${code}, Reason: ${reason?.toString?.() || 'N/A'}`)
+    console.info(`[${connectionId}] 🔍 WebSocket close details - Code: ${code}, Reason: ${reason?.toString?.() || 'N/A'}, Active sessions: ${activeSessions.size}`)
     handleClose(connectionId)
   });
 

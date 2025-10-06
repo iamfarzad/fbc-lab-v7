@@ -17,14 +17,18 @@
     "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "dependencies": {
-    "@google/genai": "^1.21.0",
+    "@google/genai": "^1.4.0",
     "dotenv": "^17.2.1",
+    "eventemitter3": "^5.0.1",
+    "lodash": "^4.17.21",
+    "lodash-es": "^4.17.21",
     "tsx": "^4.20.3",
     "uuid": "^9.0.1",
     "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "@types/lodash": "^4.17.20",
     "@types/node": "^20.19.9",
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.8",
