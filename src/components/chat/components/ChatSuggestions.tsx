@@ -6,7 +6,7 @@ interface ChatSuggestionsProps {
     company?: { name?: string };
     person?: { fullName?: string; role?: string };
   } | null;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => Promise<void> | void;
 }
 
 export function ChatSuggestions({

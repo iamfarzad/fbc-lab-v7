@@ -38,16 +38,10 @@ export function ChatContainer({ chatState, children }: ChatContainerProps) {
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 20, scale: 0.95 }}
-        transition={{ duration: CHAT_CONSTANTS.ANIMATION.FADE_IN }}
-        className={getContainerClasses()}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <div
+      className={getContainerClasses()}
+    >
+      {children}
+    </div>
   );
 }

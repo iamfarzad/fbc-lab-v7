@@ -4,7 +4,7 @@ import { Loader } from "@/components/ai-elements/loader";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
-import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle } from "lucide-react";
+import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Paperclip, Download } from "lucide-react";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -97,6 +97,14 @@ type StreamedArtifact = {
   error?: string;
 };
 
+const formatFileSize = (size: number): string => {
+  if (size < 1024) return `${size} B`;
+  const kb = size / 1024;
+  if (kb < 1024) return `${Math.round(kb * 10) / 10} KB`;
+  const mb = kb / 1024;
+  return `${Math.round(mb * 10) / 10} MB`;
+};
+
 const MESSAGE_PRESENTATION = {
   user: {
     label: "You",
@@ -122,7 +130,7 @@ interface ChatMessagesProps {
     person?: { fullName?: string; role?: string };
   } | null;
   hasAcceptedTerms: boolean;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => Promise<void> | void;
   aiElements?: {
     showReasoning: boolean;
     showSources: boolean;
@@ -208,7 +216,7 @@ export function ChatMessages({
                 />
               ) : (
                 <ChatSuggestions
-                  suggestions={CHAT_CONSTANTS.DEFAULT_SUGGESTIONS}
+                  suggestions={[...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]}
                   contextReady={contextReady}
                   currentContext={currentContext}
                   onSendMessage={onSendMessage}
@@ -281,8 +289,8 @@ export function ChatMessages({
                                 key={index}
                                 label={step.label}
                                 description={step.description}
-                                status={step.status}
-                                icon={step.icon}
+                                status={step.status as "pending" | "active" | "complete"}
+                                icon={step.icon as any}
                               >
                                 {step.content}
                               </ChainOfThoughtStep>
@@ -310,7 +318,7 @@ export function ChatMessages({
                         <div className="space-y-2">
                           {message.metadata.tools.map((tool, index) => (
                             <Tool key={index} defaultOpen={false}>
-                              <ToolHeader title={tool.name} type={tool.type} state={tool.state} />
+                              <ToolHeader title={tool.name} type={tool.type as `tool-${string}`} state={tool.state as "output-available" | "input-streaming" | "input-available" | "output-error"} />
                               <ToolContent>
                                 {tool.input && <ToolInput input={tool.input} />}
                                 {tool.output && <ToolOutput output={tool.output} errorText={tool.error} />}
@@ -341,7 +349,7 @@ export function ChatMessages({
                         <Context
                           usedTokens={message.metadata.contextUsage.usedTokens}
                           maxTokens={message.metadata.contextUsage.maxTokens}
-                          usage={message.metadata.contextUsage.usage}
+                          usage={message.metadata.contextUsage.usage as any}
                           modelId={message.metadata.contextUsage.modelId}
                         >
                           <ContextTrigger />
@@ -369,6 +377,7 @@ export function ChatMessages({
                               mediaType={image.mediaType}
                               alt={image.alt || `Generated image ${index + 1}`}
                               className="rounded-lg border"
+                              uint8Array={new Uint8Array(Buffer.from(image.base64, 'base64'))}
                             />
                           ))}
                         </div>
@@ -378,10 +387,74 @@ export function ChatMessages({
                       {aiElements?.showInlineCitations && message.metadata?.inlineCitations && message.metadata.inlineCitations.length > 0 && (
                         <div className="space-y-1">
                           {message.metadata.inlineCitations.map((citation, index) => (
-                            <InlineCitation key={index} href={citation.url} title={citation.title}>
-                              {citation.text}
+                            <InlineCitation key={index} title={citation.title}>
+                              <a href={citation.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                {citation.text}
+                              </a>
                             </InlineCitation>
                           ))}
+                        </div>
+                      )}
+
+                      {message.metadata?.attachments && message.metadata.attachments.length > 0 && (
+                        <div className="space-y-3">
+                          {message.metadata.attachments.map((attachment) => {
+                            const isImage = attachment.type?.startsWith('image/');
+                            return (
+                              <div
+                                key={attachment.id}
+                                className="rounded-xl border border-border/40 bg-card/80 p-3 shadow-sm"
+                              >
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                  <div className="space-y-1">
+                                    <p className="flex items-center gap-2 text-sm font-semibold">
+                                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                                      {attachment.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {attachment.type || 'Unknown'} · {formatFileSize(attachment.size)}
+                                      {typeof attachment.pages === 'number' && attachment.pages > 0 && (
+                                        <> · {attachment.pages} page{attachment.pages === 1 ? '' : 's'}</>
+                                      )}
+                                    </p>
+                                  </div>
+                                  {attachment.url && (
+                                    <a
+                                      href={attachment.url}
+                                      download={attachment.name}
+                                      className="flex items-center gap-1 text-xs font-medium text-[hsl(var(--accent))] transition-colors hover:text-[hsl(var(--accent))]/80"
+                                    >
+                                      <Download className="h-3.5 w-3.5" />
+                                      Download
+                                    </a>
+                                  )}
+                                </div>
+
+                                {attachment.analysis && (
+                                  <p className="mt-2 text-xs text-muted-foreground/90">
+                                    {attachment.analysis}
+                                  </p>
+                                )}
+
+                                {attachment.summary && (
+                                  <p className="mt-2 text-xs text-muted-foreground/80">
+                                    {attachment.summary}
+                                  </p>
+                                )}
+
+                                {isImage && attachment.url && (
+                                  <div className="mt-3 overflow-hidden rounded-lg border border-border/40">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={attachment.url}
+                                      alt={attachment.name || 'Uploaded image'}
+                                      className="max-h-60 w-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -390,7 +463,7 @@ export function ChatMessages({
                         <Task defaultOpen={false}>
                           <div className="space-y-2">
                             {message.metadata.tasks.map((task, index) => (
-                              <TaskItem key={index} status={task.status}>
+                              <TaskItem key={index} status={task.status as "completed" | "pending" | "failed" | "in_progress"}>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{task.title}</span>
                                   {task.files && task.files.length > 0 && (

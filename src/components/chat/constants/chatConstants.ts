@@ -25,7 +25,7 @@ export const CHAT_CONSTANTS = {
 
   // Audio processing constants
   AUDIO: {
-    TARGET_VOICE_SAMPLE_RATE: 16000,
+    TARGET_VOICE_SAMPLE_RATE: 24000, // Updated to match Gemini Live API requirements
     VAD_SILENCE_TIMEOUT: 2500,
   },
 

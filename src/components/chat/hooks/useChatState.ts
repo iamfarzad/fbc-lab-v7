@@ -169,7 +169,12 @@ export function useChatState() {
   }, [chatState.isCameraActive, setCameraActive]);
 
   const setListening = useCallback((listening: boolean) => {
-    setChatState(prev => ({ ...prev, isListening: listening }));
+    setChatState(prev => {
+      if (prev.isListening === listening) {
+        return prev;
+      }
+      return { ...prev, isListening: listening };
+    });
   }, []);
 
   return {
@@ -188,5 +193,4 @@ export function useChatState() {
     stopCamera,
   };
 }
-
 
