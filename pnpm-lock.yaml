@@ -37,7 +37,7 @@ importers:
         version: 7.2.0
       '@google/genai':
         specifier: ^1.21.0
-        version: 1.21.0(@modelcontextprotocol/sdk@1.18.1)
+        version: 1.22.0(@modelcontextprotocol/sdk@1.18.1)
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
@@ -119,6 +119,9 @@ importers:
       crypto-js:
         specifier: ^4.2.0
         version: 4.2.0
+      cytoscape:
+        specifier: ^3.33.1
+        version: 3.33.1
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -213,9 +216,18 @@ importers:
         specifier: ^5.0.8
         version: 5.0.8(@types/react@18.3.25)(immer@10.1.3)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
     devDependencies:
+      '@babel/plugin-proposal-class-properties':
+        specifier: ^7.18.6
+        version: 7.18.6(@babel/core@7.28.4)
+      '@babel/plugin-proposal-private-methods':
+        specifier: ^7.18.6
+        version: 7.18.6(@babel/core@7.28.4)
       '@babel/preset-env':
         specifier: ^7.28.3
         version: 7.28.3(@babel/core@7.28.4)
+      '@babel/preset-react':
+        specifier: ^7.27.1
+        version: 7.27.1(@babel/core@7.28.4)
       '@babel/preset-typescript':
         specifier: ^7.27.1
         version: 7.27.1(@babel/core@7.28.4)
@@ -303,6 +315,9 @@ importers:
       jest-environment-jsdom:
         specifier: ^30.1.2
         version: 30.2.0
+      json5:
+        specifier: ^2.2.3
+        version: 2.2.3
       lint-staged:
         specifier: ^16.2.0
         version: 16.2.3
@@ -549,6 +564,20 @@ packages:
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0
+
+  '@babel/plugin-proposal-class-properties@7.18.6':
+    resolution: {integrity: sha512-cumfXOF0+nzZrrN8Rf0t7M+tF6sZc7vhQwYQck9q1/5w2OExlD+b4v4RpMJFaV1Z7WcDRgO6FqvxqxGlwo+RHQ==}
+    engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-class-properties instead.
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+
+  '@babel/plugin-proposal-private-methods@7.18.6':
+    resolution: {integrity: sha512-nutsvktDItsNn4rpGItSNV2sz1XwS+nfU0Rg8aCx3W3NOKVzdMjJRu0O5OkgDp3ZGICSTbgRpxZoWsxoKRvbeA==}
+    engines: {node: '>=6.9.0'}
+    deprecated: This proposal has been merged to the ECMAScript standard and thus this plugin is no longer maintained. Please use @babel/plugin-transform-private-methods instead.
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
 
   '@babel/plugin-proposal-private-property-in-object@7.21.0-placeholder-for-preset-env.2':
     resolution: {integrity: sha512-SOSkfJDddaM7mak6cPEpswyTRnuRltl429hMraQEglW+OkovnCzsiszTmsrlY//qLFjCpQDFRvjdm2wA5pPm9w==}
@@ -893,6 +922,30 @@ packages:
     peerDependencies:
       '@babel/core': ^7.0.0-0
 
+  '@babel/plugin-transform-react-display-name@7.28.0':
+    resolution: {integrity: sha512-D6Eujc2zMxKjfa4Zxl4GHMsmhKKZ9VpcqIchJLvwTxad9zWIYulwYItBovpDOoNLISpcZSXoDJ5gaGbQUDqViA==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+
+  '@babel/plugin-transform-react-jsx-development@7.27.1':
+    resolution: {integrity: sha512-ykDdF5yI4f1WrAolLqeF3hmYU12j9ntLQl/AOG1HAS21jxyg1Q0/J/tpREuYLfatGdGmXp/3yS0ZA76kOlVq9Q==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+
+  '@babel/plugin-transform-react-jsx@7.27.1':
+    resolution: {integrity: sha512-2KH4LWGSrJIkVf5tSiBFYuXDAoWRq2MMwgivCf+93dd0GQi8RXLjKA/0EvRnVV5G0hrHczsquXuD01L8s6dmBw==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+
+  '@babel/plugin-transform-react-pure-annotations@7.27.1':
+    resolution: {integrity: sha512-JfuinvDOsD9FVMTHpzA/pBLisxpv1aSf+OIV8lgH3MuWrks19R27e6a6DipIg4aX1Zm9Wpb04p8wljfKrVSnPA==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
+
   '@babel/plugin-transform-regenerator@7.28.4':
     resolution: {integrity: sha512-+ZEdQlBoRg9m2NnzvEeLgtvBMO4tkFBw5SQIUgLICgTrumLoU7lr+Oghi6km2PFj+dbUt2u1oby2w3BDO9YQnA==}
     engines: {node: '>=6.9.0'}
@@ -981,6 +1034,12 @@ packages:
     resolution: {integrity: sha512-HrcgcIESLm9aIR842yhJ5RWan/gebQUJ6E/E5+rf0y9o6oj7w0Br+sWuL6kEQ/o/AdfvR1Je9jG18/gnpwjEyA==}
     peerDependencies:
       '@babel/core': ^7.0.0-0 || ^8.0.0-0 <8.0.0
+
+  '@babel/preset-react@7.27.1':
+    resolution: {integrity: sha512-oJHWh2gLhU9dW9HHr42q0cI0/iHHXTLGe39qvpAZZzagHy0MzYLCnCVV0symeRvzmjHyVU7mw2K06E6u/JwbhA==}
+    engines: {node: '>=6.9.0'}
+    peerDependencies:
+      '@babel/core': ^7.0.0-0
 
   '@babel/preset-typescript@7.27.1':
     resolution: {integrity: sha512-l7WfQfX0WK4M0v2RudjuQK4u99BS6yLHYEmdtVPP7lKV013zr9DygFuWNlnbvQ9LR+LS0Egz/XAvGx5U9MX0fQ==}
@@ -1290,8 +1349,8 @@ packages:
     resolution: {integrity: sha512-bklwpRJlZH6XPsljFkaibeTx5JsbMQZPlhMxTAITs8uY/EOqUkockhQscgpRC4A6Jdl7iHTZfZbYqHRaClS5Mg==}
     engines: {node: '>=18'}
 
-  '@google/genai@1.21.0':
-    resolution: {integrity: sha512-k47DECR8BF9z7IJxQd3reKuH2eUnOH5NlJWSe+CKM6nbXx+wH3hmtWQxUQR9M8gzWW1EvFuRVgjQssEIreNZsw==}
+  '@google/genai@1.22.0':
+    resolution: {integrity: sha512-siETS3zTm3EGpTT4+BFc1z20xXBYfueD3gCYfxkOjuAKRk8lt8TJevDHi3zepn1oSI6NhG/LZvy0i+Q3qheObg==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.11.4
@@ -7943,6 +8002,22 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@babel/plugin-proposal-class-properties@7.18.6(@babel/core@7.28.4)':
+    dependencies:
+      '@babel/core': 7.28.4
+      '@babel/helper-create-class-features-plugin': 7.28.3(@babel/core@7.28.4)
+      '@babel/helper-plugin-utils': 7.27.1
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/plugin-proposal-private-methods@7.18.6(@babel/core@7.28.4)':
+    dependencies:
+      '@babel/core': 7.28.4
+      '@babel/helper-create-class-features-plugin': 7.28.3(@babel/core@7.28.4)
+      '@babel/helper-plugin-utils': 7.27.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@babel/plugin-proposal-private-property-in-object@7.21.0-placeholder-for-preset-env.2(@babel/core@7.28.4)':
     dependencies:
       '@babel/core': 7.28.4
@@ -8309,6 +8384,35 @@ snapshots:
       '@babel/core': 7.28.4
       '@babel/helper-plugin-utils': 7.27.1
 
+  '@babel/plugin-transform-react-display-name@7.28.0(@babel/core@7.28.4)':
+    dependencies:
+      '@babel/core': 7.28.4
+      '@babel/helper-plugin-utils': 7.27.1
+
+  '@babel/plugin-transform-react-jsx-development@7.27.1(@babel/core@7.28.4)':
+    dependencies:
+      '@babel/core': 7.28.4
+      '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.28.4)
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/plugin-transform-react-jsx@7.27.1(@babel/core@7.28.4)':
+    dependencies:
+      '@babel/core': 7.28.4
+      '@babel/helper-annotate-as-pure': 7.27.3
+      '@babel/helper-module-imports': 7.27.1
+      '@babel/helper-plugin-utils': 7.27.1
+      '@babel/plugin-syntax-jsx': 7.27.1(@babel/core@7.28.4)
+      '@babel/types': 7.28.4
+    transitivePeerDependencies:
+      - supports-color
+
+  '@babel/plugin-transform-react-pure-annotations@7.27.1(@babel/core@7.28.4)':
+    dependencies:
+      '@babel/core': 7.28.4
+      '@babel/helper-annotate-as-pure': 7.27.3
+      '@babel/helper-plugin-utils': 7.27.1
+
   '@babel/plugin-transform-regenerator@7.28.4(@babel/core@7.28.4)':
     dependencies:
       '@babel/core': 7.28.4
@@ -8469,6 +8573,18 @@ snapshots:
       '@babel/helper-plugin-utils': 7.27.1
       '@babel/types': 7.28.4
       esutils: 2.0.3
+
+  '@babel/preset-react@7.27.1(@babel/core@7.28.4)':
+    dependencies:
+      '@babel/core': 7.28.4
+      '@babel/helper-plugin-utils': 7.27.1
+      '@babel/helper-validator-option': 7.27.1
+      '@babel/plugin-transform-react-display-name': 7.28.0(@babel/core@7.28.4)
+      '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.28.4)
+      '@babel/plugin-transform-react-jsx-development': 7.27.1(@babel/core@7.28.4)
+      '@babel/plugin-transform-react-pure-annotations': 7.27.1(@babel/core@7.28.4)
+    transitivePeerDependencies:
+      - supports-color
 
   '@babel/preset-typescript@7.27.1(@babel/core@7.28.4)':
     dependencies:
@@ -8903,7 +9019,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@google/genai@1.21.0(@modelcontextprotocol/sdk@1.18.1)':
+  '@google/genai@1.22.0(@modelcontextprotocol/sdk@1.18.1)':
     dependencies:
       google-auth-library: 9.15.1
       ws: 8.18.3
