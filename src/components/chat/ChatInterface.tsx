@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { ChatInput } from "./components/ChatInput";
 // Hooks - extracted logic
 import { useChatState } from "./hooks/useChatState";
 import { useChatMessages } from "./hooks/useChatMessages";
-import { useChatAudio } from "./hooks/useChatAudio";
+import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 import { useChatIntelligence } from "./hooks/useChatIntelligence";
 
 // Constants - centralized configuration
@@ -46,8 +46,45 @@ type StreamedArtifact = {
 export function ChatInterface({ id }: { id?: string | null }) {
   // Extract state management to hooks
   const chatStateHook = useChatState();
+  const { setListening } = chatStateHook;
   const messagesHook = useChatMessages();
-  const audioHook = useChatAudio();
+  const {
+    appendVoiceUserMessage,
+    appendVoiceAssistantChunk,
+    finalizeVoiceAssistantMessage,
+  } = messagesHook;
+
+  const handleVoiceSessionState = useCallback((state: { active: boolean; isProcessing: boolean }) => {
+    setListening(state.active || state.isProcessing);
+    if (!state.active && !state.isProcessing) {
+      finalizeVoiceAssistantMessage();
+    }
+  }, [finalizeVoiceAssistantMessage, setListening]);
+
+  const handleVoiceFinalTranscript = useCallback((text: string) => {
+    appendVoiceUserMessage(text);
+  }, [appendVoiceUserMessage]);
+
+  const handleVoiceAssistantText = useCallback((text: string) => {
+    appendVoiceAssistantChunk(text);
+  }, [appendVoiceAssistantChunk]);
+
+  const handleVoiceTurnComplete = useCallback(() => {
+    finalizeVoiceAssistantMessage();
+  }, [finalizeVoiceAssistantMessage]);
+
+  const handleVoiceError = useCallback((message: string) => {
+    finalizeVoiceAssistantMessage({ error: message });
+  }, [finalizeVoiceAssistantMessage]);
+
+  const audioHook = useRealtimeVoice({
+    onSessionStateChange: handleVoiceSessionState,
+    onFinalTranscript: handleVoiceFinalTranscript,
+    onAssistantText: handleVoiceAssistantText,
+    onTurnComplete: handleVoiceTurnComplete,
+    onError: handleVoiceError,
+  });
+  
   // const intelligenceHook = useChatIntelligence(id); // Bypassed due to missing file
   const mockIntelligenceHook = {
     sessionId: 'mock-session',
@@ -66,16 +103,22 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const artifactsState = useArtifacts();
 
   // Enhanced AI elements for advanced features
-  const aiElements = useAIElements({
+  const aiConfig = {
     showReasoning: true,
     showSources: true,
     showActions: true,
     showCodeBlocks: true,
     showArtifacts: true,
+    showImages: true,
+    showInlineCitations: true,
+    showSuggestions: true,
+    showTasks: true,
+    showWebPreview: true,
     enableReactions: true,
     enableReadReceipts: true,
     enableTypingIndicators: true
-  });
+  };
+  const aiElements = useAIElements(aiConfig);
 
   // Meeting overlay state
   const [isMeetingOpen, setIsMeetingOpen] = useState(false);
@@ -133,7 +176,13 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const renderActiveStreamBanner = () => {
     if (!isExpanded) return null;
 
-    if (!(chatState.isCameraActive || chatState.isScreenSharing)) {
+    const activeStream = chatState.isCameraActive
+      ? chatState.cameraStream
+      : chatState.isScreenSharing
+        ? chatState.screenShareStream
+        : null;
+
+    if (!(chatState.isCameraActive || chatState.isScreenSharing) || !activeStream) {
       return null;
     }
 
@@ -152,6 +201,10 @@ export function ChatInterface({ id }: { id?: string | null }) {
             <p className="text-sm text-muted-foreground">
               Participants can now see your {chatState.isCameraActive ? 'video feed' : 'shared screen'}.
             </p>
+            <MediaPreview
+              stream={activeStream}
+              kind={chatState.isCameraActive ? 'camera' : 'screen'}
+            />
           </div>
         </div>
       </div>
@@ -192,13 +245,12 @@ export function ChatInterface({ id }: { id?: string | null }) {
           </div>
           <span className="tracking-[0.35em] uppercase">Voice Active</span>
           <Badge variant="secondary" className="ml-auto text-[10px] tracking-[0.3em] uppercase">
-            Listening
+            {audioHook.isMuted ? 'Muted' : 'Listening'}
           </Badge>
         </div>
       </div>
     );
   };
-
 
   // Main render - clean and organized
   return (
@@ -233,6 +285,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
         {isMinimized ? (
           /* Minimized State */
           <motion.div
+            key="chat-minimized"
             className="h-full flex items-center justify-between px-4 cursor-pointer"
             onClick={chatStateHook.toggleMinimize}
           >
@@ -279,7 +332,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
             </Button>
           </motion.div>
         ) : (
-          <div className={cn("flex h-full w-full flex-col", isExpanded ? "" : "overflow-hidden")}>
+          <div key="chat-expanded" className={cn("flex h-full w-full flex-col", isExpanded ? "" : "overflow-hidden")}>
             <ChatHeader
               chatState={chatState}
               onToggleMinimize={chatStateHook.toggleMinimize}
@@ -304,7 +357,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
                     currentContext={intelligenceHook.currentContext}
                     hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
                     onSendMessage={messagesHook.handleSendMessage}
-                    aiElements={aiElements}
+                    aiElements={aiConfig}
                     isExpanded={isExpanded}
                     artifacts={artifactCards}
                     name={intelligenceHook.name}
@@ -325,15 +378,19 @@ export function ChatInterface({ id }: { id?: string | null }) {
                 inputValue={messagesHook.inputValue}
                 isLoading={messagesHook.isLoading}
                 isListening={chatState.isListening}
-                voiceTranscript={audioHook.voiceTranscript}
-                voicePartialTranscript={audioHook.voicePartialTranscript}
-                isMinimized={chatState.isMinimized}
-                voiceError={audioHook.voiceError}
-                cameraState={chatState.isCameraActive}
-                isScreenSharing={chatState.isScreenSharing}
-                onInputChange={messagesHook.setInputValue}
-                onSendMessage={messagesHook.handleSendMessage}
-                onToggleVoice={audioHook.toggleVoice}
+                  voiceTranscript={audioHook.transcript}
+                  voicePartialTranscript={audioHook.partialTranscript}
+                  isMinimized={chatState.isMinimized}
+                  voiceError={audioHook.error}
+                  isVoiceActive={audioHook.isSessionActive}
+                  isVoiceProcessing={audioHook.isProcessing}
+                  isVoiceSupported={audioHook.isVoiceSupported}
+                  isMuted={audioHook.isMuted}
+                  cameraState={chatState.isCameraActive}
+                  isScreenSharing={chatState.isScreenSharing}
+                  onInputChange={messagesHook.setInputValue}
+                  onSendMessage={messagesHook.handleSendMessage}
+                  onToggleVoice={audioHook.toggleMute}
                 onToggleCamera={chatStateHook.toggleCamera}
                 onToggleScreenShare={chatStateHook.toggleScreenShare}
                 onToggleSettings={chatStateHook.toggleSettings}
@@ -366,5 +423,38 @@ export function ChatInterface({ id }: { id?: string | null }) {
         />
       )}
     </ErrorBoundary>
+  );
+}
+
+function MediaPreview({ stream, kind }: { stream: MediaStream | null; kind: 'camera' | 'screen' }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !stream) return;
+
+    video.srcObject = stream;
+    void video.play().catch(() => undefined);
+
+    return () => {
+      if (video.srcObject === stream) {
+        video.srcObject = null;
+      }
+    };
+  }, [stream]);
+
+  if (!stream) return null;
+
+  return (
+    <div className="mx-auto w-full max-w-2xl">
+      <video
+        ref={videoRef}
+        className="mt-4 w-full rounded-2xl border border-border/40 object-cover"
+        muted
+        playsInline
+        autoPlay
+        aria-label={kind === 'camera' ? 'Live camera preview' : 'Live screen share preview'}
+      />
+    </div>
   );
 }

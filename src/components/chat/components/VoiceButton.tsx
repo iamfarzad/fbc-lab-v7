@@ -1,16 +1,17 @@
 "use client";
 
-import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { MicOff } from "lucide-react";
-import { useCallback } from "react";
+import { MicOff, Mic } from "lucide-react";
+import { useMemo } from "react";
 
 // Custom Voice Icon with smooth animation
 const VoiceIcon = ({
   size = 16,
-  isRecording = false,
-}: { size?: number; isRecording?: boolean }) => {
+  isActive = false,
+  isProcessing = false,
+}: { size?: number; isActive?: boolean; isProcessing?: boolean }) => {
+  const animate = isActive || isProcessing;
   return (
     <svg
       width={size}
@@ -22,7 +23,7 @@ const VoiceIcon = ({
       {/* Animated voice waveform icon */}
       {/* Bar 1 (leftmost, shortest) */}
       <rect x="3" y="10" width="2" height="4" fill="currentColor">
-        {isRecording && (
+        {animate && (
           <>
             <animate
               attributeName="height"
@@ -44,7 +45,7 @@ const VoiceIcon = ({
 
       {/* Bar 2 (second from left) */}
       <rect x="7" y="6" width="2" height="12" fill="currentColor">
-        {isRecording && (
+        {animate && (
           <>
             <animate
               attributeName="height"
@@ -66,7 +67,7 @@ const VoiceIcon = ({
 
       {/* Bar 3 (center, tallest) */}
       <rect x="11" y="2" width="2" height="20" fill="currentColor">
-        {isRecording && (
+        {animate && (
           <>
             <animate
               attributeName="height"
@@ -88,7 +89,7 @@ const VoiceIcon = ({
 
       {/* Bar 4 (second from right) */}
       <rect x="15" y="6" width="2" height="12" fill="currentColor">
-        {isRecording && (
+        {animate && (
           <>
             <animate
               attributeName="height"
@@ -110,7 +111,7 @@ const VoiceIcon = ({
 
       {/* Bar 5 (rightmost) */}
       <rect x="19" y="10" width="2" height="4" fill="currentColor">
-        {isRecording && (
+        {animate && (
           <>
             <animate
               attributeName="height"
@@ -137,110 +138,57 @@ export interface VoiceButtonProps {
   disabled?: boolean;
   className?: string;
   size?: number;
-  onTranscriptUpdate?: (transcript: string) => void;
+  isActive?: boolean;
+  isProcessing?: boolean;
+  isMuted?: boolean;
+  error?: string | null;
+  onToggle?: () => void | Promise<void>;
 }
 
 export function VoiceButton({
   disabled = false,
   className,
   size = 16,
-  onTranscriptUpdate,
+  isActive = false,
+  isProcessing = false,
+  isMuted = false,
+  error,
+  onToggle,
 }: VoiceButtonProps) {
-  const {
-    isRecording,
-    isTranscribing,
-    transcription,
-    partialTranscript,
-    error: voiceError,
-    isSupported,
-    startRecording,
-    stopRecording,
-  } = useVoiceRecording();
+  const hasError = Boolean(error);
 
-  const handleVoiceClick = useCallback(async () => {
-    if (!isSupported) {
-      console.warn('Speech recognition is not supported in this browser.');
-      return;
-    }
-
-    if (isRecording) {
-      // Stop recording and get transcript
-      try {
-        const finalTranscript = await stopRecording();
-        const result = finalTranscript || transcription || partialTranscript;
-        if (result && onTranscriptUpdate) {
-          onTranscriptUpdate(result.trim());
-        }
-      } catch (error) {
-        console.error("Failed to stop recording:", error);
-      }
-    } else {
-      // Start recording
-      try {
-        await startRecording();
-      } catch (error) {
-        console.error("Failed to start recording:", error);
-      }
-    }
-  }, [
-    isRecording,
-    stopRecording,
-    startRecording,
-    onTranscriptUpdate,
-  ]);
-
-  // Show error state
-  if (voiceError) {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        disabled
-        className={cn("size-6 mr-2 opacity-50", className)}
-        title={`Voice error: ${voiceError}`}
-      >
-        <div className="flex items-center justify-center">
-          <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="text-red-500"
-          >
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-          </svg>
-        </div>
-      </Button>
-    );
-  }
+  const title = useMemo(() => {
+    if (hasError) return `Voice error: ${error}`;
+    if (disabled) return 'Voice capture is not supported in this browser yet.';
+    if (!isActive) return 'Start voice session';
+    return isMuted ? 'Unmute microphone' : 'Mute microphone';
+  }, [disabled, error, hasError, isActive, isMuted]);
 
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon"
-      onClick={handleVoiceClick}
-      disabled={disabled || !isSupported || isTranscribing}
+      onClick={() => { if (!disabled && !hasError) { void onToggle?.(); } }}
+      disabled={disabled || hasError}
       className={cn(
         "size-6 mr-2 transition-all duration-300 hover:bg-transparent text-muted-foreground",
-        isRecording &&
-          "text-red-500 hover:text-red-500 [&_svg]:text-red-500 [&_svg]:hover:text-red-500",
-        (disabled || !isSupported) && "opacity-50",
+        isActive && !isMuted && "text-[hsl(var(--foreground))] bg-[hsl(var(--background))]",
+        isActive && isMuted && "text-[hsl(var(--foreground))]/70 bg-[hsl(var(--background))]/30",
+        disabled && "opacity-50",
+        hasError && "text-red-500",
         className,
       )}
-      title={
-        !isSupported
-          ? 'Voice capture is not supported in this browser yet.'
-          : isRecording
-            ? 'Stop voice recording'
-            : 'Start voice recording'
-      }
+      title={title}
     >
-      {isSupported ? (
-        <VoiceIcon size={size} isRecording={isRecording || isTranscribing} />
-      ) : (
+      {disabled ? (
         <MicOff className="h-3 w-3" aria-hidden="true" />
+      ) : !isActive ? (
+        <Mic className="h-3 w-3" aria-hidden="true" />
+      ) : isMuted ? (
+        <MicOff className="h-3 w-3" aria-hidden="true" />
+      ) : (
+        <VoiceIcon size={size} isActive={true} isProcessing={isProcessing} />
       )}
     </Button>
   );

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   PromptInput,
@@ -11,14 +11,17 @@ import {
   PromptInputActionMenu,
   PromptInputActionMenuTrigger,
   PromptInputActionMenuContent,
-  PromptInputActionMenuItem
+  PromptInputActionMenuItem,
+  PromptInputActionAddAttachments,
+  PromptInputAttachment,
+  PromptInputAttachments,
+  PromptInputAttachmentsWatcher,
+  type PromptInputFile
 } from "@/components/ai-elements/prompt-input";
 import { toast } from "sonner";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import {
   Plus,
-  Mic,
-  MicOff,
   Camera,
   CameraOff,
   Monitor,
@@ -30,6 +33,11 @@ import {
 } from "lucide-react";
 import { VoiceButton } from "./VoiceButton";
 
+type SendMessageInput = string | {
+  text?: string;
+  attachments?: PromptInputFile[];
+};
+
 interface ChatInputProps {
   inputValue: string;
   isLoading: boolean;
@@ -37,10 +45,14 @@ interface ChatInputProps {
   voiceTranscript: string;
   voicePartialTranscript: string;
   voiceError: string | null;
+  isVoiceActive: boolean;
+  isVoiceProcessing: boolean;
+  isVoiceSupported: boolean;
+  isMuted?: boolean;
   cameraState: boolean;
   isScreenSharing: boolean;
   onInputChange: (value: string) => void;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: SendMessageInput) => Promise<void> | void;
   onToggleVoice: () => void | Promise<void>;
   onToggleCamera: () => void | Promise<void>;
   onToggleScreenShare: () => void | Promise<void>;
@@ -60,6 +72,10 @@ export function ChatInput({
   voiceTranscript,
   voicePartialTranscript,
   voiceError,
+  isVoiceActive,
+  isVoiceProcessing,
+  isVoiceSupported,
+  isMuted = false,
   cameraState,
   isScreenSharing,
   onInputChange,
@@ -74,6 +90,8 @@ export function ChatInput({
   onExportSummary,
   sessionIdForExport,
 }: ChatInputProps) {
+  const [hasAttachments, setHasAttachments] = useState(false);
+
   // Don't render input in minimized state
   if (isMinimized) {
     return null;
@@ -108,20 +126,33 @@ export function ChatInput({
         <PromptInput
           className="flex flex-col gap-2 rounded-[24px] border border-border/30 bg-card/95 px-4 sm:px-6 pb-3 pt-3 shadow-[0_20px_60px_-40px_rgba(12,18,26,0.45)]"
           accept="image/*,.pdf"
-          onSubmit={async (message, event) => {
-            event.preventDefault();
+          onSubmit={async (message) => {
+            const text = message.text?.trim() ?? '';
 
-            const text = message.text?.trim();
-
-            if (message.files && message.files.length > 0) {
-              toast.info('File uploads are not yet supported in this build. Your file selection was cleared.');
+            if (!text && (!message.files || message.files.length === 0)) {
+              toast.error('Please add a message or at least one attachment.');
+              return;
             }
 
-            if (text) {
-              onSendMessage(text);
+            try {
+              await onSendMessage({
+                text,
+                attachments: message.files,
+              });
+
+              if (message.files && message.files.length > 0) {
+                toast.success('Attachments uploaded for analysis.');
+              }
+            } catch (error) {
+              console.error('Failed to send message:', error);
+              toast.error('Failed to send message. Please try again.');
+              throw error;
             }
           }}
         >
+          <PromptInputAttachmentsWatcher
+            onChange={(files) => setHasAttachments(files.length > 0)}
+          />
           {/* Primary actions */}
           {onOpenMeeting && onExportSummary && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -151,6 +182,12 @@ export function ChatInput({
             disabled={isLoading || isListening}
           />
 
+          <PromptInputAttachments className="pt-1">
+            {(attachment) => (
+              <PromptInputAttachment key={attachment.id} data={attachment} />
+            )}
+          </PromptInputAttachments>
+
           {isListening && (voicePartialTranscript || voiceTranscript) && (
             <div className="px-1 sm:px-2 text-xs text-muted-foreground/75">
               <span className="font-medium text-muted-foreground/90">Voice preview:</span>{' '}
@@ -178,12 +215,7 @@ export function ChatInput({
                   <Plus className={cn("text-foreground/70", isExpanded ? "h-4 w-4" : "h-3 w-3")} aria-hidden="true" />
                 </PromptInputActionMenuTrigger>
                 <PromptInputActionMenuContent align="start" className="rounded-2xl border border-border/40 bg-background/95 shadow-lg">
-                  <PromptInputActionMenuItem
-                    onClick={() => toast.info('File uploads are coming soon. Contact us for bespoke document reviews.')}
-                  >
-                    <Plus className={`mr-2 ${CHAT_CONSTANTS.ICONS.SMALL}`} />
-                    Upload photos & files (coming soon)
-                  </PromptInputActionMenuItem>
+                  <PromptInputActionAddAttachments label="Upload photos & files" />
                   <PromptInputActionMenuItem
                     onClick={() => toast.info('PDF summaries are on the roadmap. Stay tuned!')}
                   >
@@ -196,14 +228,16 @@ export function ChatInput({
               <VoiceButton
                 className={cn(
                   "rounded-full border border-border/40 transition-all duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
-                  isExpanded ? "h-8 w-8 shadow-md" : "h-6 w-6 shadow-sm"
+                  isExpanded ? "h-8 w-8 shadow-md" : "h-6 w-6 shadow-sm",
+                  isVoiceActive ? "bg-[hsl(var(--foreground))] text-[hsl(var(--background))]" : ""
                 )}
                 size={isExpanded ? 16 : 12}
-                onTranscriptUpdate={(transcript) => {
-                  if (transcript) {
-                    onInputChange(inputValue + (inputValue ? " " : "") + transcript);
-                  }
-                }}
+                disabled={!isVoiceSupported}
+                isActive={isVoiceActive}
+                isProcessing={isVoiceProcessing}
+                isMuted={isMuted}
+                error={voiceError}
+                onToggle={onToggleVoice}
               />
 
               <PromptInputButton
@@ -264,7 +298,7 @@ export function ChatInput({
               className="h-10 w-10 rounded-full bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[0_24px_60px_-30px_rgba(255,107,53,0.35)] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[hsl(var(--accent))]/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2"
               variant="ghost"
               status={isLoading ? 'submitted' : undefined}
-              disabled={isLoading || !getInputDisplayValue().trim()}
+              disabled={isLoading || (!getInputDisplayValue().trim() && !hasAttachments)}
               aria-label={isLoading ? 'Sending message...' : 'Send message'}
             />
           </PromptInputToolbar>
