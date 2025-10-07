@@ -94,23 +94,23 @@ export const createRetryableGeminiReliable = () => {
   }
   
   return createRetryable({
-    model: google('gemini-2.5-pro', { apiKey }), // Most reliable
+    model: google('gemini-2.5-pro'), // Most reliable
     
     retries: [
       // Rate limiting - fallback to flash
-      serviceOverloaded(google('gemini-2.5-flash', { apiKey })),
+      serviceOverloaded(google('gemini-2.5-flash')),
       
       // Content filtering - try different model
-      contentFilterTriggered(google('gemini-2.0-flash', { apiKey })),
+      contentFilterTriggered(google('gemini-2.0-flash')),
       
       // Timeouts - try faster model
-      requestTimeout(google('gemini-2.5-flash', { apiKey })),
+      requestTimeout(google('gemini-2.5-flash')),
       
       // Other errors
-      requestNotRetryable(google('gemini-2.5-flash', { apiKey })),
+      requestNotRetryable(google('gemini-2.5-flash')),
       
       // Final fallback
-      google('gemini-2.5-flash', { apiKey })
+      google('gemini-2.5-flash')
     ]
   });
 };

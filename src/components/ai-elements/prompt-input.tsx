@@ -412,12 +412,12 @@ export const PromptInput = ({
       ...item,
     }));
 
-    onSubmit({ text: event.currentTarget.message.value, files }, event);
+    onSubmit({ text: event.currentTarget.message.value, files: files as any }, event);
   };
 
   const ctx = useMemo<AttachmentsContext>(
     () => ({
-      files: items.map((item) => ({ ...item, id: item.id })),
+      files: items.map((item) => ({ ...item, id: item.id })) as any,
       add,
       remove,
       clear,

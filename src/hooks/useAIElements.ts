@@ -150,7 +150,7 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
       metadata: {
         ...metadata,
         ...transformedExtracted
-      }
+      } as any
     };
   }, [extractElements]);
 

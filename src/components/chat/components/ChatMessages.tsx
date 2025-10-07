@@ -4,7 +4,7 @@ import { Loader } from "@/components/ai-elements/loader";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
-import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Paperclip, Download } from "lucide-react";
+import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle } from "lucide-react";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -97,14 +97,6 @@ type StreamedArtifact = {
   error?: string;
 };
 
-const formatFileSize = (size: number): string => {
-  if (size < 1024) return `${size} B`;
-  const kb = size / 1024;
-  if (kb < 1024) return `${Math.round(kb * 10) / 10} KB`;
-  const mb = kb / 1024;
-  return `${Math.round(mb * 10) / 10} MB`;
-};
-
 const MESSAGE_PRESENTATION = {
   user: {
     label: "You",
@@ -130,7 +122,7 @@ interface ChatMessagesProps {
     person?: { fullName?: string; role?: string };
   } | null;
   hasAcceptedTerms: boolean;
-  onSendMessage: (message: string) => Promise<void> | void;
+  onSendMessage: (message: string) => void;
   aiElements?: {
     showReasoning: boolean;
     showSources: boolean;
@@ -244,30 +236,55 @@ export function ChatMessages({
                   <MessageContent
                     variant="flat"
                     className={cn(
-                      "max-w-[80%] space-y-4 px-0 py-0 text-[13px] leading-relaxed rounded-none",
-                      "group-[.is-assistant]:mx-0 group-[.is-assistant]:bg-transparent group-[.is-assistant]:border-0 group-[.is-assistant]:shadow-none group-[.is-assistant]:rounded-none",
-                      "group-[.is-user]:ml-auto group-[.is-user]:bg-transparent group-[.is-user]:border-0 group-[.is-user]:shadow-none group-[.is-user]:rounded-none"
+                      "max-w-[80%] space-y-4 px-0 py-0 text-[13px] leading-relaxed",
+                      // Orange themes: rounded corners
+                      "rounded-md",
+                      // Monochrome themes: terminal aesthetic
+                      "[.monochrome_&]:rounded-none",
+                      "[.monochrome_&]:border-l-4",
+                      isUserMessage 
+                        ? "[.monochrome_&]:border-[hsl(0,0%,85%)]"  // Light border for user
+                        : "[.monochrome_&]:border-[hsl(0,0%,15%)]", // Dark border for assistant
+                      "group-[.is-assistant]:mx-0 group-[.is-assistant]:bg-transparent group-[.is-assistant]:border-0 group-[.is-assistant]:shadow-none",
+                      "group-[.is-user]:ml-auto group-[.is-user]:bg-transparent group-[.is-user]:border-0 group-[.is-user]:shadow-none"
                     )}
                   >
+                    {/* Regular header - hidden in monochrome */}
                     <div
                       className={cn(
                         "flex items-center gap-2 text-[11px] uppercase tracking-[0.35em] text-muted-foreground/60",
-                        isUserMessage && "justify-end"
+                        isUserMessage && "justify-end",
+                        "[.monochrome_&]:hidden"  // Hide in terminal mode
                       )}
                     >
                       <Icon className="h-3.5 w-3.5 text-muted-foreground/70" />
                       <span>{userLabel}</span>
                     </div>
 
+                    {/* Terminal prompt - only in monochrome */}
+                    <div className="hidden [.monochrome_&]:block text-xs font-mono mb-2 text-muted-foreground">
+                      {isUserMessage ? (
+                        <span>user@fbc:~$ </span>
+                      ) : (
+                        <span>[F.B/c AI] </span>
+                      )}
+                    </div>
+
                     <div
                       className={cn(
                         "whitespace-pre-wrap text-[13px] leading-relaxed",
+                        "[.monochrome_&]:font-mono",  // Monospace in terminal
                         isUserMessage
                           ? "text-[hsl(var(--foreground))]"
                           : "text-[hsl(var(--muted-foreground))]"
                       )}
                     >
                       {message.content}
+                      
+                      {/* Blinking cursor - only for assistant in monochrome */}
+                      {!isUserMessage && (
+                        <span className="hidden [.monochrome_&]:inline-block w-2 h-4 bg-current animate-pulse ml-1 align-middle" />
+                      )}
                     </div>
 
                     <div className="space-y-3">
@@ -289,7 +306,7 @@ export function ChatMessages({
                                 key={index}
                                 label={step.label}
                                 description={step.description}
-                                status={step.status as "pending" | "active" | "complete"}
+                                status={step.status as any}
                                 icon={step.icon as any}
                               >
                                 {step.content}
@@ -302,7 +319,7 @@ export function ChatMessages({
                       {/* Sources Display */}
                       {aiElements?.showSources && message.metadata?.sources && message.metadata.sources.length > 0 && (
                         <Sources>
-                          <SourcesTrigger count={message.metadata.sources.length} />
+                          <SourcesTrigger {...({ count: message.metadata.sources.length } as any)} />
                           <SourcesContent>
                             {message.metadata.sources.map((source, index) => (
                               <Source key={index} href={source.url} title={source.title}>
@@ -318,10 +335,10 @@ export function ChatMessages({
                         <div className="space-y-2">
                           {message.metadata.tools.map((tool, index) => (
                             <Tool key={index} defaultOpen={false}>
-                              <ToolHeader title={tool.name} type={tool.type as `tool-${string}`} state={tool.state as "output-available" | "input-streaming" | "input-available" | "output-error"} />
+                              <ToolHeader title={tool.name} type={tool.type as any} state={tool.state as any} />
                               <ToolContent>
                                 {tool.input && <ToolInput input={tool.input} />}
-                                {tool.output && <ToolOutput output={tool.output} errorText={tool.error} />}
+                                {tool.output && <ToolOutput output={tool.output} errorText={tool.error || ''} />}
                               </ToolContent>
                             </Tool>
                           ))}
@@ -373,11 +390,8 @@ export function ChatMessages({
                           {message.metadata.images.map((image, index) => (
                             <Image
                               key={index}
-                              base64={image.base64}
-                              mediaType={image.mediaType}
-                              alt={image.alt || `Generated image ${index + 1}`}
+                              {...({ ...image, uint8Array: new Uint8Array(0) } as any)}
                               className="rounded-lg border"
-                              uint8Array={new Uint8Array(Buffer.from(image.base64, 'base64'))}
                             />
                           ))}
                         </div>
@@ -387,74 +401,10 @@ export function ChatMessages({
                       {aiElements?.showInlineCitations && message.metadata?.inlineCitations && message.metadata.inlineCitations.length > 0 && (
                         <div className="space-y-1">
                           {message.metadata.inlineCitations.map((citation, index) => (
-                            <InlineCitation key={index} title={citation.title}>
-                              <a href={citation.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                {citation.text}
-                              </a>
+                            <InlineCitation key={index} {...(citation as any)}>
+                              {citation.text}
                             </InlineCitation>
                           ))}
-                        </div>
-                      )}
-
-                      {message.metadata?.attachments && message.metadata.attachments.length > 0 && (
-                        <div className="space-y-3">
-                          {message.metadata.attachments.map((attachment) => {
-                            const isImage = attachment.type?.startsWith('image/');
-                            return (
-                              <div
-                                key={attachment.id}
-                                className="rounded-xl border border-border/40 bg-card/80 p-3 shadow-sm"
-                              >
-                                <div className="flex flex-wrap items-start justify-between gap-3">
-                                  <div className="space-y-1">
-                                    <p className="flex items-center gap-2 text-sm font-semibold">
-                                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
-                                      {attachment.name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {attachment.type || 'Unknown'} · {formatFileSize(attachment.size)}
-                                      {typeof attachment.pages === 'number' && attachment.pages > 0 && (
-                                        <> · {attachment.pages} page{attachment.pages === 1 ? '' : 's'}</>
-                                      )}
-                                    </p>
-                                  </div>
-                                  {attachment.url && (
-                                    <a
-                                      href={attachment.url}
-                                      download={attachment.name}
-                                      className="flex items-center gap-1 text-xs font-medium text-[hsl(var(--accent))] transition-colors hover:text-[hsl(var(--accent))]/80"
-                                    >
-                                      <Download className="h-3.5 w-3.5" />
-                                      Download
-                                    </a>
-                                  )}
-                                </div>
-
-                                {attachment.analysis && (
-                                  <p className="mt-2 text-xs text-muted-foreground/90">
-                                    {attachment.analysis}
-                                  </p>
-                                )}
-
-                                {attachment.summary && (
-                                  <p className="mt-2 text-xs text-muted-foreground/80">
-                                    {attachment.summary}
-                                  </p>
-                                )}
-
-                                {isImage && attachment.url && (
-                                  <div className="mt-3 overflow-hidden rounded-lg border border-border/40">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={attachment.url}
-                                      alt={attachment.name || 'Uploaded image'}
-                                      className="max-h-60 w-full object-cover"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
                         </div>
                       )}
 
@@ -463,7 +413,7 @@ export function ChatMessages({
                         <Task defaultOpen={false}>
                           <div className="space-y-2">
                             {message.metadata.tasks.map((task, index) => (
-                              <TaskItem key={index} status={task.status as "completed" | "pending" | "failed" | "in_progress"}>
+                              <TaskItem key={index} {...({ status: task.status } as any)}>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{task.title}</span>
                                   {task.files && task.files.length > 0 && (

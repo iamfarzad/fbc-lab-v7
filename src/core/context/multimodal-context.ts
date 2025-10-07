@@ -88,6 +88,7 @@ function ensureContext(ctx: unknown): MultimodalContext {
       conversationHistory: [],
       visualContext: [],
       audioContext: [],
+      uploadContext: [],
       leadContext: { email: '', name: '', company: '' },
       metadata: {
         createdAt: new Date().toISOString(),

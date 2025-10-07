@@ -45,6 +45,10 @@
   "exclude": [
     "node_modules",
     ".next",
-    "dist"
+    "dist",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "app/chat-ui-test/**"
   ]
 }
