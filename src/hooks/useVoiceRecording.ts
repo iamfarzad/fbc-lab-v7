@@ -77,7 +77,7 @@ export function useVoiceRecording() {
         recognitionRef.current.onerror = null
         recognitionRef.current.onend = null
         recognitionRef.current.stop()
-      } catch (err) {
+      } catch {
         // Ignore stop errors during teardown
       }
     }

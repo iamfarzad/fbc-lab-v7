@@ -4,7 +4,7 @@ import { Loader } from "@/components/ai-elements/loader";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
-import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle } from "lucide-react";
+import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw } from "lucide-react";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -80,6 +80,9 @@ import {
   ConversationEmptyState,
   ConversationScrollButton
 } from "@/components/ai-elements/conversation";
+import {
+  Response
+} from "@/components/ai-elements/response";
 import type { ResearchSummary } from "../hooks/useChatMessages";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { ChatSuggestions } from "./ChatSuggestions";
@@ -154,7 +157,6 @@ interface ChatMessagesProps {
 export function ChatMessages({
   messages,
   enhancedMessages,
-  researchSummaries,
   isLoading,
   contextReady,
   currentContext,
@@ -230,13 +232,19 @@ export function ChatMessages({
                   from={message.role}
                   className={cn(
                     "font-mono",
-                    isUserMessage ? "flex justify-end" : "flex justify-start"
+                    isUserMessage ? "flex justify-start" : "flex justify-end"
                   )}
                 >
+                  {/* Add MessageAvatar for official Vercel AI Elements pattern */}
+                  <MessageAvatar 
+                    src={message.role === 'assistant' ? undefined : undefined} // No avatars for now, but component is ready
+                    name={message.role === 'assistant' ? 'F.B/c AI' : (name || 'You')}
+                  />
+                  
                   <MessageContent
-                    variant="flat"
+                    variant="contained"
                     className={cn(
-                      "max-w-[80%] space-y-4 px-0 py-0 text-[13px] leading-relaxed",
+                      "max-w-[80%] space-y-4 text-[13px] leading-relaxed",
                       // Orange themes: rounded corners
                       "rounded-md",
                       // Monochrome themes: terminal aesthetic
@@ -272,14 +280,15 @@ export function ChatMessages({
 
                     <div
                       className={cn(
-                        "whitespace-pre-wrap text-[13px] leading-relaxed",
+                        "text-[13px] leading-relaxed",
                         "[.monochrome_&]:font-mono",  // Monospace in terminal
                         isUserMessage
                           ? "text-[hsl(var(--foreground))]"
                           : "text-[hsl(var(--muted-foreground))]"
                       )}
                     >
-                      {message.content}
+                      {/* Use Response component for proper markdown rendering */}
+                      <Response>{message.content}</Response>
                       
                       {/* Blinking cursor - only for assistant in monochrome */}
                       {!isUserMessage && (
@@ -447,8 +456,12 @@ export function ChatMessages({
                       {/* Message Actions */}
                       {aiElements?.showActions && (
                         <Actions>
-                          <Action tooltip="Copy message">Copy</Action>
-                          <Action tooltip="Regenerate response">Regenerate</Action>
+                          <Action tooltip="Copy message">
+                            <Copy className="h-4 w-4" />
+                          </Action>
+                          <Action tooltip="Regenerate response">
+                            <RotateCw className="h-4 w-4" />
+                          </Action>
                         </Actions>
                       )}
                     </div>

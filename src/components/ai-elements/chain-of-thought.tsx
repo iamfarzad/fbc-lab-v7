@@ -60,7 +60,7 @@ export const ChainOfThought = memo(
     return (
       <ChainOfThoughtContext.Provider value={{ isOpen, setIsOpen }}>
         <div
-          className={cn("not-prose max-w-prose space-y-4", className)}
+          className={cn("not-prose max-w-prose space-y-4", "[.monochrome_&]:font-mono [.monochrome_&]:space-y-2", className)}
           {...props}
         >
           {children}
@@ -206,7 +206,7 @@ export type ChainOfThoughtImageProps = ComponentProps<"div"> & {
 export const ChainOfThoughtImage = memo(
   ({ className, children, caption, ...props }: ChainOfThoughtImageProps) => (
     <div className={cn("mt-2 space-y-2", className)} {...props}>
-      <div className="relative flex max-h-[22rem] items-center justify-center overflow-hidden rounded-lg bg-muted p-3">
+      <div className="relative flex max-h-[22rem] items-center justify-center overflow-hidden rounded-lg bg-muted p-3 [.monochrome_&]:rounded-none">
         {children}
       </div>
       {caption && <p className="text-muted-foreground text-xs">{caption}</p>}

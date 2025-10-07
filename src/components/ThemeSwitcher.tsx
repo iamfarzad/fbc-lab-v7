@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/tooltip"
 import { Sun, Moon, Monitor, Palette } from "lucide-react"
 
-export type ThemeVariant = "orange-light" | "orange-dark" | "monochrome" | "monochrome-dark" | "system"
+export type ThemeVariant = "orange-light" | "orange-dark" | "monochrome" | "monochrome-dark" | "monochrome-orange" | "monochrome-orange-dark" | "system"
 
 interface ThemeSwitcherProps {
   className?: string
@@ -46,7 +46,7 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
     const root = document.documentElement
     
     // Remove all theme classes
-    root.classList.remove("orange-light", "orange-dark", "monochrome", "monochrome-dark")
+    root.classList.remove("orange-light", "orange-dark", "monochrome", "monochrome-dark", "monochrome-orange", "monochrome-orange-dark")
     
     // Apply new theme
     switch (themeVariant) {
@@ -64,6 +64,13 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
         break
       case "monochrome-dark":
         root.classList.add("dark", "monochrome", "monochrome-dark")
+        break
+      case "monochrome-orange":
+        root.classList.remove("dark")
+        root.classList.add("monochrome", "monochrome-orange", "orange-light")
+        break
+      case "monochrome-orange-dark":
+        root.classList.add("dark", "monochrome", "monochrome-orange-dark", "orange-dark")
         break
       case "system":
         // Enhanced system preference detection like Midday
@@ -113,6 +120,10 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
         return <Palette className="h-4 w-4" />
       case "monochrome-dark":
         return <Palette className="h-4 w-4" />
+      case "monochrome-orange":
+        return <Sun className="h-4 w-4 text-orange-500" />
+      case "monochrome-orange-dark":
+        return <Moon className="h-4 w-4 text-orange-500" />
       case "system":
         return <Monitor className="h-4 w-4" />
       default:
@@ -131,6 +142,10 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
         return "Monochrome Light"
       case "monochrome-dark":
         return "Monochrome Dark"
+      case "monochrome-orange":
+        return "Terminal Orange"
+      case "monochrome-orange-dark":
+        return "Terminal Orange Dark"
       case "system":
         return "System"
       default:
@@ -212,6 +227,26 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
               <span>Monochrome Dark</span>
               {theme === "monochrome-dark" && (
                 <div className="ml-auto h-2 w-2 rounded-full bg-gray-500"></div>
+              )}
+            </div>
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem onClick={() => handleThemeChange("monochrome-orange")}>
+            <div className="flex items-center gap-2 w-full">
+              <Sun className="h-4 w-4 text-orange-500" />
+              <span>Terminal Orange</span>
+              {theme === "monochrome-orange" && (
+                <div className="ml-auto h-2 w-2 rounded-full bg-orange-500"></div>
+              )}
+            </div>
+          </DropdownMenuItem>
+          
+          <DropdownMenuItem onClick={() => handleThemeChange("monochrome-orange-dark")}>
+            <div className="flex items-center gap-2 w-full">
+              <Moon className="h-4 w-4 text-orange-500" />
+              <span>Terminal Orange Dark</span>
+              {theme === "monochrome-orange-dark" && (
+                <div className="ml-auto h-2 w-2 rounded-full bg-orange-500"></div>
               )}
             </div>
           </DropdownMenuItem>

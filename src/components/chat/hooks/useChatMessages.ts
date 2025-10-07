@@ -231,9 +231,7 @@ export function useChatMessages() {
 
     setInputValue('');
 
-    await unifiedChat.sendMessage(outgoingText, {
-      metadata: uploadResult?.attachments?.length ? { attachments: uploadResult.attachments } : undefined,
-    });
+    await unifiedChat.sendMessage(outgoingText);
   }, [unifiedChat, uploadAttachments]);
 
   const appendVoiceUserMessage = useCallback((text: string) => {

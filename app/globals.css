@@ -179,6 +179,80 @@
     --font-weight-bold: 700;
   }
 
+  /* Monochrome Orange - Terminal aesthetic with orange accent (light) */
+  .monochrome.monochrome-orange {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 8%;
+    --card: 0 0% 95%;
+    --card-foreground: 0 0% 12%;
+    --popover: 0 0% 95%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 17 100% 55%; /* Orange */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 88%;
+    --secondary-foreground: 0 0% 15%;
+    --muted: 0 0% 88%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 17 100% 55%; /* Orange accent */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 85%;
+    --input: 0 0% 85%;
+    --ring: 17 100% 55%; /* Orange ring */
+
+    /* Terminal with orange accent */
+    --chat-user-bg: 17 100% 55%; /* Orange user messages */
+    --chat-user-text: 0 0% 98%;
+    --chat-assistant-bg: 0 0% 100%;
+    --chat-assistant-text: 0 0% 8%;
+    --chat-assistant-border: 0 0% 85%;
+
+    /* Monochrome typography */
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+  }
+
+  /* Monochrome Orange Dark - Terminal aesthetic with orange accent (dark) */
+  .monochrome.monochrome-orange-dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 94%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 90%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 94%;
+    --primary: 18 92% 60%; /* Lighter orange for dark mode */
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 85%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 18 92% 60%; /* Lighter orange accent */
+    --accent-foreground: 0 0% 4%;
+    --destructive: 0 73% 45%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 18 92% 60%; /* Orange ring */
+
+    /* Terminal with orange accent (dark) */
+    --chat-user-bg: 18 92% 60%; /* Orange user messages */
+    --chat-user-text: 0 0% 4%;
+    --chat-assistant-bg: 0 0% 10%;
+    --chat-assistant-text: 0 0% 94%;
+    --chat-assistant-border: 0 0% 16%;
+
+    /* Monochrome typography */
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+  }
+
   * {
     @apply border-border;
   }

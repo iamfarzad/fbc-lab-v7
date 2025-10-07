@@ -17,6 +17,7 @@ export const Artifact = ({ className, ...props }: ArtifactProps) => (
   <div
     className={cn(
       "flex flex-col overflow-hidden rounded-lg border bg-background shadow-sm",
+      "[.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2",
       className
     )}
     {...props}

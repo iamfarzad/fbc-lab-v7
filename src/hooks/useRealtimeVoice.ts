@@ -70,6 +70,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     return `${protocol}://${host.replace(/:\d+$/, '')}:${process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001'}`
   }, []);
 
+  // Send WebSocket message
+  const sendMessage = useCallback((message: Record<string, unknown>) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify(message));
+  }, []);
+
   // Reset state
   const resetState = useCallback((opts?: { soft?: boolean }) => {
     const callbacks = callbacksRef.current;
@@ -132,9 +138,13 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
     return () => {
       recorder.off('data', handleAudioData);
-      recorder.off('error');
+      recorder.off('error', (error) => {
+        console.error('🎤 [RealtimeVoice] Audio recorder error:', error);
+        setError(error.message);
+        callbacksRef.current?.onError?.(error.message);
+      });
     };
-  }, [isSessionActive, isMuted]);
+  }, [isSessionActive, isMuted, sendMessage]);
 
   // Handle server events
   const handleServerEvent = useCallback((event: LiveServerEvent) => {
@@ -226,12 +236,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       }
     }
   }, [session?.mock]);
-
-  // Send WebSocket message
-  const sendMessage = useCallback((message: Record<string, unknown>) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify(message));
-  }, []);
 
   // Connect WebSocket
   const connectWebSocket = useCallback(() => {

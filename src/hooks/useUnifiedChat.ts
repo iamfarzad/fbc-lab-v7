@@ -432,7 +432,7 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
   // Sync state with stable dependencies to prevent infinite re-render loops
   useEffect(() => {
     syncUnifiedChatStoreState(stateSyncData, UNIFIED_CHAT_STORE_ID)
-  }, [options.sessionId, messages.length, error?.message, chatStatus, JSON.stringify(chatContextState)])
+  }, [stateSyncData])
 
   // Sync actions once on mount or when needed (avoid in loop)
   useEffect(() => {

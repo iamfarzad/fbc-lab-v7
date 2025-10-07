@@ -1,4 +1,6 @@
 // Chat interface constants - centralized configuration
+import { CHAT_DESIGN, chatStyles } from '../design-tokens';
+
 export const CHAT_CONSTANTS = {
   // Default suggestions for new users
   DEFAULT_SUGGESTIONS: [
@@ -29,10 +31,10 @@ export const CHAT_CONSTANTS = {
     VAD_SILENCE_TIMEOUT: 2500,
   },
 
-  // Animation durations
+  // Animation durations - using design tokens
   ANIMATION: {
-    FADE_IN: 0.2,
-    SLIDE_IN: 0.3,
+    FADE_IN: 0.3, // Updated to match CHAT_DESIGN.ANIMATION.FADE duration
+    SLIDE_IN: 0.3, // Updated to match CHAT_DESIGN.ANIMATION.FADE duration
     BOUNCE: 0.5,
   },
 
@@ -68,7 +70,7 @@ export const CHAT_CONSTANTS = {
   // Design system styling classes
   STYLING: {
     // Container styles
-    CONTAINER: "rounded-[32px] bg-card border border-border/40 shadow-[0_24px_80px_-60px_rgba(12,18,26,0.45)] overflow-hidden",
+    CONTAINER: "rounded-[32px] bg-card border border-border/40 shadow-[0_24px_80px_-60px_rgba(12,18,26,0.45)] overflow-hidden [.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2",
     CARD: "rounded-[28px] bg-card border border-border/30 shadow-[0_28px_80px_-60px_rgba(12,18,26,0.35)]",
     GLASS: "bg-card/80 backdrop-blur border border-border/30",
     
@@ -93,11 +95,11 @@ export const CHAT_CONSTANTS = {
     FONT_DISPLAY: "font-display",
   },
 
-  // Icons sizing
+  // Icons sizing - using design tokens
   ICONS: {
-    SMALL: "h-3 w-3 sm:h-4 sm:w-4",
-    MEDIUM: "h-4 w-4 sm:h-5 sm:w-5",
-    LARGE: "h-5 w-5 sm:h-6 sm:w-6",
+    SMALL: CHAT_DESIGN.SIZES.ICON_SMALL,
+    MEDIUM: CHAT_DESIGN.SIZES.ICON_MEDIUM,
+    LARGE: CHAT_DESIGN.SIZES.ICON_LARGE,
   },
 } as const;
 

@@ -23,16 +23,19 @@ export function ChatHeader({
   onToggleChat
 }: ChatHeaderProps) {
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-4",
-        chatState.isExpanded
-          ? "safe-area-inset-top px-8 sm:px-12 pt-12 sm:pt-16 pb-6"
-          : chatState.isMinimized
-          ? "px-4 sm:px-6 py-3 border-b border-border/40 bg-card"
-          : "px-5 py-4 border-b border-border/40 bg-card"
-      )}
-    >
+    <>
+      {/* Regular header - hidden in monochrome */}
+      <div
+        className={cn(
+          "flex items-center justify-between gap-4",
+          chatState.isExpanded
+            ? "safe-area-inset-top px-8 sm:px-12 pt-12 sm:pt-16 pb-6"
+            : chatState.isMinimized
+            ? "px-4 sm:px-6 py-3 border-b border-border/40 bg-card"
+            : "px-5 py-4 border-b border-border/40 bg-card",
+          "[.monochrome_&]:hidden"
+        )}
+      >
       <div className="flex items-center gap-3">
         <div className={cn(
           "flex items-center justify-center rounded-full bg-[hsl(var(--foreground))] text-[11px] font-semibold tracking-[0.3em] text-[hsl(var(--background))]",
@@ -107,5 +110,68 @@ export function ChatHeader({
         </div>
       </div>
     </div>
+
+      {/* Terminal header - only in monochrome */}
+      <div
+        className={cn(
+          "hidden [.monochrome_&]:flex items-center justify-between px-4 py-2 border-b-2 border-border bg-transparent"
+        )}
+      >
+        <div className="flex items-center gap-2">
+          {/* macOS-style dots */}
+          <div className="flex gap-1.5">
+            <div className="h-3 w-3 rounded-full bg-red-500" />
+            <div className="h-3 w-3 rounded-full bg-yellow-500" />
+            <div className="h-3 w-3 rounded-full bg-green-500" />
+          </div>
+          <span className="text-xs font-mono text-muted-foreground ml-2">
+            F.B/c AI Terminal - user@fbc:~/consulting
+          </span>
+        </div>
+        {/* Controls */}
+        <div className="flex items-center gap-1">
+          {!chatState.isExpanded && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleExpand}
+              className="h-6 w-6 p-0"
+              title="Expand"
+            >
+              <Expand className="h-3 w-3" />
+            </Button>
+          )}
+          {chatState.isExpanded && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleExpand}
+              className="h-6 w-6 p-0"
+              title="Exit fullscreen"
+            >
+              <Shrink className="h-3 w-3" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleMinimize}
+            className="h-6 w-6 p-0"
+            title="Minimize"
+          >
+            <Minimize2 className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleChat}
+            className="h-6 w-6 p-0"
+            title="Close"
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    </>
   );
 }

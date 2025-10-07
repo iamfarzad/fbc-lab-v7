@@ -1,6 +1,5 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface ChatTermsAcceptanceProps {
   name: string;
@@ -22,7 +21,7 @@ export function ChatTermsAcceptance({
   onAcceptTerms,
 }: ChatTermsAcceptanceProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border border-border/30 bg-card px-4 py-4 sm:px-6 sm:py-5 rounded-[24px] shadow-[0_16px_48px_-40px_rgba(12,18,26,0.35)]">
+    <div className="flex flex-wrap items-center justify-between gap-3 border border-border/30 bg-card px-4 py-4 sm:px-6 sm:py-5 rounded-[24px] shadow-[0_16px_48px_-40px_rgba(12,18,26,0.35)] [.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2 [.monochrome_&]:font-mono">
       <div className="text-[11px] uppercase tracking-[0.35em] text-muted-foreground/70">
         Continue with F.B/c
       </div>
@@ -35,7 +34,7 @@ export function ChatTermsAcceptance({
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="Your name"
-            className="px-3 py-2 text-xs border border-border/40 rounded-full bg-card/80 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]/40 focus:border-transparent"
+            className="px-3 py-2 text-xs border border-border/40 rounded-full bg-card/80 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]/40 focus:border-transparent [.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
           />
         </div>
 
@@ -46,7 +45,7 @@ export function ChatTermsAcceptance({
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             placeholder="work@company.com"
-            className="px-3 py-2 text-xs border border-border/40 rounded-full bg-card/80 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]/40 focus:border-transparent"
+            className="px-3 py-2 text-xs border border-border/40 rounded-full bg-card/80 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]/40 focus:border-transparent [.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
           />
         </div>
 
@@ -76,4 +75,3 @@ export function ChatTermsAcceptance({
     </div>
   );
 }
-

@@ -39,12 +39,13 @@ export const CodeBlock = ({
     <div
       className={cn(
         "relative w-full overflow-hidden rounded-md border bg-background text-foreground",
+        "[.monochrome_&]:rounded-none [.monochrome_&]:border-2",
         className
       )}
       {...props}
     >
       <div className="relative">
-        <div className="mb-2">
+        <div className="mb-1">
           <Badge className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
             {language.toUpperCase()}
           </Badge>
@@ -56,7 +57,7 @@ export const CodeBlock = ({
           }}
           customStyle={{
             margin: 0,
-            padding: "1rem",
+            padding: "0.75rem",
             fontSize: "0.875rem",
             background: "hsl(var(--background))",
             color: "hsl(var(--foreground))",
@@ -79,7 +80,7 @@ export const CodeBlock = ({
           }}
           customStyle={{
             margin: 0,
-            padding: "1rem",
+            padding: "0.75rem",
             fontSize: "0.875rem",
             background: "hsl(var(--background))",
             color: "hsl(var(--foreground))",

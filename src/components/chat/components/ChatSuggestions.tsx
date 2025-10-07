@@ -32,8 +32,9 @@ export function ChatSuggestions({
           <button
             key={index}
             onClick={() => onSendMessage(suggestion)}
-            className="rounded-full border border-border/40 bg-card/90 px-5 py-2.5 text-xs font-medium tracking-wide text-foreground/80 shadow-[0_12px_32px_-20px_rgba(12,18,26,0.35)] transition-transform duration-200 hover:-translate-y-1 hover:text-foreground hover:shadow-[0_24px_60px_-32px_rgba(12,18,26,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2"
+            className="rounded-full border border-border/40 bg-card/90 px-5 py-2.5 text-xs font-medium tracking-wide text-foreground/80 shadow-[0_12px_32px_-20px_rgba(12,18,26,0.35)] transition-transform duration-200 hover:-translate-y-1 hover:text-foreground hover:shadow-[0_24px_60px_-32px_rgba(12,18,26,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2 [.monochrome_&]:font-mono [.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:hover:translate-y-0 [.monochrome_&]:hover:border-foreground"
           >
+            <span className="hidden [.monochrome_&]:inline mr-1">$</span>
             {suggestion}
           </button>
         ))}

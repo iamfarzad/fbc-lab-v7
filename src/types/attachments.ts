@@ -14,4 +14,5 @@ export interface AttachmentUploadResponse {
   ok: boolean
   attachments: ChatAttachment[]
   prompt?: string
+  error?: string
 }

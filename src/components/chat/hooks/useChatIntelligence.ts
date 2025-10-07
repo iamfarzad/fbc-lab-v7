@@ -118,7 +118,7 @@ export function useChatIntelligence(id?: string | null) {
     }
 
     toast.success('Welcome to F.B/c AI! Your personalized consultation begins now.');
-  }, [agreed, email, initialiseSession]);
+  }, [agreed, email, name, initialiseSession]);
 
   // Initialize session when chat opens or terms are accepted
   useEffect(() => {
@@ -142,4 +142,3 @@ export function useChatIntelligence(id?: string | null) {
     handleTermsAcceptance,
   };
 }
-
