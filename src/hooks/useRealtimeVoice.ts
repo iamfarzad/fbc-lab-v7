@@ -378,12 +378,27 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, [handleServerEvent, resetState, serverUrl]);
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
+    console.log('🎤 [RealtimeVoice] startSession called', { 
+      isSocketReady, 
+      wsState: wsRef.current?.readyState, 
+      connectionId: connectionIdRef.current,
+      opts 
+    });
+    
     if (!isSocketReady || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      setError('Voice server not ready');
+      const message = 'Voice server not ready';
+      console.error('🎤 [RealtimeVoice] Cannot start session - server not ready:', { 
+        isSocketReady, 
+        wsState: wsRef.current?.readyState,
+        serverUrl 
+      });
+      setError(message);
+      callbacksRef.current?.onError?.(message);
       return;
     }
 
     try {
+      console.log('🎤 [RealtimeVoice] Starting session - setting processing state');
       setIsProcessing(true);
       callbacksRef.current?.onSessionStateChange?.({
         active: false,
@@ -392,8 +407,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isProcessing: true,
       });
 
+      console.log('🎤 [RealtimeVoice] Starting audio recording');
       await startRecording({ onChunk: handleRecorderChunk });
-
+      
+      console.log('🎤 [RealtimeVoice] Audio recording started, sending start message');
       sendMessage({
         type: 'start',
         payload: {
@@ -402,6 +419,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           sessionId: opts?.sessionId,
         },
       });
+      
+      console.log('🎤 [RealtimeVoice] Start message sent successfully');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start voice session';
       console.error('🎤 [RealtimeVoice] Failed to start session:', err);
@@ -410,7 +429,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       callbacksRef.current?.onError?.(message);
       await resetRecording();
     }
-  }, [handleRecorderChunk, isSocketReady, sendMessage, session?.mock, startRecording, resetRecording]);
+  }, [handleRecorderChunk, isSocketReady, sendMessage, session?.mock, startRecording, resetRecording, serverUrl]);
 
   const stopSession = useCallback(async () => {
     if (!isSessionActive && !isRecording && !isProcessing) {
