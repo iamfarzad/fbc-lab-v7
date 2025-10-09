@@ -106,10 +106,16 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const serverUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined;
     const envUrl = process.env.NEXT_PUBLIC_LIVE_SERVER_URL;
-    if (envUrl) return envUrl;
+    console.log('🎤 [RealtimeVoice] serverUrl calculation:', { envUrl, windowLocation: window.location });
+    if (envUrl) {
+      console.log('🎤 [RealtimeVoice] Using environment variable URL:', envUrl);
+      return envUrl;
+    }
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.host;
-    return `${protocol}://${host.replace(/:\d+$/, '')}:${process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001'}`;
+    const fallbackUrl = `${protocol}://${host.replace(/:\d+$/, '')}:${process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001'}`;
+    console.log('🎤 [RealtimeVoice] Using fallback URL:', fallbackUrl);
+    return fallbackUrl;
   }, []);
 
   const sendMessage = useCallback((message: Record<string, unknown>) => {
@@ -321,15 +327,19 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, [sendMessage]);
 
   const connectWebSocket = useCallback(() => {
+    console.log('🎤 [RealtimeVoice] connectWebSocket called', { serverUrl, existingSocket: !!wsRef.current });
     if (!serverUrl || wsRef.current) {
+      console.log('🎤 [RealtimeVoice] Early return:', { noServerUrl: !serverUrl, existingSocket: !!wsRef.current });
       return;
     }
 
     try {
+      console.log('🎤 [RealtimeVoice] Creating WebSocket to:', serverUrl);
       const socket = new WebSocket(serverUrl);
       wsRef.current = socket;
 
       socket.onopen = () => {
+        console.log('🎤 [RealtimeVoice] WebSocket opened successfully');
         setSocketReady(true);
         setError(null);
       };
