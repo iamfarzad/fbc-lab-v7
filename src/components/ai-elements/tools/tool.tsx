@@ -17,13 +17,13 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { CodeBlock } from "./code-block";
+import { CodeBlock } from "../content/code-block";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
-    className={cn("not-prose mb-4 w-full rounded-md border", "[.monochrome_&]:rounded-none [.monochrome_&]:border-2 [.monochrome_&]:shadow-none [.monochrome_&]:mb-2", className)}
+    className={cn("not-prose mb-2 w-full rounded-md border border-border/50", "[.monochrome_&]:rounded-none [.monochrome_&]:border-2 [.monochrome_&]:shadow-none [.monochrome_&]:mb-2", className)}
     {...props}
   />
 );
@@ -51,7 +51,7 @@ const getStatusBadge = (status: ToolUIPart["state"]) => {
   } as const;
 
   return (
-    <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
+    <Badge className="gap-1 rounded-full text-[10px] h-4 px-1.5" variant="secondary">
       {icons[status]}
       {labels[status]}
     </Badge>
@@ -67,19 +67,19 @@ export const ToolHeader = ({
 }: ToolHeaderProps) => (
   <CollapsibleTrigger
     className={cn(
-      "flex w-full items-center justify-between gap-4 p-3",
+      "flex w-full items-center justify-between gap-3 p-2",
       className
     )}
     {...props}
   >
-    <div className="flex items-center gap-2">
-      <WrenchIcon className="size-4 text-muted-foreground" />
-      <span className="font-medium text-sm">
+    <div className="flex items-center gap-1.5">
+      <WrenchIcon className="size-3.5 text-muted-foreground" />
+      <span className="font-medium text-[13px]">
         {title ?? type.split("-").slice(1).join("-")}
       </span>
       {getStatusBadge(state)}
     </div>
-    <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+    <ChevronDownIcon className="size-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
   </CollapsibleTrigger>
 );
 
@@ -100,11 +100,11 @@ export type ToolInputProps = ComponentProps<"div"> & {
 };
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
-  <div className={cn("space-y-2 overflow-hidden p-4", className)} {...props}>
-    <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+  <div className={cn("space-y-1.5 overflow-hidden p-3", className)} {...props}>
+    <h4 className="font-medium text-muted-foreground text-[10px] uppercase tracking-wide">
       Parameters
     </h4>
-    <div className="rounded-md bg-muted/50">
+    <div className="rounded-md bg-muted/30">
       <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
     </div>
   </div>
@@ -136,16 +136,16 @@ export const ToolOutput = ({
   }
 
   return (
-    <div className={cn("space-y-2 p-4", className)} {...props}>
-      <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+    <div className={cn("space-y-1.5 p-3", className)} {...props}>
+      <h4 className="font-medium text-muted-foreground text-[10px] uppercase tracking-wide">
         {errorText ? "Error" : "Result"}
       </h4>
       <div
         className={cn(
-          "overflow-x-auto rounded-md text-xs [&_table]:w-full",
+          "overflow-x-auto rounded-md text-[11px] [&_table]:w-full",
           errorText
             ? "bg-destructive/10 text-destructive"
-            : "bg-muted/50 text-foreground"
+            : "bg-muted/30 text-foreground"
         )}
       >
         {errorText && <div>{errorText}</div>}

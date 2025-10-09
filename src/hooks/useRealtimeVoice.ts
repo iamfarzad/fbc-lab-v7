@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AudioRecorder } from '@/lib/audio-recorder';
-import { AudioStreamer } from '@/lib/audio-streamer';
+import { AudioStreamingQueue } from '@/lib/audio-streaming-queue';
+import { useMediaRecorderVoice, type MediaRecorderVoiceResult } from '@/hooks/useMediaRecorderVoice';
 
 export type VoiceSession = {
   connectionId: string;
@@ -9,16 +9,31 @@ export type VoiceSession = {
   mock?: boolean;
 };
 
+export type VoiceContextUpdate = {
+  sessionId?: string | null;
+  modality: 'screen' | 'webcam';
+  analysis?: string;
+  imageData?: string;
+  capturedAt?: number;
+  metadata?: Record<string, unknown>;
+};
+
 type LiveServerEvent =
   | { type: 'connected'; payload: { connectionId: string } }
   | { type: 'session_started'; payload: { connectionId: string; languageCode?: string; voiceName?: string; mock?: boolean } }
   | { type: 'session_closed'; payload?: { reason?: string } }
-  | { type: 'input_transcript'; payload: { text: string; final?: boolean } }
+  | { type: 'input_transcript'; payload: { text: string; isFinal?: boolean } }
+  | { type: 'output_transcript'; payload: { text: string; isFinal?: boolean } }
   | { type: 'model_text'; payload: { text: string } }
   | { type: 'text'; payload: { content: string } }
   | { type: 'audio'; payload: { audioData: string; mimeType?: string } }
   | { type: 'heartbeat'; payload?: { timestamp: number } }
-  | { type: 'turn_complete' }
+  | { type: 'turn_complete'; payload?: { turnComplete?: boolean } }
+  | { type: 'setup_complete'; payload: { setupComplete: boolean } }
+  | { type: 'interrupted'; payload: { interrupted: boolean } }
+  | { type: 'tool_call'; payload: any }
+  | { type: 'tool_result'; payload: any }
+  | { type: 'tool_call_cancellation'; payload: any }
   | { type: 'error'; payload: { message: string; detail?: unknown } };
 
 type SessionStateEvent = {
@@ -33,7 +48,12 @@ export interface UseRealtimeVoiceOptions {
   onPartialTranscript?: (text: string) => void;
   onFinalTranscript?: (text: string) => void;
   onAssistantText?: (text: string) => void;
+  onOutputTranscript?: (text: string, isFinal: boolean) => void;
   onTurnComplete?: () => void;
+  onInterrupted?: () => void;
+  onSetupComplete?: () => void;
+  onToolCall?: (toolCall: any) => void;
+  onToolResult?: (result: any) => void;
   onError?: (message: string) => void;
 }
 
@@ -46,20 +66,42 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const [partialTranscript, setPartialTranscript] = useState('');
   const [modelReplies, setModelReplies] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
 
-  // WebSocket and audio refs
+  const {
+    startRecording,
+    stopRecording,
+    resetRecording,
+    isSupported: isVoiceSupported,
+    isRecording,
+    isProcessing: recorderProcessing,
+    error: recorderError,
+  } = useMediaRecorderVoice({ targetSampleRate: 16000 });
+
   const wsRef = useRef<WebSocket | null>(null);
-  const audioRecorderRef = useRef<AudioRecorder | null>(null);
-  const audioStreamerRef = useRef<AudioStreamer | null>(null);
+  const audioQueueRef = useRef<AudioStreamingQueue | null>(null);
   const connectionIdRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbacksRef = useRef(options);
+  const isSessionActiveRef = useRef(false);
+  const pendingChunksRef = useRef<MediaRecorderVoiceResult[]>([]);
 
   useEffect(() => {
     callbacksRef.current = options;
   }, [options]);
+
+  useEffect(() => {
+    audioQueueRef.current = new AudioStreamingQueue(24000); // 24kHz for Gemini output
+    return () => {
+      audioQueueRef.current?.destroy();
+      audioQueueRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recorderError) return;
+    setError(recorderError);
+    callbacksRef.current?.onError?.(recorderError);
+  }, [recorderError]);
 
   const serverUrl = useMemo(() => {
     if (typeof window === 'undefined') return undefined;
@@ -67,86 +109,57 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     if (envUrl) return envUrl;
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.host;
-    return `${protocol}://${host.replace(/:\d+$/, '')}:${process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001'}`
+    return `${protocol}://${host.replace(/:\d+$/, '')}:${process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001'}`;
   }, []);
 
-  // Send WebSocket message
   const sendMessage = useCallback((message: Record<string, unknown>) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify(message));
   }, []);
 
-  // Reset state
+  const sendToolResult = useCallback((responses: Array<Record<string, unknown>>) => {
+    if (!responses || responses.length === 0) return;
+    sendMessage({
+      type: 'TOOL_RESULT',
+      payload: { responses },
+    });
+  }, [sendMessage]);
+
+  const sendContextUpdate = useCallback((update: VoiceContextUpdate) => {
+    if (!update || typeof update !== 'object') return;
+    sendMessage({
+      type: 'CONTEXT_UPDATE',
+      payload: {
+        ...update,
+        modality: update.modality,
+        sessionId: update.sessionId ?? undefined,
+        capturedAt: typeof update.capturedAt === 'number' ? update.capturedAt : Date.now(),
+      },
+    });
+  }, [sendMessage]);
+
   const resetState = useCallback((opts?: { soft?: boolean }) => {
-    const callbacks = callbacksRef.current;
     if (!opts?.soft) {
       setSession(null);
       connectionIdRef.current = null;
     }
+
     setSessionActive(false);
+    isSessionActiveRef.current = false;
     setIsProcessing(false);
     setPartialTranscript('');
     setError(null);
-    callbacks?.onSessionStateChange?.({
+    void resetRecording();
+    pendingChunksRef.current = [];
+
+    callbacksRef.current?.onSessionStateChange?.({
       active: false,
       connectionId: connectionIdRef.current,
       mock: session?.mock,
       isProcessing: false,
     });
-  }, [session?.mock]);
+  }, [resetRecording, session?.mock]);
 
-  // Initialize audio components
-  useEffect(() => {
-    audioRecorderRef.current = new AudioRecorder();
-    audioStreamerRef.current = new AudioStreamer();
-
-    // Check voice support
-    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-      setIsVoiceSupported(true);
-    }
-
-    return () => {
-      audioRecorderRef.current?.stop();
-      audioStreamerRef.current?.destroy();
-    };
-  }, []);
-
-  // Handle audio data from recorder
-  useEffect(() => {
-    const recorder = audioRecorderRef.current;
-    if (!recorder) return;
-
-    const handleAudioData = (base64: string) => {
-      if (isSessionActive && !isMuted) {
-        // Send audio chunk immediately
-        sendMessage({
-          type: 'user_audio',
-          payload: {
-            audioData: base64,
-            mimeType: 'audio/pcm;rate=16000',
-          },
-        });
-      }
-    };
-
-    recorder.on('data', handleAudioData);
-    recorder.on('error', (error) => {
-      console.error('🎤 [RealtimeVoice] Audio recorder error:', error);
-      setError(error.message);
-      callbacksRef.current?.onError?.(error.message);
-    });
-
-    return () => {
-      recorder.off('data', handleAudioData);
-      recorder.off('error', (error) => {
-        console.error('🎤 [RealtimeVoice] Audio recorder error:', error);
-        setError(error.message);
-        callbacksRef.current?.onError?.(error.message);
-      });
-    };
-  }, [isSessionActive, isMuted, sendMessage]);
-
-  // Handle server events
   const handleServerEvent = useCallback((event: LiveServerEvent) => {
     const callbacks = callbacksRef.current;
 
@@ -157,7 +170,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
       case 'session_started': {
-        console.log('🎤 [RealtimeVoice] Session started:', event.payload);
         setSession({
           connectionId: event.payload.connectionId,
           languageCode: event.payload.languageCode,
@@ -165,18 +177,38 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           mock: event.payload.mock,
         });
         setSessionActive(true);
+        isSessionActiveRef.current = true;
         setIsProcessing(false);
         setError(null);
+
         callbacks?.onSessionStateChange?.({
           active: true,
           connectionId: event.payload.connectionId,
           mock: event.payload.mock,
-          isProcessing: false,
+          isProcessing: recorderProcessing,
         });
+        // Flush any audio chunks captured before the session opened
+        if (pendingChunksRef.current.length > 0) {
+          pendingChunksRef.current.forEach((chunk) => {
+            sendMessage({
+              type: 'user_audio',
+              payload: {
+                audioData: chunk.base64,
+                mimeType: chunk.mimeType,
+              },
+            });
+          });
+          pendingChunksRef.current = [];
+        }
         break;
       }
       case 'session_closed': {
         setSessionActive(false);
+        isSessionActiveRef.current = false;
+        setIsProcessing(false);
+        // Clear audio queue on session close
+        audioQueueRef.current?.clear();
+        void resetRecording();
         callbacks?.onSessionStateChange?.({
           active: false,
           connectionId: connectionIdRef.current,
@@ -186,7 +218,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
       case 'input_transcript': {
-        if (event.payload.final) {
+        const isFinal = event.payload.isFinal ?? event.payload.final ?? false
+        if (isFinal) {
           setTranscript((prev) => (prev ? `${prev}\n${event.payload.text}` : event.payload.text));
           setPartialTranscript('');
           callbacks?.onFinalTranscript?.(event.payload.text);
@@ -194,6 +227,13 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           setPartialTranscript(event.payload.text);
           callbacks?.onPartialTranscript?.(event.payload.text);
         }
+        break;
+      }
+      case 'output_transcript': {
+        // AI speech-to-text (closed captions)
+        const text = event.payload.text
+        const isFinal = event.payload.isFinal ?? false
+        callbacks?.onOutputTranscript?.(text, isFinal)
         break;
       }
       case 'model_text':
@@ -206,15 +246,39 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
       case 'audio': {
-        // Play audio immediately as it arrives
+        // Use new audio queue for smooth playback
         const audioData = event.payload.audioData;
-        const audioBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0));
-        audioStreamerRef.current?.addPCM16(audioBytes);
+        audioQueueRef.current?.addChunk(audioData);
         break;
       }
       case 'heartbeat': {
-        // Respond to server heartbeat
         sendMessage({ type: 'heartbeat_ack', timestamp: Date.now() });
+        break;
+      }
+      case 'interrupted': {
+        // User interrupted AI - clear audio queue immediately
+        console.log('🔇 User interrupted AI - clearing audio queue')
+        audioQueueRef.current?.clear();
+        callbacks?.onInterrupted?.();
+        break;
+      }
+      case 'setup_complete': {
+        console.log('✅ Voice session setup complete')
+        callbacks?.onSetupComplete?.();
+        break;
+      }
+      case 'tool_call': {
+        console.log('🛠️ Tool call received:', event.payload)
+        callbacks?.onToolCall?.(event.payload);
+        break;
+      }
+      case 'tool_result': {
+        console.log('🛠️ Tool result received:', event.payload)
+        callbacks?.onToolResult?.(event.payload);
+        break;
+      }
+      case 'tool_call_cancellation': {
+        console.log('🛠️ Tool call cancelled')
         break;
       }
       case 'turn_complete': {
@@ -231,20 +295,36 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       case 'error': {
         const message = event.payload?.message ?? 'Voice session error';
         setError(message);
+        // Clear audio queue on errors
+        audioQueueRef.current?.clear();
         callbacks?.onError?.(message);
         break;
       }
     }
-  }, [session?.mock]);
+  }, [recorderProcessing, resetRecording, sendMessage, session?.mock]);
 
-  // Connect WebSocket
-  const connectWebSocket = useCallback(() => {
-    if (!serverUrl || wsRef.current) {
-      console.log('🎤 [RealtimeVoice] WebSocket already exists or no server URL');
+  const handleRecorderChunk = useCallback((chunk: MediaRecorderVoiceResult) => {
+    if (!chunk?.base64) return;
+
+    if (!isSessionActiveRef.current) {
+      pendingChunksRef.current.push(chunk);
       return;
     }
 
-    console.log('🎤 [RealtimeVoice] Connecting to:', serverUrl);
+    sendMessage({
+      type: 'user_audio',
+      payload: {
+        audioData: chunk.base64,
+        mimeType: chunk.mimeType,
+      },
+    });
+  }, [sendMessage]);
+
+  const connectWebSocket = useCallback(() => {
+    if (!serverUrl || wsRef.current) {
+      return;
+    }
+
     try {
       const socket = new WebSocket(serverUrl);
       wsRef.current = socket;
@@ -273,8 +353,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         wsRef.current = null;
         setSocketReady(false);
         resetState({ soft: true });
-        
-        // Auto-reconnect
+
         if (!reconnectTimerRef.current) {
           reconnectTimerRef.current = setTimeout(() => {
             reconnectTimerRef.current = null;
@@ -288,8 +367,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     }
   }, [handleServerEvent, resetState, serverUrl]);
 
-  // Start voice session
-  const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string }) => {
+  const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
     if (!isSocketReady || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       setError('Voice server not ready');
       return;
@@ -304,58 +382,58 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isProcessing: true,
       });
 
+      await startRecording({ onChunk: handleRecorderChunk });
+
       sendMessage({
         type: 'start',
         payload: {
           languageCode: opts?.languageCode,
           voiceName: opts?.voiceName,
+          sessionId: opts?.sessionId,
         },
       });
-    } catch (error) {
-      console.error('🎤 [RealtimeVoice] Failed to start session:', error);
-      setError(error instanceof Error ? error.message : 'Failed to start voice session');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start voice session';
+      console.error('🎤 [RealtimeVoice] Failed to start session:', err);
+      setError(message);
       setIsProcessing(false);
+      callbacksRef.current?.onError?.(message);
+      await resetRecording();
     }
-  }, [isSocketReady, sendMessage, session]);
+  }, [handleRecorderChunk, isSocketReady, sendMessage, session?.mock, startRecording, resetRecording]);
 
-  // Stop voice session
-  const stopSession = useCallback(() => {
-    if (!isSessionActive && !isProcessing) return;
-    
-    audioRecorderRef.current?.stop();
-    setIsMuted(false);
-    
-    sendMessage({ type: 'TURN_COMPLETE' });
-    setSessionActive(false);
-    setIsProcessing(false);
-  }, [isSessionActive, isProcessing, sendMessage]);
-
-  // Toggle mute/unmute (the main control)
-  const toggleMute = useCallback(async () => {
-    if (!isSessionActive) {
-      // Start session if not active
-      await startSession();
+  const stopSession = useCallback(async () => {
+    if (!isSessionActive && !isRecording && !isProcessing) {
       return;
     }
 
-    const newMutedState = !isMuted;
-    setIsMuted(newMutedState);
+    try {
+      setIsProcessing(true);
+      callbacksRef.current?.onSessionStateChange?.({
+        active: false,
+        connectionId: connectionIdRef.current,
+        mock: session?.mock,
+        isProcessing: true,
+      });
 
-    if (newMutedState) {
-      // Stop recording but keep session
-      audioRecorderRef.current?.stop();
-    } else {
-      // Resume recording
-      try {
-        await audioRecorderRef.current?.start();
-      } catch (error) {
-        console.error('🎤 [RealtimeVoice] Failed to resume recording:', error);
-        setError(error instanceof Error ? error.message : 'Failed to resume recording');
+      await stopRecording();
+      pendingChunksRef.current = [];
+
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        sendMessage({ type: 'TURN_COMPLETE' });
       }
-    }
-  }, [isSessionActive, isMuted, startSession]);
 
-  // Initialize WebSocket connection
+      setSessionActive(false);
+      isSessionActiveRef.current = false;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to stop voice session';
+      console.error('🎤 [RealtimeVoice] Failed to stop session:', err);
+      setError(message);
+      setIsProcessing(false);
+      callbacksRef.current?.onError?.(message);
+    }
+  }, [isSessionActive, isRecording, isProcessing, sendMessage, session?.mock, stopRecording]);
+
   useEffect(() => {
     connectWebSocket();
     return () => {
@@ -368,27 +446,27 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     };
   }, [connectWebSocket]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      audioRecorderRef.current?.stop();
+      void resetRecording();
       audioStreamerRef.current?.destroy();
     };
-  }, []);
+  }, [resetRecording]);
 
   return {
     session,
     isSocketReady,
     isSessionActive,
-    isProcessing,
+    isProcessing: isProcessing || recorderProcessing,
+    isRecording,
     transcript,
     partialTranscript,
     modelReplies,
     error,
-    isMuted,
     isVoiceSupported,
     startSession,
     stopSession,
-    toggleMute,
+    sendToolResult,
+    sendContextUpdate,
   };
 }

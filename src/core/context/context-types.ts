@@ -74,12 +74,32 @@ export interface UploadEntry {
   pages?: number;
 }
 
+/** Audio entry for voice transcripts and audio data */
+export interface AudioEntry {
+  id: string;
+  type: 'voice_input' | 'voice_output' | 'voice_transcript';
+  timestamp: string;
+  data: {
+    transcript?: string;
+    isFinal?: boolean;
+    languageCode?: string;
+    voiceName?: string;
+    duration?: number;  // ms
+  };
+  metadata: {
+    confidence?: number;
+    format?: string;  // 'pcm16@16000' or 'pcm16@24000'
+    size?: number;    // bytes
+    storedRaw?: boolean;
+  };
+}
+
 /** In-memory multimodal context stored per session. */
 export interface MultimodalContext {
   sessionId: string;
   conversationHistory: ConversationEntry[];
   visualContext: VisualEntry[];
-  audioContext: unknown[]; // refine later
+  audioContext: AudioEntry[]; // Voice transcripts and audio
   uploadContext: UploadEntry[];
   /** Required; callers can pass an empty object with empty strings. */
   leadContext: LeadContext;

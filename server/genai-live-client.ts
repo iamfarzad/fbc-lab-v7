@@ -15,7 +15,7 @@ import {
   Part,
   Session,
 } from '@google/genai';
-import EventEmitter from 'eventemitter3';
+import { EventEmitter } from 'eventemitter3';
 import { difference } from 'lodash-es';
 
 /**
@@ -186,26 +186,28 @@ export class GenAILiveClient extends EventEmitter<LiveClientEventTypes> {
       }
 
       if (serverContent.inputTranscription) {
+        const text = serverContent.inputTranscription.text || '';
         this.emit(
           'inputTranscription',
-          serverContent.inputTranscription.text,
+          text,
           (serverContent.inputTranscription as any).isFinal ?? false,
         );
         this.log(
           'server.inputTranscription',
-          serverContent.inputTranscription.text,
+          text,
         );
       }
 
       if (serverContent.outputTranscription) {
+        const text = serverContent.outputTranscription.text || '';
         this.emit(
           'outputTranscription',
-          serverContent.outputTranscription.text,
+          text,
           (serverContent.outputTranscription as any).isFinal ?? false,
         );
         this.log(
           'server.outputTranscription',
-          serverContent.outputTranscription.text,
+          text,
         );
       }
 

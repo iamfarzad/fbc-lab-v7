@@ -27,6 +27,9 @@ export interface ChatState {
   cameraStream: MediaStream | null;
   screenShareError: string | null;
   cameraError: string | null;
+  // Initialization states for loading UI
+  isCameraInitializing?: boolean;
+  isScreenShareInitializing?: boolean;
 }
 
 // Component props interfaces

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { GoogleGroundingProvider } from './providers/search/google-grounding'
+import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache'
 
 export interface ResearchResult {
   company: CompanyContext
@@ -32,29 +33,37 @@ export interface PersonContext {
 }
 
 export class LeadResearchService {
-  private cache = new Map<string, ResearchResult>()
-  private cacheTTL = 24 * 60 * 60 * 1000 // 24 hours
   private genAI: GoogleGenAI
   private groundingProvider: GoogleGroundingProvider
+  
+  // Cached research function
+  private cachedResearch: (email: string, name?: string, companyUrl?: string, sessionId?: string) => Promise<ResearchResult>
 
   constructor() {
     this.genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
     this.groundingProvider = new GoogleGroundingProvider()
+    
+    // Wrap the internal method with caching (24 hour TTL)
+    this.cachedResearch = createCachedFunction(
+      this.researchLeadInternal.bind(this),
+      {
+        ttl: CACHE_TTL.VERY_LONG, // 24 hours
+        keyPrefix: 'lead-research:',
+        keyGenerator: (email, name, companyUrl) => `${email}|${name || ''}|${companyUrl || ''}`
+      }
+    )
   }
 
   async researchLead(email: string, name?: string, companyUrl?: string, sessionId?: string): Promise<ResearchResult> {
-    void sessionId
-    const cacheKey = this.generateCacheKey(email, name, companyUrl)
+    // Use cached version - cache key based on email, name, companyUrl
+    return await this.cachedResearch(email, name, companyUrl, sessionId)
+  }
 
-    // Check cache first
-    const cached = this.cache.get(cacheKey)
-    if (cached) {
-      console.log('Using cached research result for:', email)
-      return cached
-    }
+  private async researchLeadInternal(email: string, name?: string, companyUrl?: string, sessionId?: string): Promise<ResearchResult> {
+    void sessionId
 
     try {
-      console.log('Starting lead research for:', email)
+      console.log('🔍 [Lead Research] Starting for:', email)
 
       const domain = email.split('@')[1]
 
@@ -94,16 +103,16 @@ export class LeadResearchService {
 
       // Use Google Grounding for comprehensive research
       const researchResult = await this.researchWithGrounding(email, name, domain, companyUrl)
-      
 
-      // Cache the result
-      this.cache.set(cacheKey, researchResult)
-
-      console.log('Lead research completed:', researchResult)
+      console.log('✅ [Lead Research] Completed:', { 
+        company: researchResult.company.name,
+        person: researchResult.person.fullName,
+        confidence: researchResult.confidence
+      })
       return researchResult
 
     } catch (error) {
-      console.error('Lead research failed:', error)
+      console.error('❌ [Lead Research] Failed:', error)
 
       // Return fallback result
       const fallbackDomain = email.split('@')[1] || 'unknown.com'
@@ -230,7 +239,4 @@ Be thorough and accurate. If information is not available, use null for that fie
     }
   }
 
-  private generateCacheKey(email: string, name?: string, companyUrl?: string): string {
-    return `${email}|${name || ''}|${companyUrl || ''}`
-  }
 }

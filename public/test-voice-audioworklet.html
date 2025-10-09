@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Test - AudioWorklet (PCM16)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: 600;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.recording { background: #fff3cd; color: #856404; animation: pulse 1.5s infinite; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.idle { background: #e2e3e5; color: #383d41; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        button.danger {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .messages {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            background: white;
+        }
+        .message.user {
+            border-left: 4px solid #667eea;
+        }
+        .message.assistant {
+            border-left: 4px solid #28a745;
+        }
+        .message.system {
+            border-left: 4px solid #ffc107;
+        }
+        
+        .logs {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 10px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 2px 0;
+        }
+        .log-error { color: #f48771; }
+        .log-success { color: #89d185; }
+        .log-info { color: #6bb6ff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Voice Test - AudioWorklet</h1>
+        <p class="subtitle">Using PCM16 @ 16kHz (Gemini-compatible format)</p>
+        
+        <div id="status" class="status idle">Ready to connect</div>
+        
+        <div class="controls">
+            <button id="connectBtn">Connect</button>
+            <button id="startSessionBtn" disabled>Start Session</button>
+            <button id="recordBtn" disabled>Start Recording</button>
+            <button id="stopBtn" class="danger" disabled>Stop</button>
+        </div>
+        
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="chunksCount">0</div>
+                <div class="metric-label">Audio Chunks</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="transcriptCount">0</div>
+                <div class="metric-label">Transcripts</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="responsesCount">0</div>
+                <div class="metric-label">Responses</div>
+            </div>
+        </div>
+        
+        <div class="messages" id="messages">
+            <div class="message system">No messages yet. Start a session and speak!</div>
+        </div>
+        
+        <div class="logs" id="logs"></div>
+    </div>
+
+    <script>
+        class VoiceTest {
+            constructor() {
+                this.ws = null
+                this.audioContext = null
+                this.audioWorklet = null
+                this.microphone = null
+                this.stream = null
+                this.sessionActive = false
+                this.isRecording = false
+                this.connectionId = null
+                this.metrics = { chunks: 0, transcripts: 0, responses: 0 }
+                
+                // Audio playback queue
+                this.playbackContext = null
+                this.audioQueue = []
+                this.isPlaying = false
+                this.nextScheduledTime = 0
+                
+                this.init()
+            }
+            
+            init() {
+                // UI elements
+                this.statusEl = document.getElementById('status')
+                this.messagesEl = document.getElementById('messages')
+                this.logsEl = document.getElementById('logs')
+                
+                // Buttons
+                document.getElementById('connectBtn').onclick = () => this.connect()
+                document.getElementById('startSessionBtn').onclick = () => this.startSession()
+                document.getElementById('recordBtn').onclick = () => this.startRecording()
+                document.getElementById('stopBtn').onclick = () => this.stop()
+                
+                // Metrics
+                setInterval(() => this.updateMetrics(), 1000)
+            }
+            
+            log(msg, type = 'info') {
+                const time = new Date().toLocaleTimeString()
+                const className = `log-${type}`
+                this.logsEl.innerHTML += `<div class="log-entry ${className}">[${time}] ${msg}</div>`
+                this.logsEl.scrollTop = this.logsEl.scrollHeight
+                console.log(`[${time}] ${msg}`)
+            }
+            
+            setStatus(msg, className = 'idle') {
+                this.statusEl.textContent = msg
+                this.statusEl.className = `status ${className}`
+            }
+            
+            addMessage(role, content) {
+                const div = document.createElement('div')
+                div.className = `message ${role}`
+                div.innerHTML = `<strong>${role}:</strong> ${content}`
+                this.messagesEl.appendChild(div)
+                this.messagesEl.scrollTop = this.messagesEl.scrollHeight
+                
+                if (role === 'user') this.metrics.transcripts++
+                if (role === 'assistant') this.metrics.responses++
+            }
+            
+            updateMetrics() {
+                document.getElementById('chunksCount').textContent = this.metrics.chunks
+                document.getElementById('transcriptCount').textContent = this.metrics.transcripts
+                document.getElementById('responsesCount').textContent = this.metrics.responses
+            }
+            
+            async connect() {
+                try {
+                    this.setStatus('Connecting...', 'idle')
+                    this.ws = new WebSocket('ws://localhost:3001')
+                    
+                    this.ws.onopen = () => {
+                        this.setStatus('Connected', 'connected')
+                        this.log('WebSocket connected', 'success')
+                        document.getElementById('connectBtn').disabled = true
+                        document.getElementById('startSessionBtn').disabled = false
+                    }
+                    
+                    this.ws.onmessage = (event) => {
+                        const data = JSON.parse(event.data)
+                        this.handleMessage(data)
+                    }
+                    
+                    this.ws.onerror = (error) => {
+                        this.setStatus('Connection error', 'error')
+                        this.log('WebSocket error', 'error')
+                    }
+                    
+                    this.ws.onclose = () => {
+                        this.setStatus('Disconnected', 'error')
+                        this.log('WebSocket closed', 'error')
+                        this.cleanup()
+                    }
+                } catch (err) {
+                    this.setStatus('Connection failed', 'error')
+                    this.log(`Failed to connect: ${err.message}`, 'error')
+                }
+            }
+            
+            handleMessage(data) {
+                this.log(`Received: ${data.type}`, 'info')
+                
+                switch (data.type) {
+                    case 'connected':
+                        this.connectionId = data.payload.connectionId
+                        break
+                    case 'session_started':
+                        this.sessionActive = true
+                        this.setStatus('Session active', 'connected')
+                        document.getElementById('recordBtn').disabled = false
+                        break
+                    case 'input_transcript':
+                        this.addMessage('user', data.payload.text)
+                        break
+                    case 'text':
+                        this.addMessage('assistant', data.payload.content)
+                        break
+                    case 'audio':
+                        this.log('Received audio response', 'success')
+                        this.playAudio(data.payload.audioData)
+                        break
+                    case 'error':
+                        this.setStatus('Error: ' + data.payload.message, 'error')
+                        this.log(data.payload.message, 'error')
+                        break
+                    case 'session_closed':
+                        this.sessionActive = false
+                        this.setStatus('Session closed', 'error')
+                        this.log('Session closed by server', 'error')
+                        break
+                    case 'heartbeat':
+                        this.ws.send(JSON.stringify({ type: 'heartbeat_ack', timestamp: Date.now() }))
+                        break
+                }
+            }
+            
+            startSession() {
+                this.log('Starting session...', 'info')
+                this.ws.send(JSON.stringify({
+                    type: 'start',
+                    payload: {
+                        languageCode: 'en-US',
+                        voiceName: 'Puck'
+                    }
+                }))
+            }
+            
+            async startRecording() {
+                try {
+                    this.setStatus('Starting recording...', 'recording')
+                    
+                    // Get microphone stream
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                            sampleRate: 16000
+                        }
+                    })
+                    
+                    // Create audio context @ 16kHz
+                    this.audioContext = new AudioContext({ sampleRate: 16000 })
+                    
+                    // Load AudioWorklet processor
+                    await this.audioContext.audioWorklet.addModule('/audio-processor.js')
+                    
+                    // Create microphone source
+                    this.microphone = this.audioContext.createMediaStreamSource(this.stream)
+                    
+                    // Create AudioWorklet node
+                    this.audioWorklet = new AudioWorkletNode(this.audioContext, 'audio-processor')
+                    
+                    // Handle audio data from worklet
+                    this.audioWorklet.port.onmessage = (event) => {
+                        if (event.data.type === 'audioData') {
+                            const pcm16Buffer = event.data.data.int16arrayBuffer
+                            this.sendAudio(pcm16Buffer)
+                        }
+                    }
+                    
+                    // Connect microphone -> worklet
+                    this.microphone.connect(this.audioWorklet)
+                    
+                    this.isRecording = true
+                    this.setStatus('Recording with PCM16 @ 16kHz', 'recording')
+                    this.log('Recording started with AudioWorklet', 'success')
+                    
+                    document.getElementById('recordBtn').disabled = true
+                    document.getElementById('stopBtn').disabled = false
+                    
+                } catch (err) {
+                    this.setStatus('Recording failed', 'error')
+                    this.log(`Failed to start recording: ${err.message}`, 'error')
+                }
+            }
+            
+            sendAudio(arrayBuffer) {
+                if (!this.sessionActive || !this.ws || this.ws.readyState !== WebSocket.OPEN) return
+                
+                // Convert ArrayBuffer to base64
+                const bytes = new Uint8Array(arrayBuffer)
+                let binary = ''
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i])
+                }
+                const base64 = btoa(binary)
+                
+                this.metrics.chunks++
+                
+                // Send to server
+                this.ws.send(JSON.stringify({
+                    type: 'user_audio',
+                    payload: {
+                        audioData: base64,
+                        mimeType: 'audio/pcm;rate=16000'
+                    }
+                }))
+            }
+            
+            async playAudio(base64Audio) {
+                try {
+                    // Decode base64 to PCM16 data
+                    const binaryString = atob(base64Audio)
+                    const bytes = new Uint8Array(binaryString.length)
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i)
+                    }
+                    
+                    // Convert PCM16 to Float32 for Web Audio API
+                    const pcm16 = new Int16Array(bytes.buffer)
+                    const float32 = new Float32Array(pcm16.length)
+                    for (let i = 0; i < pcm16.length; i++) {
+                        float32[i] = pcm16[i] / 32768.0
+                    }
+                    
+                    // Add to queue
+                    this.audioQueue.push(float32)
+                    
+                    // Start playing if not already playing
+                    if (!this.isPlaying) {
+                        this.isPlaying = true
+                        this.playNextChunk()
+                    }
+                    
+                } catch (err) {
+                    this.log(`Audio playback error: ${err.message}`, 'error')
+                }
+            }
+            
+            playNextChunk() {
+                // If queue is empty, stop playing
+                if (this.audioQueue.length === 0) {
+                    this.isPlaying = false
+                    return
+                }
+                
+                // Get next chunk from queue
+                const float32 = this.audioQueue.shift()
+                
+                try {
+                    // Create audio context if needed (24kHz - Gemini output rate)
+                    if (!this.playbackContext || this.playbackContext.state === 'closed') {
+                        this.playbackContext = new AudioContext({ sampleRate: 24000 })
+                        this.nextScheduledTime = this.playbackContext.currentTime
+                    }
+                    
+                    // Create audio buffer
+                    const audioBuffer = this.playbackContext.createBuffer(1, float32.length, 24000)
+                    audioBuffer.copyToChannel(float32, 0)
+                    
+                    // Create source and schedule playback
+                    const source = this.playbackContext.createBufferSource()
+                    source.buffer = audioBuffer
+                    source.connect(this.playbackContext.destination)
+                    
+                    // Schedule at next available time
+                    if (this.nextScheduledTime < this.playbackContext.currentTime) {
+                        this.nextScheduledTime = this.playbackContext.currentTime
+                    }
+                    
+                    source.start(this.nextScheduledTime)
+                    this.nextScheduledTime += audioBuffer.duration
+                    
+                    // Play next chunk when this one finishes
+                    source.onended = () => {
+                        this.playNextChunk()
+                    }
+                    
+                    this.log(`Playing audio: ${float32.length} samples @ ${this.nextScheduledTime.toFixed(2)}s`, 'success')
+                } catch (err) {
+                    this.log(`Chunk playback error: ${err.message}`, 'error')
+                    this.isPlaying = false
+                }
+            }
+            
+            stop() {
+                this.cleanup()
+                this.setStatus('Stopped', 'idle')
+                this.log('Recording stopped', 'info')
+            }
+            
+            cleanup() {
+                if (this.audioWorklet) {
+                    this.audioWorklet.disconnect()
+                    this.audioWorklet = null
+                }
+                if (this.microphone) {
+                    this.microphone.disconnect()
+                    this.microphone = null
+                }
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop())
+                    this.stream = null
+                }
+                if (this.audioContext) {
+                    this.audioContext.close()
+                    this.audioContext = null
+                }
+                
+                // Clear audio queue
+                this.audioQueue = []
+                this.isPlaying = false
+                
+                this.isRecording = false
+                
+                document.getElementById('recordBtn').disabled = !this.sessionActive
+                document.getElementById('stopBtn').disabled = true
+            }
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', () => {
+            new VoiceTest()
+        })
+    </script>
+</body>
+</html>
+

@@ -69,11 +69,12 @@ PopoverAnchor.displayName = "PopoverAnchor"
 
 interface PopoverContentProps extends React.HTMLAttributes<HTMLDivElement> {
   align?: "start" | "center" | "end"
+  side?: "top" | "bottom" | "left" | "right"
   sideOffset?: number
 }
 
 const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
-  ({ className, align = "center", sideOffset = 4, ...props }, ref) => {
+  ({ className, align = "center", side = "top", sideOffset = 4, ...props }, ref) => {
     const { isOpen, setIsOpen } = usePopover()
     const contentRef = React.useRef<HTMLDivElement>(null)
     const [position, setPosition] = React.useState({ top: 0, left: 0 })
@@ -88,39 +89,98 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
         const anchorRect = anchor.getBoundingClientRect()
         const contentRect = contentRef.current.getBoundingClientRect()
         
-        let top = anchorRect.top - contentRect.height - sideOffset
-        let left = anchorRect.left
+        let top = 0
+        let left = 0
 
-        // Adjust horizontal alignment
-        if (align === "center") {
-          left = anchorRect.left + (anchorRect.width - contentRect.width) / 2
-        } else if (align === "end") {
-          left = anchorRect.right - contentRect.width
-        }
-
-        // Keep within viewport
-        if (top < 0) {
+        // Position based on side preference
+        if (side === "top") {
+          top = anchorRect.top - contentRect.height - sideOffset
+          left = anchorRect.left
+          
+          // Adjust horizontal alignment
+          if (align === "center") {
+            left = anchorRect.left + (anchorRect.width - contentRect.width) / 2
+          } else if (align === "end") {
+            left = anchorRect.right - contentRect.width
+          }
+          
+          // Flip to bottom if not enough space above
+          if (top < 0) {
+            top = anchorRect.bottom + sideOffset
+          }
+        } else if (side === "bottom") {
           top = anchorRect.bottom + sideOffset
+          left = anchorRect.left
+          
+          if (align === "center") {
+            left = anchorRect.left + (anchorRect.width - contentRect.width) / 2
+          } else if (align === "end") {
+            left = anchorRect.right - contentRect.width
+          }
+        } else if (side === "left") {
+          top = anchorRect.top
+          left = anchorRect.left - contentRect.width - sideOffset
+          
+          if (align === "center") {
+            top = anchorRect.top + (anchorRect.height - contentRect.height) / 2
+          } else if (align === "end") {
+            top = anchorRect.bottom - contentRect.height
+          }
+          
+          // Flip to right if not enough space on left
+          if (left < 0) {
+            left = anchorRect.right + sideOffset
+          }
+        } else if (side === "right") {
+          top = anchorRect.top
+          left = anchorRect.right + sideOffset
+          
+          if (align === "center") {
+            top = anchorRect.top + (anchorRect.height - contentRect.height) / 2
+          } else if (align === "end") {
+            top = anchorRect.bottom - contentRect.height
+          }
         }
-        if (left < 0) {
-          left = 0
+
+        // Keep within viewport bounds with responsive margins
+        const margin = window.innerWidth < 640 ? 16 : 8 // More margin on mobile
+        
+        if (left < margin) {
+          left = margin
         }
-        if (left + contentRect.width > window.innerWidth) {
-          left = window.innerWidth - contentRect.width
+        if (left + contentRect.width > window.innerWidth - margin) {
+          left = window.innerWidth - contentRect.width - margin
+        }
+        if (top < margin) {
+          top = margin
+        }
+        if (top + contentRect.height > window.innerHeight - margin) {
+          top = window.innerHeight - contentRect.height - margin
         }
 
         setPosition({ top, left })
       }
 
       updatePosition()
-      window.addEventListener('resize', updatePosition)
-      window.addEventListener('scroll', updatePosition)
+      
+      // Debounce for performance on mobile
+      let timeoutId: NodeJS.Timeout
+      const debouncedUpdate = () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(updatePosition, 10)
+      }
+      
+      window.addEventListener('resize', debouncedUpdate)
+      window.addEventListener('scroll', debouncedUpdate, true)
+      window.addEventListener('orientationchange', updatePosition)
 
       return () => {
-        window.removeEventListener('resize', updatePosition)
-        window.removeEventListener('scroll', updatePosition)
+        clearTimeout(timeoutId)
+        window.removeEventListener('resize', debouncedUpdate)
+        window.removeEventListener('scroll', debouncedUpdate, true)
+        window.removeEventListener('orientationchange', updatePosition)
       }
-    }, [isOpen, align, sideOffset])
+    }, [isOpen, align, side, sideOffset])
 
     // Close on escape
     React.useEffect(() => {
@@ -165,8 +225,10 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
             ref.current = node
           }
         }}
+        role="dialog"
+        aria-modal="true"
         className={cn(
-          "fixed z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95",
+          "fixed z-[200] w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95",
           className
         )}
         style={{

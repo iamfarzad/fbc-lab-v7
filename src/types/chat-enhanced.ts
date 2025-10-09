@@ -134,6 +134,7 @@ export interface EnhancedChatMessage {
       title: string;
       description?: string;
     };
+    followUp?: string;
   };
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error' | 'failed';
   error?: string;

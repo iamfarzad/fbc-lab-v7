@@ -1,5 +1,10 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { VISUAL, SPACING } from "../design-tokens";
 
 interface ChatTermsAcceptanceProps {
   name: string;
@@ -21,53 +26,62 @@ export function ChatTermsAcceptance({
   onAcceptTerms,
 }: ChatTermsAcceptanceProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border border-border/30 bg-card px-4 py-4 sm:px-6 sm:py-5 rounded-[24px] shadow-[0_16px_48px_-40px_rgba(12,18,26,0.35)] [.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2 [.monochrome_&]:font-mono">
-      <div className="text-[11px] uppercase tracking-[0.35em] text-muted-foreground/70">
+    <div className={cn(
+      "border bg-card p-6 space-y-4 shadow-lg max-w-md mx-auto",
+      VISUAL.CORNER_RADIUS,
+      "[.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2"
+    )}>
+      <div className="text-xs uppercase tracking-widest text-muted-foreground text-center">
         Continue with F.B/c
       </div>
       
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Name Input */}
-        <div className="flex items-center gap-2">
-          <input
+      <div className="space-y-3">
+        <div>
+          <Label htmlFor="name" className="text-xs text-muted-foreground mb-1">
+            Name
+          </Label>
+          <Input
+            id="name"
             type="text"
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="Your name"
-            className="px-3 py-2 text-xs border border-border/40 rounded-full bg-card/80 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]/40 focus:border-transparent [.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
+            className="h-10"
           />
         </div>
 
-        {/* Email Input */}
-        <div className="flex items-center gap-2">
-          <input
+        <div>
+          <Label htmlFor="email" className="text-xs text-muted-foreground mb-1">
+            Email
+          </Label>
+          <Input
+            id="email"
             type="email"
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             placeholder="work@company.com"
-            className="px-3 py-2 text-xs border border-border/40 rounded-full bg-card/80 placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-[hsl(var(--accent))]/40 focus:border-transparent [.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
+            className="h-10"
           />
         </div>
 
-        {/* Terms Checkbox */}
         <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="inline-terms"
+          <Checkbox
+            id="terms"
             checked={agreed}
-            onChange={(e) => onAgreedChange(e.target.checked)}
-            className="w-4 h-4 text-[hsl(var(--accent))] bg-card border-border/40 rounded focus:ring-[hsl(var(--accent))]/40"
+            onCheckedChange={(checked) => onAgreedChange(checked === true)}
           />
-          <label htmlFor="inline-terms" className="text-xs text-muted-foreground/80 cursor-pointer">
-            Accept terms
-          </label>
+          <Label 
+            htmlFor="terms" 
+            className="text-xs text-muted-foreground cursor-pointer"
+          >
+            I accept the terms and conditions
+          </Label>
         </div>
 
-        {/* Submit Button */}
         <Button
           onClick={onAcceptTerms}
           disabled={!agreed || !email.trim() || !name.trim()}
-          className="rounded-full bg-[hsl(var(--accent))] px-4 text-xs font-semibold tracking-[0.2em] text-[hsl(var(--accent-foreground))] transition-colors duration-150 hover:bg-[hsl(var(--accent))]/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full min-h-[44px]"
         >
           Continue
         </Button>

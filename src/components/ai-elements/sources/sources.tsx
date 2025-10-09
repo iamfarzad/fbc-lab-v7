@@ -13,7 +13,7 @@ export type SourcesProps = ComponentProps<"div">;
 
 export const Sources = ({ className, ...props }: SourcesProps) => (
   <Collapsible
-    className={cn("not-prose mb-4 text-primary text-xs", "[.monochrome_&]:font-mono [.monochrome_&]:mb-2", className)}
+    className={cn("not-prose mb-2 text-primary text-[11px]", "[.monochrome_&]:font-mono [.monochrome_&]:mb-2", className)}
     {...props}
   />
 );
@@ -29,13 +29,13 @@ export const SourcesTrigger = ({
   ...props
 }: SourcesTriggerProps) => (
   <CollapsibleTrigger
-    className={cn("flex items-center gap-2", className)}
+    className={cn("flex items-center gap-1.5", className)}
     {...props}
   >
     {children ?? (
       <>
         <p className="font-medium">Used {count} sources</p>
-        <ChevronDownIcon className="h-4 w-4" />
+        <ChevronDownIcon className="h-3 w-3" />
       </>
     )}
   </CollapsibleTrigger>
@@ -61,7 +61,7 @@ export type SourceProps = ComponentProps<"a">;
 
 export const Source = ({ href, title, children, ...props }: SourceProps) => (
   <a
-    className="flex items-center gap-2"
+    className="flex items-center gap-1.5"
     href={href}
     rel="noreferrer"
     target="_blank"
@@ -69,7 +69,7 @@ export const Source = ({ href, title, children, ...props }: SourceProps) => (
   >
     {children ?? (
       <>
-        <BookIcon className="h-4 w-4" />
+        <BookIcon className="h-3 w-3" />
         <span className="block font-medium">{title}</span>
       </>
     )}

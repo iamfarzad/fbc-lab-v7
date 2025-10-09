@@ -1,8 +1,12 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, Phone, MapPin, Calendar } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { ComponentProps } from "react"
 
-export function ContactSection() {
+interface ContactSectionProps extends ComponentProps<"section"> {}
+
+export function ContactSection({ className, ...props }: ContactSectionProps) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     // Get form data
@@ -23,178 +27,277 @@ export function ContactSection() {
   }
 
   return (
-    <section id="contact" className="py-20 px-6 bg-muted/10">
+    <section 
+      id="contact" 
+      className={cn(
+        "py-20 px-6 bg-muted/10",
+        className
+      )} 
+      {...props}
+    >
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ fontFamily: 'var(--font-display)' }}>
+          <h2 className={cn(
+            "text-4xl md:text-5xl font-bold mb-6",
+            "font-display text-foreground"
+          )}>
             CONTACT
           </h2>
-          <div className="text-lg text-muted-foreground max-w-3xl mx-auto" style={{ fontFamily: 'var(--font-serif)' }}>
+          <p className={cn(
+            "text-lg text-muted-foreground max-w-3xl mx-auto",
+            "font-serif"
+          )}>
             Ready to transform your organization with AI? Let's start a conversation about your specific needs and how we can work together.
-          </div>
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <div className="space-y-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl" style={{ fontFamily: 'var(--font-mono)' }}>
-                  GET IN TOUCH
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center space-x-4">
-                  <Mail className="h-5 w-5 text-primary" />
-                  <div>
-                    <div className="font-medium" style={{ fontFamily: 'var(--font-sans)' }}>Email</div>
-                    <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>
-                      contact@farzadbayat.com
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <Phone className="h-5 w-5 text-primary" />
-                  <div>
-                    <div className="font-medium" style={{ fontFamily: 'var(--font-sans)' }}>Phone</div>
-                    <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>
-                      +47 94446446
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  <div>
-                    <div className="font-medium" style={{ fontFamily: 'var(--font-sans)' }}>Location</div>
-                    <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>
-                      Oslo, Norway & Remote
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <ContactCard title="GET IN TOUCH">
+              <div className="space-y-6">
+                <ContactItem
+                  icon={Mail}
+                  label="Email"
+                  value="contact@farzadbayat.com"
+                />
+                <ContactItem
+                  icon={Phone}
+                  label="Phone"
+                  value="+47 94446446"
+                />
+                <ContactItem
+                  icon={MapPin}
+                  label="Location"
+                  value="Oslo, Norway & Remote"
+                />
+              </div>
+            </ContactCard>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl" style={{ fontFamily: 'var(--font-mono)' }}>
-                  AVAILABILITY
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="h-4 w-4 text-green-500" />
-                    <div>
-                      <div className="font-medium" style={{ fontFamily: 'var(--font-sans)' }}>
-                        Consultation Slots
-                      </div>
-                      <div className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>
-                        Available within 2-3 business days
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="h-4 w-4 text-blue-500" />
-                    <div>
-                      <div className="font-medium" style={{ fontFamily: 'var(--font-sans)' }}>
-                        Workshop Scheduling
-                      </div>
-                      <div className="text-sm text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>
-                        Planning 2-4 weeks in advance
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <ContactCard title="AVAILABILITY">
+              <div className="space-y-4">
+                <AvailabilityItem
+                  icon={Calendar}
+                  iconColor="text-green-500"
+                  title="Consultation Slots"
+                  description="Available within 2-3 business days"
+                />
+                <AvailabilityItem
+                  icon={Calendar}
+                  iconColor="text-blue-500"
+                  title="Workshop Scheduling"
+                  description="Planning 2-4 weeks in advance"
+                />
+              </div>
+            </ContactCard>
           </div>
 
           <div>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl" style={{ fontFamily: 'var(--font-mono)' }}>
-                  SCHEDULE A CONSULTATION
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="text-muted-foreground" style={{ fontFamily: 'var(--font-serif)' }}>
+            <ContactCard title="SCHEDULE A CONSULTATION">
+              <div className="space-y-6">
+                <p className={cn(
+                  "text-muted-foreground",
+                  "font-serif"
+                )}>
                   Take the first step towards AI transformation. Book a free 30-minute consultation to discuss your goals and explore how we can work together.
-                </div>
+                </p>
                 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block" style={{ fontFamily: 'var(--font-mono)' }}>
-                      YOUR NAME
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      className="w-full px-4 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="John Doe"
-                      style={{ fontFamily: 'var(--font-sans)' }}
-                      required
-                    />
-                  </div>
+                  <FormField
+                    name="name"
+                    label="YOUR NAME"
+                    placeholder="John Doe"
+                    required
+                  />
                   
-                  <div>
-                    <label className="text-sm font-medium mb-2 block" style={{ fontFamily: 'var(--font-mono)' }}>
-                      COMPANY
-                    </label>
-                    <input
-                      type="text"
-                      name="company"
-                      className="w-full px-4 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="Your Company"
-                      style={{ fontFamily: 'var(--font-sans)' }}
-                      required
-                    />
-                  </div>
+                  <FormField
+                    name="company"
+                    label="COMPANY"
+                    placeholder="Your Company"
+                    required
+                  />
                   
-                  <div>
-                    <label className="text-sm font-medium mb-2 block" style={{ fontFamily: 'var(--font-mono)' }}>
-                      EMAIL
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      className="w-full px-4 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      placeholder="john@company.com"
-                      style={{ fontFamily: 'var(--font-sans)' }}
-                      required
-                    />
-                  </div>
+                  <FormField
+                    name="email"
+                    type="email"
+                    label="EMAIL"
+                    placeholder="john@company.com"
+                    required
+                  />
                   
-                  <div>
-                    <label className="text-sm font-medium mb-2 block" style={{ fontFamily: 'var(--font-mono)' }}>
-                      AREA OF INTEREST
-                    </label>
-                    <select
-                      name="areaOfInterest"
-                      className="w-full px-4 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                      style={{ fontFamily: 'var(--font-sans)' }}
-                      required
-                    >
-                      <option value="">Select an option</option>
-                      <option value="AI Strategy Consulting">AI Strategy Consulting</option>
-                      <option value="Team Training Workshop">Team Training Workshop</option>
-                      <option value="Implementation Support">Implementation Support</option>
-                      <option value="Custom AI Solution">Custom AI Solution</option>
-                    </select>
-                  </div>
+                  <SelectField
+                    name="areaOfInterest"
+                    label="AREA OF INTEREST"
+                    required
+                  >
+                    <option value="">Choose your area of interest</option>
+                    <option value="AI Strategy Consulting">AI Strategy Consulting</option>
+                    <option value="Team Training Workshop">Team Training Workshop</option>
+                    <option value="Implementation Support">Implementation Support</option>
+                    <option value="Custom AI Solution">Custom AI Solution</option>
+                  </SelectField>
                   
                   <Button 
                     type="submit" 
                     size="lg" 
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                    style={{ fontFamily: 'var(--font-mono)' }}
+                    className={cn(
+                      "w-full bg-primary text-primary-foreground hover:bg-primary/90",
+                      "font-mono"
+                    )}
                   >
                     REQUEST CONSULTATION
                   </Button>
                 </form>
-              </CardContent>
-            </Card>
+              </div>
+            </ContactCard>
           </div>
         </div>
       </div>
     </section>
+  )
+}
+
+// Helper components
+interface ContactCardProps {
+  title: string
+  children: React.ReactNode
+}
+
+function ContactCard({ title, children }: ContactCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className={cn(
+          "text-xl",
+          "font-mono text-foreground"
+        )}>
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
+interface ContactItemProps {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string
+}
+
+function ContactItem({ icon: Icon, label, value }: ContactItemProps) {
+  return (
+    <div className="flex items-center space-x-4">
+      <Icon className="h-5 w-5 text-primary" />
+      <div>
+        <div className={cn(
+          "font-medium",
+          "font-sans text-foreground"
+        )}>
+          {label}
+        </div>
+        <div className={cn(
+          "text-muted-foreground",
+          "font-mono"
+        )}>
+          {value}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface AvailabilityItemProps {
+  icon: React.ComponentType<{ className?: string }>
+  iconColor: string
+  title: string
+  description: string
+}
+
+function AvailabilityItem({ icon: Icon, iconColor, title, description }: AvailabilityItemProps) {
+  return (
+    <div className="flex items-center space-x-3">
+      <Icon className={cn("h-4 w-4", iconColor)} />
+      <div>
+        <div className={cn(
+          "font-medium",
+          "font-sans text-foreground"
+        )}>
+          {title}
+        </div>
+        <div className={cn(
+          "text-sm text-muted-foreground",
+          "font-mono"
+        )}>
+          {description}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface FormFieldProps {
+  name: string
+  label: string
+  type?: string
+  placeholder?: string
+  required?: boolean
+}
+
+function FormField({ name, label, type = "text", placeholder, required }: FormFieldProps) {
+  return (
+    <div className="space-y-2">
+      <label className={cn(
+        "text-sm font-medium block",
+        "font-mono text-foreground"
+      )}>
+        {label}
+      </label>
+      <input
+        type={type}
+        name={name}
+        className={cn(
+          "w-full px-4 py-3 border border-input rounded-md bg-background text-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+          "font-sans placeholder:text-muted-foreground/70",
+          "transition-all duration-200 hover:border-primary/50"
+        )}
+        placeholder={placeholder}
+        required={required}
+      />
+    </div>
+  )
+}
+
+interface SelectFieldProps {
+  name: string
+  label: string
+  children: React.ReactNode
+  required?: boolean
+}
+
+function SelectField({ name, label, children, required }: SelectFieldProps) {
+  return (
+    <div className="space-y-2">
+      <label className={cn(
+        "text-sm font-medium block",
+        "font-mono text-foreground"
+      )}>
+        {label}
+      </label>
+      <select
+        name={name}
+        className={cn(
+          "w-full px-4 py-3 border border-input rounded-md bg-background text-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+          "font-sans",
+          "transition-all duration-200 hover:border-primary/50"
+        )}
+        required={required}
+      >
+        {children}
+      </select>
+    </div>
   )
 }

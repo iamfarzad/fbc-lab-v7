@@ -1,5 +1,5 @@
 import { ContextStorage } from './context-storage'
-import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry } from './context-types'
+import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry, AudioEntry } from './context-types'
 
 // Define a local alias for the allowed modalities so we don't widen to string[]
 type Modality = 'text' | 'video' | 'image' | 'audio';
@@ -13,30 +13,14 @@ function coerceModalities(v: unknown): Modality[] {
     .slice();
 }
 
-// If you have an AudioEntry type imported, don't change it globally.
-// Create a local guard to accept only known keys.
-type AudioEntryLike = {
-  mimeType?: unknown;
-  data?: unknown;
-  durationMs?: unknown;
-  // some code elsewhere might *read* metadata/id — guard those reads.
-  metadata?: unknown;
-  id?: unknown;
-};
-
-export interface AudioEntry {
-  mimeType: string;
-  data: string;          // base64 or similar
-  durationMs?: number;   // optional by spec
-}
-
-// runtime guard
+// Runtime guard for AudioEntry
 function isAudioEntry(x: unknown): x is AudioEntry {
-  const o = x as AudioEntryLike;
+  const o = x as any;
   return !!o && typeof o === 'object'
-    && typeof o.mimeType === 'string'
-    && typeof o.data === 'string'
-    && (o.durationMs === undefined || typeof o.durationMs === 'number');
+    && typeof o.id === 'string'
+    && typeof o.type === 'string'
+    && typeof o.timestamp === 'string'
+    && typeof o.data === 'object';
 }
 
 // Safely normalize a list that was previously unknown[]
@@ -295,6 +279,84 @@ export class MultimodalContextManager {
     context.metadata.totalTokens += Math.ceil(payload.analysis.length / 4)
 
     await this.saveContext(sessionId, context)
+  }
+
+  /**
+   * Add voice transcript to context (from real-time voice conversation)
+   */
+  async addVoiceTranscript(
+    sessionId: string,
+    transcript: string,
+    role: 'user' | 'assistant',
+    isFinal: boolean,
+    metadata?: Partial<AudioEntry['metadata']>
+  ): Promise<void> {
+    try {
+      const context = await this.getOrCreateContext(sessionId)
+      const entryTimestamp = new Date().toISOString()
+
+      const audioEntry: AudioEntry = {
+        id: crypto.randomUUID(),
+        type: role === 'user' ? 'voice_input' : 'voice_output',
+        timestamp: entryTimestamp,
+        data: {
+          transcript,
+          isFinal,
+          languageCode: metadata?.format?.includes('nb-NO') ? 'nb-NO' : 'en-US',
+        },
+        metadata: {
+          confidence: metadata?.confidence ?? 1.0,
+          format: role === 'user' ? 'pcm16@16000' : 'pcm16@24000',
+          size: metadata?.size,
+          storedRaw: metadata?.storedRaw ?? false,
+        }
+      }
+
+      context.audioContext = context.audioContext || []
+      context.audioContext.push(audioEntry)
+      
+      // Add to conversation history if final
+      if (isFinal && transcript.trim().length > 0) {
+        context.conversationHistory.push({
+          id: audioEntry.id,
+          role: role === 'assistant' ? 'model' : 'user',
+          timestamp: entryTimestamp,
+          content: transcript,
+          modality: 'audio'
+        })
+      }
+
+      context.metadata.lastUpdated = entryTimestamp
+      context.metadata.modalitiesUsed = coerceModalities([...context.metadata.modalitiesUsed, 'audio'])
+      context.metadata.totalTokens += Math.ceil(transcript.length / 4)
+
+      await this.saveContext(sessionId, context)
+    } catch (err) {
+      console.error('Failed to add voice transcript to context (non-fatal):', err)
+      // Don't throw - this is best-effort storage
+    }
+  }
+
+  /**
+   * Get voice transcripts from context
+   */
+  async getVoiceTranscripts(sessionId: string, limit?: number): Promise<string[]> {
+    const context = await this.getContext(sessionId)
+    if (!context) return []
+
+    return context.audioContext
+      .filter(e => e.data.transcript && e.data.isFinal)
+      .map(e => e.data.transcript!)
+      .filter(Boolean)
+      .slice(-(limit ?? 10))
+  }
+
+  /**
+   * Get voice context entries
+   */
+  async getVoiceContext(sessionId: string): Promise<AudioEntry[]> {
+    const context = await this.getContext(sessionId)
+    return context?.audioContext ?? []
   }
 
   async getContext(sessionId: string): Promise<MultimodalContext | null> {

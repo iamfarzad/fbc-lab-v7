@@ -38,17 +38,18 @@ export const CodeBlock = ({
   <CodeBlockContext.Provider value={{ code }}>
     <div
       className={cn(
-        "relative w-full overflow-hidden rounded-md border bg-background text-foreground",
+        "relative w-full overflow-hidden rounded-md border border-border/50 bg-muted/30",
         "[.monochrome_&]:rounded-none [.monochrome_&]:border-2",
         className
       )}
       {...props}
     >
       <div className="relative">
-        <div className="mb-1">
-          <Badge className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-            {language.toUpperCase()}
-          </Badge>
+        <div className="flex items-center justify-between px-2 py-1 border-b border-border/50 bg-muted/20">
+          <span className="text-[10px] text-muted-foreground uppercase font-mono">
+            {language}
+          </span>
+          {children}
         </div>
         <SyntaxHighlighter
           className="overflow-hidden dark:hidden"
@@ -57,10 +58,9 @@ export const CodeBlock = ({
           }}
           customStyle={{
             margin: 0,
-            padding: "0.75rem",
-            fontSize: "0.875rem",
-            background: "hsl(var(--background))",
-            color: "hsl(var(--foreground))",
+            padding: "0.5rem",
+            fontSize: "0.8125rem",
+            background: "transparent",
           }}
           language={language}
           lineNumberStyle={{
@@ -80,10 +80,9 @@ export const CodeBlock = ({
           }}
           customStyle={{
             margin: 0,
-            padding: "0.75rem",
-            fontSize: "0.875rem",
-            background: "hsl(var(--background))",
-            color: "hsl(var(--foreground))",
+            padding: "0.5rem",
+            fontSize: "0.8125rem",
+            background: "transparent",
           }}
           language={language}
           lineNumberStyle={{
@@ -96,11 +95,6 @@ export const CodeBlock = ({
         >
           {code}
         </SyntaxHighlighter>
-        {children && (
-          <div className="absolute top-2 right-2 flex items-center gap-2">
-            {children}
-          </div>
-        )}
       </div>
     </div>
   </CodeBlockContext.Provider>

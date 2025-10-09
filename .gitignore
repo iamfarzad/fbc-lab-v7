@@ -136,3 +136,6 @@ mcp.json
 .env.example
 .env.template
 .env*.local
+
+# Project documentation and task tracking
+project-tasks/

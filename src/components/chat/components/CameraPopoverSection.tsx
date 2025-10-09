@@ -2,11 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Camera, CameraOff, RotateCcw, Video, VideoOff } from 'lucide-react';
-import { VISUAL } from '../design-tokens';
+import { Camera, RotateCcw, VideoOff } from 'lucide-react';
+import { VISUAL, SPACING } from '../design-tokens';
 
 interface CameraPopoverSectionProps {
   isActive: boolean;
+  isInitializing?: boolean;
   stream?: MediaStream | null;
   error?: string | null;
   onToggle: () => void;
@@ -16,6 +17,7 @@ interface CameraPopoverSectionProps {
 
 export function CameraPopoverSection({
   isActive,
+  isInitializing = false,
   stream,
   error,
   onToggle,
@@ -24,7 +26,6 @@ export function CameraPopoverSection({
 }: CameraPopoverSectionProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Set up video stream when active
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !stream) return;
@@ -44,18 +45,22 @@ export function CameraPopoverSection({
   }, [stream]);
 
   return (
-    <div className="space-y-3 p-4">
+    <div className={cn("space-y-3", SPACING.PADDING_CONTAINER)}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className={cn(
             "h-2 w-2 rounded-full",
-            isActive ? "bg-green-500 animate-pulse" : "bg-gray-400"
+            isActive ? "bg-accent animate-pulse" : "bg-muted-foreground/30"
           )} />
-          <span className="text-sm font-medium">📷 Camera</span>
-          {isActive && (
+          <span className="text-sm font-medium">Camera</span>
+          {isInitializing && (
             <Badge variant="secondary" className="text-xs">
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse mr-1" />
+              Requesting
+            </Badge>
+          )}
+          {isActive && !isInitializing && (
+            <Badge variant="secondary" className="text-xs">
               Live
             </Badge>
           )}
@@ -64,31 +69,52 @@ export function CameraPopoverSection({
           size="sm" 
           onClick={onToggle}
           variant={isActive ? "destructive" : "default"}
-          className="h-7 px-3"
+          className="min-h-[32px]"
+          disabled={isInitializing}
         >
           {isActive ? 'Stop' : 'Start'}
         </Button>
       </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded p-2 text-red-600 text-sm">
+      {/* Loading State */}
+      {isInitializing && !isActive && (
+        <div className={cn(
+          "flex flex-col items-center justify-center gap-3 bg-muted/50 p-6",
+          VISUAL.CORNER_RADIUS
+        )}>
+          <div className="h-8 w-8 border-3 border-accent border-t-transparent rounded-full animate-spin" />
+          <div className="text-center text-sm text-muted-foreground">
+            <div className="font-medium mb-1">Requesting Camera Access</div>
+            <p className="text-xs">Please allow camera permissions in your browser</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && !isInitializing && (
+        <div className={cn(
+          "border bg-destructive/10 border-destructive/20 p-3 text-destructive text-sm",
+          VISUAL.CORNER_RADIUS
+        )}>
           <div className="font-medium mb-1">Camera Error</div>
-          {error}
-          <Button size="sm" variant="outline" onClick={onToggle} className="mt-2 h-6 px-2">
+          <p>{error}</p>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={onToggle} 
+            className="mt-2 min-h-[28px]"
+          >
             Retry
           </Button>
         </div>
       )}
 
-      {/* Video Preview */}
+      {/* Preview */}
       {isActive && !error && (
         <div className="space-y-2">
-          <div className="text-xs text-muted-foreground font-medium">
-            Camera Preview
-          </div>
+          <div className="text-xs text-muted-foreground font-medium">Preview</div>
           <div className={cn(
-            "relative bg-black overflow-hidden aspect-video rounded-lg",
+            "relative bg-muted overflow-hidden aspect-video touch-none",
             VISUAL.CORNER_RADIUS,
             "[.monochrome_&]:rounded-none"
           )}>
@@ -99,75 +125,69 @@ export function CameraPopoverSection({
                 autoPlay
                 muted
                 playsInline
+                aria-label="Camera preview"
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <div className="text-center">
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center text-muted-foreground">
                   <VideoOff className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <div className="text-xs">Camera initializing...</div>
+                  <div className="text-xs">Initializing...</div>
                 </div>
               </div>
             )}
             
-            {/* Overlay controls */}
-            <div className="absolute bottom-2 right-2 flex gap-1">
-              {onSwitchCamera && availableDevices > 1 && (
+            {/* Controls */}
+            {onSwitchCamera && availableDevices > 1 && stream && (
+              <div className="absolute bottom-2 right-2">
                 <Button 
-                  size="sm" 
+                  size="icon"
                   variant="secondary" 
                   onClick={onSwitchCamera}
-                  className="h-6 w-6 p-0 bg-black/50 hover:bg-black/70"
+                  className="h-9 w-9 bg-background/80 hover:bg-background/90 backdrop-blur-sm"
+                  aria-label="Switch camera"
+                  title="Switch camera"
                 >
-                  <RotateCcw className="h-3 w-3" />
+                  <RotateCcw className="h-4 w-4" />
                 </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Camera Info */}
-      {isActive && !error && (
-        <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2">
-          <div className="flex items-center justify-between">
-            <span>Camera is active and sharing</span>
-            {availableDevices > 1 && (
-              <span className="text-xs">{availableDevices} cameras available</span>
+              </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Instructions when inactive */}
+      {/* Info */}
+      {isActive && !error && (
+        <div className={cn(
+          "text-xs text-muted-foreground bg-muted/30 p-2",
+          VISUAL.CORNER_RADIUS
+        )}>
+          <div className="flex items-center justify-between">
+            <span>Camera active</span>
+            {availableDevices > 1 && (
+              <span>{availableDevices} available</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Instructions */}
       {!isActive && !error && (
-        <div className="text-xs text-muted-foreground bg-muted/30 rounded p-3">
+        <div className={cn(
+          "text-xs text-muted-foreground bg-muted/30 p-3",
+          VISUAL.CORNER_RADIUS
+        )}>
           <div className="flex items-center gap-2 mb-2">
             <Camera className="h-4 w-4" />
             <span className="font-medium">Camera Ready</span>
           </div>
           <p className="mb-2">
-            Click "Start" to enable your camera. The preview will appear here and you can switch between cameras if multiple are available.
+            Click "Start" to enable your camera. Preview will appear here.
           </p>
           {availableDevices > 1 && (
-            <p className="text-xs">
-              💡 {availableDevices} cameras detected - you can switch between them.
+            <p>
+              {availableDevices} cameras detected - you can switch between them.
             </p>
           )}
-        </div>
-      )}
-
-      {/* Camera Settings (placeholder) */}
-      {isActive && !error && (
-        <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="flex items-center gap-1 h-7 px-2"
-            disabled
-          >
-            <Camera className="h-3 w-3" />
-            Settings
-          </Button>
         </div>
       )}
     </div>

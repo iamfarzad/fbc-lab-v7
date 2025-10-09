@@ -140,7 +140,6 @@ export interface VoiceButtonProps {
   size?: number;
   isActive?: boolean;
   isProcessing?: boolean;
-  isMuted?: boolean;
   error?: string | null;
   onToggle?: () => void | Promise<void>;
 }
@@ -151,7 +150,6 @@ export function VoiceButton({
   size = 16,
   isActive = false,
   isProcessing = false,
-  isMuted = false,
   error,
   onToggle,
 }: VoiceButtonProps) {
@@ -160,9 +158,9 @@ export function VoiceButton({
   const title = useMemo(() => {
     if (hasError) return `Voice error: ${error}`;
     if (disabled) return 'Voice capture is not supported in this browser yet.';
-    if (!isActive) return 'Start voice session';
-    return isMuted ? 'Unmute microphone' : 'Mute microphone';
-  }, [disabled, error, hasError, isActive, isMuted]);
+    if (isProcessing) return 'Processing voice input';
+    return isActive ? 'Stop voice session' : 'Start voice session';
+  }, [disabled, error, hasError, isActive, isProcessing]);
 
   return (
     <Button
@@ -173,8 +171,7 @@ export function VoiceButton({
       disabled={disabled || hasError}
       className={cn(
         "size-6 mr-2 transition-all duration-300 hover:bg-transparent text-muted-foreground",
-        isActive && !isMuted && "text-[hsl(var(--foreground))] bg-[hsl(var(--background))]",
-        isActive && isMuted && "text-[hsl(var(--foreground))]/70 bg-[hsl(var(--background))]/30",
+        isActive && "text-[hsl(var(--foreground))] bg-[hsl(var(--background))]",
         disabled && "opacity-50",
         hasError && "text-red-500",
         className,
@@ -185,8 +182,6 @@ export function VoiceButton({
         <MicOff className="h-3 w-3" aria-hidden="true" />
       ) : !isActive ? (
         <Mic className="h-3 w-3" aria-hidden="true" />
-      ) : isMuted ? (
-        <MicOff className="h-3 w-3" aria-hidden="true" />
       ) : (
         <VoiceIcon size={size} isActive={true} isProcessing={isProcessing} />
       )}

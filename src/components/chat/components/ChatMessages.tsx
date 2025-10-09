@@ -1,49 +1,50 @@
 import React, { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Loader } from "@/components/ai-elements/loader";
+import { Button } from "@/components/ui/button";
+import { Loader } from "@/components/ai-elements/core/loader";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
-import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw } from "lucide-react";
+import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw, Search } from "lucide-react";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
   ArtifactTitle,
   ArtifactDescription,
   ArtifactContent
-} from "@/components/ai-elements/artifact";
+} from "@/components/ai-elements/content/artifact";
 // Additional AI elements for enhanced functionality
 import {
   Actions,
   Action
-} from "@/components/ai-elements/actions";
+} from "@/components/ai-elements/interactive/actions";
 import {
   Message,
   MessageContent,
   MessageAvatar
-} from "@/components/ai-elements/message";
+} from "@/components/ai-elements/core/message";
 import {
   Reasoning,
   ReasoningTrigger,
   ReasoningContent
-} from "@/components/ai-elements/reasoning";
+} from "@/components/ai-elements/reasoning/reasoning";
 import {
   Sources,
   SourcesTrigger,
   SourcesContent,
   Source
-} from "@/components/ai-elements/sources";
+} from "@/components/ai-elements/sources/sources";
 import {
   Tool,
   ToolHeader,
   ToolContent,
   ToolInput,
   ToolOutput
-} from "@/components/ai-elements/tool";
+} from "@/components/ai-elements/tools/tool";
 import {
   CodeBlock,
   CodeBlockCopyButton
-} from "@/components/ai-elements/code-block";
+} from "@/components/ai-elements/content/code-block";
 import {
   Context,
   ContextTrigger,
@@ -51,38 +52,38 @@ import {
   ContextContentHeader,
   ContextContentBody,
   ContextContentFooter
-} from "@/components/ai-elements/context";
+} from "@/components/ai-elements/sources/context";
 import {
   ChainOfThought,
   ChainOfThoughtHeader,
   ChainOfThoughtStep,
   ChainOfThoughtContent
-} from "@/components/ai-elements/chain-of-thought";
+} from "@/components/ai-elements/reasoning/chain-of-thought";
 import {
   Image
-} from "@/components/ai-elements/image";
+} from "@/components/ai-elements/content/image";
 import {
   InlineCitation
-} from "@/components/ai-elements/inline-citation";
+} from "@/components/ai-elements/sources/inline-citation";
 import {
   Task,
   TaskItem,
   TaskItemFile
-} from "@/components/ai-elements/task";
+} from "@/components/ai-elements/reasoning/task";
 import {
   WebPreview,
   WebPreviewBody,
   WebPreviewUrl
-} from "@/components/ai-elements/web-preview";
+} from "@/components/ai-elements/content/web-preview";
 import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton
-} from "@/components/ai-elements/conversation";
+} from "@/components/ai-elements/core/conversation";
 import {
   Response
-} from "@/components/ai-elements/response";
+} from "@/components/ai-elements/core/response";
 import type { ResearchSummary } from "../hooks/useChatMessages";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { ChatSuggestions } from "./ChatSuggestions";
@@ -174,134 +175,187 @@ export function ChatMessages({
   onAgreedChange,
   onAcceptTerms,
 }: ChatMessagesProps) {
+  const followUpSuggestion = useMemo(() => {
+    for (let index = enhancedMessages.length - 1; index >= 0; index--) {
+      const message = enhancedMessages[index];
+      if (message.role !== "assistant") continue;
+      const followUp = message.metadata?.followUp;
+      if (typeof followUp === "string" && followUp.trim().length > 0) {
+        return followUp.trim();
+      }
+    }
+    return null;
+  }, [enhancedMessages]);
   // Don't render messages in minimized state
   if (isMinimized) {
     return null;
   }
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
-      <Conversation className="h-full">
-        <ConversationContent
-          className={cn(
-            "px-6 sm:px-8 py-6 space-y-6 min-h-full",
-            isExpanded ? "mx-auto w-full max-w-3xl" : ""
-          )}
-        >
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full space-y-6">
-              <ConversationEmptyState
-                title={`Welcome to F.B/c AI${contextReady && currentContext?.person?.fullName ? `, ${currentContext.person.fullName}` : ''}`}
-                description={contextReady
-                  ? `I'm here to help you navigate AI strategy and implementation. Based on your ${currentContext?.company?.name || 'organization'}, I can provide tailored guidance.`
-                  : 'Gathering company intelligence tailored to you...'}
-                icon={<MessageCircle className="h-6 w-6 text-muted-foreground" />}
+    <Conversation className="h-full">
+      <ConversationContent
+        className={cn(
+          "px-6 sm:px-8 py-6 space-y-6 min-h-full",
+          isExpanded ? "mx-auto w-full max-w-3xl" : ""
+        )}
+      >
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full space-y-6">
+            <ConversationEmptyState
+              title={`Hey ${contextReady && currentContext?.person?.fullName ? currentContext.person.fullName : 'there'}, welcome in.`}
+              description={contextReady
+                ? `I'm F.B/c - Farzad's AI sidekick. Voice, screen share, uploads... use whatever helps and tell me what nudged you to reach out.`
+                : 'Give me a second while I grab a bit of context, then we’ll dive in.'}
+              icon={<MessageCircle className="h-6 w-6 text-muted-foreground" />}
+            />
+
+            {!hasAcceptedTerms ? (
+              <ChatTermsAcceptance
+                name={name || ''}
+                email={email || ''}
+                agreed={agreed || false}
+                onNameChange={onNameChange || (() => {})}
+                onEmailChange={onEmailChange || (() => {})}
+                onAgreedChange={onAgreedChange || (() => {})}
+                onAcceptTerms={onAcceptTerms || (() => {})}
               />
+            ) : (
+              <ChatSuggestions
+                suggestions={[...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]}
+                contextReady={contextReady}
+                currentContext={currentContext}
+                onSendMessage={onSendMessage}
+              />
+            )}
+          </div>
+        ) : (
+          <>
+          {enhancedMessages.map((message) => {
+            const meta = MESSAGE_PRESENTATION[message.role];
+            const Icon = meta.icon;
+            const isUserMessage = message.role === "user";
 
-              {!hasAcceptedTerms ? (
-                <ChatTermsAcceptance
-                  name={name || ''}
-                  email={email || ''}
-                  agreed={agreed || false}
-                  onNameChange={onNameChange || (() => {})}
-                  onEmailChange={onEmailChange || (() => {})}
-                  onAgreedChange={onAgreedChange || (() => {})}
-                  onAcceptTerms={onAcceptTerms || (() => {})}
-                />
-              ) : (
-                <ChatSuggestions
-                  suggestions={[...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]}
-                  contextReady={contextReady}
-                  currentContext={currentContext}
-                  onSendMessage={onSendMessage}
-                />
-              )}
-            </div>
-          ) : (
-            enhancedMessages.map((message) => {
-              const meta = MESSAGE_PRESENTATION[message.role];
-              const Icon = meta.icon;
-              const isUserMessage = message.role === "user";
-              
-              // Use the user's name from terms acceptance for user messages
-              const userLabel = isUserMessage && name ? name : meta.label;
+            // Use the user's name from terms acceptance for user messages
+            const userLabel = isUserMessage && name ? name : meta.label;
 
-              return (
-                <Message
-                  key={message.id}
-                  from={message.role}
+            const rawResearchSummary = message.metadata?.researchSummary as unknown;
+            const researchSummary = rawResearchSummary && typeof rawResearchSummary === 'object'
+              ? (rawResearchSummary as Record<string, any>)
+              : rawResearchSummary && typeof rawResearchSummary === 'string'
+                ? { combinedAnswer: rawResearchSummary }
+                : null;
+            const researchError = typeof researchSummary?.error === 'string' ? researchSummary.error : null;
+            const showResearchSummary = Boolean(
+              researchSummary &&
+              !researchError &&
+              (
+                (typeof researchSummary.combinedAnswer === 'string' && researchSummary.combinedAnswer.trim().length > 0) ||
+                typeof researchSummary.citationCount === 'number' ||
+                typeof researchSummary.searchGroundingUsed === 'number' ||
+                typeof researchSummary.urlContextUsed === 'number'
+              )
+            );
+
+            const researchBadges = [
+              typeof researchSummary?.citationCount === 'number'
+                ? `Citations: ${researchSummary.citationCount}`
+                : null,
+              typeof researchSummary?.searchGroundingUsed === 'number'
+                ? `Search Grounding: ${researchSummary.searchGroundingUsed}`
+                : null,
+              typeof researchSummary?.urlContextUsed === 'number'
+                ? `URL Context: ${researchSummary.urlContextUsed}`
+                : null,
+            ].filter(Boolean) as string[];
+
+            return (
+              <Message
+                key={message.id}
+                from={message.role}
+              >
+                {/* Avatar */}
+                <MessageAvatar name={isUserMessage ? name || "You" : "AI"} />
+                
+                <MessageContent
+                  variant="flat"
                   className={cn(
-                    "font-mono",
-                    isUserMessage ? "flex justify-start" : "flex justify-end"
+                    "space-y-2",
+                    // Monochrome themes: terminal aesthetic
+                    "[.monochrome_&]:rounded-none",
+                    "[.monochrome_&]:border-l-2",
+                    isUserMessage 
+                      ? "[.monochrome_&]:border-[hsl(0,0%,85%)]"
+                      : "[.monochrome_&]:border-[hsl(0,0%,15%)]",
                   )}
                 >
-                  {/* Add MessageAvatar for official Vercel AI Elements pattern */}
-                  <MessageAvatar 
-                    src={message.role === 'assistant' ? undefined : undefined} // No avatars for now, but component is ready
-                    name={message.role === 'assistant' ? 'F.B/c AI' : (name || 'You')}
-                  />
-                  
-                  <MessageContent
-                    variant="contained"
-                    className={cn(
-                      "max-w-[80%] space-y-4 text-[13px] leading-relaxed",
-                      // Orange themes: rounded corners
-                      "rounded-md",
-                      // Monochrome themes: terminal aesthetic
-                      "[.monochrome_&]:rounded-none",
-                      "[.monochrome_&]:border-l-4",
-                      isUserMessage 
-                        ? "[.monochrome_&]:border-[hsl(0,0%,85%)]"  // Light border for user
-                        : "[.monochrome_&]:border-[hsl(0,0%,15%)]", // Dark border for assistant
-                      "group-[.is-assistant]:mx-0 group-[.is-assistant]:bg-transparent group-[.is-assistant]:border-0 group-[.is-assistant]:shadow-none",
-                      "group-[.is-user]:ml-auto group-[.is-user]:bg-transparent group-[.is-user]:border-0 group-[.is-user]:shadow-none"
+                  {/* Terminal prompt - only in monochrome */}
+                  <div className="hidden [.monochrome_&]:block text-[11px] font-mono text-muted-foreground">
+                    {isUserMessage ? (
+                      <span>user@fbc:~$ </span>
+                    ) : (
+                      <span>[F.B/c AI] </span>
                     )}
-                  >
-                    {/* Regular header - hidden in monochrome */}
-                    <div
-                      className={cn(
-                        "flex items-center gap-2 text-[11px] uppercase tracking-[0.35em] text-muted-foreground/60",
-                        isUserMessage && "justify-end",
-                        "[.monochrome_&]:hidden"  // Hide in terminal mode
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground/70" />
-                      <span>{userLabel}</span>
-                    </div>
+                  </div>
 
-                    {/* Terminal prompt - only in monochrome */}
-                    <div className="hidden [.monochrome_&]:block text-xs font-mono mb-2 text-muted-foreground">
-                      {isUserMessage ? (
-                        <span>user@fbc:~$ </span>
-                      ) : (
-                        <span>[F.B/c AI] </span>
-                      )}
-                    </div>
+                  <div className={cn(
+                    "text-[13px] leading-relaxed",
+                    "[.monochrome_&]:font-mono",
+                  )}>
+                    <Response>{message.content}</Response>
+                    
+                    {/* Blinking cursor - only for assistant in monochrome */}
+                    {!isUserMessage && (
+                      <span className="hidden [.monochrome_&]:inline-block w-2 h-4 bg-current animate-pulse ml-1 align-middle" />
+                    )}
+                  </div>
 
-                    <div
-                      className={cn(
-                        "text-[13px] leading-relaxed",
-                        "[.monochrome_&]:font-mono",  // Monospace in terminal
-                        isUserMessage
-                          ? "text-[hsl(var(--foreground))]"
-                          : "text-[hsl(var(--muted-foreground))]"
-                      )}
-                    >
-                      {/* Use Response component for proper markdown rendering */}
-                      <Response>{message.content}</Response>
-                      
-                      {/* Blinking cursor - only for assistant in monochrome */}
-                      {!isUserMessage && (
-                        <span className="hidden [.monochrome_&]:inline-block w-2 h-4 bg-current animate-pulse ml-1 align-middle" />
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
+                  <div className="space-y-2">
                       {/* Reasoning Display */}
                       {aiElements?.showReasoning && message.metadata?.reasoning && (
                         <Reasoning isStreaming={isLoading} defaultOpen={false}>
                           <ReasoningTrigger />
                           <ReasoningContent>{message.metadata.reasoning}</ReasoningContent>
+                        </Reasoning>
+                      )}
+
+                      {aiElements?.showReasoning && showResearchSummary && (
+                        <Reasoning isStreaming={false} defaultOpen={false}>
+                          <ReasoningTrigger>
+                            <Search className="h-3.5 w-3.5" />
+                            <span>Research findings</span>
+                          </ReasoningTrigger>
+                          <ReasoningContent>
+                            <div className="space-y-2 text-sm text-muted-foreground">
+                              {typeof researchSummary?.combinedAnswer === 'string' && researchSummary.combinedAnswer.trim().length > 0 && (
+                                <p className="leading-relaxed whitespace-pre-wrap">
+                                  {researchSummary.combinedAnswer}
+                                </p>
+                              )}
+                              {researchBadges.length > 0 && (
+                                <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-wide">
+                                  {researchBadges.map((label) => (
+                                    <Badge key={label} variant="outline" className="border-border/40 bg-background/60">
+                                      {label}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </ReasoningContent>
+                        </Reasoning>
+                      )}
+
+                      {aiElements?.showReasoning && researchError && (
+                        <Reasoning isStreaming={false} defaultOpen={false}>
+                          <ReasoningTrigger>
+                            <Search className="h-3.5 w-3.5" />
+                            <span>Research unavailable</span>
+                          </ReasoningTrigger>
+                          <ReasoningContent>
+                            <p className="text-sm text-muted-foreground">
+                              {researchError}
+                            </p>
+                          </ReasoningContent>
                         </Reasoning>
                       )}
 
@@ -332,7 +386,19 @@ export function ChatMessages({
                           <SourcesContent>
                             {message.metadata.sources.map((source, index) => (
                               <Source key={index} href={source.url} title={source.title}>
-                                {source.title}
+                                <div className="flex items-start gap-1.5 text-left">
+                                  <ExternalLink className="mt-0.5 h-3 w-3 text-muted-foreground/70" />
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-medium text-foreground text-[12px] leading-snug">
+                                      {source.title}
+                                    </span>
+                                    {(source.description || source.snippet) && (
+                                      <span className="text-[11px] text-muted-foreground leading-snug">
+                                        {source.description || source.snippet}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               </Source>
                             ))}
                           </SourcesContent>
@@ -457,29 +523,42 @@ export function ChatMessages({
                       {aiElements?.showActions && (
                         <Actions>
                           <Action tooltip="Copy message">
-                            <Copy className="h-4 w-4" />
+                            <Copy className="h-3 w-3" />
                           </Action>
                           <Action tooltip="Regenerate response">
-                            <RotateCw className="h-4 w-4" />
+                            <RotateCw className="h-3 w-3" />
                           </Action>
                         </Actions>
                       )}
                     </div>
                   </MessageContent>
                 </Message>
-              );
-            })
+            );
+          })}
+          {followUpSuggestion && (
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 text-xs tracking-wide"
+                onClick={() => onSendMessage(followUpSuggestion)}
+              >
+                {followUpSuggestion}
+              </Button>
+            </div>
           )}
+          </>
+        )}
 
           {aiElements?.showArtifacts && artifacts.length > 0 && (
-            <section className={cn("space-y-5", isExpanded ? "mx-auto w-full max-w-3xl" : "")}
+            <section className={cn("space-y-2", isExpanded ? "mx-auto w-full max-w-3xl" : "")}
             >
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-muted-foreground/75">
-                <Sparkles className="h-3.5 w-3.5 text-[hsl(var(--accent))]" />
+              <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <Sparkles className="h-3 w-3 text-[hsl(var(--accent))]" />
                 <h3>AI Generated Insights</h3>
               </div>
 
-              <div className="grid gap-4">
+              <div className="grid gap-2">
                 {artifacts.map((artifact) => (
                   <ArtifactCardView key={`${artifact.id}-${artifact.version ?? '1'}`} artifact={artifact} />
                 ))}
@@ -488,8 +567,8 @@ export function ChatMessages({
           )}
 
           {isLoading && (
-            <div className="flex flex-col items-center justify-center py-6 space-y-3">
-              <div className="flex items-center gap-2 rounded-full border border-border/40 bg-card/80 px-4 py-2 text-xs text-muted-foreground shadow-[0_12px_32px_-24px_rgba(12,18,26,0.35)]">
+            <div className="flex items-start gap-3 max-w-[80%]">
+              <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-2 text-xs text-muted-foreground shadow-sm">
                 <div className="flex items-center gap-1">
                   <div className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse"></div>
                   <div className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}}></div>
@@ -497,15 +576,11 @@ export function ChatMessages({
                 </div>
                 <span className="tracking-[0.3em] uppercase">AI Thinking</span>
               </div>
-              <Loader />
             </div>
           )}
-
-          <div id="messages-end" />
-        </ConversationContent>
-        <ConversationScrollButton className="shadow-md" />
-      </Conversation>
-    </div>
+      </ConversationContent>
+      <ConversationScrollButton className="shadow-md" />
+    </Conversation>
   );
 }
 
@@ -559,34 +634,34 @@ function ArtifactCardView({ artifact }: ArtifactCardViewProps) {
   };
 
   return (
-    <ArtifactCard className="rounded-[24px] border border-border/40 bg-card/95 shadow-[0_36px_90px_-70px_rgba(12,18,26,0.55)]">
-      <ArtifactHeader className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2">
+    <ArtifactCard className="rounded-md border border-border/50 bg-muted/30 shadow-none">
+      <ArtifactHeader className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           {type.includes('code') ? (
-            <Code2 className="h-4 w-4 text-primary" />
+            <Code2 className="h-3 w-3 text-primary" />
           ) : type.includes('research') ? (
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Sparkles className="h-3 w-3 text-primary" />
           ) : type.includes('tool') ? (
-            <ListTree className="h-4 w-4 text-primary" />
+            <ListTree className="h-3 w-3 text-primary" />
           ) : (
-            <MessageCircle className="h-4 w-4 text-primary" />
+            <MessageCircle className="h-3 w-3 text-primary" />
           )}
-          <ArtifactTitle className="capitalize">
+          <ArtifactTitle className="capitalize text-[13px]">
             {type.replace(/-/g, ' ')}
           </ArtifactTitle>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
           {createdLabel && (
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
               {createdLabel}
             </span>
           )}
-          <Badge className={`text-[11px] ${tone}`}>{status}</Badge>
+          <Badge className={`text-[10px] h-4 px-1.5 ${tone}`}>{status}</Badge>
         </div>
       </ArtifactHeader>
-      <ArtifactContent className="space-y-3">
+      <ArtifactContent className="space-y-1.5">
         {error && (
-          <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-500">
+          <div className="flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/5 p-2 text-[13px] text-red-500">
             <AlertTriangle className="h-4 w-4" />
             <span>{error}</span>
           </div>
@@ -614,9 +689,9 @@ function ResearchArtifactContent({ payload }: ArtifactContentProps) {
 
   const answer = combinedAnswer ?? summary;
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {query && (
-        <ArtifactDescription className="text-xs uppercase tracking-wide text-muted-foreground/80">
+        <ArtifactDescription className="text-[11px] uppercase tracking-wide text-muted-foreground/80">
           Query: <span className="font-medium normal-case text-foreground">{query}</span>
         </ArtifactDescription>
       )}

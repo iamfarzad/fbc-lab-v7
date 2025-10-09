@@ -15,7 +15,10 @@ export function useChatState() {
     cameraStream: null,
     screenShareError: null,
     cameraError: null,
+    isCameraInitializing: false,
+    isScreenShareInitializing: false,
   });
+  const [availableCameras, setAvailableCameras] = useState<number>(0);
 
   // Toggle functions - clean and simple
   const toggleChat = useCallback(() => {
@@ -53,12 +56,15 @@ export function useChatState() {
   const startScreenShare = useCallback(async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       const message = "Screen sharing is not supported in this browser.";
-      setChatState(prev => ({ ...prev, screenShareError: message }));
+      setChatState(prev => ({ ...prev, screenShareError: message, isScreenShareInitializing: false }));
       toast.error(message);
       throw new Error(message);
     }
 
     try {
+      // Set initializing state before showing screen picker
+      setChatState(prev => ({ ...prev, isScreenShareInitializing: true, screenShareError: null }));
+      
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false,
@@ -80,13 +86,20 @@ export function useChatState() {
       setChatState(prev => ({
         ...prev,
         isScreenSharing: true,
+        isScreenShareInitializing: false,
         screenShareStream: stream,
         screenShareError: null,
       }));
       return stream;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to start screen sharing.";
-      setChatState(prev => ({ ...prev, screenShareError: message, isScreenSharing: false, screenShareStream: null }));
+      setChatState(prev => ({ 
+        ...prev, 
+        screenShareError: message, 
+        isScreenSharing: false, 
+        screenShareStream: null,
+        isScreenShareInitializing: false 
+      }));
       toast.error(message);
       throw error;
     }
@@ -123,13 +136,21 @@ export function useChatState() {
   const startCamera = useCallback(async () => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       const message = "Camera access is not supported in this browser.";
-      setChatState(prev => ({ ...prev, cameraError: message }));
+      setChatState(prev => ({ ...prev, cameraError: message, isCameraInitializing: false }));
       toast.error(message);
       throw new Error(message);
     }
 
     try {
+      // Set initializing state before requesting permission
+      setChatState(prev => ({ ...prev, isCameraInitializing: true, cameraError: null }));
+      
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+      // Count available cameras
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setAvailableCameras(videoDevices.length);
 
       stream.getVideoTracks().forEach(track => {
         track.addEventListener("ended", () => {
@@ -140,13 +161,20 @@ export function useChatState() {
       setChatState(prev => ({
         ...prev,
         isCameraActive: true,
+        isCameraInitializing: false,
         cameraStream: stream,
         cameraError: null,
       }));
       return stream;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to access the camera.";
-      setChatState(prev => ({ ...prev, cameraError: message, isCameraActive: false, cameraStream: null }));
+      setChatState(prev => ({ 
+        ...prev, 
+        cameraError: message, 
+        isCameraActive: false, 
+        cameraStream: null,
+        isCameraInitializing: false 
+      }));
       toast.error(message);
       throw error;
     }
@@ -177,8 +205,61 @@ export function useChatState() {
     });
   }, []);
 
+  const switchCamera = useCallback(async () => {
+    if (!chatState.isCameraActive) return;
+
+    try {
+      // Get list of available video devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      
+      if (videoDevices.length <= 1) {
+        toast.info('Only one camera available');
+        return;
+      }
+
+      // Get current device ID
+      const currentStream = chatState.cameraStream;
+      const currentTrack = currentStream?.getVideoTracks()[0];
+      const currentDeviceId = currentTrack?.getSettings().deviceId;
+
+      // Find next device
+      const currentIndex = videoDevices.findIndex(d => d.deviceId === currentDeviceId);
+      const nextIndex = (currentIndex + 1) % videoDevices.length;
+      const nextDevice = videoDevices[nextIndex];
+
+      // Stop current stream
+      currentStream?.getTracks().forEach(track => track.stop());
+
+      // Start new stream with next device
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: nextDevice.deviceId } },
+        audio: false
+      });
+
+      newStream.getVideoTracks().forEach(track => {
+        track.addEventListener("ended", () => {
+          setChatState(prev => ({ ...prev, isCameraActive: false, cameraStream: null }));
+        });
+      });
+
+      setChatState(prev => ({
+        ...prev,
+        cameraStream: newStream,
+        cameraError: null,
+      }));
+
+      toast.success(`Switched to ${nextDevice.label || 'camera ' + (nextIndex + 1)}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to switch camera";
+      setChatState(prev => ({ ...prev, cameraError: message }));
+      toast.error(message);
+    }
+  }, [chatState.isCameraActive, chatState.cameraStream]);
+
   return {
     chatState,
+    availableCameras,
     toggleChat,
     toggleMinimize,
     toggleExpand,
@@ -186,6 +267,7 @@ export function useChatState() {
     toggleSettings,
     setCameraActive,
     toggleCamera,
+    switchCamera,
     setListening,
     startScreenShare,
     stopScreenShare,

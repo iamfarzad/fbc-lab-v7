@@ -1,6 +1,13 @@
 import { getSupabaseService } from '@/src/lib/supabase'
-import { logger } from '@/src/lib/logger'
 import { MultimodalContext, DatabaseConversationContext } from './context-types'
+
+// Browser-safe logger (winston is Node.js only)
+const logger = {
+  warn: console.warn.bind(console),
+  error: console.error.bind(console),
+  debug: console.debug.bind(console),
+  info: console.info.bind(console),
+}
 
 // Type-safe conversion for multimodal context storage
 type StorableMultimodal = string | MultimodalContext;
@@ -14,11 +21,29 @@ function toStorable(ctx: MultimodalContext): StorableMultimodal {
 export class ContextStorage {
   // Use the service client type to avoid Database generic issues.
   private supabase: ReturnType<typeof getSupabaseService> | null
-  private inMemoryStorage = new Map<string, DatabaseConversationContext>()
-  private cacheTimestamps = new Map<string, number>()
+  private inMemoryStorage: Map<string, DatabaseConversationContext>
+  private cacheTimestamps: Map<string, number>
   private readonly CACHE_TTL = 5 * 60 * 1000 // 5 minutes TTL
 
   constructor() {
+    // Ensure in-memory storage is shared across module instances when Supabase is unavailable
+    const globalContext = globalThis as unknown as {
+      __fbcContextStore__?: {
+        data: Map<string, DatabaseConversationContext>
+        timestamps: Map<string, number>
+      }
+    }
+
+    if (!globalContext.__fbcContextStore__) {
+      globalContext.__fbcContextStore__ = {
+        data: new Map<string, DatabaseConversationContext>(),
+        timestamps: new Map<string, number>()
+      }
+    }
+
+    this.inMemoryStorage = globalContext.__fbcContextStore__.data
+    this.cacheTimestamps = globalContext.__fbcContextStore__.timestamps
+
     // Try to create Supabase client, fallback to in-memory if unavailable
     try {
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {

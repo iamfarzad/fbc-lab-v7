@@ -71,7 +71,7 @@ export const Branch = ({
   return (
     <BranchContext.Provider value={contextValue}>
       <div
-        className={cn("grid w-full gap-2 [&>div]:pb-0", className)}
+        className={cn("grid w-full gap-1.5 [&>div]:pb-0", className)}
         {...props}
       />
     </BranchContext.Provider>
@@ -95,7 +95,7 @@ export const BranchMessages = ({ children, ...props }: BranchMessagesProps) => {
   return branches.map((branch, index) => (
     <div
       className={cn(
-        "grid gap-2 overflow-hidden [&>div]:pb-0",
+        "grid gap-1.5 overflow-hidden [&>div]:pb-0",
         index === currentBranch ? "block" : "hidden"
       )}
       key={branch.key || index}
@@ -125,7 +125,7 @@ export const BranchSelector = ({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 self-end px-10",
+        "flex items-center gap-1.5 self-end px-8",
         from === "assistant" ? "justify-start" : "justify-end",
         className
       )}
@@ -147,7 +147,7 @@ export const BranchPrevious = ({
     <Button
       aria-label="Previous branch"
       className={cn(
-        "size-7 shrink-0 rounded-full text-muted-foreground transition-colors",
+        "size-6 shrink-0 rounded-full text-muted-foreground transition-colors",
         "hover:bg-accent hover:text-foreground",
         "disabled:pointer-events-none disabled:opacity-50",
         className
@@ -159,7 +159,7 @@ export const BranchPrevious = ({
       variant="ghost"
       {...props}
     >
-      {children ?? <ChevronLeftIcon size={14} />}
+      {children ?? <ChevronLeftIcon size={12} />}
     </Button>
   );
 };
@@ -177,7 +177,7 @@ export const BranchNext = ({
     <Button
       aria-label="Next branch"
       className={cn(
-        "size-7 shrink-0 rounded-full text-muted-foreground transition-colors",
+        "size-6 shrink-0 rounded-full text-muted-foreground transition-colors",
         "hover:bg-accent hover:text-foreground",
         "disabled:pointer-events-none disabled:opacity-50",
         className
@@ -189,7 +189,7 @@ export const BranchNext = ({
       variant="ghost"
       {...props}
     >
-      {children ?? <ChevronRightIcon size={14} />}
+      {children ?? <ChevronRightIcon size={12} />}
     </Button>
   );
 };
@@ -202,7 +202,7 @@ export const BranchPage = ({ className, ...props }: BranchPageProps) => {
   return (
     <span
       className={cn(
-        "font-medium text-muted-foreground text-xs tabular-nums",
+        "font-medium text-muted-foreground text-[11px] tabular-nums",
         className
       )}
       {...props}

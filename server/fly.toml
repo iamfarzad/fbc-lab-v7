@@ -6,12 +6,12 @@ primary_region = 'iad'
 
 [env]
   NODE_ENV = 'production'
-  PORT = '8080'
+  PORT = '3001'
   GEMINI_API_KEY = '${GEMINI_API_KEY}'
   GEMINI_LIVE_MODEL = 'gemini-2.0-flash-live-001'
 
 [http_service]
-  internal_port = 8080
+  internal_port = 3001
   force_https = true
   auto_stop_machines = 'off'
   auto_start_machines = true

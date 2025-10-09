@@ -7,14 +7,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
+import { pickFollowUp, PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
 // Configure Google SDK globally
 if (process.env.GEMINI_API_KEY) {
   // Google SDK is configured via environment variable
 }
-import { multimodalContextManager } from '@/src/core/context/multimodal-context'
-import { GoogleGroundingProvider } from '@/src/core/intelligence/providers/search/google-grounding'
-import { ContextStorage } from '@/src/core/context/context-storage'
+import { multimodalContextManager } from '@/core/context/multimodal-context'
+import { GoogleGroundingProvider } from '@/core/intelligence/providers/search/google-grounding'
+import { ContextStorage } from '@/core/context/context-storage'
 
 // Type definitions
 interface ChatMessage {
@@ -48,7 +49,19 @@ interface ChatContext {
   sessionId?: string
   multimodalData?: MultimodalData
   enhancedResearch?: boolean // Enable enhanced grounding research
+  conversationFlow?: ConversationFlowSnapshot
 }
+
+type ConversationFlowSnapshot = {
+  covered?: Record<string, boolean>
+  recommendedNext?: string | null
+  evidence?: Record<string, string[]>
+  coverageOrder?: Array<{ category: string; firstTurnIndex: number; firstMessageId: string; firstTimestamp: number | null }>
+  totalUserTurns?: number
+  shouldOfferRecap?: boolean
+}
+
+const CONVERSATION_CATEGORIES = ['goals', 'pain', 'data', 'readiness', 'budget', 'success'] as const
 
 interface ChatRequestBody {
   messages: UnifiedMessage[]
@@ -66,25 +79,44 @@ interface MultimodalContextResult {
   systemPrompt: string
 }
 
+const isMockUnifiedChat = (() => {
+  const flag = process.env.MOCK_UNIFIED_CHAT
+  if (!flag) return false
+  const normalized = flag.toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes'
+})()
+
 let cachedModel: ReturnType<typeof createRetryableGemini> | null = null
 const contextStorage = new ContextStorage()
 const groundingProvider = new GoogleGroundingProvider()
 
 const getModel = () => {
-  const apiKey = process.env.GEMINI_API_KEY
+  const resolvedApiKey =
+    process.env.GEMINI_API_KEY ??
+    process.env.GOOGLE_GEMINI_API_KEY ??
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY
   const googleApiKey = process.env.GOOGLE_API_KEY
-  const googleGenApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
 
   console.log('[DEBUG] Environment variables:', {
-    GEMINI_API_KEY: apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT SET',
-    GOOGLE_API_KEY: googleApiKey ? `${googleApiKey.substring(0, 10)}...` : 'NOT SET',
-    GOOGLE_GENERATIVE_AI_API_KEY: googleGenApiKey ? `${googleGenApiKey.substring(0, 10)}...` : 'NOT SET'
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 10)}...` : 'NOT SET',
+    GOOGLE_GEMINI_API_KEY: process.env.GOOGLE_GEMINI_API_KEY ? `${process.env.GOOGLE_GEMINI_API_KEY.substring(0, 10)}...` : 'NOT SET',
+    GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY ? `${process.env.GOOGLE_GENERATIVE_AI_API_KEY.substring(0, 10)}...` : 'NOT SET',
+    GOOGLE_API_KEY: googleApiKey ? `${googleApiKey.substring(0, 10)}...` : 'NOT SET'
   })
 
-  if (!apiKey) {
+  if (!resolvedApiKey) {
     throw new Error(
-      'Missing Google Generative AI API key. Add GEMINI_API_KEY to your .env.local file and restart the dev server.'
+      'Missing Google Generative AI API key. Set GEMINI_API_KEY (preferred) or GOOGLE_GEMINI_API_KEY in your environment and restart the dev server.'
     )
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    process.env.GEMINI_API_KEY = resolvedApiKey
+  }
+  
+  // Also set GOOGLE_GENERATIVE_AI_API_KEY for @ai-sdk/google
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = resolvedApiKey
   }
 
   if (!cachedModel) {
@@ -98,23 +130,39 @@ const getModel = () => {
 function parseStructuredResponse(content: string) {
   const metadata: any = {}
   
-  // Extract reasoning
-  const reasoningMatch = content.match(/<reasoning>(.*?)<\/reasoning>/s)
+  // Extract reasoning - try both formats
+  let reasoningMatch = content.match(/<reasoning>(.*?)<\/reasoning>/s)
   if (reasoningMatch) {
     metadata.reasoning = reasoningMatch[1].trim()
+  } else {
+    // Try plain text format: "Reasoning:" followed by text until next section
+    const reasoningTextMatch = content.match(/^Reasoning:\s*\n(.*?)(?=\n<|$)/sm)
+    if (reasoningTextMatch) {
+      metadata.reasoning = reasoningTextMatch[1].trim()
+    }
   }
   
-  // Extract chain of thought
-  const chainMatch = content.match(/<chain_of_thought>(.*?)<\/chain_of_thought>/s)
+  // Extract chain of thought - handle both with/without closing tags
+  let chainMatch = content.match(/<chain_of_thought>(.*?)<\/chain_of_thought>/s)
+  if (!chainMatch) {
+    // Try without closing tag - match until end of line or next tag
+    chainMatch = content.match(/<chain_of_thought>\s*(.*?)(?=\n\n|\n<|$)/s)
+  }
   if (chainMatch) {
-    const steps = chainMatch[1].trim().split('\n').map((step, index) => ({
-      label: `Step ${index + 1}`,
-      description: step.trim(),
-      content: step.trim(),
-      status: 'completed' as const,
-      icon: 'check'
-    }))
-    metadata.chainOfThought = { steps }
+    const chainText = chainMatch[1].trim()
+    // Split by "Step N:" pattern
+    const stepParts = chainText.split(/Step\s+\d+:\s*/i).filter(Boolean)
+    
+    if (stepParts.length > 0) {
+      const steps = stepParts.map((step, index) => ({
+        label: `Step ${index + 1}`,
+        description: step.trim().replace(/\s+/g, ' '), // Normalize whitespace
+        content: step.trim().replace(/\s+/g, ' '),
+        status: 'completed' as const,
+        icon: 'check'
+      }))
+      metadata.chainOfThought = { steps }
+    }
   }
   
   // Extract code blocks
@@ -209,6 +257,236 @@ function parseStructuredResponse(content: string) {
   return metadata
 }
 
+// Function to clean content by removing parsed metadata sections
+function cleanParsedContent(content: string): string {
+  let cleaned = content
+  
+  // Remove reasoning tags (both formats)
+  cleaned = cleaned.replace(/<reasoning>.*?<\/reasoning>/gs, '')
+  // Remove plain text "Reasoning:" sections (from line start to next tag or double newline)
+  cleaned = cleaned.replace(/\n\s*Reasoning:\s*\n[\s\S]*?(?=\n<|\n\n[A-Z]|$)/gi, '')
+  
+  // Remove chain of thought tags (both formats)
+  cleaned = cleaned.replace(/<chain_of_thought>.*?<\/chain_of_thought>/gs, '')
+  // Remove unclosed chain_of_thought tags
+  cleaned = cleaned.replace(/<chain_of_thought>[\s\S]*?(?=\n\n[A-Z]|$)/gi, '')
+  
+  // Remove other metadata tags
+  cleaned = cleaned.replace(/<sources>.*?<\/sources>/gs, '')
+  cleaned = cleaned.replace(/<code(?:\s+language="[^"]*")?>.*?<\/code>/gs, '')
+  cleaned = cleaned.replace(/<image>.*?<\/image>/gs, '')
+  cleaned = cleaned.replace(/<citation[^>]*>.*?<\/citation>/gs, '')
+  cleaned = cleaned.replace(/<task[^>]*>.*?<\/task>/gs, '')
+  cleaned = cleaned.replace(/<web_preview[^>]*>.*?<\/web_preview>/gs, '')
+  
+  // Clean up extra whitespace and empty lines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim()
+  
+  return cleaned
+}
+
+function createMockUnifiedStreamResponse(params: {
+  reqId: string
+  mode: string | undefined
+  researchMetadata: any
+  systemPrompt: string
+}) {
+  const { reqId, mode, researchMetadata, systemPrompt } = params
+
+  const mockContent = `
+<reasoning>The assistant considers prior context and user intent.</reasoning>
+<chain_of_thought>
+Step 1: Review the user question and session context.
+Step 2: Reference recent research findings to craft the reply.
+</chain_of_thought>
+<code language="typescript">console.log('mock response');</code>
+<task status="completed">Summarize
+Ensure the reply is concise and actionable.</task>
+<sources>
+- https://example.com/source
+</sources>
+<citation href="https://example.com/doc" title="Reference Document">Reference Document</citation>
+Here is your mock response with enriched metadata.
+`.trim()
+
+  const structuredMetadata = parseStructuredResponse(mockContent)
+  const cleanedContent = cleanParsedContent(mockContent).trim()
+
+  if (typeof ReadableStream === 'undefined') {
+    throw new Error('ReadableStream is not available in the current environment.')
+  }
+
+  const encoder = new TextEncoder()
+  const messageId = crypto.randomUUID()
+  const streamChunks = [
+    'Here is your ',
+    'mock response with ',
+    'enriched metadata.'
+  ]
+
+  const stream = new ReadableStream({
+    start(controller) {
+      const metaEvent = `event: meta\ndata: ${JSON.stringify({ reqId, type: 'meta' })}\n\n`
+      controller.enqueue(encoder.encode(metaEvent))
+
+      let accumulated = ''
+      for (const chunk of streamChunks) {
+        accumulated += chunk
+        const messageData = {
+          id: messageId,
+          role: 'assistant' as const,
+          content: accumulated,
+          timestamp: new Date().toISOString(),
+          type: 'text' as const,
+          metadata: {
+            mode,
+            isStreaming: true,
+            reqId
+          }
+        }
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(messageData)}\n\n`))
+      }
+
+      const formattedSources = Array.isArray(researchMetadata?.citations)
+        ? (researchMetadata.citations as Array<{ id?: string; title?: string; url?: string; description?: string }>).map((citation, index) => {
+            const url = citation.url || ''
+            let hostname = citation.title
+            if (url) {
+              try {
+                hostname = new URL(url).hostname
+              } catch {
+                hostname = hostname || url
+              }
+            }
+
+            return {
+              id: citation.id || `source-${index + 1}`,
+              title: citation.title || hostname || `Source ${index + 1}`,
+              url: url,
+              description: citation.description
+            }
+          })
+        : Array.isArray(researchMetadata?.urlsUsed)
+          ? (researchMetadata.urlsUsed as string[]).map((url, index) => {
+              let hostname = url
+              try {
+                hostname = new URL(url).hostname
+              } catch {
+                hostname = url
+              }
+
+              return {
+                id: `source-${index + 1}`,
+                title: hostname,
+                url
+              }
+            })
+          : []
+
+      const mergedMetadata = {
+        ...structuredMetadata,
+        sources: formattedSources.length > 0 ? formattedSources : structuredMetadata.sources,
+        researchSummary: researchMetadata?.combinedAnswer || structuredMetadata.researchSummary,
+        research: researchMetadata
+      }
+
+      const completionData = {
+        id: messageId,
+        role: 'assistant' as const,
+        content: cleanedContent,
+        timestamp: new Date().toISOString(),
+        type: 'text' as const,
+        metadata: {
+          mode,
+          isComplete: true,
+          finalChunk: true,
+          reqId,
+          ...mergedMetadata
+        }
+      }
+
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(completionData)}\n\n`))
+      controller.close()
+    }
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'x-fbc-endpoint': 'unified-ai-sdk',
+      'x-request-id': reqId,
+      'X-Chat-Mode': mode ?? 'standard',
+      'X-Session-Id': 'mock-session',
+      'X-Enhanced-Research': researchMetadata ? 'true' : 'false',
+      'x-mock-system-prompt': (() => {
+        const sanitized = systemPrompt.replace(/[\r\n]+/g, ' ')
+        return sanitized.slice(Math.max(0, sanitized.length - 1024))
+      })()
+    }
+  })
+}
+
+function formatConversationGuidance(flow?: ConversationFlowSnapshot | null): string {
+  if (!flow) return ''
+
+  const lines: string[] = []
+
+  const coverage = CONVERSATION_CATEGORIES.map((category) => {
+    const status = flow.covered?.[category] ? 'covered' : 'pending'
+    return `- ${capitalize(category)}: ${status}`
+  }).join('\n')
+
+  lines.push('CONVERSATION STATUS:\n' + coverage)
+
+  if (flow.totalUserTurns && flow.totalUserTurns >= 1) {
+    lines.push(`Total user turns so far: ${flow.totalUserTurns}`)
+  }
+
+  if (flow.recommendedNext) {
+    const key = flow.recommendedNext as keyof typeof PHRASE_BANK
+    const suggestions = PHRASE_BANK[key]?.slice(0, 2).map((s) => `• ${s}`).join('\n') || ''
+    lines.push(`NEXT TOPIC: ${capitalize(flow.recommendedNext)}. Focus on this next.`)
+    if (suggestions) {
+      lines.push('Suggested phrasings:\n' + suggestions)
+    }
+  } else {
+    lines.push('All core discovery categories are covered. Shift into recap and next-step alignment.')
+  }
+
+  if (flow.shouldOfferRecap) {
+    lines.push('Deliver a concise two-sentence recap before your next question, then confirm alignment.')
+  }
+
+  const recentCategory = flow.coverageOrder && flow.coverageOrder.length > 0
+    ? flow.coverageOrder[flow.coverageOrder.length - 1].category
+    : null
+  if (recentCategory && flow.evidence?.[recentCategory]?.length) {
+    const lastSnippet = flow.evidence[recentCategory][flow.evidence[recentCategory].length - 1]
+    lines.push(`Latest user detail (${recentCategory}): ${truncate(lastSnippet, 180)}`)
+  }
+
+  return '\n' + lines.join('\n')
+}
+
+function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function truncate(value: string, maxLength: number) {
+  if (value.length <= maxLength) return value
+  return value.slice(0, maxLength - 1).trimEnd() + '…'
+}
+
+function getFollowUp(flow?: ConversationFlowSnapshot | null) {
+  if (!flow?.recommendedNext) return null
+  const key = flow.recommendedNext as keyof typeof PHRASE_BANK
+  if (!PHRASE_BANK[key]) return null
+  return pickFollowUp(key, Math.random() * 1000)
+}
+
 // Node.js runtime for streaming compatibility
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -236,6 +514,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Messages must include non-empty content.' }, { status: 400 })
     }
 
+    const conversationFlow = context?.conversationFlow ?? null
+
     // Convert UnifiedMessage to ChatMessage format for AI SDK
     const messages: ChatMessage[] = rawMessages.map((msg) => ({
       role: msg.role,
@@ -244,90 +524,58 @@ export async function POST(req: NextRequest) {
     const model = getModel()
 
     // Build system prompt based on mode and context
-    let systemPrompt = `You are F.B/c AI, the intelligent assistant for Farzad Bayat's AI consulting practice.
+    let systemPrompt = `You are F.B/c - Farzad Bayat's AI consulting copilot.
 
-MISSION: "Helping organizations navigate the AI landscape through strategic consulting, hands-on workshops, and practical implementation guidance."
+VOICE & TONE:
+- Sound like a sharp, friendly consultant (Farzad's "no fluff" style).
+- Use plain English, two sentences max per turn, and end with an open question when you still need context.
+- Mention the voice, screen share, and document upload options the first time you reply after the user accepts terms.
 
-PERSONALITY:
-- Strategic & Insightful: Provide actionable business intelligence
-- Professional yet approachable: Expert guidance with warm engagement
-- Context-aware: Use research data to personalize every interaction
-- Progressive: Guide users through 16 AI capabilities systematically
-- Mission-driven: Always connect responses to business value and AI strategy
+MISSION FOCUS:
+Use the conversation to uncover:
+1. Business goals
+2. Painful workflows
+3. Data reality
+4. Team readiness
+5. Budget & timeline
+6. Success metrics
 
-CORE CAPABILITIES (Progressive Discovery):
-1. ROI Analysis - Calculate AI investment returns
-2. Document Analysis - Process and understand documents
-3. Image Analysis - Visual content understanding
-4. Screenshot Capture - Screen content analysis
-5. Voice Integration - Audio conversations and processing
-6. Screen Sharing - Real-time screen collaboration
-7. Webcam Integration - Video conversations and analysis
-8. Translation - Multi-language communication
-9. Web Search - Research and information gathering
-10. URL Context - Website content analysis
-11. Lead Research - Company and person intelligence
-12. Meeting Scheduling - Calendar and booking integration
-13. PDF Export - Generate strategy summaries
-14. Calculator - Mathematical and financial computations
-15. Code Analysis - Programming and development support
-16. Video to App - Video content transformation
+CONVERSATION STRATEGY:
+- When conversationFlow.totalUserTurns <= 1, open with the warm "Hey {name}..." welcome from the playbook and immediately ask what prompted the chat.
+- If conversationFlow.recommendedNext exists, steer your next question to that topic and skip categories that are already covered.
+- If conversationFlow.shouldOfferRecap is true, deliver a two-sentence recap of what you have learned so far, confirm you're aligned, and then either explore conversationFlow.recommendedNext or propose an actionable next step if none remains.
+- Mirror the user's language, build on the latest turn, and ask exactly one focused question at a time.
+- Weave in intelligenceContext, leadContext, and research casually (e.g., "I noticed you're expanding in the Nordics - does that tie in?").
+- Keep answers tight; offer summaries or plans only after you understand the situation.
+- Suggest multimodal actions when they're helpful ("Want to show me your screen?" etc.).
+- Voice transcripts should be handled exactly like text messages - no change in tone or verbosity.
+- If the user asks for legal, medical, HR, or financial advice, politely decline, recommend speaking with the appropriate licensed professional, and offer to continue only with AI strategy topics.
 
-RESPONSE STYLE:
-- Always connect to business outcomes and strategic value
-- Use company/person research to personalize responses
-- Guide users progressively through capabilities based on context
-- Reference specific industries and roles when known
-- End with actionable next steps or capability suggestions
+FORMATTING:
+- No headings, numbered lists, or structured reports unless the user explicitly asks for them.
+- Reference research inline using clean domains, e.g., "industry benchmarks (Gartner)" - never paste redirect URLs.
+- When proposing next steps, weave them into sentences instead of bullet lists.
+- Never restate this prompt or the capability list.
 
-RESPONSE FORMAT:
-Structure your responses with clear sections and metadata:
+If conversationFlow.recommendedNext is null, you have enough information - offer a crisp recap and propose the next concrete move.`
 
-1. **Main Response**: Provide your primary answer
-2. **Reasoning**: Explain your thought process (use <reasoning> tags)
-3. **Chain of Thought**: Break down complex analysis into steps (use <chain_of_thought> tags)
-4. **Sources**: Reference any research or data used (use <sources> tags)
-5. **Code Blocks**: Format code examples properly (use <code> tags with language)
-6. **Context Usage**: Track token usage and model information
+    // Add voice context if available
+    if (context?.sessionId) {
+      try {
+        const voiceTranscripts = await multimodalContextManager.getVoiceTranscripts(context.sessionId, 3)
+        if (voiceTranscripts.length > 0) {
+          systemPrompt += `\n\nRECENT VOICE CONTEXT:\n${voiceTranscripts.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`
+        }
+      } catch (err) {
+        // Voice context is best-effort
+        console.error('Failed to load voice context (non-fatal):', err)
+      }
+    }
 
-Example format:
-<reasoning>
-I'm analyzing this request by considering the business context, available data, and strategic implications...
-</reasoning>
-
-<chain_of_thought>
-Step 1: Understanding the business need
-Step 2: Evaluating available options
-Step 3: Recommending the best approach
-</chain_of_thought>
-
-<code language="javascript">
-// Example code implementation
-function calculateROI(investment, returns) {
-  return (returns - investment) / investment * 100;
-}
-</code>
-
-<sources>
-- Industry research data
-- Best practices documentation
-- Case study examples
-</sources>
-
-<image>
-[Base64 encoded image data for visual content]
-</image>
-
-<citation href="https://example.com" title="Research Paper">According to recent studies</citation>
-
-<task status="completed">
-Implement AI strategy
-Review current systems and recommend improvements
-</task>
-
-<web_preview url="https://example.com" title="AI Implementation Guide">
-Preview of relevant website content for context
-</web_preview>`
+    // Note if voice is currently active
+    if (context?.voiceActive) {
+      systemPrompt += `\n\nNOTE: User is currently in a voice conversation. Keep responses conversational and concise for voice playback.`
+    }
     
     if (mode === 'admin') {
       systemPrompt = `You are F.B/c AI Admin Assistant, specialized in business intelligence and management.
@@ -366,9 +614,11 @@ Response style: Be concise, actionable, and data-driven.`
       systemPrompt += contextData
     }
 
+    systemPrompt += formatConversationGuidance(conversationFlow)
+
     // Add enhanced research context (combines search grounding + URL context)
     let enhancedResearchContext = ''
-    let researchMetadata = null
+    let researchMetadata: Record<string, any> | null = null
     if (context?.enhancedResearch !== false && context?.sessionId) {
       try {
         // Get current context for research
@@ -395,7 +645,25 @@ Response style: Be concise, actionable, and data-driven.`
             urlsUsed: researchResult.urlsUsed,
             citationCount: researchResult.allCitations.length,
             searchGroundingUsed: researchResult.searchGrounding.citations.length,
-            urlContextUsed: researchResult.urlContext.length
+            urlContextUsed: researchResult.urlContext.length,
+            combinedAnswer: researchResult.combinedAnswer,
+            citations: researchResult.allCitations.map((citation, index) => {
+              const safeUrl = citation.uri || citation.title || `source-${index + 1}`
+              let hostname: string | undefined
+              try {
+                hostname = new URL(safeUrl).hostname
+              } catch {
+                hostname = citation.title || undefined
+              }
+
+              return {
+                id: `citation-${index + 1}`,
+                title: citation.title || hostname || `Source ${index + 1}`,
+                description: citation.description,
+                url: safeUrl,
+                source: citation.source || 'search'
+              }
+            })
           }
 
           enhancedResearchContext = `
@@ -404,8 +672,14 @@ Query: ${latestMessage.content}
 
 ${researchResult.combinedAnswer}
 
-Sources Used (${researchResult.urlsUsed.length} URLs analyzed):
-${researchResult.urlsUsed.map((url, i) => `${i + 1}. ${url}`).join('\n')}
+Top Sources (${Math.min(researchResult.urlsUsed.length, 5)} shown):
+${researchResult.urlsUsed.slice(0, 5).map((url, i) => {
+  try {
+    return `${i + 1}. ${new URL(url).hostname}`
+  } catch {
+    return `${i + 1}. ${url}`
+  }
+}).join('\n')}
 
 Citations: ${researchResult.allCitations.length} sources processed
 `
@@ -413,10 +687,19 @@ Citations: ${researchResult.allCitations.length} sources processed
         }
       } catch (error) {
         console.warn('Enhanced research failed:', error)
-        researchMetadata = { error: 'Enhanced research failed' }
+        researchMetadata = {
+          query: typeof messages[messages.length - 1]?.content === 'string' ? messages[messages.length - 1]?.content : undefined,
+          error: 'Enhanced research failed'
+        }
         // Continue without enhanced context
       }
     }
+
+    const researchHasError = Boolean(
+      researchMetadata &&
+      typeof researchMetadata === 'object' &&
+      typeof researchMetadata.error === 'string'
+    )
 
     if (enhancedResearchContext) {
       systemPrompt += '\n\n' + enhancedResearchContext
@@ -472,6 +755,14 @@ Citations: ${researchResult.allCitations.length} sources processed
 
     // Handle streaming vs non-streaming
     if (stream !== false) {
+      if (isMockUnifiedChat) {
+        return createMockUnifiedStreamResponse({
+          reqId,
+          mode,
+          researchMetadata,
+          systemPrompt
+        })
+      }
       // For streaming, use direct Google model (ai-retry doesn't support streaming)
       const apiKey = process.env.GEMINI_API_KEY
       const googleApiKey = process.env.GOOGLE_API_KEY
@@ -486,6 +777,12 @@ Citations: ${researchResult.allCitations.length} sources processed
       if (!apiKey) {
         throw new Error('Missing GEMINI_API_KEY environment variable')
       }
+      
+      // Set GOOGLE_GENERATIVE_AI_API_KEY for @ai-sdk/google
+      if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+        process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
+      }
+      
       const streamingModel = google('gemini-flash-lite-latest')
       
       // Streaming response using AI SDK
@@ -540,12 +837,62 @@ Citations: ${researchResult.allCitations.length} sources processed
 
             // Parse structured response for AI elements metadata
             const structuredMetadata = parseStructuredResponse(fullContent)
-            
+
+            // Clean content by removing parsed sections
+            const cleanedContent = cleanParsedContent(fullContent)
+
+            const formattedSources = !researchHasError && Array.isArray(researchMetadata?.citations)
+              ? (researchMetadata.citations as Array<{ id?: string; title?: string; url?: string; description?: string }>).map((citation, index) => {
+                  const url = citation.url || ''
+                  let hostname = citation.title
+                  if (url) {
+                    try {
+                      hostname = new URL(url).hostname
+                    } catch {
+                      hostname = hostname || url
+                    }
+                  }
+
+                  return {
+                    id: citation.id || `source-${index + 1}`,
+                    title: citation.title || hostname || `Source ${index + 1}`,
+                    url,
+                    description: citation.description
+                  }
+                })
+              : !researchHasError && Array.isArray(researchMetadata?.urlsUsed)
+                ? (researchMetadata.urlsUsed as string[]).map((url, index) => {
+                    let hostname = url
+                    try {
+                      hostname = new URL(url).hostname
+                    } catch {
+                      hostname = url
+                    }
+
+                    return {
+                      id: `source-${index + 1}`,
+                      title: hostname,
+                      url
+                    }
+                  })
+                : []
+
+            const mergedMetadata = {
+              ...structuredMetadata,
+              sources: formattedSources.length > 0 ? formattedSources : structuredMetadata.sources,
+              researchSummary: !researchHasError
+                ? researchMetadata?.combinedAnswer || structuredMetadata.researchSummary
+                : structuredMetadata.researchSummary,
+              research: researchMetadata
+            }
+
+            const followUp = getFollowUp(conversationFlow)
+
             // Send completion event with same ID
             const completionData = {
               id: messageId,
               role: 'assistant',
-              content: fullContent,
+              content: cleanedContent,
               timestamp: new Date().toISOString(),
               type: 'text',
               metadata: {
@@ -553,8 +900,8 @@ Citations: ${researchResult.allCitations.length} sources processed
                 isComplete: true,
                 finalChunk: true,
                 reqId,
-                research: researchMetadata,
-                ...structuredMetadata
+                ...mergedMetadata,
+                followUp,
               }
             }
             
@@ -579,12 +926,36 @@ Citations: ${researchResult.allCitations.length} sources processed
           'x-request-id': reqId,
           'X-Chat-Mode': mode,
           'X-Session-Id': context?.sessionId || 'anonymous',
-          'X-Enhanced-Research': researchMetadata ? 'true' : 'false'
-        }
-      })
+              'X-Enhanced-Research': researchMetadata && !researchHasError ? 'true' : 'false'
+            }
+          })
 
     } else {
       // Non-streaming response
+      if (isMockUnifiedChat) {
+        const mockContent = 'Mock response generated in non-streaming mode.'
+        return NextResponse.json({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: mockContent,
+          timestamp: new Date().toISOString(),
+          type: 'text',
+          metadata: {
+            mode,
+            tokensUsed: 0,
+            reqId,
+            research: researchMetadata
+          }
+        }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+            'x-fbc-endpoint': 'unified-ai-sdk',
+            'x-request-id': reqId,
+            'X-Enhanced-Research': researchMetadata ? 'true' : 'false'
+          }
+        })
+      }
+
       const result = await generateText({
         model,
         system: systemPrompt,
@@ -594,6 +965,53 @@ Citations: ${researchResult.allCitations.length} sources processed
 
       // Parse structured response for AI elements metadata
       const structuredMetadata = parseStructuredResponse(result.text)
+
+      const formattedSources = !researchHasError && Array.isArray(researchMetadata?.citations)
+        ? (researchMetadata.citations as Array<{ id?: string; title?: string; url?: string; description?: string }>).map((citation, index) => {
+            const url = citation.url || ''
+            let hostname = citation.title
+            if (url) {
+              try {
+                hostname = new URL(url).hostname
+              } catch {
+                hostname = hostname || url
+              }
+            }
+
+            return {
+              id: citation.id || `source-${index + 1}`,
+              title: citation.title || hostname || `Source ${index + 1}`,
+              url,
+              description: citation.description
+            }
+          })
+        : !researchHasError && Array.isArray(researchMetadata?.urlsUsed)
+          ? (researchMetadata.urlsUsed as string[]).map((url, index) => {
+              let hostname = url
+              try {
+                hostname = new URL(url).hostname
+              } catch {
+                hostname = url
+              }
+
+              return {
+                id: `source-${index + 1}`,
+                title: hostname,
+                url
+              }
+            })
+          : []
+
+      const mergedMetadata = {
+        ...structuredMetadata,
+        sources: formattedSources.length > 0 ? formattedSources : structuredMetadata.sources,
+        researchSummary: !researchHasError
+          ? researchMetadata?.combinedAnswer || structuredMetadata.researchSummary
+          : structuredMetadata.researchSummary,
+        research: researchMetadata
+      }
+
+      const followUp = getFollowUp(conversationFlow)
 
       return NextResponse.json({
         id: crypto.randomUUID(),
@@ -605,15 +1023,15 @@ Citations: ${researchResult.allCitations.length} sources processed
           mode,
           tokensUsed: result.usage?.totalTokens || 0,
           reqId,
-          research: researchMetadata,
-          ...structuredMetadata
+          ...mergedMetadata,
+          followUp,
         }
       }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
           'x-fbc-endpoint': 'unified-ai-sdk',
           'x-request-id': reqId,
-          'X-Enhanced-Research': researchMetadata ? 'true' : 'false'
+          'X-Enhanced-Research': researchMetadata && !researchHasError ? 'true' : 'false'
         }
       })
     }
@@ -621,7 +1039,8 @@ Citations: ${researchResult.allCitations.length} sources processed
   } catch (error) {
     console.error('[UNIFIED_AI_SDK] Error:', error)
 
-    const message = error instanceof Error ? error.message : 'Internal server error'
+    const rawMessage = error instanceof Error ? error.message : String(error)
+    const message = isMockUnifiedChat ? rawMessage : (error instanceof Error ? rawMessage : 'Internal server error')
     const status = message.includes('GEMINI_API_KEY') ? 503 : 500
 
     return NextResponse.json(

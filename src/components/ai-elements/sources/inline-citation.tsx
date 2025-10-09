@@ -64,7 +64,7 @@ export const InlineCitationCardTrigger = ({
 }: InlineCitationCardTriggerProps) => (
   <HoverCardTrigger asChild>
     <Badge
-      className={cn("ml-1 rounded-full", "[.monochrome_&]:rounded-none", className)}
+      className={cn("ml-0.5 rounded-full text-[10px] h-4 px-1.5", "[.monochrome_&]:rounded-none", className)}
       variant="secondary"
       {...props}
     >
@@ -127,7 +127,7 @@ export const InlineCitationCarouselItem = ({
   ...props
 }: InlineCitationCarouselItemProps) => (
   <CarouselItem
-    className={cn("w-full space-y-2 p-4 pl-8", className)}
+    className={cn("w-full space-y-1.5 p-3 pl-6", className)}
     {...props}
   />
 );
@@ -140,7 +140,7 @@ export const InlineCitationCarouselHeader = ({
 }: InlineCitationCarouselHeaderProps) => (
   <div
     className={cn(
-      "flex items-center justify-between gap-2 rounded-t-md bg-secondary p-2",
+      "flex items-center justify-between gap-1.5 rounded-t-md bg-muted/30 p-1.5",
       className
     )}
     {...props}
@@ -174,7 +174,7 @@ export const InlineCitationCarouselIndex = ({
   return (
     <div
       className={cn(
-        "flex flex-1 items-center justify-end px-3 py-1 text-muted-foreground text-xs",
+        "flex flex-1 items-center justify-end px-2 py-0.5 text-muted-foreground text-[11px]",
         className
       )}
       {...props}
@@ -206,7 +206,7 @@ export const InlineCitationCarouselPrev = ({
       type="button"
       {...props}
     >
-      <ArrowLeftIcon className="size-4 text-muted-foreground" />
+      <ArrowLeftIcon className="size-3 text-muted-foreground" />
     </button>
   );
 };
@@ -233,7 +233,7 @@ export const InlineCitationCarouselNext = ({
       type="button"
       {...props}
     >
-      <ArrowRightIcon className="size-4 text-muted-foreground" />
+      <ArrowRightIcon className="size-3 text-muted-foreground" />
     </button>
   );
 };
@@ -252,15 +252,15 @@ export const InlineCitationSource = ({
   children,
   ...props
 }: InlineCitationSourceProps) => (
-  <div className={cn("space-y-1", className)} {...props}>
+  <div className={cn("space-y-0.5", className)} {...props}>
     {title && (
-      <h4 className="truncate font-medium text-sm leading-tight">{title}</h4>
+      <h4 className="truncate font-medium text-[13px] leading-tight">{title}</h4>
     )}
     {url && (
-      <p className="truncate break-all text-muted-foreground text-xs">{url}</p>
+      <p className="truncate break-all text-muted-foreground text-[11px]">{url}</p>
     )}
     {description && (
-      <p className="line-clamp-3 text-muted-foreground text-sm leading-relaxed">
+      <p className="line-clamp-3 text-muted-foreground text-[13px] leading-relaxed">
         {description}
       </p>
     )}
@@ -277,7 +277,7 @@ export const InlineCitationQuote = ({
 }: InlineCitationQuoteProps) => (
   <blockquote
     className={cn(
-      "border-muted border-l-2 pl-3 text-muted-foreground text-sm italic",
+      "border-border/50 border-l-2 pl-2 text-muted-foreground text-[13px] italic",
       className
     )}
     {...props}
