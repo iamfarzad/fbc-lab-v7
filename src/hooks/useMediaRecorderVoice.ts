@@ -138,6 +138,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
   }, [targetSampleRate]);
 
   const handleWorkletError = useCallback((error: Error) => {
+    console.error('🎤 [useMediaRecorderVoice] AudioWorklet error:', error);
     setError(error.message);
   }, []);
 
@@ -259,6 +260,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
           recorder.on('data', handleWorkletData);
           recorder.on('error', handleWorkletError);
           recorder.on('stop', () => {
+            console.log('🎤 [useMediaRecorderVoice] AudioRecorder stopped');
             setIsRecording(false);
           });
           audioWorkletRecorderRef.current = recorder;

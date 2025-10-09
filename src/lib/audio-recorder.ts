@@ -28,6 +28,7 @@ export class AudioRecorder extends EventEmitter {
       console.log('🎤 [AudioRecorder] Starting continuous audio capture...');
       
       // Get microphone access
+      console.log('🎤 [AudioRecorder] Requesting microphone access...');
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -38,16 +39,26 @@ export class AudioRecorder extends EventEmitter {
           autoGainControl: true
         }
       });
+      console.log('🎤 [AudioRecorder] Microphone access granted');
 
       // Create audio context
+      console.log('🎤 [AudioRecorder] Creating audio context...');
       this.audioContext = new AudioContext({ sampleRate: 16000 });
+      console.log('🎤 [AudioRecorder] Audio context created, state:', this.audioContext.state);
       
       // Create source
+      console.log('🎤 [AudioRecorder] Creating media stream source...');
       this.source = this.audioContext.createMediaStreamSource(this.stream);
+      console.log('🎤 [AudioRecorder] Media stream source created');
       
       // Load and create AudioWorklet
+      console.log('🎤 [AudioRecorder] Loading audio worklet module...');
       await this.audioContext.audioWorklet.addModule('/audio-processor.js');
+      console.log('🎤 [AudioRecorder] Audio worklet module loaded');
+      
+      console.log('🎤 [AudioRecorder] Creating audio worklet node...');
       this.recordingWorklet = new AudioWorkletNode(this.audioContext, 'audio-processor');
+      console.log('🎤 [AudioRecorder] Audio worklet node created');
       
       // Handle audio data from worklet
       this.recordingWorklet.port.onmessage = (event) => {
@@ -59,12 +70,14 @@ export class AudioRecorder extends EventEmitter {
       };
       
       // Connect audio nodes
+      console.log('🎤 [AudioRecorder] Connecting audio nodes...');
       this.source.connect(this.recordingWorklet);
       this.recordingWorklet.connect(this.audioContext.destination);
+      console.log('🎤 [AudioRecorder] Audio nodes connected');
       
       this.isActive = true;
       this.emit('start');
-      console.log('🎤 [AudioRecorder] Continuous audio capture started');
+      console.log('🎤 [AudioRecorder] Continuous audio capture started successfully');
       
     } catch (error) {
       console.error('🎤 [AudioRecorder] Failed to start audio capture:', error);
