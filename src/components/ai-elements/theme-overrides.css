@@ -1,0 +1,109 @@
+/* Override AI Elements to match our theme */
+.ai-elements-conversation {
+  @apply bg-background text-foreground;
+}
+
+.ai-elements-message {
+  @apply border-border/40;
+}
+
+.ai-elements-message--user {
+  @apply bg-primary/10 border-l-4 border-l-primary;
+}
+
+.ai-elements-message--assistant {
+  @apply bg-muted border-l-4 border-l-accent;
+}
+
+.ai-elements-response {
+  @apply text-foreground;
+}
+
+.ai-elements-loader {
+  @apply text-primary;
+}
+
+.ai-elements-suggestion {
+  @apply bg-muted hover:bg-accent/20 text-foreground border-border/40;
+}
+
+/* Monochrome overrides */
+.monochrome .ai-elements-message,
+.monochrome .ai-elements-suggestion {
+  @apply rounded-none border-2;
+}
+
+/* Touch targets */
+.ai-elements-button,
+.ai-elements-action {
+  @apply min-h-[44px] min-w-[44px];
+}
+
+/* Safe area support */
+.ai-elements-conversation {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Typography consistency */
+.ai-elements-message-content {
+  @apply text-sm leading-relaxed;
+}
+
+.ai-elements-suggestion-text {
+  @apply text-sm font-medium;
+}
+
+.ai-elements-timestamp {
+  @apply text-xs text-muted-foreground;
+}
+
+/* Animation consistency */
+.ai-elements-loader {
+  @apply animate-pulse;
+}
+
+.ai-elements-typing-indicator {
+  @apply animate-pulse;
+}
+
+/* Border consistency */
+.ai-elements-code-block {
+  @apply border border-border/40 rounded-xl;
+}
+
+.ai-elements-tool {
+  @apply border border-border/40 rounded-xl;
+}
+
+.ai-elements-source {
+  @apply border border-border/40 rounded-lg;
+}
+
+/* Monochrome mode specific */
+.monochrome .ai-elements-code-block,
+.monochrome .ai-elements-tool,
+.monochrome .ai-elements-source {
+  @apply rounded-none border-2;
+}
+
+/* Focus states */
+.ai-elements-button:focus-visible,
+.ai-elements-action:focus-visible {
+  @apply outline-none ring-2 ring-primary/40 ring-offset-2;
+}
+
+/* Hover states */
+.ai-elements-suggestion:hover {
+  @apply bg-accent/20;
+}
+
+.ai-elements-button:hover {
+  @apply bg-muted/50;
+}
+
+/* Disabled states */
+.ai-elements-button:disabled,
+.ai-elements-action:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
