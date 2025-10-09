@@ -2,11 +2,34 @@
 echo "🔍 Running pre-commit checks..."
 
 # Check for sensitive data (excluding documentation, scripts, and husky files)
-# Temporarily disabled for initial repository setup
-# if grep -r "AIzaSy" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
-#   echo "❌ Error: API keys found in code. Please use environment variables."
-#   exit 1
-# fi
+if grep -r "AIzaSy" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
+  echo "❌ Error: API keys found in code. Please use environment variables."
+  exit 1
+fi
+
+# Check for Vercel Blob tokens
+if grep -r "vercel_blob_rw_" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
+  echo "❌ Error: Vercel Blob tokens found in code. Please use environment variables."
+  exit 1
+fi
+
+# Check for Supabase service keys
+if grep -r "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
+  echo "❌ Error: JWT tokens found in code. Please use environment variables."
+  exit 1
+fi
+
+# Check for Redis tokens
+if grep -r "AVItAAIncDJiOWY1MWFlNTczZTg0NGE2YjY3MGI4YjdkN2VmYjliNXAyMjEwMzc" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
+  echo "❌ Error: Redis tokens found in code. Please use environment variables."
+  exit 1
+fi
+
+# Check for Resend API keys
+if grep -r "re_[A-Za-z0-9_-]\{40,\}" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
+  echo "❌ Error: Resend API keys found in code. Please use environment variables."
+  exit 1
+fi
 
 # Run linting (temporarily disabled for initial setup)
 # echo "🧹 Running linter..."
