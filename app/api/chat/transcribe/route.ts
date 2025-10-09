@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SpeechClient } from '@google-cloud/speech';
 
-const client = new SpeechClient();
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -11,6 +9,9 @@ export async function POST(request: NextRequest) {
     if (!audioFile || audioFile.size === 0) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
+
+    // Initialize client only when needed to avoid metadata lookup during build
+    const client = new SpeechClient();
 
     const audioBytes = Buffer.from(await audioFile.arrayBuffer());
     const requestConfig = {
