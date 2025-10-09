@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache'
 
 export type GroundedCitation = { uri: string; title?: string; description?: string; source?: 'url' | 'search' }
 export type GroundedAnswer = { text: string; citations: GroundedCitation[]; raw?: unknown }
@@ -13,6 +14,10 @@ export interface EnhancedResearchResult {
 
 export class GoogleGroundingProvider {
   private genAI: GoogleGenAI | null = null
+  
+  // Cached functions
+  private cachedGrounding: (query: string, urls?: string[]) => Promise<GroundedAnswer>
+  private cachedResearch: (query: string, context: any) => Promise<EnhancedResearchResult>
 
   constructor() {
     // Gracefully handle missing API key during build time
@@ -21,6 +26,26 @@ export class GoogleGroundingProvider {
       return
     }
     this.genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    
+    // Wrap grounding with 1 hour cache
+    this.cachedGrounding = createCachedFunction(
+      this.groundedAnswerInternal.bind(this),
+      {
+        ttl: CACHE_TTL.MEDIUM, // 1 hour
+        keyPrefix: 'grounding:',
+        keyGenerator: (query, urls) => `${query}|${JSON.stringify(urls || [])}`
+      }
+    )
+    
+    // Wrap comprehensive research with 2 hour cache
+    this.cachedResearch = createCachedFunction(
+      this.comprehensiveResearchInternal.bind(this),
+      {
+        ttl: CACHE_TTL.LONG, // 2 hours
+        keyPrefix: 'research:',
+        keyGenerator: (query, context) => `${query}|${JSON.stringify(context)}`
+      }
+    )
   }
 
   /**
@@ -100,6 +125,11 @@ export class GoogleGroundingProvider {
    * are provided, we fall back to Search-only grounding.
    */
   async groundedAnswer(query: string, urls?: string[]): Promise<GroundedAnswer> {
+    // Use cached version
+    return await this.cachedGrounding(query, urls)
+  }
+
+  private async groundedAnswerInternal(query: string, urls?: string[]): Promise<GroundedAnswer> {
     try {
       // Handle case where API key is not available (build time)
       if (!this.genAI) {
@@ -149,7 +179,7 @@ export class GoogleGroundingProvider {
 
       return { text, citations, raw: res }
     } catch (error) {
-    console.error('Google grounding search failed', error)
+      console.error('❌ [Grounding] Search failed:', error)
       return {
         text: `I couldn't find specific information about "${query}". Please try rephrasing your question or provide more context.`,
         citations: [],
@@ -178,6 +208,14 @@ export class GoogleGroundingProvider {
    * Perform comprehensive research using both search grounding and URL context
    */
   async comprehensiveResearch(
+    query: string,
+    context: { email?: string; company?: string; industry?: string; previousUrls?: string[] } = {}
+  ): Promise<EnhancedResearchResult> {
+    // Use cached version
+    return await this.cachedResearch(query, context)
+  }
+
+  private async comprehensiveResearchInternal(
     query: string,
     context: { email?: string; company?: string; industry?: string; previousUrls?: string[] } = {}
   ): Promise<EnhancedResearchResult> {
@@ -351,7 +389,7 @@ If there are conflicting information between sources, mention this and explain y
 
       return response.text || 'Unable to generate response'
     } catch (error) {
-      console.error('Failed to generate combined answer:', error)
+      console.error('❌ [Combined Answer] Generation failed:', error)
       return searchGrounding.text // Fallback to search result
     }
   }

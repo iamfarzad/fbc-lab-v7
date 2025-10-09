@@ -35,7 +35,7 @@ export const Action = ({
   const button = (
     <Button
       className={cn(
-        "relative size-9 p-1.5 text-muted-foreground hover:text-foreground transition-colors duration-200",
+        "relative size-5 p-0.5 text-muted-foreground hover:text-foreground transition-colors duration-200",
         className
       )}
       size={size}
@@ -53,7 +53,7 @@ export const Action = ({
       <TooltipProvider>
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent className="px-2 py-1 text-xs">
+          <TooltipContent className="px-2 py-1 text-[10px]">
             <p>{tooltip}</p>
           </TooltipContent>
         </Tooltip>

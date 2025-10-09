@@ -40,6 +40,7 @@ interface RoleDetectionInput {
 export class ConversationalIntelligence {
   private grounding = new GoogleGroundingProvider()
   private research = new LeadResearchService()
+  private lastStableTranscript = new Map<string, string>()
 
   async initSession(input: { sessionId: string; email: string; name?: string; companyUrl?: string }): Promise<ContextSnapshot | null> {
     const { sessionId, email, name, companyUrl } = input
@@ -83,8 +84,7 @@ export class ConversationalIntelligence {
 
   async detectIntent(text: string, context: ContextSnapshot): Promise<AdvancedIntentResult> {
     // Import the intent detector dynamically to avoid circular dependencies
-    // 🔧 PATCH: make NodeNext happy
-    const { advancedIntentClassifier } = await import('./advanced-intent-classifier.js')
+    const { advancedIntentClassifier } = await import('./advanced-intent-classifier')
     const result = await advancedIntentClassifier.classifyIntent({
       message: text,
       sessionId: (context as any).sessionId || 'unknown',
@@ -107,6 +107,45 @@ export class ConversationalIntelligence {
     // Convert advanced intent result to legacy format for compatibility
     const legacyIntent = this.convertToLegacyIntent(intent)
     return suggestTools(context as any, legacyIntent)
+  }
+
+  /**
+   * Analyze voice transcript and update context
+   * Caches last stable transcript to avoid re-processing partials
+   */
+  async analyzeVoiceTranscript(
+    transcript: string,
+    sessionId: string,
+    role: 'user' | 'assistant'
+  ): Promise<void> {
+    try {
+      // Skip if same as last processed (avoid re-processing on streaming updates)
+      const cacheKey = `${sessionId}:${role}`
+      if (this.lastStableTranscript.get(cacheKey) === transcript) {
+        return
+      }
+      
+      this.lastStableTranscript.set(cacheKey, transcript)
+
+      // Only analyze user transcripts for intent
+      if (role !== 'user') return
+
+      const context = await getContextSnapshot(sessionId)
+      if (!context) return
+
+      // Detect intent from voice
+      const intent = await this.detectIntent(transcript, context)
+      
+      console.log(`🎤 Voice intent: ${intent.type} (${Math.round(intent.confidence * 100)}%)`)
+
+      // Update context with voice-derived insights
+      await updateContext(sessionId, {
+        lastUserMessage: transcript,
+      })
+    } catch (err) {
+      console.error('Voice transcript analysis failed (non-fatal):', err)
+      // Don't throw - this is best-effort analysis
+    }
   }
 
   private convertToLegacyIntent(advancedIntent: AdvancedIntentResult): LegacyIntentResult {

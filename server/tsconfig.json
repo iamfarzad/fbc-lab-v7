@@ -12,7 +12,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": false,
-    "sourceMap": false
+    "sourceMap": false,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["../src/*"],
+      "@/src/*": ["../src/*"],
+      "@/app/*": ["../app/*"]
+    }
   },
   "include": [
     "./**/*.ts"

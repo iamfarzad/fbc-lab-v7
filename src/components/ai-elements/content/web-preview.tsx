@@ -66,7 +66,8 @@ export const WebPreview = ({
     <WebPreviewContext.Provider value={contextValue}>
       <div
         className={cn(
-          "flex size-full flex-col rounded-lg border bg-card",
+          "flex size-full flex-col rounded-md border border-border/50 bg-card",
+          "[.monochrome_&]:rounded-none [.monochrome_&]:border-2",
           className
         )}
         {...props}
@@ -85,7 +86,7 @@ export const WebPreviewNavigation = ({
   ...props
 }: WebPreviewNavigationProps) => (
   <div
-    className={cn("flex items-center gap-1 border-b p-2", className)}
+    className={cn("flex items-center gap-1 border-b border-border/50 p-1.5", className)}
     {...props}
   >
     {children}
@@ -107,7 +108,7 @@ export const WebPreviewNavigationButton = ({
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          className="h-8 w-8 p-0 hover:text-foreground"
+          className="h-6 w-6 p-0 hover:text-foreground"
           disabled={disabled}
           onClick={onClick}
           size="sm"
@@ -117,7 +118,7 @@ export const WebPreviewNavigationButton = ({
           {children}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>
+      <TooltipContent className="text-[10px]">
         <p>{tooltip}</p>
       </TooltipContent>
     </Tooltip>
@@ -144,7 +145,7 @@ export const WebPreviewUrl = ({
 
   return (
     <Input
-      className="h-8 flex-1 text-sm"
+      className="h-6 flex-1 text-[13px]"
       onChange={onChange}
       onKeyDown={handleKeyDown}
       placeholder="Enter URL..."
@@ -198,20 +199,20 @@ export const WebPreviewConsole = ({
 
   return (
     <Collapsible
-      className={cn("border-t bg-muted/50 font-mono text-sm", className)}
+      className={cn("border-t border-border/50 bg-muted/20 font-mono text-[13px]", className)}
       onOpenChange={setConsoleOpen}
       open={consoleOpen}
       {...props}
     >
       <CollapsibleTrigger asChild>
         <Button
-          className="flex w-full items-center justify-between p-4 text-left font-medium hover:bg-muted/50"
+          className="flex w-full items-center justify-between p-2 text-left font-medium hover:bg-muted/30 text-[13px]"
           variant="ghost"
         >
           Console
           <ChevronDownIcon
             className={cn(
-              "h-4 w-4 transition-transform duration-200",
+              "h-3 w-3 transition-transform duration-200",
               consoleOpen && "rotate-180"
             )}
           />
@@ -219,18 +220,18 @@ export const WebPreviewConsole = ({
       </CollapsibleTrigger>
       <CollapsibleContent
         className={cn(
-          "px-4 pb-4",
+          "px-3 pb-3",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 outline-none data-[state=closed]:animate-out data-[state=open]:animate-in"
         )}
       >
-        <div className="max-h-48 space-y-1 overflow-y-auto">
+        <div className="max-h-48 space-y-0.5 overflow-y-auto">
           {logs.length === 0 ? (
-            <p className="text-muted-foreground">No console output</p>
+            <p className="text-muted-foreground text-[11px]">No console output</p>
           ) : (
             logs.map((log, index) => (
               <div
                 className={cn(
-                  "text-xs",
+                  "text-[11px]",
                   log.level === "error" && "text-destructive",
                   log.level === "warn" && "text-yellow-600",
                   log.level === "log" && "text-foreground"

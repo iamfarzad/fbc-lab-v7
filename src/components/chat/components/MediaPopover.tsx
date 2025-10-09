@@ -20,20 +20,47 @@ export function MediaPopover({
   triggerRef,
   className 
 }: MediaPopoverProps) {
+  // Prevent body scroll when popover is open
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = '0px'; // Prevent layout shift
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    };
+  }, [isOpen]);
+
   return (
     <Popover open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <PopoverAnchor ref={triggerRef} />
       <PopoverContent 
+        side="top"
         align="center" 
-        sideOffset={8}
+        sideOffset={12}
         className={cn(
-          "w-80 bg-background/95 backdrop-blur-sm border border-border/40 shadow-lg p-0",
-          "z-50",
+          // Responsive width: full width on mobile (minus padding), fixed on desktop
+          "w-[calc(100vw-2rem)] sm:w-96 max-w-[480px]",
+          // Responsive height and scrolling
+          "max-h-[60vh] sm:max-h-[70vh] overflow-y-auto overscroll-contain",
+          // Visual styling
+          "bg-background/98 backdrop-blur-md border border-border/40 shadow-xl p-0",
+          // Z-index above everything
+          "z-[200]",
           VISUAL.CORNER_RADIUS,
           "[.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2",
+          // Touch and scroll optimization
+          "touch-pan-y will-change-transform",
+          // Smooth scrolling
+          "scroll-smooth",
           className
         )}
         data-media-popover={type}
+        aria-label={`${type} controls`}
       >
         {children}
       </PopoverContent>

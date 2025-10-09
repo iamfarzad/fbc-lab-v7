@@ -2,11 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Monitor, MonitorOff, Video, VideoOff, X } from 'lucide-react';
-import { VISUAL } from '../design-tokens';
+import { Monitor, VideoOff } from 'lucide-react';
+import { VISUAL, SPACING } from '../design-tokens';
 
 interface ScreenPopoverSectionProps {
   isActive: boolean;
+  isInitializing?: boolean;
   stream?: MediaStream | null;
   error?: string | null;
   onToggle: () => void;
@@ -14,13 +15,13 @@ interface ScreenPopoverSectionProps {
 
 export function ScreenPopoverSection({
   isActive,
+  isInitializing = false,
   stream,
   error,
   onToggle
 }: ScreenPopoverSectionProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Set up video stream when active
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !stream) return;
@@ -40,18 +41,22 @@ export function ScreenPopoverSection({
   }, [stream]);
 
   return (
-    <div className="space-y-3 p-4">
+    <div className={cn("space-y-3", SPACING.PADDING_CONTAINER)}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className={cn(
             "h-2 w-2 rounded-full",
-            isActive ? "bg-blue-500 animate-pulse" : "bg-gray-400"
+            isActive ? "bg-accent animate-pulse" : "bg-muted-foreground/30"
           )} />
-          <span className="text-sm font-medium">🖥️ Screen Share</span>
-          {isActive && (
+          <span className="text-sm font-medium">Screen Share</span>
+          {isInitializing && (
             <Badge variant="secondary" className="text-xs">
-              <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse mr-1" />
+              Selecting
+            </Badge>
+          )}
+          {isActive && !isInitializing && (
+            <Badge variant="secondary" className="text-xs">
               Sharing
             </Badge>
           )}
@@ -60,31 +65,52 @@ export function ScreenPopoverSection({
           size="sm" 
           onClick={onToggle}
           variant={isActive ? "destructive" : "default"}
-          className="h-7 px-3"
+          className="min-h-[32px]"
+          disabled={isInitializing}
         >
           {isActive ? 'Stop' : 'Share'}
         </Button>
       </div>
 
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded p-2 text-red-600 text-sm">
+      {/* Loading State */}
+      {isInitializing && !isActive && (
+        <div className={cn(
+          "flex flex-col items-center justify-center gap-3 bg-muted/50 p-6",
+          VISUAL.CORNER_RADIUS
+        )}>
+          <div className="h-8 w-8 border-3 border-accent border-t-transparent rounded-full animate-spin" />
+          <div className="text-center text-sm text-muted-foreground">
+            <div className="font-medium mb-1">Select Screen to Share</div>
+            <p className="text-xs">Choose from the dialog that appeared</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && !isInitializing && (
+        <div className={cn(
+          "border bg-destructive/10 border-destructive/20 p-3 text-destructive text-sm",
+          VISUAL.CORNER_RADIUS
+        )}>
           <div className="font-medium mb-1">Screen Share Error</div>
-          {error}
-          <Button size="sm" variant="outline" onClick={onToggle} className="mt-2 h-6 px-2">
+          <p>{error}</p>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={onToggle} 
+            className="mt-2 min-h-[28px]"
+          >
             Retry
           </Button>
         </div>
       )}
 
-      {/* Screen Preview */}
+      {/* Preview */}
       {isActive && !error && (
         <div className="space-y-2">
-          <div className="text-xs text-muted-foreground font-medium">
-            Screen Preview
-          </div>
+          <div className="text-xs text-muted-foreground font-medium">Preview</div>
           <div className={cn(
-            "relative bg-black overflow-hidden aspect-video rounded-lg",
+            "relative bg-muted overflow-hidden aspect-video touch-none",
             VISUAL.CORNER_RADIUS,
             "[.monochrome_&]:rounded-none"
           )}>
@@ -95,88 +121,55 @@ export function ScreenPopoverSection({
                 autoPlay
                 muted
                 playsInline
+                aria-label="Screen share preview"
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <div className="text-center">
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center text-muted-foreground">
                   <VideoOff className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <div className="text-xs">Screen share initializing...</div>
+                  <div className="text-xs">Initializing...</div>
                 </div>
               </div>
             )}
             
-            {/* Overlay indicator */}
-            <div className="absolute top-2 left-2 bg-black/50 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+            {/* Recording indicator */}
+            <div className={cn(
+              "absolute top-2 left-2 bg-destructive/90 text-destructive-foreground px-2 py-1 text-xs flex items-center gap-1",
+              VISUAL.CORNER_RADIUS
+            )}>
+              <div className="h-2 w-2 rounded-full bg-current animate-pulse" />
               REC
             </div>
           </div>
         </div>
       )}
 
-      {/* Screen Share Info */}
+      {/* Info */}
       {isActive && !error && (
-        <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2">
+        <div className={cn(
+          "text-xs text-muted-foreground bg-muted/30 p-2",
+          VISUAL.CORNER_RADIUS
+        )}>
           <div className="flex items-center gap-2">
             <Monitor className="h-3 w-3" />
-            <span>Your screen is being shared</span>
+            <span>Screen sharing active</span>
           </div>
-          <p className="mt-1 text-xs">
-            Other users can see your screen. Stop sharing when you're done.
-          </p>
         </div>
       )}
 
-      {/* Instructions when inactive */}
+      {/* Instructions */}
       {!isActive && !error && (
-        <div className="text-xs text-muted-foreground bg-muted/30 rounded p-3">
+        <div className={cn(
+          "text-xs text-muted-foreground bg-muted/30 p-3",
+          VISUAL.CORNER_RADIUS
+        )}>
           <div className="flex items-center gap-2 mb-2">
             <Monitor className="h-4 w-4" />
             <span className="font-medium">Ready to Share</span>
           </div>
-          <p className="mb-2">
-            Click "Share" to start sharing your screen. You can choose to share your entire screen, a specific window, or a browser tab.
+          <p>
+            Click "Share" to start sharing your screen. Choose to share your entire screen, a window, or a browser tab.
           </p>
-          <div className="space-y-1 text-xs">
-            <p>💡 <strong>Privacy Tip:</strong> Make sure to close any sensitive windows before sharing.</p>
-            <p>💡 You can stop sharing at any time by clicking "Stop".</p>
-          </div>
-        </div>
-      )}
-
-      {/* Quick Actions when active */}
-      {isActive && !error && (
-        <div className="flex gap-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={onToggle}
-            className="flex items-center gap-1 h-7 px-2"
-          >
-            <X className="h-3 w-3" />
-            Stop Sharing
-          </Button>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="flex items-center gap-1 h-7 px-2"
-            disabled
-          >
-            <Monitor className="h-3 w-3" />
-            Pause
-          </Button>
-        </div>
-      )}
-
-      {/* Screen Share Options (placeholder) */}
-      {!isActive && !error && (
-        <div className="text-xs text-muted-foreground">
-          <div className="font-medium mb-1">What you can share:</div>
-          <ul className="space-y-1 ml-2">
-            <li>• Entire desktop screen</li>
-            <li>• Specific application window</li>
-            <li>• Browser tab</li>
-          </ul>
         </div>
       )}
     </div>

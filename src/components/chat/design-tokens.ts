@@ -95,10 +95,14 @@ export const fontWeight = {
 // ============================================================================
 
 export const SPACING = {
-  MESSAGE_MAX_WIDTH: 'max-w-[85%] sm:max-w-[75%]',
-  PADDING_CONTAINER: 'p-4 sm:p-6',
-  PADDING_MESSAGE: 'px-4 py-3',
-  GAP_DEFAULT: 'gap-3',
+  MESSAGE_MAX_WIDTH: 'max-w-[75%]',
+  PADDING_CONTAINER: 'p-3',
+  PADDING_MESSAGE: 'px-3 py-1.5',
+  GAP_DEFAULT: 'gap-1.5',
+  GAP_MESSAGE: 'py-1.5',
+  SECTION: 'space-y-4',
+  DENSE: 'space-y-2',
+  MINIMAL: 'space-y-1',
 } as const
 
 // ============================================================================
@@ -122,8 +126,12 @@ export const SIZES = {
   TOGGLE_BUTTON: 'h-14 w-14',
   HEADER_BUTTON: 'h-8 w-8',
   INPUT_HEIGHT: 'h-10',
+  AVATAR_SMALL: 'size-6',
+  AVATAR_MEDIUM: 'size-8',
+  ICON_TINY: 'h-2.5 w-2.5',
   ICON_SMALL: 'h-3 w-3',
-  ICON_MEDIUM: 'h-4 w-4',
+  ICON_MEDIUM: 'h-3.5 w-3.5',
+  ICON_DEFAULT: 'h-4 w-4',
   ICON_LARGE: 'h-6 w-6',
 } as const
 
@@ -152,12 +160,12 @@ export const STATES = {
 // ============================================================================
 
 export const chatStyles = {
-  // Common patterns from original design
-  orangeDot: 'h-2 w-2 bg-orange-500 animate-pulse rounded-full',
-  activeBadge: 'text-orange-500 border-orange-500',
-  userBubble: `${SPACING.MESSAGE_MAX_WIDTH} ${COLORS.USER_MESSAGE.bg} ${COLORS.USER_MESSAGE.text} ${SPACING.PADDING_MESSAGE} ${VISUAL.SHADOW_MESSAGE}`,
-  assistantBubble: `${SPACING.MESSAGE_MAX_WIDTH} ${COLORS.ASSISTANT_MESSAGE.bg} ${SPACING.PADDING_MESSAGE} ${VISUAL.SHADOW_MESSAGE}`,
-  headerLogo: 'w-5 h-5 bg-orange-500/10 flex items-center justify-center border border-orange-500/20',
+  // Common patterns - minimal design
+  orangeDot: 'h-2 w-2 bg-primary animate-pulse rounded-full',
+  activeBadge: 'text-primary border-primary',
+  userBubble: `${SPACING.MESSAGE_MAX_WIDTH} ${COLORS.USER_MESSAGE.bg} ${COLORS.USER_MESSAGE.text} ${SPACING.PADDING_MESSAGE}`,
+  assistantBubble: `${SPACING.MESSAGE_MAX_WIDTH} ${COLORS.ASSISTANT_MESSAGE.bg} ${SPACING.PADDING_MESSAGE}`,
+  headerLogo: 'w-5 h-5 bg-primary/10 flex items-center justify-center border border-primary/20',
   inputField: `${SIZES.INPUT_HEIGHT} border-muted focus:border-primary transition-colors`,
   
   // Monochrome-specific helpers (Terminal Aesthetic)

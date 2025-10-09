@@ -1,10 +1,15 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { useUnifiedChat } from "@/hooks/useUnifiedChat";
+import type { UnifiedContext } from "@/core/chat/unified-types";
+import type { ConversationCategory } from "./useConversationFlow";
+import { useConversationFlow } from "./useConversationFlow";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
-import type { PromptInputFile } from "@/components/ai-elements/prompt-input";
+import type { PromptInputFile } from "@/components/ai-elements/interactive/prompt-input";
 import type { AttachmentUploadResponse, ChatAttachment } from "@/types/attachments";
+import { logConversationMilestone } from "@/lib/analytics/chat-flow";
+import { detectSafetyCategory, logSafetyEvent } from "@/lib/analytics/safety";
 
 export interface ResearchSummary {
   messageId: string;
@@ -29,10 +34,16 @@ type SendMessagePayload = string | {
   attachments?: PromptInputFile[];
 };
 
-export function useChatMessages() {
+export function useChatMessages(initialSessionId?: string) {
   const [inputValue, setInputValue] = useState('');
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const [sessionId, setSessionId] = useState(() => initialSessionId ?? crypto.randomUUID());
   const voiceAssistantMessageIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (initialSessionId && initialSessionId !== sessionId) {
+      setSessionId(initialSessionId);
+    }
+  }, [initialSessionId, sessionId]);
 
   // Use unified chat hook with store integration
   const unifiedChat = useUnifiedChat({
@@ -73,51 +84,132 @@ export function useChatMessages() {
         ? (msg.metadata!.annotations as Array<Record<string, any>>)
         : undefined;
 
-      const mappedSources = Array.isArray(researchMetadata?.urlsUsed)
-        ? researchMetadata!.urlsUsed.map((url: string, index: number) => ({
-            id: `${msg.id}-source-${index}`,
-            title: url.replace(/^https?:\/\//, ''),
-            url
-          }))
-        : undefined;
-
       // Extract AI elements metadata
       const reasoning = msg.metadata?.reasoning
       const chainOfThought = msg.metadata?.chainOfThought
       const contextUsage = msg.metadata?.contextUsage
       const codeBlocks = msg.metadata?.codeBlocks
-      const aiSources = msg.metadata?.sources
+      const aiSources = Array.isArray(msg.metadata?.sources)
+        ? (msg.metadata!.sources as Array<Record<string, any>>)
+        : undefined
       const images = msg.metadata?.images
       const inlineCitations = msg.metadata?.inlineCitations
       const tasks = msg.metadata?.tasks
       const webPreview = msg.metadata?.webPreview
+      const followUp =
+        typeof msg.metadata?.followUp === 'string' && msg.metadata.followUp.trim().length > 0
+          ? msg.metadata.followUp.trim()
+          : undefined
       const attachments = Array.isArray(msg.metadata?.attachments)
         ? (msg.metadata!.attachments as ChatAttachment[])
         : undefined;
 
-      let metadata: EnhancedChatMessage['metadata'] | undefined = researchMetadata || toolInvocations || annotations || reasoning || chainOfThought || contextUsage || codeBlocks || aiSources || images || inlineCitations || tasks || webPreview
-        ? {
-            sources: mappedSources || aiSources,
-            researchSummary: researchMetadata || undefined,
-            toolInvocations,
-            annotations,
-            reasoning,
-            chainOfThought,
-            contextUsage,
-            codeBlocks,
-            images,
-            inlineCitations,
-            tasks,
-            webPreview
-          }
+      const metadataPayload: Partial<NonNullable<EnhancedChatMessage['metadata']>> = {};
+
+      const fallbackSources = (!aiSources && researchMetadata)
+        ? (() => {
+            if (Array.isArray(researchMetadata?.citations)) {
+              const mapped = researchMetadata!.citations
+                .map((citation: any, index: number) => {
+                  const url = citation?.url || citation?.uri || '';
+                  if (!url || typeof url !== 'string') return null;
+                  const title = typeof citation?.title === 'string'
+                    ? citation.title
+                    : url.replace(/^https?:\/\//, '');
+                  const snippet = typeof citation?.description === 'string'
+                    ? citation.description
+                    : undefined;
+                  return {
+                    id: citation?.id || `${msg.id}-source-${index}`,
+                    title,
+                    url,
+                    snippet,
+                  };
+                })
+                .filter(Boolean) as Array<{ id: string; title: string; url: string; snippet?: string }>;
+              if (mapped.length > 0) return mapped;
+            }
+            if (Array.isArray(researchMetadata?.urlsUsed)) {
+              const mapped = researchMetadata!.urlsUsed
+                .map((url: string, index: number) => {
+                  if (typeof url !== 'string' || url.length === 0) return null;
+                  return {
+                    id: `${msg.id}-source-${index}`,
+                    title: url.replace(/^https?:\/\//, ''),
+                    url,
+                  };
+                })
+                .filter(Boolean) as Array<{ id: string; title: string; url: string }>;
+              if (mapped.length > 0) return mapped;
+            }
+            return undefined;
+          })()
         : undefined;
 
-      if (attachments && attachments.length > 0) {
-        metadata = {
-          ...(metadata ?? {}),
-          attachments
-        };
+      if (aiSources || fallbackSources) {
+        metadataPayload.sources = aiSources ?? fallbackSources;
       }
+      if (researchMetadata && typeof researchMetadata === 'object') {
+        const researchSummary = {
+          query: typeof researchMetadata.query === 'string' ? researchMetadata.query : undefined,
+          combinedAnswer: typeof researchMetadata.combinedAnswer === 'string' ? researchMetadata.combinedAnswer : undefined,
+          urlsUsed: Array.isArray(researchMetadata.urlsUsed) ? (researchMetadata.urlsUsed as string[]) : undefined,
+          citationCount: typeof researchMetadata.citationCount === 'number' ? researchMetadata.citationCount : undefined,
+          searchGroundingUsed: typeof researchMetadata.searchGroundingUsed === 'number' ? researchMetadata.searchGroundingUsed : undefined,
+          urlContextUsed: typeof researchMetadata.urlContextUsed === 'number' ? researchMetadata.urlContextUsed : undefined,
+          error: typeof researchMetadata.error === 'string' ? researchMetadata.error : undefined,
+        };
+
+        if (
+          researchSummary.combinedAnswer ||
+          researchSummary.urlsUsed?.length ||
+          typeof researchSummary.citationCount === 'number' ||
+          typeof researchSummary.searchGroundingUsed === 'number' ||
+          typeof researchSummary.urlContextUsed === 'number' ||
+          researchSummary.error
+        ) {
+          metadataPayload.researchSummary = researchSummary;
+        }
+      }
+      if (toolInvocations) {
+        metadataPayload.toolInvocations = toolInvocations;
+      }
+      if (annotations) {
+        metadataPayload.annotations = annotations;
+      }
+      if (reasoning) {
+        metadataPayload.reasoning = reasoning;
+      }
+      if (chainOfThought) {
+        metadataPayload.chainOfThought = chainOfThought;
+      }
+      if (contextUsage) {
+        metadataPayload.contextUsage = contextUsage;
+      }
+      if (codeBlocks) {
+        metadataPayload.codeBlocks = codeBlocks;
+      }
+      if (images) {
+        metadataPayload.images = images;
+      }
+      if (inlineCitations) {
+        metadataPayload.inlineCitations = inlineCitations;
+      }
+      if (tasks) {
+        metadataPayload.tasks = tasks;
+      }
+      if (webPreview) {
+        metadataPayload.webPreview = webPreview;
+      }
+      if (followUp) {
+        metadataPayload.followUp = followUp;
+      }
+      if (attachments && attachments.length > 0) {
+        metadataPayload.attachments = attachments;
+      }
+
+      const metadata: EnhancedChatMessage['metadata'] | undefined =
+        Object.keys(metadataPayload).length > 0 ? metadataPayload : undefined;
 
       const status = msg.metadata?.error
         ? 'error'
@@ -234,6 +326,63 @@ export function useChatMessages() {
     await unifiedChat.sendMessage(outgoingText);
   }, [unifiedChat, uploadAttachments]);
 
+  const updateChatContext = useCallback((context: Partial<UnifiedContext>) => {
+    unifiedChat.updateContext(context);
+  }, [unifiedChat.updateContext]);
+
+  const conversationFlow = useConversationFlow(unifiedChat.messages);
+  const loggedCategoriesRef = useRef<Set<ConversationCategory>>(new Set());
+  const safetyLoggedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    updateChatContext({
+      sessionId,
+      conversationFlow,
+    });
+  }, [conversationFlow, sessionId, updateChatContext]);
+
+  useEffect(() => {
+    if (!conversationFlow.coverageOrder.length) return;
+
+    for (const insight of conversationFlow.coverageOrder) {
+      if (loggedCategoriesRef.current.has(insight.category)) continue;
+      loggedCategoriesRef.current.add(insight.category);
+
+      const elapsedMs = insight.firstTimestamp && conversationFlow.firstUserTimestamp
+        ? insight.firstTimestamp - conversationFlow.firstUserTimestamp
+        : null;
+
+      logConversationMilestone({
+        sessionId,
+        category: insight.category,
+        firstTurnIndex: insight.firstTurnIndex,
+        firstMessageId: insight.firstMessageId,
+        firstTimestamp: insight.firstTimestamp,
+        elapsedMs,
+      });
+    }
+  }, [conversationFlow.coverageOrder, conversationFlow.firstUserTimestamp, sessionId]);
+
+  useEffect(() => {
+    const userMessages = unifiedChat.messages.filter((message) => message.role === 'user');
+    if (userMessages.length === 0) return;
+
+    const latest = userMessages[userMessages.length - 1];
+    if (safetyLoggedRef.current.has(latest.id)) return;
+
+    const category = detectSafetyCategory(latest.content.toLowerCase());
+    if (!category) return;
+
+    safetyLoggedRef.current.add(latest.id);
+    logSafetyEvent({
+      sessionId,
+      category,
+      messageId: latest.id,
+      messageSnippet: latest.content.slice(0, 200),
+      timestamp: Date.now(),
+    });
+  }, [sessionId, unifiedChat.messages]);
+
   const appendVoiceUserMessage = useCallback((text: string) => {
     const content = text.trim();
     if (!content) return;
@@ -250,7 +399,11 @@ export function useChatMessages() {
         isComplete: true,
       },
     });
-  }, [unifiedChat]);
+
+    // NOTE: Intent detection happens server-side when this message is sent to /api/chat/unified
+    // The unified API route handles conversation flow analysis and intent detection
+    console.log('🎤 Voice message added:', content.substring(0, 50) + '...')
+  }, [unifiedChat, sessionId]);
 
   const appendVoiceAssistantChunk = useCallback((chunk: string) => {
     if (!chunk) return;
@@ -351,6 +504,7 @@ export function useChatMessages() {
     handleSendMessage,
     handleExportSummary,
     sessionId,
+    updateChatContext,
     appendVoiceUserMessage,
     appendVoiceAssistantChunk,
     finalizeVoiceAssistantMessage,

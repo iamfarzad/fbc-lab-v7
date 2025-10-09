@@ -8,7 +8,7 @@ export function useChatIntelligence(id?: string | null) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [currentContext, setCurrentContext] = useState<{
-    company?: { name?: string };
+    company?: { name?: string; industry?: string };
     person?: { fullName?: string; role?: string };
   } | null>(null);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
@@ -19,8 +19,14 @@ export function useChatIntelligence(id?: string | null) {
   });
   const [suggestions, setSuggestions] = useState<string[]>([...CHAT_CONSTANTS.DEFAULT_SUGGESTIONS]);
 
-  const sessionIdRef = useRef<string>(id || '');
+  const sessionIdRef = useRef<string>(id ?? crypto.randomUUID());
   const hasInitialisedRef = useRef(false);
+
+  useEffect(() => {
+    if (id && sessionIdRef.current !== id) {
+      sessionIdRef.current = id;
+    }
+  }, [id]);
 
   // Fetch suggestions from API
   const fetchSuggestions = useCallback(async () => {
@@ -76,13 +82,17 @@ export function useChatIntelligence(id?: string | null) {
       }
 
       const data = await response.json();
+      sessionIdRef.current = data.sessionId || sessionIdRef.current;
       hasInitialisedRef.current = true;
       setContextReady(true);
 
       // Set current context from session data
       if (data.context) {
         setCurrentContext({
-          company: data.context.company ? { name: data.context.company.name } : undefined,
+          company: data.context.company ? { 
+            name: data.context.company.name,
+            industry: data.context.company.industry 
+          } : undefined,
           person: data.context.person ? { fullName: data.context.person.fullName, role: data.context.role } : undefined
         });
       }

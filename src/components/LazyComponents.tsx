@@ -1,6 +1,15 @@
-import { lazy } from 'react'
+import dynamic from 'next/dynamic'
 
-// Lazy loaded components for better performance
-export const WorkSectionLazy = lazy(() => import('./WorkSection').then(mod => ({ default: mod.WorkSection })))
-export const WorkshopsSectionLazy = lazy(() => import('./WorkshopsSection').then(mod => ({ default: mod.WorkshopsSection })))
-export const MultimodalChatLazy = lazy(() => import('./chat/ChatInterface').then(mod => ({ default: mod.ChatInterface })))
+// Client-only dynamic components for sections that reference browser APIs
+export const WorkSectionLazy = dynamic(
+  () => import('./WorkSection').then(mod => ({ default: mod.WorkSection })),
+  { ssr: false }
+)
+export const WorkshopsSectionLazy = dynamic(
+  () => import('./WorkshopsSection').then(mod => ({ default: mod.WorkshopsSection })),
+  { ssr: false }
+)
+export const MultimodalChatLazy = dynamic(
+  () => import('./chat/ChatInterface').then(mod => ({ default: mod.ChatInterface })),
+  { ssr: false }
+)

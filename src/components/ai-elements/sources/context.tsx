@@ -156,17 +156,17 @@ export const ContextContentHeader = ({
   }).format(maxTokens);
 
   return (
-    <div className={cn("w-full space-y-2 p-3", className)} {...props}>
+    <div className={cn("w-full space-y-1.5 p-2", className)} {...props}>
       {children ?? (
         <>
-          <div className="flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center justify-between gap-2 text-[11px]">
             <p>{displayPct}</p>
             <p className="font-mono text-muted-foreground">
               {used} / {total}
             </p>
           </div>
-          <div className="space-y-2">
-            <Progress className="bg-muted" value={usedPercent * PERCENT_MAX} />
+          <div className="space-y-1">
+            <Progress className="bg-muted h-1" value={usedPercent * PERCENT_MAX} />
           </div>
         </>
       )}
@@ -181,7 +181,7 @@ export const ContextContentBody = ({
   className,
   ...props
 }: ContextContentBody) => (
-  <div className={cn("w-full p-3", className)} {...props}>
+  <div className={cn("w-full p-2 space-y-1", className)} {...props}>
     {children}
   </div>
 );
@@ -211,7 +211,7 @@ export const ContextContentFooter = ({
   return (
     <div
       className={cn(
-        "flex w-full items-center justify-between gap-3 bg-secondary p-3 text-xs",
+        "flex w-full items-center justify-between gap-2 bg-muted/30 p-2 text-[11px]",
         className
       )}
       {...props}
@@ -257,7 +257,7 @@ export const ContextInputUsage = ({
 
   return (
     <div
-      className={cn("flex items-center justify-between text-xs", className)}
+      className={cn("flex items-center justify-between text-[11px]", className)}
       {...props}
     >
       <span className="text-muted-foreground">Input</span>
@@ -297,7 +297,7 @@ export const ContextOutputUsage = ({
 
   return (
     <div
-      className={cn("flex items-center justify-between text-xs", className)}
+      className={cn("flex items-center justify-between text-[11px]", className)}
       {...props}
     >
       <span className="text-muted-foreground">Output</span>
@@ -337,7 +337,7 @@ export const ContextReasoningUsage = ({
 
   return (
     <div
-      className={cn("flex items-center justify-between text-xs", className)}
+      className={cn("flex items-center justify-between text-[11px]", className)}
       {...props}
     >
       <span className="text-muted-foreground">Reasoning</span>
@@ -377,7 +377,7 @@ export const ContextCacheUsage = ({
 
   return (
     <div
-      className={cn("flex items-center justify-between text-xs", className)}
+      className={cn("flex items-center justify-between text-[11px]", className)}
       {...props}
     >
       <span className="text-muted-foreground">Cache</span>

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
-import { Response } from "./response";
+import { Response } from "../core/response";
 
 type ReasoningContextValue = {
   isStreaming: boolean;
@@ -98,7 +98,7 @@ export const Reasoning = memo(
         value={{ isStreaming, isOpen, setIsOpen, duration }}
       >
         <Collapsible
-          className={cn("not-prose mb-4", "[.monochrome_&]:font-mono [.monochrome_&]:mb-2", className)}
+          className={cn("not-prose mb-2", "[.monochrome_&]:font-mono [.monochrome_&]:mb-2", className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
@@ -129,18 +129,18 @@ export const ReasoningTrigger = memo(
     return (
       <CollapsibleTrigger
         className={cn(
-          "flex w-full items-center gap-1.5 text-muted-foreground text-xs transition-colors duration-200 hover:text-foreground",
+          "flex w-full items-center gap-1 text-muted-foreground text-[11px] transition-colors duration-200 hover:text-foreground",
           className
         )}
         {...props}
       >
         {children ?? (
           <>
-            <BrainIcon className="size-4" />
+            <BrainIcon className="size-3.5" />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
               className={cn(
-                "size-4 transition-transform duration-200",
+                "size-3 transition-transform duration-200",
                 isOpen ? "rotate-180" : "rotate-0"
               )}
             />

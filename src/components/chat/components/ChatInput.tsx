@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   PromptInput,
   PromptInputBody,
@@ -16,7 +17,7 @@ import {
   PromptInputAttachment,
   PromptInputAttachments,
   type PromptInputFile
-} from "@/components/ai-elements/prompt-input";
+} from "@/components/ai-elements/interactive/prompt-input";
 import { toast } from "sonner";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { CHAT_DESIGN, VISUAL, chatStyles } from "../design-tokens";
@@ -31,11 +32,12 @@ import {
   Calendar,
   Download,
 } from "lucide-react";
-import { VoiceButton } from "./VoiceButton";
+import { VoiceButton, type VoiceButtonState } from "@/components/ui/voice-button";
 import { MediaPopover } from "./MediaPopover";
 import { VoicePopoverSection } from "./VoicePopoverSection";
 import { CameraPopoverSection } from "./CameraPopoverSection";
 import { ScreenPopoverSection } from "./ScreenPopoverSection";
+import { PermissionExplanationDialog } from "./PermissionExplanationDialog";
 
 type SendMessageInput = string | {
   text?: string;
@@ -52,13 +54,16 @@ interface ChatInputProps {
   isVoiceActive: boolean;
   isVoiceProcessing: boolean;
   isVoiceSupported: boolean;
-  isMuted?: boolean;
+  isVoiceInitializing?: boolean;
   cameraState: boolean;
+  isCameraInitializing?: boolean;
   isScreenSharing: boolean;
+  isScreenShareInitializing?: boolean;
   cameraStream?: MediaStream | null;
   screenShareStream?: MediaStream | null;
   cameraError?: string;
   screenShareError?: string;
+  availableCameras?: number;
   onInputChange: (value: string) => void;
   onSendMessage: (message: SendMessageInput) => Promise<void> | void;
   onToggleVoice: () => void | Promise<void>;
@@ -72,6 +77,8 @@ interface ChatInputProps {
   onOpenMeeting?: () => void;
   onExportSummary?: () => void;
   sessionIdForExport?: string | null;
+  autoOpenPopover?: 'voice' | 'camera' | 'screen' | null;
+  onAutoOpenPopoverHandled?: () => void;
 }
 
 export function ChatInput({
@@ -84,13 +91,16 @@ export function ChatInput({
   isVoiceActive,
   isVoiceProcessing,
   isVoiceSupported,
-  isMuted = false,
+  isVoiceInitializing = false,
   cameraState,
+  isCameraInitializing = false,
   isScreenSharing,
+  isScreenShareInitializing = false,
   cameraStream,
   screenShareStream,
   cameraError,
   screenShareError,
+  availableCameras = 1,
   onInputChange,
   onSendMessage,
   onToggleVoice,
@@ -103,9 +113,12 @@ export function ChatInput({
   onOpenMeeting,
   onExportSummary,
   sessionIdForExport,
+  autoOpenPopover = null,
+  onAutoOpenPopoverHandled,
 }: ChatInputProps) {
   const [hasAttachments, setHasAttachments] = useState(false);
   const [activePopover, setActivePopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
+  const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
   
   // Refs for popover positioning
   const voiceButtonRef = useRef<HTMLDivElement>(null);
@@ -114,42 +127,172 @@ export function ChatInput({
 
   // Auto-open popover when media becomes active
   useEffect(() => {
-    if (isVoiceActive && !activePopover) {
+    if ((isVoiceActive || isVoiceProcessing) && !activePopover) {
       setActivePopover('voice');
     } else if (cameraState && !activePopover) {
       setActivePopover('camera');
     } else if (isScreenSharing && !activePopover) {
       setActivePopover('screen');
     }
-  }, [isVoiceActive, cameraState, isScreenSharing, activePopover]);
+  }, [isVoiceActive, isVoiceProcessing, cameraState, isScreenSharing, activePopover]);
 
   // Close popover when media stops
   useEffect(() => {
-    if (activePopover === 'voice' && !isVoiceActive) {
+    if (activePopover === 'voice' && !isVoiceActive && !isVoiceProcessing) {
       setActivePopover(null);
     } else if (activePopover === 'camera' && !cameraState) {
       setActivePopover(null);
     } else if (activePopover === 'screen' && !isScreenSharing) {
       setActivePopover(null);
     }
-  }, [activePopover, isVoiceActive, cameraState, isScreenSharing]);
+  }, [activePopover, isVoiceActive, isVoiceProcessing, cameraState, isScreenSharing]);
 
   const closePopover = () => setActivePopover(null);
 
-  const handleVoiceButtonClick = () => {
-    setActivePopover(activePopover === 'voice' ? null : 'voice');
-    onToggleVoice();
+  useEffect(() => {
+    if (!autoOpenPopover) return;
+    setActivePopover(autoOpenPopover);
+    onAutoOpenPopoverHandled?.();
+  }, [autoOpenPopover, onAutoOpenPopoverHandled]);
+
+  const handleVoiceButtonClick = async () => {
+    const willOpen = activePopover !== 'voice';
+    
+    // If opening and not already active, show permission explanation first
+    if (willOpen && !isVoiceActive) {
+      setPendingPermission('voice');
+      return;
+    }
+    
+    // Update popover state first
+    setActivePopover(willOpen ? 'voice' : null);
+    
+    // Then trigger media in next frame to avoid race condition
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    
+    try {
+      await onToggleVoice();
+    } catch (error) {
+      console.error('Voice toggle error:', error);
+      // Close popover if media failed to start
+      if (willOpen) {
+        setActivePopover(null);
+      }
+    }
   };
 
-  const handleCameraButtonClick = () => {
-    setActivePopover(activePopover === 'camera' ? null : 'camera');
-    onToggleCamera();
+  const handleCameraButtonClick = async () => {
+    const willOpen = activePopover !== 'camera';
+    
+    // If opening and not already active, show permission explanation first
+    if (willOpen && !cameraState) {
+      setPendingPermission('camera');
+      return;
+    }
+    
+    setActivePopover(willOpen ? 'camera' : null);
+    
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    
+    try {
+      await onToggleCamera();
+    } catch (error) {
+      console.error('Camera toggle error:', error);
+      if (willOpen) {
+        setActivePopover(null);
+      }
+    }
   };
 
-  const handleScreenButtonClick = () => {
-    setActivePopover(activePopover === 'screen' ? null : 'screen');
-    onToggleScreenShare();
+  const handleScreenButtonClick = async () => {
+    const willOpen = activePopover !== 'screen';
+    
+    // If opening and not already active, show permission explanation first
+    if (willOpen && !isScreenSharing) {
+      setPendingPermission('screen');
+      return;
+    }
+    
+    setActivePopover(willOpen ? 'screen' : null);
+    
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    
+    try {
+      await onToggleScreenShare();
+    } catch (error) {
+      console.error('Screen share toggle error:', error);
+      if (willOpen) {
+        setActivePopover(null);
+      }
+    }
   };
+
+  // Handle permission dialog acceptance
+  const handlePermissionAccept = async () => {
+    const permissionType = pendingPermission;
+    setPendingPermission(null);
+    
+    if (!permissionType) return;
+    
+    // Open popover
+    setActivePopover(permissionType);
+    
+    // Wait for next frame
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    
+    // Trigger the actual permission request
+    try {
+      if (permissionType === 'voice') {
+        await onToggleVoice();
+      } else if (permissionType === 'camera') {
+        await onToggleCamera();
+      } else if (permissionType === 'screen') {
+        await onToggleScreenShare();
+      }
+    } catch (error) {
+      console.error('Permission request failed:', error);
+      setActivePopover(null);
+    }
+  };
+
+  const handlePermissionDecline = () => {
+    setPendingPermission(null);
+  };
+
+  // Keyboard shortcuts for media controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + M = Toggle microphone/voice
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+        e.preventDefault();
+        if (isVoiceActive || activePopover !== 'voice') {
+          setPendingPermission('voice');
+        }
+      }
+      // Ctrl/Cmd + Shift + C = Toggle camera
+      else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'c') {
+        e.preventDefault();
+        if (cameraState || activePopover !== 'camera') {
+          setPendingPermission('camera');
+        }
+      }
+      // Ctrl/Cmd + Shift + S = Toggle screen share
+      else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 's') {
+        e.preventDefault();
+        if (isScreenSharing || activePopover !== 'screen') {
+          setPendingPermission('screen');
+        }
+      }
+      // ESC = Close active popover
+      else if (e.key === 'Escape' && activePopover) {
+        e.preventDefault();
+        closePopover();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePopover, isVoiceActive, cameraState, isScreenSharing]);
 
   // Don't render input in minimized state
   if (isMinimized) {
@@ -175,13 +318,11 @@ export function ChatInput({
   };
 
   return (
-    <div
-      className={cn(
-        "px-4 sm:px-6 pb-4 pt-2 safe-area-inset-bottom",
-        isExpanded ? "w-full bg-transparent pb-6 pt-4" : ""
-      )}
-    >
-      <div className="mx-auto w-full max-w-3xl">
+    <div className="w-full pb-[env(safe-area-inset-bottom)]">
+      <div className={cn(
+        "mx-auto w-full",
+        isExpanded ? "max-w-3xl" : "max-w-3xl px-4"
+      )}>
         <PromptInput
           className={cn(
             "flex flex-col gap-2 border border-border/30 bg-card/95 px-4 sm:px-6 pb-3 pt-3 shadow-[0_20px_60px_-40px_rgba(12,18,26,0.45)]",
@@ -216,29 +357,40 @@ export function ChatInput({
           {/* Primary actions */}
           {onOpenMeeting && onExportSummary && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <button
+              <Button
+                variant="outline"
                 onClick={onOpenMeeting}
                 className={cn(
-                  "flex items-center gap-2 border border-border/40 bg-card px-4 py-2 text-[11px] font-semibold tracking-[0.2em] text-foreground transition-colors duration-150 hover:bg-card/80",
+                  "min-h-[44px] gap-2 px-4 py-2 text-xs font-semibold tracking-wide",
                   VISUAL.CORNER_RADIUS,
-                  "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
+                  "border border-border/40 bg-card/90",
+                  "shadow-sm hover:shadow-md hover:bg-card/80",
+                  "transition-all duration-200",
+                  "active:scale-[0.98]",
+                  "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono [.monochrome_&]:shadow-none"
                 )}
               >
-                <Calendar className={CHAT_DESIGN.SIZES.ICON_MEDIUM} />
+                <Calendar className={CHAT_DESIGN.SIZES.ICON_MEDIUM} aria-hidden="true" />
                 Schedule a call
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
                 onClick={onExportSummary}
                 disabled={!sessionIdForExport}
                 className={cn(
-                  "flex items-center gap-2 border border-border/40 bg-card px-4 py-2 text-[11px] font-semibold tracking-[0.2em] text-foreground transition-colors duration-150 hover:bg-card/80 disabled:cursor-not-allowed disabled:opacity-50",
+                  "min-h-[44px] gap-2 px-4 py-2 text-xs font-semibold tracking-wide",
                   VISUAL.CORNER_RADIUS,
-                  "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
+                  "border border-border/40 bg-card/90",
+                  "shadow-sm hover:shadow-md hover:bg-card/80",
+                  "transition-all duration-200",
+                  "active:scale-[0.98]",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                  "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono [.monochrome_&]:shadow-none"
                 )}
               >
-                <Download className={CHAT_DESIGN.SIZES.ICON_MEDIUM} />
+                <Download className={CHAT_DESIGN.SIZES.ICON_MEDIUM} aria-hidden="true" />
                 Export summary
-              </button>
+              </Button>
             </div>
           )}
           <PromptInputBody className="flex flex-col gap-2">
@@ -295,22 +447,23 @@ export function ChatInput({
                 </PromptInputActionMenuContent>
               </PromptInputActionMenu>
 
-              <div ref={voiceButtonRef}>
+              <div ref={voiceButtonRef} className="flex items-center">
                 <VoiceButton
+                  state={
+                    voiceError ? "error" :
+                    isVoiceProcessing ? "processing" :
+                    isVoiceActive ? "recording" :
+                    "idle"
+                  }
+                  onPress={handleVoiceButtonClick}
+                  isExpanded={isExpanded}
+                  isMinimized={isMinimized}
+                  variant="ghost"
                   className={cn(
-                    "border border-border/40 transition-all duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
+                    "border border-border/40 transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 shadow-sm",
                     VISUAL.CORNER_RADIUS,
-                    "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono",
-                    isExpanded ? "h-8 w-8 shadow-md" : "h-6 w-6 shadow-sm",
-                    isVoiceActive ? "bg-[hsl(var(--foreground))] text-[hsl(var(--background))]" : ""
+                    isVoiceActive ? "bg-[hsl(var(--foreground))] text-[hsl(var(--background))]" : "bg-muted"
                   )}
-                  size={isExpanded ? 16 : 12}
-                  disabled={!isVoiceSupported}
-                  isActive={isVoiceActive}
-                  isProcessing={isVoiceProcessing}
-                  isMuted={isMuted}
-                  error={voiceError}
-                  onToggle={handleVoiceButtonClick}
                 />
               </div>
 
@@ -318,22 +471,22 @@ export function ChatInput({
                 <PromptInputButton
                   variant="ghost"
                   className={cn(
-                    "flex items-center justify-center border border-border/40 transition-all duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
+                    "flex items-center justify-center border border-border/40 transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
                     VISUAL.CORNER_RADIUS,
                     "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono",
-                    isExpanded ? "h-8 w-8 shadow-md" : "h-6 w-6 shadow-sm",
+                    isExpanded ? "h-10 w-10 shadow-md min-h-[44px] min-w-[44px]" : "h-9 w-9 shadow-sm min-h-[44px] min-w-[44px]",
                     cameraState 
                       ? "bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-[0_18px_40px_-28px_rgba(12,18,26,0.65)]" 
                       : "bg-muted text-foreground/70 hover:bg-card hover:text-foreground"
                   )}
                   onClick={handleCameraButtonClick}
-                  aria-label={`${cameraState ? 'Disable' : 'Enable'} camera`}
-                  title={`${cameraState ? 'Disable' : 'Enable'} camera`}
+                  aria-label={`${cameraState ? 'Stop' : 'Start'} camera`}
+                  title={`${cameraState ? 'Stop' : 'Start'} camera`}
                 >
                   {cameraState ? (
-                    <Camera className={cn("", isExpanded ? "h-4 w-4" : "h-3 w-3")} aria-hidden="true" />
+                    <Camera className={cn("", isExpanded ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
                   ) : (
-                    <CameraOff className={cn("", isExpanded ? "h-4 w-4" : "h-3 w-3")} aria-hidden="true" />
+                    <CameraOff className={cn("", isExpanded ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
                   )}
                 </PromptInputButton>
               </div>
@@ -342,22 +495,22 @@ export function ChatInput({
                 <PromptInputButton
                   variant="ghost"
                   className={cn(
-                    "flex items-center justify-center border border-border/40 transition-all duration-150 hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
+                    "flex items-center justify-center border border-border/40 transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
                     VISUAL.CORNER_RADIUS,
                     "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono",
-                    isExpanded ? "h-8 w-8 shadow-md" : "h-6 w-6 shadow-sm",
+                    isExpanded ? "h-10 w-10 shadow-md min-h-[44px] min-w-[44px]" : "h-9 w-9 shadow-sm min-h-[44px] min-w-[44px]",
                     isScreenSharing
                       ? "bg-[hsl(var(--foreground))] text-[hsl(var(--background))] shadow-[0_18px_40px_-28px_rgba(12,18,26,0.65)]"
                       : "bg-muted text-foreground/70 hover:bg-card hover:text-foreground"
                   )}
                   onClick={handleScreenButtonClick}
-                  aria-label="Toggle screen share"
-                  title="Toggle screen share"
+                  aria-label={`${isScreenSharing ? 'Stop' : 'Start'} screen sharing`}
+                  title={`${isScreenSharing ? 'Stop' : 'Start'} screen sharing`}
                 >
                   {isScreenSharing ? (
-                    <Monitor className={cn("", isExpanded ? "h-4 w-4" : "h-3 w-3")} aria-hidden="true" />
+                    <Monitor className={cn("", isExpanded ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
                   ) : (
-                    <MonitorOff className={cn("", isExpanded ? "h-4 w-4" : "h-3 w-3")} aria-hidden="true" />
+                    <MonitorOff className={cn("", isExpanded ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
                   )}
                 </PromptInputButton>
               </div>
@@ -365,16 +518,16 @@ export function ChatInput({
               <PromptInputButton
                 variant="ghost"
                 className={cn(
-                  "flex items-center justify-center border border-border/40 bg-muted text-foreground/70 transition-all duration-150 hover:scale-105 hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
+                  "flex items-center justify-center border border-border/40 bg-muted text-foreground/70 transition-all duration-150 hover:scale-105 active:scale-95 hover:bg-card hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
                   VISUAL.CORNER_RADIUS,
                   "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono",
-                  isExpanded ? "h-8 w-8 shadow-md" : "h-6 w-6 shadow-sm"
+                  isExpanded ? "h-10 w-10 shadow-md min-h-[44px] min-w-[44px]" : "h-9 w-9 shadow-sm min-h-[44px] min-w-[44px]"
                 )}
                 onClick={onToggleSettings}
-                aria-label="Chat settings"
-                title="Chat settings"
+                aria-label="Open chat settings"
+                title="Settings"
               >
-                <Settings className={cn("text-foreground/70", isExpanded ? "h-4 w-4" : "h-3 w-3")} aria-hidden="true" />
+                <Settings className={cn("text-foreground/70", isExpanded ? "h-5 w-5" : "h-4 w-4")} aria-hidden="true" />
               </PromptInputButton>
             </PromptInputTools>
 
@@ -394,6 +547,9 @@ export function ChatInput({
           <div className="px-1 sm:px-2 text-[10px] text-muted-foreground/65 text-right">
             <span className="font-semibold tracking-[0.3em] uppercase">Shift + Enter</span> for newline
           </div>
+          <div className="px-1 sm:px-2 mt-1 text-[10px] text-muted-foreground/65 text-center tracking-[0.3em] uppercase">
+            Strategic guidance only - not legal, medical, or financial advice.
+          </div>
         </PromptInputBody>
         </PromptInput>
       </div>
@@ -409,7 +565,7 @@ export function ChatInput({
           isActive={isVoiceActive}
           isProcessing={isVoiceProcessing}
           isSupported={isVoiceSupported}
-          isMuted={isMuted}
+          isInitializing={isVoiceInitializing}
           transcript={voiceTranscript}
           partialTranscript={voicePartialTranscript}
           error={voiceError}
@@ -425,11 +581,12 @@ export function ChatInput({
       >
         <CameraPopoverSection
           isActive={cameraState}
+          isInitializing={isCameraInitializing}
           stream={cameraStream}
           error={cameraError}
           onToggle={handleCameraButtonClick}
           onSwitchCamera={onSwitchCamera}
-          availableDevices={2} // TODO: Get actual device count
+          availableDevices={availableCameras}
         />
       </MediaPopover>
 
@@ -441,11 +598,20 @@ export function ChatInput({
       >
         <ScreenPopoverSection
           isActive={isScreenSharing}
+          isInitializing={isScreenShareInitializing}
           stream={screenShareStream}
           error={screenShareError}
           onToggle={handleScreenButtonClick}
         />
       </MediaPopover>
+
+      {/* Permission Explanation Dialog */}
+      <PermissionExplanationDialog
+        type={pendingPermission}
+        isOpen={pendingPermission !== null}
+        onAccept={handlePermissionAccept}
+        onDecline={handlePermissionDecline}
+      />
     </div>
   );
 }

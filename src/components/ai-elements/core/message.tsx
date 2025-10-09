@@ -15,8 +15,8 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
-      "group flex w-full items-end gap-2 py-4",
-      from === "user" ? "is-user justify-end" : "is-assistant flex-row-reverse justify-start",
+      "group flex w-full items-start gap-1.5 py-1.5",
+      from === "user" ? "is-user justify-end" : "is-assistant justify-start",
       className
     )}
     {...props}
@@ -24,23 +24,24 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
 );
 
 const messageContentVariants = cva(
-  "flex flex-col gap-2 overflow-hidden text-sm",
+  "flex flex-col gap-1 overflow-hidden text-sm",
   {
     variants: {
       variant: {
         contained: [
-          "max-w-[80%] px-4 py-3",
+          "max-w-[75%] px-3 py-1.5 rounded-2xl",
           "group-[.is-user]:bg-[hsl(var(--chat-user-bg))] group-[.is-user]:text-[hsl(var(--chat-user-text))]",
-          "group-[.is-assistant]:bg-[hsl(var(--chat-assistant-bg))] group-[.is-assistant]:text-[hsl(var(--chat-assistant-text))] group-[.is-assistant]:border group-[.is-assistant]:border-[hsl(var(--chat-assistant-border))]",
+          "group-[.is-assistant]:bg-[hsl(var(--chat-assistant-bg))] group-[.is-assistant]:text-[hsl(var(--chat-assistant-text))] group-[.is-assistant]:border group-[.is-assistant]:border-[hsl(var(--chat-assistant-border))/50]",
         ],
         flat: [
-          "group-[.is-user]:max-w-[80%]",
+          "group-[.is-user]:max-w-[75%]",
+          "group-[.is-assistant]:max-w-[75%]",
           "group-[.is-assistant]:text-foreground",
         ],
       },
     },
     defaultVariants: {
-      variant: "contained",
+      variant: "flat",
     },
   }
 );
@@ -73,9 +74,9 @@ export const MessageAvatar = ({
   className,
   ...props
 }: MessageAvatarProps) => (
-  <Avatar className={cn("size-8 ring-1 ring-border/40 shadow-sm", className)} {...props}>
+  <Avatar className={cn("size-6 ring-0", className)} {...props}>
     {src && <AvatarImage alt="" className="mt-0 mb-0" src={src} />}
-    <AvatarFallback className="text-muted-foreground">
+    <AvatarFallback className="text-[10px] text-muted-foreground">
       {name?.slice(0, 2).toUpperCase() || "AI"}
     </AvatarFallback>
   </Avatar>

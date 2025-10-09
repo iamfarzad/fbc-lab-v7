@@ -60,7 +60,7 @@ export const ChainOfThought = memo(
     return (
       <ChainOfThoughtContext.Provider value={{ isOpen, setIsOpen }}>
         <div
-          className={cn("not-prose max-w-prose space-y-4", "[.monochrome_&]:font-mono [.monochrome_&]:space-y-2", className)}
+          className={cn("not-prose max-w-prose space-y-2", "[.monochrome_&]:font-mono [.monochrome_&]:space-y-1", className)}
           {...props}
         >
           {children}
@@ -82,18 +82,18 @@ export const ChainOfThoughtHeader = memo(
       <Collapsible onOpenChange={setIsOpen} open={isOpen}>
         <CollapsibleTrigger
           className={cn(
-            "flex w-full items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground",
+            "flex w-full items-center gap-1.5 text-muted-foreground text-[13px] transition-colors hover:text-foreground",
             className
           )}
           {...props}
         >
-          <BrainIcon className="size-4" />
+          <BrainIcon className="size-3.5" />
           <span className="flex-1 text-left">
             {children ?? "Chain of Thought"}
           </span>
           <ChevronDownIcon
             className={cn(
-              "size-4 transition-transform",
+              "size-3 transition-transform",
               isOpen ? "rotate-180" : "rotate-0"
             )}
           />
@@ -129,7 +129,7 @@ export const ChainOfThoughtStep = memo(
     return (
       <div
         className={cn(
-          "flex gap-2 text-sm",
+          "flex gap-1.5 text-[13px]",
           statusStyles[status],
           "fade-in-0 slide-in-from-top-2 animate-in",
           className
@@ -137,13 +137,13 @@ export const ChainOfThoughtStep = memo(
         {...props}
       >
         <div className="relative mt-0.5">
-          <Icon className="size-4" />
-          <div className="-mx-px absolute top-7 bottom-0 left-1/2 w-px bg-border" />
+          <Icon className="size-3.5" />
+          <div className="-mx-px absolute top-6 bottom-0 left-1/2 w-px bg-border/50" />
         </div>
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 space-y-1">
           <div>{label}</div>
           {description && (
-            <div className="text-muted-foreground text-xs">{description}</div>
+            <div className="text-muted-foreground text-[11px]">{description}</div>
           )}
           {children}
         </div>
@@ -165,7 +165,7 @@ export type ChainOfThoughtSearchResultProps = ComponentProps<typeof Badge>;
 export const ChainOfThoughtSearchResult = memo(
   ({ className, children, ...props }: ChainOfThoughtSearchResultProps) => (
     <Badge
-      className={cn("gap-1 px-2 py-0.5 font-normal text-xs", className)}
+      className={cn("gap-1 px-1.5 py-0.5 font-normal text-[10px] h-4", className)}
       variant="secondary"
       {...props}
     >
@@ -186,7 +186,7 @@ export const ChainOfThoughtContent = memo(
       <Collapsible open={isOpen}>
         <CollapsibleContent
           className={cn(
-            "mt-2 space-y-3",
+            "mt-1.5 space-y-2",
             "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
             className
           )}
@@ -205,11 +205,11 @@ export type ChainOfThoughtImageProps = ComponentProps<"div"> & {
 
 export const ChainOfThoughtImage = memo(
   ({ className, children, caption, ...props }: ChainOfThoughtImageProps) => (
-    <div className={cn("mt-2 space-y-2", className)} {...props}>
-      <div className="relative flex max-h-[22rem] items-center justify-center overflow-hidden rounded-lg bg-muted p-3 [.monochrome_&]:rounded-none">
+    <div className={cn("mt-1.5 space-y-1.5", className)} {...props}>
+      <div className="relative flex max-h-[22rem] items-center justify-center overflow-hidden rounded-md bg-muted/30 p-2 [.monochrome_&]:rounded-none">
         {children}
       </div>
-      {caption && <p className="text-muted-foreground text-xs">{caption}</p>}
+      {caption && <p className="text-muted-foreground text-[11px]">{caption}</p>}
     </div>
   )
 );

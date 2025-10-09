@@ -209,9 +209,9 @@ export type OpenInTriggerProps = ComponentProps<typeof DropdownMenuTrigger>;
 export const OpenInTrigger = ({ children, ...props }: OpenInTriggerProps) => (
   <DropdownMenuTrigger {...props} asChild>
     {children ?? (
-      <Button type="button" variant="outline">
+      <Button type="button" variant="outline" className="text-[13px] h-8">
         Open in chat
-        <ChevronDownIcon className="ml-2 size-4" />
+        <ChevronDownIcon className="ml-1.5 size-3" />
       </Button>
     )}
   </DropdownMenuTrigger>
@@ -224,14 +224,14 @@ export const OpenInChatGPT = (props: OpenInChatGPTProps) => {
   return (
     <DropdownMenuItem asChild {...props}>
       <a
-        className="flex items-center gap-2"
+        className="flex items-center gap-1.5 text-[13px]"
         href={providers.chatgpt.createUrl(query)}
         rel="noopener"
         target="_blank"
       >
-        <span className="shrink-0">{providers.chatgpt.icon}</span>
+        <span className="shrink-0 size-3.5">{providers.chatgpt.icon}</span>
         <span className="flex-1">{providers.chatgpt.title}</span>
-        <ExternalLinkIcon className="size-4 shrink-0" />
+        <ExternalLinkIcon className="size-3 shrink-0" />
       </a>
     </DropdownMenuItem>
   );
@@ -244,14 +244,14 @@ export const OpenInClaude = (props: OpenInClaudeProps) => {
   return (
     <DropdownMenuItem asChild {...props}>
       <a
-        className="flex items-center gap-2"
+        className="flex items-center gap-1.5 text-[13px]"
         href={providers.claude.createUrl(query)}
         rel="noopener"
         target="_blank"
       >
-        <span className="shrink-0">{providers.claude.icon}</span>
+        <span className="shrink-0 size-3.5">{providers.claude.icon}</span>
         <span className="flex-1">{providers.claude.title}</span>
-        <ExternalLinkIcon className="size-4 shrink-0" />
+        <ExternalLinkIcon className="size-3 shrink-0" />
       </a>
     </DropdownMenuItem>
   );
@@ -264,14 +264,14 @@ export const OpenInT3 = (props: OpenInT3Props) => {
   return (
     <DropdownMenuItem asChild {...props}>
       <a
-        className="flex items-center gap-2"
+        className="flex items-center gap-1.5 text-[13px]"
         href={providers.t3.createUrl(query)}
         rel="noopener"
         target="_blank"
       >
-        <span className="shrink-0">{providers.t3.icon}</span>
+        <span className="shrink-0 size-3.5">{providers.t3.icon}</span>
         <span className="flex-1">{providers.t3.title}</span>
-        <ExternalLinkIcon className="size-4 shrink-0" />
+        <ExternalLinkIcon className="size-3 shrink-0" />
       </a>
     </DropdownMenuItem>
   );
@@ -284,14 +284,14 @@ export const OpenInScira = (props: OpenInSciraProps) => {
   return (
     <DropdownMenuItem asChild {...props}>
       <a
-        className="flex items-center gap-2"
+        className="flex items-center gap-1.5 text-[13px]"
         href={providers.scira.createUrl(query)}
         rel="noopener"
         target="_blank"
       >
-        <span className="shrink-0">{providers.scira.icon}</span>
+        <span className="shrink-0 size-3.5">{providers.scira.icon}</span>
         <span className="flex-1">{providers.scira.title}</span>
-        <ExternalLinkIcon className="size-4 shrink-0" />
+        <ExternalLinkIcon className="size-3 shrink-0" />
       </a>
     </DropdownMenuItem>
   );
@@ -304,14 +304,14 @@ export const OpenInv0 = (props: OpenInv0Props) => {
   return (
     <DropdownMenuItem asChild {...props}>
       <a
-        className="flex items-center gap-2"
+        className="flex items-center gap-1.5 text-[13px]"
         href={providers.v0.createUrl(query)}
         rel="noopener"
         target="_blank"
       >
-        <span className="shrink-0">{providers.v0.icon}</span>
+        <span className="shrink-0 size-3.5">{providers.v0.icon}</span>
         <span className="flex-1">{providers.v0.title}</span>
-        <ExternalLinkIcon className="size-4 shrink-0" />
+        <ExternalLinkIcon className="size-3 shrink-0" />
       </a>
     </DropdownMenuItem>
   );

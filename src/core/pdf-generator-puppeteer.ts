@@ -52,6 +52,11 @@ interface SummaryData {
 
 type Mode = 'client' | 'internal'
 
+interface ConversationPair {
+  user: { content: string; timestamp: string }
+  assistant?: { content: string; timestamp: string }
+}
+
 /**
  * Lightweight text helper until the Gemini translator is migrated.
  */
@@ -172,6 +177,20 @@ async function generatePdfWithPdfLib(
     writeLine('Consultant Brief', 14, true)
     await writeParagraph(summaryData.leadResearch.consultant_brief)
     cursorY -= 4
+  }
+
+  const conversationPairs = buildConversationPairs(summaryData.conversationHistory)
+  if (conversationPairs.length > 0) {
+    writeLine('Conversation Highlights', 14, true)
+    for (const pair of conversationPairs.slice(-6)) {
+      writeLine('You', 11, true)
+      await writeParagraph(shortenText(pair.user.content))
+      if (pair.assistant?.content) {
+        writeLine('F.B/c', 11, true)
+        await writeParagraph(shortenText(pair.assistant.content))
+      }
+      cursorY -= 6
+    }
   }
 
   if (summaryData.researchHighlights && summaryData.researchHighlights.length > 0) {
@@ -321,6 +340,7 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
   const leadName = summaryData.leadInfo.name || 'Valued Client'
   const translatedSummary = await translateText(summaryData.leadResearch?.conversation_summary || '')
   const translatedBrief = await translateText(summaryData.leadResearch?.consultant_brief || '')
+  const conversationPairs = buildConversationPairs(summaryData.conversationHistory)
 
   const escapeHtml = (value: string) =>
     value
@@ -347,16 +367,16 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
   const researchSection = (summaryData.researchHighlights && summaryData.researchHighlights.length > 0)
     ? `<section class="section">
       <h2>Research Highlights</h2>
-      ${summaryData.researchHighlights.map((highlight, index) => {
+      ${summaryData.researchHighlights.slice(0, 3).map((highlight, index) => {
         const sources = Array.isArray(highlight.urlsUsed)
-          ? `<ul>${highlight.urlsUsed.map(url => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a></li>`).join('')}</ul>`
+          ? `<ul>${highlight.urlsUsed.slice(0, 5).map(url => `<li><a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a></li>`).join('')}</ul>`
           : ''
         const metrics = [
           typeof highlight.citationCount === 'number' ? `Citations: ${highlight.citationCount}` : '',
           typeof highlight.searchGroundingUsed === 'number' ? `Search Grounding: ${highlight.searchGroundingUsed}` : '',
           typeof highlight.urlContextUsed === 'number' ? `URL Context: ${highlight.urlContextUsed}` : ''
         ].filter(Boolean).join(' • ')
-        const answer = highlight.combinedAnswer ? `<p>${escapeHtml(highlight.combinedAnswer)}</p>` : ''
+        const answer = highlight.combinedAnswer ? `<p>${escapeHtml(shortenText(highlight.combinedAnswer))}</p>` : ''
         const metricBlock = metrics ? `<p><strong>${metrics}</strong></p>` : ''
         const note = highlight.error ? `<p>Note: ${escapeHtml(highlight.error)}</p>` : ''
         return `<article>
@@ -401,6 +421,18 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
     highlight: '#161616'
   } as const
 
+  const conversationSection = conversationPairs.length > 0
+    ? `<section class="section">
+        <h2>Conversation Highlights</h2>
+        ${conversationPairs.slice(-6).map((pair) => `
+          <article>
+            <p><strong>You:</strong> ${escapeHtml(shortenText(pair.user.content))}</p>
+            ${pair.assistant?.content ? `<p><strong>F.B/c:</strong> ${escapeHtml(shortenText(pair.assistant.content))}</p>` : ''}
+          </article>
+        `).join('')}
+      </section>`
+    : ''
+
   return `<!DOCTYPE html>
 <html lang="${language}">
 <head>
@@ -442,6 +474,8 @@ async function generateHtmlContent(summaryData: SummaryData, mode: Mode, languag
       <p>${translatedBrief || 'We have compiled the key findings and recommendations for your team.'}</p>
     </section>
 
+    ${conversationSection}
+
     ${researchSection}
 
     ${artifactsSection}
@@ -472,4 +506,54 @@ export function resolveAssetPath(relativePath: string) {
   }
   
   return path.resolve(currentDir, relativePath)
+}
+
+function buildConversationPairs(history: SummaryData['conversationHistory'] = []): ConversationPair[] {
+  const pairs: ConversationPair[] = []
+  let pendingUser: { content: string; timestamp: string } | null = null
+
+  for (const entry of history) {
+    const trimmed = entry.content?.trim()
+    if (!trimmed) continue
+
+    if (entry.role === 'user') {
+      pendingUser = { content: trimmed, timestamp: entry.timestamp }
+    } else if (entry.role === 'assistant') {
+      if (pendingUser) {
+        pairs.push({ user: pendingUser, assistant: { content: trimmed, timestamp: entry.timestamp } })
+        pendingUser = null
+      } else if (pairs.length > 0) {
+        const last = pairs[pairs.length - 1]
+        if (!last.assistant) {
+          last.assistant = { content: trimmed, timestamp: entry.timestamp }
+        }
+      }
+    }
+  }
+
+  if (pendingUser) {
+    pairs.push({ user: pendingUser })
+  }
+
+  return pairs
+}
+
+function shortenText(text: string, sentenceLimit = 2): string {
+  if (!text) return ''
+  const sanitized = text.replace(/\s+/g, ' ').trim()
+  const sentenceEnd = /[.!?] +/g
+  const sentences: string[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = sentenceEnd.exec(sanitized)) !== null && sentences.length < sentenceLimit - 1) {
+    sentences.push(sanitized.slice(lastIndex, match.index + 1).trim())
+    lastIndex = match.index + match[0].length
+  }
+
+  if (lastIndex < sanitized.length && sentences.length < sentenceLimit) {
+    sentences.push(sanitized.slice(lastIndex).trim())
+  }
+
+  return sentences.join(' ')
 }
