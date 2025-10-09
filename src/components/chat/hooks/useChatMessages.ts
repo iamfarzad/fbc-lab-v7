@@ -34,6 +34,16 @@ type SendMessagePayload = string | {
   attachments?: PromptInputFile[];
 };
 
+type SourceMetadata = {
+  id: string;
+  title: string;
+  url: string;
+  snippet?: string;
+  description?: string;
+  relevanceScore?: number;
+  [key: string]: any;
+};
+
 export function useChatMessages(initialSessionId?: string) {
   const [inputValue, setInputValue] = useState('');
   const [sessionId, setSessionId] = useState(() => initialSessionId ?? crypto.randomUUID());
@@ -90,7 +100,7 @@ export function useChatMessages(initialSessionId?: string) {
       const contextUsage = msg.metadata?.contextUsage
       const codeBlocks = msg.metadata?.codeBlocks
       const aiSources = Array.isArray(msg.metadata?.sources)
-        ? (msg.metadata!.sources as Array<Record<string, any>>)
+        ? (msg.metadata!.sources as SourceMetadata[])
         : undefined
       const images = msg.metadata?.images
       const inlineCitations = msg.metadata?.inlineCitations
@@ -124,9 +134,10 @@ export function useChatMessages(initialSessionId?: string) {
                     title,
                     url,
                     snippet,
+                    description: snippet,
                   };
                 })
-                .filter(Boolean) as Array<{ id: string; title: string; url: string; snippet?: string }>;
+                .filter(Boolean) as SourceMetadata[];
               if (mapped.length > 0) return mapped;
             }
             if (Array.isArray(researchMetadata?.urlsUsed)) {
@@ -139,15 +150,16 @@ export function useChatMessages(initialSessionId?: string) {
                     url,
                   };
                 })
-                .filter(Boolean) as Array<{ id: string; title: string; url: string }>;
+                .filter(Boolean) as SourceMetadata[];
               if (mapped.length > 0) return mapped;
             }
             return undefined;
           })()
         : undefined;
 
-      if (aiSources || fallbackSources) {
-        metadataPayload.sources = aiSources ?? fallbackSources;
+      const combinedSources = aiSources ?? fallbackSources;
+      if (combinedSources) {
+        metadataPayload.sources = combinedSources;
       }
       if (researchMetadata && typeof researchMetadata === 'object') {
         const researchSummary = {

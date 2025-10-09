@@ -15,8 +15,61 @@ import {
   Part,
   Session,
 } from '@google/genai';
-import EventEmitter from 'eventemitter3';
-import { difference } from 'lodash-es';
+
+type EventMap = Record<string, (...args: any[]) => void>;
+
+class TypedEventEmitter<Events extends EventMap> {
+  private listeners = new Map<keyof Events, Set<(...args: any[]) => void>>();
+
+  on<K extends keyof Events>(event: K, listener: Events[K]): this {
+    const existing = this.listeners.get(event) ?? new Set<(...args: any[]) => void>();
+    existing.add(listener as unknown as (...args: any[]) => void);
+    this.listeners.set(event, existing);
+    return this;
+  }
+
+  off<K extends keyof Events>(event: K, listener: Events[K]): this {
+    const existing = this.listeners.get(event);
+    if (existing) {
+      existing.delete(listener as unknown as (...args: any[]) => void);
+      if (existing.size === 0) {
+        this.listeners.delete(event);
+      }
+    }
+    return this;
+  }
+
+  once<K extends keyof Events>(event: K, listener: Events[K]): this {
+    const wrapper = (...args: Parameters<Events[K]>) => {
+      this.off(event, wrapper as unknown as Events[K]);
+      listener(...args);
+    };
+    return this.on(event, wrapper as unknown as Events[K]);
+  }
+
+  emit<K extends keyof Events>(event: K, ...args: Parameters<Events[K]>): boolean {
+    const existing = this.listeners.get(event);
+    if (!existing || existing.size === 0) return false;
+    for (const handler of Array.from(existing)) {
+      (handler as (...handlerArgs: Parameters<Events[K]>) => void)(...args);
+    }
+    return true;
+  }
+
+  removeAllListeners(event?: keyof Events): this {
+    if (typeof event === 'undefined') {
+      this.listeners.clear();
+    } else {
+      this.listeners.delete(event);
+    }
+    return this;
+  }
+}
+
+function difference<T>(array: readonly T[], values: readonly T[]): T[] {
+  const exclude = new Set(values);
+  return array.filter((item) => !exclude.has(item));
+}
 
 /**
  * Event types that can be emitted by the GenAILiveClient.
@@ -37,9 +90,10 @@ export interface LiveClientEventTypes {
   turncomplete: () => void;
   inputTranscription: (text: string, isFinal: boolean) => void;
   outputTranscription: (text: string, isFinal: boolean) => void;
+  [key: string]: (...args: any[]) => void;
 }
 
-export class GenAILiveClient extends EventEmitter<LiveClientEventTypes> {
+export class GenAILiveClient extends TypedEventEmitter<LiveClientEventTypes> {
   public readonly model: string = 'gemini-2.5-flash-native-audio-preview-09-2025';
 
   protected readonly client: GoogleGenAI;

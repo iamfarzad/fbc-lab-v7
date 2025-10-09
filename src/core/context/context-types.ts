@@ -44,6 +44,9 @@ export interface ConversationEntry {
     imageSize?: number;
     confidence?: number;
     transcription?: string;
+    speaker?: 'user' | 'assistant' | 'model';
+    languageCode?: string;
+    [key: string]: unknown;
   };
 }
 

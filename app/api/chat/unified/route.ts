@@ -50,6 +50,7 @@ interface ChatContext {
   multimodalData?: MultimodalData
   enhancedResearch?: boolean // Enable enhanced grounding research
   conversationFlow?: ConversationFlowSnapshot
+  voiceActive?: boolean
 }
 
 type ConversationFlowSnapshot = {

@@ -17,6 +17,7 @@ export interface EnhancedChatMessage {
       title: string;
       url: string;
       snippet?: string;
+      description?: string;
       relevanceScore?: number;
     }>;
     reasoning?: string;
@@ -180,6 +181,7 @@ export interface Source {
   title: string;
   url: string;
   snippet?: string;
+  description?: string;
   relevanceScore?: number;
   type?: 'web' | 'document' | 'database' | 'api' | 'local';
   metadata?: Record<string, any>;

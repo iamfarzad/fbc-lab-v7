@@ -138,10 +138,6 @@ export class ConversationalIntelligence {
       
       console.log(`🎤 Voice intent: ${intent.type} (${Math.round(intent.confidence * 100)}%)`)
 
-      // Update context with voice-derived insights
-      await updateContext(sessionId, {
-        lastUserMessage: transcript,
-      })
     } catch (err) {
       console.error('Voice transcript analysis failed (non-fatal):', err)
       // Don't throw - this is best-effort analysis

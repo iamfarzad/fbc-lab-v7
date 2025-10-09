@@ -185,16 +185,32 @@ export class MultimodalContextManager {
       timestamp: new Date().toISOString(),
       modality: 'audio', // not 'voice'
       content: transcription,
-      metadata: { duration, transcription, ...(metadata ?? {}) }
+      metadata: {
+        duration,
+        transcription,
+        confidence: metadata?.confidence,
+        ...(typeof metadata?.sampleRate === 'number' ? { sampleRate: metadata.sampleRate } : {}),
+        ...(metadata?.format ? { format: metadata.format } : {}),
+      }
     }
 
     context.conversationHistory.push(convEntry)
 
     // Add to audio context
     const audioEntry: AudioEntry = {
-      mimeType: metadata?.format ?? 'audio/wav',
-      data: transcription, // store transcription as data for now
-      durationMs: duration
+      id: convEntry.id,
+      type: 'voice_transcript',
+      timestamp: convEntry.timestamp,
+      data: {
+        transcript: transcription,
+        isFinal: true,
+        duration,
+        languageCode: metadata?.format?.includes('nb-NO') ? 'nb-NO' : 'en-US',
+      },
+      metadata: {
+        confidence: metadata?.confidence ?? 1,
+        format: metadata?.format ?? 'pcm16@16000',
+      }
     }
 
     context.audioContext.push(audioEntry)
@@ -317,13 +333,24 @@ export class MultimodalContextManager {
       
       // Add to conversation history if final
       if (isFinal && transcript.trim().length > 0) {
-        context.conversationHistory.push({
+        const conversationEntryMetadata: ConversationEntry['metadata'] = {
+          transcription: transcript,
+          confidence: metadata?.confidence ?? 1,
+          speaker: role === 'assistant' ? 'model' : 'user',
+          languageCode: audioEntry.data.languageCode,
+        }
+        if (typeof metadata?.size === 'number') {
+          conversationEntryMetadata.duration = metadata.size;
+        }
+
+        const conversationEntry: ConversationEntry = {
           id: audioEntry.id,
-          role: role === 'assistant' ? 'model' : 'user',
           timestamp: entryTimestamp,
           content: transcript,
-          modality: 'audio'
-        })
+          modality: 'audio',
+          metadata: conversationEntryMetadata
+        }
+        context.conversationHistory.push(conversationEntry)
       }
 
       context.metadata.lastUpdated = entryTimestamp

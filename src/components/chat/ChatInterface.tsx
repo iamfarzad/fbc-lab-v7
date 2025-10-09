@@ -53,6 +53,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const messagesHook = useChatMessages(sessionId);
   const [lastScreenSnapshot, setLastScreenSnapshot] = useState<{ analysis: string; imageData?: string; capturedAt: number } | null>(null);
   const [lastWebcamSnapshot, setLastWebcamSnapshot] = useState<{ analysis: string; capturedAt: number } | null>(null);
+  const audioHookRef = useRef<ReturnType<typeof useRealtimeVoice> | null>(null);
   const {
     appendVoiceUserMessage,
     appendVoiceAssistantChunk,
@@ -214,11 +215,33 @@ export function ChatInterface({ id }: { id?: string | null }) {
       }
     }
 
-    audioHook.sendToolResult(responses);
-  }, [audioHook, lastScreenSnapshot, lastWebcamSnapshot]);
+    const hook = audioHookRef.current;
+    if (!hook) return;
+    hook.sendToolResult(responses);
+  }, [lastScreenSnapshot, lastWebcamSnapshot]);
 
   const handleVoiceToolResult = useCallback((result: any) => {
     console.log('🛠️ Voice tool result:', result);
+    const payload = result?.payload ?? result;
+    const errorMessage: string | undefined =
+      typeof payload?.error === 'string' ? payload.error : undefined;
+
+    if (errorMessage) {
+      toast.error(errorMessage, { id: 'voice-tool-call' });
+      return;
+    }
+
+    const responses = Array.isArray(payload?.responses) ? payload.responses : [];
+    const failedResponse = responses.find((item: any) => item?.response?.json?.success === false);
+    if (failedResponse) {
+      const failureMessage =
+        typeof failedResponse.response?.json?.error === 'string'
+          ? failedResponse.response.json.error
+          : 'Tool execution failed.';
+      toast.error(failureMessage, { id: 'voice-tool-call' });
+      return;
+    }
+
     toast.success('Tool result ready.', { id: 'voice-tool-call' });
   }, []);
 
@@ -239,6 +262,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     onToolResult: handleVoiceToolResult,
     onError: handleVoiceError,
   });
+  audioHookRef.current = audioHook;
   const voiceConnectionId = audioHook.session?.connectionId ?? null;
 
   // Toggle voice session (start/stop, not just mute)

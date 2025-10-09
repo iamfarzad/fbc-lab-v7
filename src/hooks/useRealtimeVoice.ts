@@ -218,7 +218,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
       case 'input_transcript': {
-        const isFinal = event.payload.isFinal ?? event.payload.final ?? false
+        const isFinal = event.payload.isFinal === true
         if (isFinal) {
           setTranscript((prev) => (prev ? `${prev}\n${event.payload.text}` : event.payload.text));
           setPartialTranscript('');
@@ -449,7 +449,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   useEffect(() => {
     return () => {
       void resetRecording();
-      audioStreamerRef.current?.destroy();
+      if (audioQueueRef.current) {
+        audioQueueRef.current.destroy();
+        audioQueueRef.current = null;
+      }
     };
   }, [resetRecording]);
 

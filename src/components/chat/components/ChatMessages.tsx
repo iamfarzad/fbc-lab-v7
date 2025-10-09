@@ -382,7 +382,7 @@ export function ChatMessages({
                       {/* Sources Display */}
                       {aiElements?.showSources && message.metadata?.sources && message.metadata.sources.length > 0 && (
                         <Sources>
-                          <SourcesTrigger {...({ count: message.metadata.sources.length } as any)} />
+                          <SourcesTrigger count={message.metadata.sources.length} />
                           <SourcesContent>
                             {message.metadata.sources.map((source, index) => (
                               <Source key={index} href={source.url} title={source.title}>
