@@ -445,13 +445,22 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       
       // Set timeout to handle case where server never responds
       sessionTimeoutRef.current = setTimeout(() => {
-        if (!isSessionActiveRef.current) {
+        console.log('🎤 [RealtimeVoice] Session timeout check:', {
+          isSessionActive: isSessionActiveRef.current,
+          hasSession: session !== null,
+          isRecording
+        });
+        
+        // Only timeout if session truly didn't start
+        if (!isSessionActiveRef.current && !session) {
           const timeoutMsg = 'Voice session failed to start - server did not respond in time';
-          console.error('🎤 [RealtimeVoice] Session timeout:', timeoutMsg);
+          console.error('🎤 [RealtimeVoice] Session timeout triggered');
           setError(timeoutMsg);
           setIsProcessing(false);
           callbacksRef.current?.onError?.(timeoutMsg);
           void stopRecording();
+        } else {
+          console.log('🎤 [RealtimeVoice] Session timeout check passed - session is active');
         }
       }, 10000); // 10 second timeout
     } catch (err) {
@@ -471,6 +480,13 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, [handleRecorderChunk, isSocketReady, sendMessage, session?.mock, startRecording, resetRecording, serverUrl]);
 
   const stopSession = useCallback(async () => {
+    console.log('🎤 [RealtimeVoice] stopSession called', {
+      isSessionActive,
+      isRecording,
+      isProcessing
+    });
+    console.trace('🎤 [RealtimeVoice] stopSession call stack:');
+    
     if (!isSessionActive && !isRecording && !isProcessing) {
       return;
     }

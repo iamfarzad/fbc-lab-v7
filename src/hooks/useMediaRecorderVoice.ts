@@ -316,6 +316,9 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
   }, [cleanupAudioWorklet, cleanupStream, handleDataAvailable, handleRecorderError, handleWorkletData, handleWorkletError, isSupported, pickMimeType, targetSampleRate]);
 
   const stopRecording = useCallback(async () => {
+    console.log('🎤 [useMediaRecorderVoice] stopRecording called');
+    console.trace('🎤 [useMediaRecorderVoice] stopRecording call stack:');
+    
     if (usingAudioWorkletRef.current && audioWorkletRecorderRef.current) {
       try {
         await audioWorkletRecorderRef.current.stop();

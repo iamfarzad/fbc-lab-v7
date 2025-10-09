@@ -87,7 +87,12 @@ export class AudioRecorder extends EventEmitter {
   }
 
   stop(): void {
+    if (!this.isActive) {
+      console.log('🎤 [AudioRecorder] Stop called but already inactive - ignoring duplicate stop');
+      return;
+    }
     console.log('🎤 [AudioRecorder] Stopping audio capture');
+    console.trace('🎤 [AudioRecorder] Stop call stack:');
     this.cleanup();
     this.isActive = false;
     this.emit('stop');

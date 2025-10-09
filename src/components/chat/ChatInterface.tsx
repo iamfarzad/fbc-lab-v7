@@ -267,12 +267,25 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   // Toggle voice session (start/stop, not just mute)
   const toggleVoiceSession = useCallback(async () => {
-    if (audioHook.isSessionActive) {
-      await audioHook.stopSession();
-    } else {
-      await audioHook.startSession({ sessionId });
+    const hook = audioHookRef.current;
+    if (!hook) {
+      console.error('🎤 [ChatInterface] Audio hook ref not available');
+      return;
     }
-  }, [audioHook, sessionId]);
+    
+    console.log('🎤 [ChatInterface] toggleVoiceSession called', {
+      isSessionActive: hook.isSessionActive,
+      isRecording: hook.isRecording
+    });
+    
+    if (hook.isSessionActive) {
+      console.log('🎤 [ChatInterface] Stopping session...');
+      await hook.stopSession();
+    } else {
+      console.log('🎤 [ChatInterface] Starting session...');
+      await hook.startSession({ sessionId });
+    }
+  }, [sessionId]);
   
   const intelligenceHook = useChatIntelligence(sessionId);
   const artifactsState = useArtifacts();
