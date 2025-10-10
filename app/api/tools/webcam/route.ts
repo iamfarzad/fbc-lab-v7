@@ -8,7 +8,7 @@ import { createHash } from 'crypto';
 const cachedAnalyzeImage = createCachedFunction(
   async (imageHash: string, base64: string, mimeType: string) => {
     const { text } = await generateText({
-      model: google('gemini-1.5-pro-latest'),
+      model: google('gemini-2.0-flash-exp'),
       messages: [
         {
           role: 'user',
