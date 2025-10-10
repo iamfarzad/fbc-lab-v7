@@ -24,11 +24,11 @@ export async function POST(req: NextRequest) {
     const proposalPrompt = `Based on this consulting conversation, generate a personalized proposal in markdown format:
 
 CLIENT PROFILE:
-- Name: ${context.name}
+- Name: ${(context as any).name || 'Not specified'}
 - Email: ${context.email}
-- Company: ${context.company_domain || 'Not specified'}
-- Industry: ${context.company_context?.summary || 'Not specified'}
-- Role: ${context.role_context?.summary || 'Not specified'}
+- Company: ${(context as any).company_domain || 'Not specified'}
+- Industry: ${typeof (context as any).company_context?.summary === 'string' ? (context as any).company_context.summary : 'Not specified'}
+- Role: ${typeof (context as any).role_context?.summary === 'string' ? (context as any).role_context.summary : 'Not specified'}
 
 CONVERSATION INSIGHTS:
 - Messages exchanged: ${usage.messages_sent}
@@ -37,7 +37,7 @@ CONVERSATION INSIGHTS:
 - Research performed: ${usage.research_calls_used} queries
 
 DISCOVERED CONTEXT:
-${context.industry_insights?.challenges || 'General AI consulting needs'}
+${typeof (context as any).industry_insights?.challenges === 'string' ? (context as any).industry_insights.challenges : 'General AI consulting needs'}
 
 Generate a professional proposal with these sections:
 
@@ -57,7 +57,7 @@ Choose one based on conversation depth:
 Include timeline and expected outcomes.
 
 ## Your Company Context
-${context.company_overview?.summary || 'Brief overview based on available information'}
+${typeof (context as any).company_overview?.summary === 'string' ? (context as any).company_overview.summary : 'Brief overview based on available information'}
 
 ## Next Steps
 1. Book a 30-minute strategy call: [calendly.com/farzad-fbc](https://calendly.com/farzad-fbc)
@@ -74,8 +74,7 @@ Format as clean, professional markdown. Be concise and specific.`;
     const result = await generateText({
       model,
       prompt: proposalPrompt,
-      temperature: 0.7,
-      maxTokens: 2000
+      temperature: 0.7
     });
 
     const proposalText = result.text;

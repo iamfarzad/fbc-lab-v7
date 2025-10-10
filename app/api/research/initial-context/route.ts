@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         research_status: 'skipped',
         reason: 'Generic email - business email required for full research'
       };
-      await contextStorage.set(sessionId, enrichedContext);
+      await contextStorage.store(sessionId, enrichedContext as any);
       return NextResponse.json({ 
         success: true,
         message: 'Business email required for full context research. Conversation will proceed with limited context.'
@@ -92,8 +92,8 @@ export async function POST(req: NextRequest) {
     
     // Check existing context - don't re-research if fresh (within 7 days)
     const existingContext = await contextStorage.get(sessionId);
-    if (existingContext?.research_timestamp) {
-      const age = Date.now() - existingContext.research_timestamp;
+    if ((existingContext as any)?.research_timestamp) {
+      const age = Date.now() - (existingContext as any).research_timestamp;
       const sevenDays = 7 * 24 * 60 * 60 * 1000;
       if (age < sevenDays) {
         console.log(`✅ Using cached research (age: ${Math.floor(age / 86400000)} days)`);
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
       raw_research: successfulResults
     };
     
-    await contextStorage.set(sessionId, enrichedContext);
+    await contextStorage.store(sessionId, enrichedContext as any);
     
     console.log(`✅ Comprehensive research completed for ${name}`);
     console.log(`   - Professional profile: ${professionalProfile?.citations?.length || 0} sources`);
@@ -223,13 +223,13 @@ export async function POST(req: NextRequest) {
     // Store minimal context so conversation can proceed
     try {
       const { name, email, sessionId } = await req.json();
-      await contextStorage.set(sessionId, {
+      await contextStorage.store(sessionId, {
         email,
         name,
         research_status: 'failed',
         research_error: error instanceof Error ? error.message : String(error),
         research_timestamp: Date.now()
-      });
+      } as any);
     } catch (storageError) {
       console.error('Failed to store error context:', storageError);
     }

@@ -847,28 +847,28 @@ Citations: ${researchResult.allCitations.length} sources processed
       const tools = {
         enable_voice: {
           description: 'Suggest enabling voice chat when user wants to talk verbally. Requires user approval.',
-          parameters: z.object({
+          inputSchema: z.object({
             reason: z.string().describe('Brief reason why voice would be helpful')
           })
         },
         
         enable_screen_share: {
           description: 'Suggest enabling screen share when user wants to show something visual. Requires user approval.',
-          parameters: z.object({
+          inputSchema: z.object({
             reason: z.string().describe('Brief reason why screen share would be helpful')
           })
         },
         
         enable_webcam: {
           description: 'Suggest enabling webcam when user wants video interaction. Requires user approval.',
-          parameters: z.object({
+          inputSchema: z.object({
             reason: z.string().describe('Brief reason why webcam would be helpful')
           })
         },
         
         create_calendar_widget: {
           description: 'Create an inline calendar booking widget for scheduling calls',
-          parameters: z.object({
+          inputSchema: z.object({
             title: z.string().describe('Title for the calendar widget'),
             description: z.string().optional().describe('Optional description'),
             url: z.string().optional().describe('Custom calendar URL (defaults to Farzad\'s Calendly)')
@@ -877,7 +877,7 @@ Citations: ${researchResult.allCitations.length} sources processed
         
         create_chart: {
           description: 'Create an inline chart/graph to visualize data',
-          parameters: z.object({
+          inputSchema: z.object({
             type: z.enum(['bar', 'line', 'pie', 'area']).describe('Chart type'),
             title: z.string().describe('Chart title'),
             data: z.array(z.object({
@@ -926,7 +926,7 @@ Citations: ${researchResult.allCitations.length} sources processed
                   id: crypto.randomUUID(),
                   type: 'tool_call',
                   tool: chunk.toolName,
-                  arguments: chunk.args,
+                  arguments: chunk.input,
                   requiresApproval: ['enable_voice', 'enable_screen_share', 'enable_webcam'].includes(chunk.toolName),
                   timestamp: new Date().toISOString()
                 };
@@ -937,7 +937,7 @@ Citations: ${researchResult.allCitations.length} sources processed
               
               // Handle text delta
               if (chunk.type === 'text-delta') {
-                fullContent += chunk.textDelta;
+                fullContent += chunk.text;
                 
                 // Send as unified message format with stable ID
                 const messageData = {
