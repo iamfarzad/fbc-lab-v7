@@ -761,6 +761,19 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
                 
                 if (isFinal) {
                   console.info(`[${connectionId}] Input transcript: "${text}"`)
+                  
+                  // Simple visual context detection for consulting scenarios
+                  const transcript = text.toLowerCase();
+                  const visualTriggers = ['screen', 'showing', 'look at', 'see this', 'dashboard', 'workflow'];
+                  
+                  if (visualTriggers.some(word => transcript.includes(word))) {
+                    const client = activeSessions.get(connectionId);
+                    if (client?.latestContext?.screen || client?.latestContext?.webcam) {
+                      injectVisualContext(connectionId, client).catch((error) => {
+                        console.error(`[${connectionId}] Visual context injection failed:`, error);
+                      });
+                    }
+                  }
                 }
               } catch (err) {
                 console.error(`[${connectionId}] Input transcript handler failed:`, err)
@@ -872,6 +885,45 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     safeSend(ws, JSON.stringify({ type: 'error', payload: { message: error instanceof Error ? error.message : 'Failed to start session' } }));
   } finally {
     sessionStarting.delete(connectionId)
+  }
+}
+
+// Visual context injection for consulting scenarios
+async function injectVisualContext(connectionId: string, client: any) {
+  const context = client.latestContext.screen || client.latestContext.webcam;
+  if (!context || context.lastInjected > Date.now() - 10000) return; // Avoid spam
+  
+  const modality = client.latestContext.screen ? 'screen' : 'webcam';
+  
+  try {
+    const parts: any[] = [];
+    
+    // Add image if available
+    if (context.imageData) {
+      const base64Data = context.imageData.replace(/^data:image\/\w+;base64,/, '');
+      parts.push({
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: base64Data
+        }
+      });
+    }
+    
+    // Add brief context
+    parts.push({
+      text: `Visual context: ${context.analysis.substring(0, 200)}`
+    });
+    
+    // Google's Live API format
+    await client.session.sendClientContent({
+      turns: [{ role: 'user', parts }],
+      turnComplete: false
+    });
+    
+    context.lastInjected = Date.now();
+    console.info(`[${connectionId}] Injected ${modality} context`);
+  } catch (err) {
+    console.error(`[${connectionId}] Visual injection failed:`, err);
   }
 }
 

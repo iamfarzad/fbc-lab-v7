@@ -322,7 +322,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     setShowTranscript(prev => !prev);
   }, []);
 
-  // Transform voice data into transcript entries
+  // Transform voice data into transcript entries - FULL HISTORY
   const transcriptEntries = useMemo(() => {
     const entries: Array<{
       id: string;
@@ -332,8 +332,21 @@ export function ChatInterface({ id }: { id?: string | null }) {
       timestamp: number;
     }> = [];
 
-    // Add partial transcript if available (user speaking)
-    if (audioHook.partialTranscript) {
+    // Get all voice messages from conversation
+    messagesHook.messages
+      .filter(msg => msg.metadata?.source === 'voice')
+      .forEach(msg => {
+        entries.push({
+          id: msg.id,
+          text: msg.content,
+          type: msg.role as 'user' | 'assistant',
+          isPartial: false,
+          timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now()
+        });
+      });
+    
+    // Add current partial (user speaking now)
+    if (audioHook.partialTranscript && audioHook.isSessionActive) {
       entries.push({
         id: `partial-${Date.now()}`,
         text: audioHook.partialTranscript,
@@ -343,31 +356,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
       });
     }
 
-    // Add final transcript if available
-    if (audioHook.transcript) {
-      entries.push({
-        id: `final-${Date.now()}`,
-        text: audioHook.transcript,
-        type: 'user',
-        isPartial: false,
-        timestamp: Date.now()
-      });
-    }
-
-    // Add assistant output transcript if available
-    if (audioHook.modelReplies && audioHook.modelReplies.length > 0) {
-      const latestReply = audioHook.modelReplies[audioHook.modelReplies.length - 1];
-      entries.push({
-        id: `assistant-${Date.now()}`,
-        text: latestReply,
-        type: 'assistant',
-        isPartial: false,
-        timestamp: Date.now()
-      });
-    }
-
     return entries;
-  }, [audioHook.partialTranscript, audioHook.transcript, audioHook.modelReplies]);
+  }, [messagesHook.messages, audioHook.partialTranscript, audioHook.isSessionActive]);
   
   const intelligenceHook = useChatIntelligence(sessionId);
   const artifactsState = useArtifacts();

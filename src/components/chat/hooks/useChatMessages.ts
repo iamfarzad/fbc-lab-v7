@@ -506,6 +506,26 @@ export function useChatMessages(initialSessionId?: string) {
     }
   }, []);
 
+  // Export voice transcript for summaries
+  const exportVoiceTranscript = useCallback(() => {
+    const voiceMessages = messages.filter(msg => msg.metadata?.source === 'voice');
+    
+    return {
+      entries: voiceMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp
+      })),
+      stats: {
+        total: voiceMessages.length,
+        duration: voiceMessages.length > 0 
+          ? new Date(voiceMessages[voiceMessages.length - 1].timestamp!).getTime() - 
+            new Date(voiceMessages[0].timestamp!).getTime()
+          : 0
+      }
+    };
+  }, [messages]);
+
   return {
     messages,
     enhancedMessages,
@@ -520,5 +540,6 @@ export function useChatMessages(initialSessionId?: string) {
     appendVoiceUserMessage,
     appendVoiceAssistantChunk,
     finalizeVoiceAssistantMessage,
+    exportVoiceTranscript,
   };
 }
