@@ -98,6 +98,16 @@ export function BottomSheet({
               className
             )}
             onClick={(e) => e.stopPropagation()}
+            // Swipe-down to close on touch devices
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={0.2}
+            dragSnapToOrigin
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 80 || info.velocity.y > 500) {
+                onClose();
+              }
+            }}
           >
             {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-2">

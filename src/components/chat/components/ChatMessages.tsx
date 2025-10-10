@@ -89,6 +89,7 @@ import {
 import type { ResearchSummary } from "../hooks/useChatMessages";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { ChatSuggestions } from "./ChatSuggestions";
+import { ShimmeringText } from "@/components/ui/shimmering-text";
 import { ChatTermsAcceptance } from "./ChatTermsAcceptance";
 import { ToolApprovalPrompt } from "../ToolApprovalPrompt";
 import { CalendarWidget, ChartWidget } from "../artifacts";
@@ -309,6 +310,19 @@ export function ChatMessages({
                     "text-[13px] leading-relaxed",
                     "[.monochrome_&]:font-mono",
                   )}>
+                    {/* Shimmering hint while streaming (non-intrusive) */}
+                    {message.role === 'assistant' && message.isStreaming && (
+                      <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="flex items-center gap-1">
+                            <span className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" />
+                            <span className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}} />
+                            <span className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.4s'}} />
+                          </span>
+                          <ShimmeringText text="Streaming" duration={1.8} repeat repeatDelay={0.4} className="opacity-90" />
+                        </span>
+                      </div>
+                    )}
                     <Response>{message.content}</Response>
                     
                     {/* Blinking cursor - only for assistant in monochrome */}

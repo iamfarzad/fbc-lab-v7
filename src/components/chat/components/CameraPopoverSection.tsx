@@ -30,10 +30,19 @@ export function CameraPopoverSection({
     const video = videoRef.current;
     if (!video || !stream) return;
 
-    video.srcObject = stream;
+    // Only update if stream changed (prevents video reload loops)
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
     video.play().catch(err => {
-      console.error('Error playing video:', err);
+      const name = (err as any)?.name || 'Error';
+      const message = (err as any)?.message || String(err);
+      if (name === 'AbortError' || message.includes('interrupted by a new load request')) {
+        console.debug('Camera preview play() interrupted — benign:', message);
+      } else {
+        console.warn('Camera preview play() warning:', message);
+      }
     });
+    }
 
     return () => {
       if (video.srcObject) {

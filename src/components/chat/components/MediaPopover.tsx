@@ -35,12 +35,14 @@ export function MediaPopover({
     };
   }, [isOpen]);
 
+  const computedAlign: 'start' | 'center' | 'end' = type === 'voice' ? 'end' : type === 'screen' ? 'start' : 'center';
+
   return (
     <Popover open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <PopoverAnchor ref={triggerRef} />
       <PopoverContent 
         side="top"
-        align="center" 
+        align={computedAlign}
         sideOffset={12}
         className={cn(
           // Responsive width: full width on mobile (minus padding), fixed on desktop

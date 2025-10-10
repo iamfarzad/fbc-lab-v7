@@ -1,27 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { google } from '@ai-sdk/google';
-import { generateText } from 'ai';
+import { GoogleGenAI } from '@google/genai';
 import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache';
 import { createHash } from 'crypto';
 
 // Create a cached function for webcam analysis (30 min TTL)
 const cachedAnalyzeImage = createCachedFunction(
   async (imageHash: string, base64: string, mimeType: string) => {
-    const { text } = await generateText({
-      model: google('gemini-2.0-flash-exp'),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Analyze this webcam image for business context or consulting insights. Describe key elements and suggest relevant AI responses.' },
-            { type: 'image', image: `data:${mimeType};base64,${base64}` }
-          ]
-        }
-      ],
-      temperature: 0.7,
-    });
+    // If no API key, return a mock analysis to avoid 500s in dev/demo
+    if (!process.env.GEMINI_API_KEY) {
+      return {
+        analysis: 'Webcam analysis (mock): Detected a person and a background. Ready to assist with on-screen tasks.'
+      };
+    }
 
-    return { analysis: text };
+    try {
+      const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.0-flash-latest',
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: 'Analyze this webcam image for business context or consulting insights. Describe key elements and suggest relevant AI responses.' },
+            { inlineData: { data: base64, mimeType } }
+          ]
+        }]
+      });
+
+      const text = result.text || '';
+      return { analysis: text };
+    } catch (err) {
+      // Surface a controlled error so the route can respond consistently
+      const message = err instanceof Error ? err.message : 'Unknown analysis error';
+      throw new Error(`Webcam analysis failed: ${message}`);
+    }
   },
   {
     ttl: CACHE_TTL.VISION, // 30 minutes
@@ -57,7 +68,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('❌ [Webcam] Analysis error:', error);
-    return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Analysis failed';
+    console.error('❌ [Webcam] Analysis error:', message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
