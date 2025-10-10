@@ -66,8 +66,19 @@ export class UsageLimiter {
   }
   
   async checkLimit(sessionId: string, type: 'message' | 'voice' | 'screen' | 'webcam' | 'research'): Promise<{ allowed: boolean; reason?: string }> {
-    const usage = this.storage.get(sessionId);
-    if (!usage) return { allowed: false, reason: 'Session not found' };
+    let usage = this.storage.get(sessionId);
+    
+    // Auto-initialize session if not found (graceful fallback)
+    if (!usage) {
+      console.log(`[UsageLimiter] Auto-initializing session: ${sessionId}`);
+      usage = {
+        sessionId,
+        email: 'unknown',
+        started_at: Date.now(),
+        ...DEFAULT_LIMITS
+      };
+      this.storage.set(sessionId, usage);
+    }
     
     // Check session duration
     const sessionMinutes = (Date.now() - usage.started_at) / 60000;
@@ -107,8 +118,19 @@ export class UsageLimiter {
   }
   
   async trackUsage(sessionId: string, type: 'message' | 'voice_start' | 'voice_stop' | 'screen_start' | 'screen_stop' | 'webcam_start' | 'webcam_stop' | 'research'): Promise<void> {
-    const usage = this.storage.get(sessionId);
-    if (!usage) return;
+    let usage = this.storage.get(sessionId);
+    
+    // Auto-initialize if needed
+    if (!usage) {
+      console.log(`[UsageLimiter] Auto-initializing session for tracking: ${sessionId}`);
+      usage = {
+        sessionId,
+        email: 'unknown',
+        started_at: Date.now(),
+        ...DEFAULT_LIMITS
+      };
+      this.storage.set(sessionId, usage);
+    }
     
     const now = Date.now();
     
@@ -152,7 +174,20 @@ export class UsageLimiter {
   }
   
   async getUsage(sessionId: string): Promise<SessionUsage | null> {
-    return this.storage.get(sessionId) || null;
+    let usage = this.storage.get(sessionId);
+    
+    // Auto-initialize if needed (for UI polling)
+    if (!usage) {
+      usage = {
+        sessionId,
+        email: 'unknown',
+        started_at: Date.now(),
+        ...DEFAULT_LIMITS
+      };
+      this.storage.set(sessionId, usage);
+    }
+    
+    return usage;
   }
 }
 

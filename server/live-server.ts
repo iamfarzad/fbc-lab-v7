@@ -21,6 +21,63 @@ const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
 console.log(`🔧 Environment check: PORT=${process.env.PORT}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT}, Using: ${PORT}`);
 const IS_MOCK = (process.env.FBC_USE_MOCKS === '1' || process.env.LIVE_MOCK === '1');
 
+// Centralized logging with batching
+const LOG_INGEST_URL = process.env.LOG_INGEST_URL || 'http://localhost:3000/api/logs/ingest'
+const LOG_SECRET = process.env.LOGS_INGESTION_SECRET || ''
+const logQueue: any[] = []
+let logFlushTimer: NodeJS.Timeout | null = null
+
+async function flushLogs() {
+  if (logQueue.length === 0) return
+  
+  const batch = [...logQueue]
+  logQueue.length = 0
+  
+  try {
+    await fetch(LOG_INGEST_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Log-Secret': LOG_SECRET
+      },
+      body: JSON.stringify(batch)
+    })
+  } catch (error) {
+    // Silently fail to avoid log loops
+  }
+}
+
+function sendLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: any) {
+  // Always log to console as backup
+  console[level === 'debug' ? 'log' : level](message, meta || '')
+  
+  // Queue for batch sending
+  logQueue.push({
+    service: 'websocket',
+    level,
+    message,
+    timestamp: new Date().toISOString(),
+    meta
+  })
+  
+  // Schedule flush if not already scheduled
+  if (!logFlushTimer) {
+    logFlushTimer = setTimeout(() => {
+      logFlushTimer = null
+      flushLogs().catch(() => {})
+    }, 2000)
+  }
+  
+  // Flush immediately on errors
+  if (level === 'error' && logQueue.length >= 10) {
+    if (logFlushTimer) {
+      clearTimeout(logFlushTimer)
+      logFlushTimer = null
+    }
+    flushLogs().catch(() => {})
+  }
+}
+
 // Voice & Language Utilities - Multilingual Support
 const VOICE_BY_LANG: Record<string, string> = {
   'en-US': 'Fenrir',
@@ -186,7 +243,7 @@ const wss = new WebSocketServer({
   maxPayload: 10 * 1024 * 1024,
   verifyClient: (info: { origin: string; req: http.IncomingMessage; secure: boolean }) => {
     // Log connection attempts for debugging
-    console.info(`🔌 WebSocket connection attempt from ${info.origin || 'unknown origin'}`)
+    sendLog('info', `🔌 WebSocket connection attempt from ${info.origin || 'unknown origin'}`)
     return true // Accept all connections for now
   },
   handleProtocols: (protocols: Set<string>) => {
@@ -635,11 +692,11 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       callbacks: {
         onopen: () => {
           isOpen = true
-          console.info(`[${connectionId}] Live API session opened`)
+          sendLog('info', `[${connectionId}] Live API session opened`, { connectionId })
         },
         onmessage: (message: any) => {
           try {
-            console.log(`[${connectionId}] 🔊 Gemini Live API message:`, JSON.stringify(message, null, 2));
+            sendLog('debug', `[${connectionId}] 🔊 Gemini Live API message`, { connectionId, message });
             const { serverContent } = message
 
             // Handle setup complete event
@@ -648,7 +705,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
                 type: 'setup_complete',
                 payload: { setupComplete: true }
               }))
-              console.info(`[${connectionId}] Setup complete`)
+              sendLog('info', `[${connectionId}] Setup complete`, { connectionId })
             }
 
             // Handle tool calls (function calling)
@@ -665,13 +722,10 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
                 type: 'tool_call',
                 payload: toolPayload
               }))
-              console.info(
-                `[${connectionId}] Tool call:`,
-                message.toolCall.functionCalls?.map((fc: any) => fc.name).join(', ')
-              )
+              sendLog('info', `[${connectionId}] Tool call: ${message.toolCall.functionCalls?.map((fc: any) => fc.name).join(', ')}`, { connectionId })
               if (RUN_SERVER_TOOL_EXECUTION) {
                 executeServerToolCall(connectionId, message.toolCall).catch((error) => {
-                  console.error(`[${connectionId}] Failed to execute tool call:`, error)
+                  sendLog('error', `[${connectionId}] Failed to execute tool call`, { connectionId, error })
                 })
               }
             }
@@ -874,9 +928,9 @@ function handleClose(connectionId: string) {
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const connectionId = uuidv4();
   try { (req.socket as any)?.setNoDelay?.(true) } catch (error) {
-    console.warn(`[${connectionId}] Unable to disable socket delay`, error)
+    sendLog('warn', `[${connectionId}] Unable to disable socket delay`, { error })
   }
-  console.info(`[${connectionId}] Client connected.`);
+  sendLog('info', `[${connectionId}] Client connected`, { connectionId });
 
   // Acknowledge connection
   safeSend(ws, JSON.stringify({ type: 'connected', payload: { connectionId } }))
@@ -1006,12 +1060,12 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   });
 
   ws.on('close', (code: number, reason: Buffer) => {
-    console.info(`[${connectionId}] WebSocket closed. Code: ${code}, Reason: ${reason?.toString?.() || 'N/A'}`)
+    sendLog('info', `[${connectionId}] WebSocket closed`, { connectionId, code, reason: reason?.toString?.() || 'N/A' })
     handleClose(connectionId)
   });
 
   ws.on('error', (err) => {
-    console.error(`[${connectionId}] WebSocket error:`, err)
+    sendLog('error', `[${connectionId}] WebSocket error`, { connectionId, error: err })
     handleClose(connectionId)
   });
 });

@@ -139,3 +139,6 @@ mcp.json
 
 # Project documentation and task tracking
 project-tasks/
+
+# Log aggregation system API (internal development tool)
+app/api/logs/
