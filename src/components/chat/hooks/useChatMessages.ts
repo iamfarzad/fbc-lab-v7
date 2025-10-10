@@ -61,7 +61,7 @@ export function useChatMessages(initialSessionId?: string) {
     mode: 'standard',
     context: {
       sessionId,
-      enhancedResearch: true
+      enhancedResearch: false  // Smart triggers will override when needed
     },
     onError: (error) => {
       console.error('Chat error:', error);

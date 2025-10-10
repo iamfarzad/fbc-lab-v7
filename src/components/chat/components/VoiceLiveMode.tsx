@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { X, Mic, MicOff, Camera, Monitor } from "lucide-react";
+import { X, Mic, MicOff, Camera, Monitor, Eye, EyeOff } from "lucide-react";
 import { getGradientForTheme, getMonochromeClass, getThemeAwareBackdrop } from "@/lib/theme-utils";
 import { DESIGN_TOKENS } from "../tokens/design-tokens";
 import { VoiceWaveform } from "./VoiceWaveform";
@@ -37,6 +37,26 @@ export function VoiceLiveMode({
   isScreenSharing = false
 }: VoiceLiveModeProps) {
   const [waveformBars] = useState([1, 2, 3, 4, 5]);
+  
+  // Transcript toggle with responsive behavior
+  const [showTranscript, setShowTranscript] = useState(() => {
+    // Auto-show on desktop (>=768px), auto-hide on mobile
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
+
+  // Listen for resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768 && !showTranscript) {
+        setShowTranscript(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [showTranscript]);
 
   // Prevent body scroll when voice mode is open
   useEffect(() => {
@@ -120,9 +140,36 @@ export function VoiceLiveMode({
             </p>
           </div>
 
-          {/* Transcript Display */}
+          {/* Toggle button */}
           {(transcript || partialTranscript) && (
-            <div className="w-full max-w-2xl mb-8">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTranscript(!showTranscript)}
+              className={cn(
+                "mb-4 px-4 py-2 rounded-full",
+                "bg-muted/20 text-foreground hover:bg-muted/30",
+                "border border-border/30",
+                DESIGN_TOKENS.corners.full,
+                getMonochromeClass()
+              )}
+            >
+              {showTranscript ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              <span className={cn(DESIGN_TOKENS.typography.body)}>
+                {showTranscript ? 'Hide' : 'Show'} Transcript
+              </span>
+            </Button>
+          )}
+
+          {/* Transcript - collapsible */}
+          {showTranscript && (transcript || partialTranscript) && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="w-full max-w-2xl mb-8"
+            >
               <div className={cn(
                 getThemeAwareBackdrop(),
                 "bg-muted/30 rounded-2xl p-6",
@@ -145,7 +192,7 @@ export function VoiceLiveMode({
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* Error Display */}

@@ -13,6 +13,7 @@ import { ChatContainer } from "./components/ChatContainer";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
 import { ChatInput } from "./components/ChatInput";
+import { SessionLimitWarning } from "./SessionLimitWarning";
 
 // Hooks - extracted logic
 import { useChatState } from "./hooks/useChatState";
@@ -21,7 +22,7 @@ import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 import { useChatIntelligence } from "./hooks/useChatIntelligence";
 
 // Constants - centralized configuration
-import { CHAT_CONSTANTS } from "./constants/chatConstants";
+import { CHAT_CONSTANTS, ChatState, MediaState } from "./constants/chatConstants";
 
 // Utils
 import { useAIElements } from "@/hooks/useAIElements";
@@ -49,10 +50,91 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const { setListening } = chatStateHook;
 
   const [sessionId] = useState(() => id ?? crypto.randomUUID());
+  const [usage, setUsage] = useState<any>(null);
+
+  // New chat state management
+  const [chatLayoutState, setChatLayoutState] = useState<ChatState>('normal');
+  const [mediaState, setMediaState] = useState<MediaState>({
+    voice: false,
+    webcam: false,
+    screenShare: false,
+    showTranscript: typeof window !== 'undefined' ? window.innerWidth >= 768 : true
+  });
 
   const messagesHook = useChatMessages(sessionId);
   const [lastScreenSnapshot, setLastScreenSnapshot] = useState<{ analysis: string; imageData?: string; capturedAt: number } | null>(null);
   const [lastWebcamSnapshot, setLastWebcamSnapshot] = useState<{ analysis: string; capturedAt: number } | null>(null);
+
+  // State persistence
+  useEffect(() => {
+    localStorage.setItem('chatLayoutState', chatLayoutState);
+    localStorage.setItem('mediaState', JSON.stringify(mediaState));
+  }, [chatLayoutState, mediaState]);
+
+  // Restore state on mount
+  useEffect(() => {
+    const savedChatLayoutState = localStorage.getItem('chatLayoutState') as ChatState;
+    const savedMediaState = localStorage.getItem('mediaState');
+    
+    if (savedChatLayoutState) setChatLayoutState(savedChatLayoutState);
+    if (savedMediaState) {
+      try {
+        setMediaState(JSON.parse(savedMediaState));
+      } catch (error) {
+        console.warn('Failed to parse saved media state:', error);
+      }
+    }
+  }, []);
+
+  // Media control handlers
+  const handleToggleVoice = useCallback(() => {
+    setMediaState(prev => ({ ...prev, voice: !prev.voice }));
+  }, []);
+
+  const handleToggleWebcam = useCallback(() => {
+    setMediaState(prev => ({ ...prev, webcam: !prev.webcam }));
+  }, []);
+
+  const handleToggleScreenShare = useCallback(() => {
+    setMediaState(prev => ({ ...prev, screenShare: !prev.screenShare }));
+  }, []);
+
+  const handleToggleTranscript = useCallback(() => {
+    setMediaState(prev => ({ ...prev, showTranscript: !prev.showTranscript }));
+  }, []);
+
+  // Chat state handlers
+  const handleExpand = useCallback(() => {
+    setChatLayoutState('normal');
+  }, []);
+
+  const handleMinimize = useCallback(() => {
+    const isMobile = window.innerWidth < 640;
+    if (isMobile) {
+      // On mobile, minimize means close
+      chatStateHook.onToggleChat();
+    } else {
+      // On desktop, minimize to ConversationBar
+      setChatLayoutState('minimized');
+    }
+  }, [chatStateHook]);
+
+  // Poll usage every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/usage/${sessionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setUsage(data);
+        }
+      } catch (error) {
+        // Silently fail - usage tracking is not critical
+      }
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [sessionId]);
   const audioHookRef = useRef<ReturnType<typeof useRealtimeVoice> | null>(null);
   const {
     appendVoiceUserMessage,
@@ -691,8 +773,22 @@ export function ChatInterface({ id }: { id?: string | null }) {
       </motion.div>
 
       {/* Main Chat Interface */}
-      <ChatContainer chatState={chatState}>
-        {isMinimized ? (
+      <ChatContainer 
+        chatState={chatLayoutState}
+        mediaState={mediaState}
+        onToggleVoice={handleToggleVoice}
+        onToggleWebcam={handleToggleWebcam}
+        onToggleScreenShare={handleToggleScreenShare}
+        onToggleTranscript={handleToggleTranscript}
+        webcamStream={null} // TODO: Add webcam stream
+        screenStream={null} // TODO: Add screen stream
+        isProcessing={audioHookRef.current?.isProcessing || false}
+        transcript={audioHookRef.current?.transcript || ''}
+        partialTranscript={audioHookRef.current?.partialTranscript || ''}
+        onExpand={handleExpand}
+        onMinimize={handleMinimize}
+      >
+        {chatLayoutState === 'minimized' ? (
           /* Minimized State */
           <motion.div
             key="chat-minimized"
@@ -755,6 +851,11 @@ export function ChatInterface({ id }: { id?: string | null }) {
             {isExpanded && renderVoiceProcessingBanner()}
 
             <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>
+              {intelligenceHook.hasAcceptedTerms && usage && (
+                <div className={cn(isExpanded ? "mx-auto w-full max-w-3xl px-4 sm:px-6" : "px-0")}>
+                  <SessionLimitWarning sessionId={sessionId} usage={usage} />
+                </div>
+              )}
               <ChatMessages
                 messages={messagesHook.messages}
                 enhancedMessages={messagesHook.enhancedMessages}

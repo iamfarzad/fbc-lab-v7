@@ -1,59 +1,107 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChatState } from "../types/chatTypes";
+import { ChatState, MediaState } from "../constants/chatConstants";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { cn } from "@/lib/utils";
+import { chatAnimations } from "@/lib/theme-utils";
+import { MinimizedChatBar } from "./MinimizedChatBar";
+import { MediaControlsOverlay } from "./MediaControlsOverlay";
 
 interface ChatContainerProps {
   chatState: ChatState;
+  mediaState: MediaState;
   children: React.ReactNode;
+  // Media control handlers
+  onToggleVoice: () => void;
+  onToggleWebcam: () => void;
+  onToggleScreenShare: () => void;
+  onToggleTranscript: () => void;
+  // Media streams
+  webcamStream?: MediaStream | null;
+  screenStream?: MediaStream | null;
+  // Voice state
+  isProcessing?: boolean;
+  transcript?: string;
+  partialTranscript?: string;
+  // Chat state handlers
+  onExpand: () => void;
+  onMinimize: () => void;
 }
 
-export function ChatContainer({ chatState, children }: ChatContainerProps) {
-  if (!chatState.isOpen) return null;
-
-  const getContainerClasses = () => {
-    // Mobile-first: full screen on mobile, floating on desktop
-    if (chatState.isExpanded) {
-      return "fixed inset-0 z-[100] flex flex-col bg-[hsl(var(--background))] text-[hsl(var(--foreground))] overflow-hidden";
-    }
-
-    // Mobile (< 640px): Full screen with safe areas
-    const mobileClasses = [
-      "fixed inset-0 z-[100] flex flex-col bg-[hsl(var(--background))] text-[hsl(var(--foreground))]",
-      "overflow-hidden safe-area-inset-top safe-area-inset-bottom",
-      // Remove rounded corners and shadows on mobile
-      "md:rounded-[32px] md:shadow-[0_24px_80px_-60px_rgba(12,18,26,0.45)] md:border md:border-border/40",
-    ];
-
-    // Desktop (> 1024px): Floating window style
-    const desktopClasses = [
-      "lg:fixed lg:z-[100] lg:flex lg:flex-col lg:transition-all lg:duration-300",
-      "lg:bottom-6 lg:right-6",
-      CHAT_CONSTANTS.STYLING.CONTAINER,
-    ];
-
-    if (chatState.isMinimized) {
-      desktopClasses.push(
-        "lg:bottom-4 lg:right-4 lg:sm:bottom-6 lg:sm:right-6",
-        CHAT_CONSTANTS.UI.CHAT_WIDTH.MINIMIZED,
-        CHAT_CONSTANTS.UI.CHAT_HEIGHT.MINIMIZED
-      );
-    } else {
-      desktopClasses.push(
-        "lg:bottom-4 lg:left-4 lg:right-4 lg:sm:bottom-6 lg:sm:right-6 lg:sm:left-auto",
-        CHAT_CONSTANTS.UI.CHAT_WIDTH.NORMAL,
-        CHAT_CONSTANTS.UI.CHAT_HEIGHT.NORMAL
-      );
-    }
-
-    // Combine mobile and desktop classes
-    return cn(...mobileClasses, ...desktopClasses);
-  };
+export function ChatContainer({ 
+  chatState, 
+  mediaState,
+  children,
+  onToggleVoice,
+  onToggleWebcam,
+  onToggleScreenShare,
+  onToggleTranscript,
+  webcamStream,
+  screenStream,
+  isProcessing = false,
+  transcript,
+  partialTranscript,
+  onExpand,
+  onMinimize
+}: ChatContainerProps) {
+  // Don't render if chat is closed
+  if (chatState === 'minimized' && !mediaState.voice && !mediaState.webcam && !mediaState.screenShare) {
+    return null;
+  }
 
   return (
-    <div className={getContainerClasses()}>
-      {children}
-    </div>
+    <AnimatePresence mode="wait">
+      {chatState === 'minimized' ? (
+        <motion.div
+          key="minimized"
+          initial={chatAnimations.minimizeToBar.initial}
+          animate={chatAnimations.minimizeToBar.animate}
+          exit={chatAnimations.minimizeToBar.exit}
+          transition={chatAnimations.minimizeToBar.transition}
+          className="fixed z-[100]"
+        >
+          <MinimizedChatBar
+            isVoiceActive={mediaState.voice}
+            isWebcamActive={mediaState.webcam}
+            isScreenSharing={mediaState.screenShare}
+            onExpand={onExpand}
+            onToggleVoice={onToggleVoice}
+            onToggleWebcam={onToggleWebcam}
+            onToggleScreenShare={onToggleScreenShare}
+            isConnected={true}
+            isProcessing={isProcessing}
+            transcript={transcript}
+            partialTranscript={partialTranscript}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="expanded"
+          initial={chatAnimations.expandFromButton.initial}
+          animate={chatAnimations.expandFromButton.animate}
+          transition={chatAnimations.expandFromButton.transition}
+          className={cn(
+            "fixed inset-0 z-[100] flex flex-col",
+            "bg-background text-foreground overflow-hidden",
+            "safe-area-inset-top safe-area-inset-bottom"
+          )}
+        >
+          {children}
+          
+          {/* Media Controls Overlay */}
+          <MediaControlsOverlay
+            chatState={chatState}
+            mediaState={mediaState}
+            onToggleVoice={onToggleVoice}
+            onToggleWebcam={onToggleWebcam}
+            onToggleScreenShare={onToggleScreenShare}
+            onToggleTranscript={onToggleTranscript}
+            webcamStream={webcamStream}
+            screenStream={screenStream}
+            isProcessing={isProcessing}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

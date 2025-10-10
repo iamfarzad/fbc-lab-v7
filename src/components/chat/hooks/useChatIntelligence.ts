@@ -127,6 +127,30 @@ export function useChatIntelligence(id?: string | null) {
       await initialiseSession();
     }
 
+    // Initialize usage limits for this session
+    const { usageLimiter } = await import('@/src/lib/usage-limits');
+    await usageLimiter.initSession(sessionIdRef.current, email.trim());
+
+    // Trigger background context research (non-blocking)
+    console.log('🔍 Triggering background research...');
+    fetch('/api/research/initial-context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        name: name.trim(), 
+        email: email.trim(), 
+        sessionId: sessionIdRef.current 
+      })
+    }).then(res => {
+      if (res.ok) {
+        console.log('✅ Background research initiated successfully');
+      } else {
+        console.warn('⚠️ Background research failed, continuing with limited context');
+      }
+    }).catch(err => {
+      console.warn('⚠️ Background research failed:', err);
+    });
+
     toast.success('Welcome to F.B/c AI! Your personalized consultation begins now.');
   }, [agreed, email, name, initialiseSession]);
 

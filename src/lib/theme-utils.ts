@@ -41,3 +41,58 @@ export const getThemeAwareShadow = () => 'shadow-[0_24px_60px_-40px_rgba(12,18,2
 export const combineThemeClasses = (...classes: string[]) => {
   return cn(...classes);
 };
+
+// Chat animations for smooth state transitions
+export const chatAnimations = {
+  // Slide from button position (bottom-right) to full-screen
+  expandFromButton: {
+    initial: { 
+      x: 'calc(100vw - 400px)', 
+      y: 'calc(100vh - 200px)',
+      width: '380px',
+      height: '160px',
+      opacity: 0.8
+    },
+    animate: { 
+      x: 0, 
+      y: 0,
+      width: '100vw',
+      height: '100vh',
+      opacity: 1
+    },
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      duration: 0.4
+    }
+  },
+  
+  // Minimize to ConversationBar
+  minimizeToBar: {
+    initial: { 
+      x: 0, 
+      y: 0,
+      width: '100vw',
+      height: '100vh',
+      opacity: 1
+    },
+    animate: { 
+      x: 'calc(100vw - 420px)', 
+      y: 'calc(100vh - 180px)',
+      width: '400px',
+      height: '160px',
+      opacity: 1
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.95
+    },
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+      duration: 0.3
+    }
+  }
+};

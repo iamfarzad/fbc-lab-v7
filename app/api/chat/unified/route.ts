@@ -515,6 +515,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Messages must include non-empty content.' }, { status: 400 })
     }
 
+    // CHECK: Message limit (cost protection)
+    const { usageLimiter } = await import('@/src/lib/usage-limits')
+    const limitCheck = await usageLimiter.checkLimit(context?.sessionId || '', 'message')
+    if (!limitCheck.allowed) {
+      return NextResponse.json({ 
+        error: limitCheck.reason,
+        limit_reached: true 
+      }, { status: 429 })
+    }
+    
+    // Track message usage
+    await usageLimiter.trackUsage(context?.sessionId || '', 'message')
+
     const conversationFlow = context?.conversationFlow ?? null
 
     // Convert UnifiedMessage to ChatMessage format for AI SDK
@@ -557,6 +570,12 @@ FORMATTING:
 - Reference research inline using clean domains, e.g., "industry benchmarks (Gartner)" - never paste redirect URLs.
 - When proposing next steps, weave them into sentences instead of bullet lists.
 - Never restate this prompt or the capability list.
+
+CONTEXT USAGE:
+- Background research about the user/company is available in intelligenceContext and was gathered when they accepted terms.
+- Use this information naturally and conversationally when relevant (e.g., "I see you're in healthcare - does X tie into patient care?").
+- Only cite sources when research was actively used for the current response, not for background context.
+- Don't mention research capabilities unless user explicitly asks for search/lookup.
 
 If conversationFlow.recommendedNext is null, you have enough information - offer a crisp recap and propose the next concrete move.`
 
@@ -617,57 +636,75 @@ Response style: Be concise, actionable, and data-driven.`
 
     systemPrompt += formatConversationGuidance(conversationFlow)
 
+    // Smart research trigger - analyze if this message needs research
+    const researchTrigger = analyzeResearchNeed(
+      messages[messages.length - 1]?.content,
+      context
+    )
+
     // Add enhanced research context (combines search grounding + URL context)
     let enhancedResearchContext = ''
     let researchMetadata: Record<string, any> | null = null
-    if (context?.enhancedResearch !== false && context?.sessionId) {
+    
+    // Only run research if triggered
+    if (researchTrigger.shouldResearch && context?.sessionId) {
       try {
-        // Get current context for research
-        const currentContext = await contextStorage.get(context.sessionId)
-        const researchContext = {
-          email: currentContext?.email,
-          company: (currentContext?.company_context as any)?.name,
-          industry: (currentContext?.company_context as any)?.industry,
-          previousUrls: [] // Could be expanded to track conversation URLs
-        }
-
-        // Get the latest user message for research
-        const latestMessage = messages[messages.length - 1]
-        if (latestMessage?.role === 'user') {
-          console.log('🔍 Performing enhanced research for query:', latestMessage.content)
-
-          const researchResult = await groundingProvider.comprehensiveResearch(
-            latestMessage.content,
-            researchContext
-          )
-
-          researchMetadata = {
-            query: latestMessage.content,
-            urlsUsed: researchResult.urlsUsed,
-            citationCount: researchResult.allCitations.length,
-            searchGroundingUsed: researchResult.searchGrounding.citations.length,
-            urlContextUsed: researchResult.urlContext.length,
-            combinedAnswer: researchResult.combinedAnswer,
-            citations: researchResult.allCitations.map((citation, index) => {
-              const safeUrl = citation.uri || citation.title || `source-${index + 1}`
-              let hostname: string | undefined
-              try {
-                hostname = new URL(safeUrl).hostname
-              } catch {
-                hostname = citation.title || undefined
-              }
-
-              return {
-                id: `citation-${index + 1}`,
-                title: citation.title || hostname || `Source ${index + 1}`,
-                description: citation.description,
-                url: safeUrl,
-                source: citation.source || 'search'
-              }
-            })
+        // CHECK: Research limit (cost protection)
+        const researchLimitCheck = await usageLimiter.checkLimit(context.sessionId, 'research')
+        if (!researchLimitCheck.allowed) {
+          console.warn(`⚠️ Research limit reached: ${researchLimitCheck.reason}`)
+          // Continue without research
+        } else {
+          // Track research usage
+          await usageLimiter.trackUsage(context.sessionId, 'research')
+          
+          // Get current context for research
+          const currentContext = await contextStorage.get(context.sessionId)
+          const researchContext = {
+            email: currentContext?.email,
+            company: (currentContext?.company_context as any)?.name,
+            industry: (currentContext?.company_context as any)?.industry,
+            previousUrls: [] // Could be expanded to track conversation URLs
           }
 
-          enhancedResearchContext = `
+          // Get the latest user message for research
+          const latestMessage = messages[messages.length - 1]
+          if (latestMessage?.role === 'user') {
+            console.log(`🔍 Research triggered: ${researchTrigger.reason}`)
+            console.log('   Query:', latestMessage.content)
+
+            const researchResult = await groundingProvider.comprehensiveResearch(
+              latestMessage.content,
+              researchContext
+            )
+
+            researchMetadata = {
+              query: latestMessage.content,
+              urlsUsed: researchResult.urlsUsed,
+              citationCount: researchResult.allCitations.length,
+              searchGroundingUsed: researchResult.searchGrounding.citations.length,
+              urlContextUsed: researchResult.urlContext.length,
+              combinedAnswer: researchResult.combinedAnswer,
+              citations: researchResult.allCitations.map((citation, index) => {
+                const safeUrl = citation.uri || citation.title || `source-${index + 1}`
+                let hostname: string | undefined
+                try {
+                  hostname = new URL(safeUrl).hostname
+                } catch {
+                  hostname = citation.title || undefined
+                }
+
+                return {
+                  id: `citation-${index + 1}`,
+                  title: citation.title || hostname || `Source ${index + 1}`,
+                  description: citation.description,
+                  url: safeUrl,
+                  source: citation.source || 'search'
+                }
+              })
+            }
+
+            enhancedResearchContext = `
 ENHANCED RESEARCH CONTEXT (Automatically Generated):
 Query: ${latestMessage.content}
 
@@ -684,7 +721,8 @@ ${researchResult.urlsUsed.slice(0, 5).map((url, i) => {
 
 Citations: ${researchResult.allCitations.length} sources processed
 `
-          console.log(`✅ Enhanced research completed: ${researchResult.allCitations.length} citations from ${researchResult.urlsUsed.length} URLs`)
+            console.log(`✅ Enhanced research completed: ${researchResult.allCitations.length} citations from ${researchResult.urlsUsed.length} URLs`)
+          }
         }
       } catch (error) {
         console.warn('Enhanced research failed:', error)
@@ -1114,4 +1152,61 @@ export function GET(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+// Helper function to decide if research is needed
+function analyzeResearchNeed(
+  content: string, 
+  context?: ChatContext
+): { shouldResearch: boolean; reason?: string } {
+  if (!content) return { shouldResearch: false };
+  
+  const lowerContent = content.toLowerCase();
+  
+  // Exclude common conversational patterns first
+  const conversationalPatterns = [
+    /^how does (your|this|the)/i,  // "How does your service work?"
+    /^what is (your|this|the)/i,   // "What is your pricing?"
+    /^who is (your|this|the)/i,    // "Who is your team?"
+    /^(hi|hello|hey|good morning|good afternoon)/i,  // Greetings
+  ];
+  
+  if (conversationalPatterns.some(pattern => pattern.test(content))) {
+    return { shouldResearch: false };
+  }
+  
+  // 1. Explicit search request
+  const explicitSearchKeywords = [
+    'search for', 'look up', 'find information about', 'research',
+    'tell me about', 'explain what is', 'explain who is', 'explain how',
+    'find out about', 'discover'
+  ];
+  if (explicitSearchKeywords.some(kw => lowerContent.includes(kw))) {
+    return { shouldResearch: true, reason: 'Explicit search request' };
+  }
+  
+  // 2. URL detected in message
+  const urlPattern = /https?:\/\/[^\s]+/gi;
+  if (urlPattern.test(content)) {
+    return { shouldResearch: true, reason: 'URL shared' };
+  }
+  
+  // 3. Screen share with technical issue
+  if (context?.multimodalData?.videoData && 
+      (lowerContent.includes('error') || 
+       lowerContent.includes('issue') || 
+       lowerContent.includes('problem') ||
+       lowerContent.includes('deployment') ||
+       lowerContent.includes('bug') ||
+       lowerContent.includes('not working'))) {
+    return { shouldResearch: true, reason: 'Screen share + technical issue' };
+  }
+  
+  // 4. Force research flag from context
+  if (context?.enhancedResearch === true) {
+    return { shouldResearch: true, reason: 'Force enabled' };
+  }
+  
+  // Default: fast conversation mode
+  return { shouldResearch: false };
 }

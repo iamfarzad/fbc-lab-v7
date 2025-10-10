@@ -1,6 +1,16 @@
 // Chat interface constants - centralized configuration
 import { CHAT_DESIGN, chatStyles } from '../design-tokens';
 
+// Chat state types
+export type ChatState = 'minimized' | 'normal' | 'expanded';
+
+export interface MediaState {
+  voice: boolean;
+  webcam: boolean;
+  screenShare: boolean;
+  showTranscript: boolean; // Toggle for voice transcript
+}
+
 export const CHAT_CONSTANTS = {
   // Default suggestions for new users
   DEFAULT_SUGGESTIONS: [
