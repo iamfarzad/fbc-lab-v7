@@ -1026,23 +1026,27 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           break;
         }
         case 'TURN_COMPLETE': {
-          console.info(`[${connectionId}] Handling TURN_COMPLETE message`);
+          sendLog('info', `[${connectionId}] Handling TURN_COMPLETE message`, { connectionId });
           if (IS_MOCK) {
             safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
             break
           }
           const client = activeSessions.get(connectionId)
           if (!client) {
-            console.warn(`[${connectionId}] TURN_COMPLETE received but no active session`)
-            console.warn(`[${connectionId}] Active sessions: ${Array.from(activeSessions.keys()).join(', ')}`)
+            sendLog('warn', `[${connectionId}] TURN_COMPLETE received but no active session`, { connectionId });
             break
           }
           try {
-            await client.session.sendClientContent({ turnComplete: true })
-            console.info(`[${connectionId}] turnComplete sent to Live API`)
+            // Send turn complete using the correct API format
+            await client.session.send({
+              clientContent: {
+                turnComplete: true
+              }
+            });
+            sendLog('info', `[${connectionId}] turnComplete sent to Live API`, { connectionId });
             safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
           } catch (e) {
-            console.error(`[${connectionId}] Failed to send turnComplete to Live API:`, e)
+            sendLog('error', `[${connectionId}] Failed to send turnComplete to Live API`, { connectionId, error: e });
           }
           break
         }
