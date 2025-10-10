@@ -6,6 +6,8 @@ import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
 import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw, Search } from "lucide-react";
+import { DESIGN_TOKENS } from "../tokens/design-tokens";
+import { getMonochromeClass } from "@/lib/theme-utils";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -176,15 +178,19 @@ export function ChatMessages({
   onAcceptTerms,
 }: ChatMessagesProps) {
   const followUpSuggestion = useMemo(() => {
-    for (let index = enhancedMessages.length - 1; index >= 0; index--) {
-      const message = enhancedMessages[index];
-      if (message.role !== "assistant") continue;
-      const followUp = message.metadata?.followUp;
-      if (typeof followUp === "string" && followUp.trim().length > 0) {
-        return followUp.trim();
-      }
-    }
+    // DISABLED: Follow-ups don't work as user prompts
     return null;
+    
+    // Original code commented:
+    // for (let index = enhancedMessages.length - 1; index >= 0; index--) {
+    //   const message = enhancedMessages[index];
+    //   if (message.role !== "assistant") continue;
+    //   const followUp = message.metadata?.followUp;
+    //   if (typeof followUp === "string" && followUp.trim().length > 0) {
+    //     return followUp.trim();
+    //   }
+    // }
+    // return null;
   }, [enhancedMessages]);
   // Don't render messages in minimized state
   if (isMinimized) {
@@ -195,7 +201,7 @@ export function ChatMessages({
     <Conversation className="h-full">
       <ConversationContent
         className={cn(
-          "px-6 sm:px-8 py-6 space-y-6 min-h-full",
+          "px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 min-h-full",
           isExpanded ? "mx-auto w-full max-w-3xl" : ""
         )}
       >
@@ -206,7 +212,7 @@ export function ChatMessages({
               description={contextReady
                 ? `I'm F.B/c - Farzad's AI sidekick. Voice, screen share, uploads... use whatever helps and tell me what nudged you to reach out.`
                 : 'Give me a second while I grab a bit of context, then we’ll dive in.'}
-              icon={<MessageCircle className="h-6 w-6 text-muted-foreground" />}
+              icon={<MessageCircle className={cn("h-6 w-6 text-muted-foreground")} />}
             />
 
             {!hasAcceptedTerms ? (
@@ -289,7 +295,7 @@ export function ChatMessages({
                   )}
                 >
                   {/* Terminal prompt - only in monochrome */}
-                  <div className="hidden [.monochrome_&]:block text-[11px] font-mono text-muted-foreground">
+                  <div className={cn("hidden [.monochrome_&]:block font-mono text-muted-foreground", DESIGN_TOKENS.typography.disclaimer)}>
                     {isUserMessage ? (
                       <span>user@fbc:~$ </span>
                     ) : (
@@ -305,7 +311,7 @@ export function ChatMessages({
                     
                     {/* Blinking cursor - only for assistant in monochrome */}
                     {!isUserMessage && (
-                      <span className="hidden [.monochrome_&]:inline-block w-2 h-4 bg-current animate-pulse ml-1 align-middle" />
+                      <span className={cn("hidden [.monochrome_&]:inline-block w-2 h-4 bg-current ml-1 align-middle", DESIGN_TOKENS.animations.pulse)} />
                     )}
                   </div>
 
@@ -325,16 +331,16 @@ export function ChatMessages({
                             <span>Research findings</span>
                           </ReasoningTrigger>
                           <ReasoningContent>
-                            <div className="space-y-2 text-sm text-muted-foreground">
+                            <div className={cn("space-y-2 text-muted-foreground", DESIGN_TOKENS.typography.body)}>
                               {typeof researchSummary?.combinedAnswer === 'string' && researchSummary.combinedAnswer.trim().length > 0 && (
                                 <p className="leading-relaxed whitespace-pre-wrap">
                                   {researchSummary.combinedAnswer}
                                 </p>
                               )}
                               {researchBadges.length > 0 && (
-                                <div className="flex flex-wrap gap-2 text-[11px] uppercase tracking-wide">
+                                <div className={cn("flex flex-wrap gap-2 uppercase tracking-wide", DESIGN_TOKENS.typography.disclaimer)}>
                                   {researchBadges.map((label) => (
-                                    <Badge key={label} variant="outline" className="border-border/40 bg-background/60">
+                                    <Badge key={label} variant="outline" className={cn("border-border/40 bg-background/60", DESIGN_TOKENS.borders.default)}>
                                       {label}
                                     </Badge>
                                   ))}
@@ -352,7 +358,7 @@ export function ChatMessages({
                             <span>Research unavailable</span>
                           </ReasoningTrigger>
                           <ReasoningContent>
-                            <p className="text-sm text-muted-foreground">
+                            <p className={cn(DESIGN_TOKENS.typography.body, "text-muted-foreground")}>
                               {researchError}
                             </p>
                           </ReasoningContent>
@@ -535,6 +541,7 @@ export function ChatMessages({
                 </Message>
             );
           })}
+          {/* DISABLED: Follow-up feature removed
           {followUpSuggestion && (
             <div className="flex justify-end">
               <Button
@@ -547,6 +554,7 @@ export function ChatMessages({
               </Button>
             </div>
           )}
+          */}
           </>
         )}
 

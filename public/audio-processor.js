@@ -1,3 +1,4 @@
+// PCM16 AudioWorklet processor for real-time audio
 class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -9,33 +10,33 @@ class AudioProcessor extends AudioWorkletProcessor {
   process(inputs, outputs, parameters) {
     const input = inputs[0];
     if (input.length > 0) {
-      const inputChannel = input[0];
+      const channelData = input[0];
       
-      for (let i = 0; i < inputChannel.length; i++) {
-        this.buffer[this.bufferIndex] = inputChannel[i];
-        this.bufferIndex++;
+      for (let i = 0; i < channelData.length; i++) {
+        this.buffer[this.bufferIndex++] = channelData[i];
         
         if (this.bufferIndex >= this.bufferSize) {
-          // Convert Float32 samples (-1..1) to PCM16 for transmission
-          const pcm16Buffer = new Int16Array(this.bufferSize);
+          // Convert Float32 to Int16 PCM
+          const int16Buffer = new Int16Array(this.bufferSize);
           for (let j = 0; j < this.bufferSize; j++) {
-            const sample = Math.max(-1, Math.min(1, this.buffer[j]));
-            pcm16Buffer[j] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+            int16Buffer[j] = Math.max(-32768, Math.min(32767, this.buffer[j] * 32768));
           }
-
-          // Send PCM16 buffer to main thread
+          
+          // Send to main thread
           this.port.postMessage({
             type: 'audioData',
             data: {
-              int16arrayBuffer: pcm16Buffer.buffer
+              float32arrayBuffer: this.buffer.slice(0),
+              int16arrayBuffer: int16Buffer.buffer
             }
           });
+          
           this.bufferIndex = 0;
         }
       }
     }
     
-    return true; // Keep the processor alive
+    return true;
   }
 }
 

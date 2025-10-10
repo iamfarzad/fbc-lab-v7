@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import AI Elements theme overrides */
+@import '../src/components/ai-elements/theme-overrides.css';
+
 @layer base {
   :root {
     /* === BASE COLOR SYSTEM === */
@@ -567,6 +570,24 @@ pre .sh__token--space,
 pre span.sh__token--space { color: var(--sh-space); }
 
 pre span[class*="sh__token--"] { color: var(--sh-identifier); }
+
+@layer utilities {
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .pb-safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .pt-safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
 
 @layer components {
   .btn,

@@ -1,12 +1,12 @@
 import React from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  HighPriorityDialog,
+  HighPriorityDialogContent,
+  HighPriorityDialogHeader,
+  HighPriorityDialogTitle,
+  HighPriorityDialogDescription,
+  HighPriorityDialogFooter,
+} from '@/components/ui/high-priority-dialog';
 import { Button } from '@/components/ui/button';
 import { Mic, Camera, Monitor, Shield, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -70,19 +70,19 @@ export function PermissionExplanationDialog({
   const Icon = info.icon;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onDecline()}>
-      <DialogContent className={cn("sm:max-w-[500px]", VISUAL.CORNER_RADIUS)}>
-        <DialogHeader>
+    <HighPriorityDialog open={isOpen} onOpenChange={(open) => !open && onDecline()}>
+      <HighPriorityDialogContent className={cn("sm:max-w-[500px]", VISUAL.CORNER_RADIUS)}>
+        <HighPriorityDialogHeader>
           <div className="flex items-center gap-3 mb-2">
             <div className="p-3 rounded-full bg-accent/10">
               <Icon className="h-6 w-6 text-accent" />
             </div>
-            <DialogTitle className="text-xl">{info.title}</DialogTitle>
+            <HighPriorityDialogTitle className="text-xl">{info.title}</HighPriorityDialogTitle>
           </div>
-          <DialogDescription className="text-base">
+          <HighPriorityDialogDescription className="text-base">
             {info.description}
-          </DialogDescription>
-        </DialogHeader>
+          </HighPriorityDialogDescription>
+        </HighPriorityDialogHeader>
 
         <div className="space-y-4 py-4">
           {/* What will happen */}
@@ -112,7 +112,7 @@ export function PermissionExplanationDialog({
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
+        <HighPriorityDialogFooter className="gap-2">
           <Button
             variant="outline"
             onClick={onDecline}
@@ -126,9 +126,9 @@ export function PermissionExplanationDialog({
           >
             Allow Access
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </HighPriorityDialogFooter>
+      </HighPriorityDialogContent>
+    </HighPriorityDialog>
   );
 }
 

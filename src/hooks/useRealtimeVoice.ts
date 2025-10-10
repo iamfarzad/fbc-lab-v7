@@ -2,6 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioStreamingQueue } from '@/lib/audio-streaming-queue';
 import { useMediaRecorderVoice, type MediaRecorderVoiceResult } from '@/hooks/useMediaRecorderVoice';
 
+// AudioWorklet integration for PCM16 @ 16kHz
+interface AudioWorkletMessage {
+  type: 'audioData';
+  data: {
+    float32arrayBuffer: Float32Array;
+    int16arrayBuffer: ArrayBuffer;
+  };
+}
+
 export type VoiceSession = {
   connectionId: string;
   languageCode?: string;

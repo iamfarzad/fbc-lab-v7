@@ -887,7 +887,7 @@ Citations: ${researchResult.allCitations.length} sources processed
               research: researchMetadata
             }
 
-            const followUp = getFollowUp(conversationFlow)
+            // const followUp = getFollowUp(conversationFlow) // DISABLED
 
             // Send completion event with same ID
             const completionData = {
@@ -902,7 +902,7 @@ Citations: ${researchResult.allCitations.length} sources processed
                 finalChunk: true,
                 reqId,
                 ...mergedMetadata,
-                followUp,
+                // followUp, // DISABLED
               }
             }
             
@@ -1012,7 +1012,7 @@ Citations: ${researchResult.allCitations.length} sources processed
         research: researchMetadata
       }
 
-      const followUp = getFollowUp(conversationFlow)
+      // const followUp = getFollowUp(conversationFlow) // DISABLED
 
       return NextResponse.json({
         id: crypto.randomUUID(),
@@ -1025,7 +1025,7 @@ Citations: ${researchResult.allCitations.length} sources processed
           tokensUsed: result.usage?.totalTokens || 0,
           reqId,
           ...mergedMetadata,
-          followUp,
+          // followUp, // DISABLED
         }
       }, {
         headers: {
