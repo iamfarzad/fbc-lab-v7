@@ -49,6 +49,9 @@
     "**/__tests__/**",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "app/chat-ui-test/**"
+    "app/chat-ui-test/**",
+    "scripts/log-collectors/**",
+    "scripts/test-logging.ts",
+    "scripts/test-enhancements.ts"
   ]
 }

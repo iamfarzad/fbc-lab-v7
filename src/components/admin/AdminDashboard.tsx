@@ -24,11 +24,14 @@ import {
   Zap,
   MessageSquare,
   Send,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react'
+import Link from 'next/link'
 
 const navigationItems = [
   { id: 'overview', label: 'Overview', icon: Home, description: 'System overview and key metrics' },
+  { id: 'logs', label: 'Logs', icon: FileText, description: 'Production log monitoring', isExternal: true, href: '/admin/logs' },
   { id: 'api-tester', label: 'API Tester', icon: Zap, description: 'Test all API endpoints' },
   { id: 'admin-chat', label: 'Admin Chat', icon: MessageSquare, description: 'Chat with full system context' },
   { id: 'leads', label: 'Leads', icon: Users, description: 'Lead management and scoring' },
@@ -606,6 +609,28 @@ export function AdminDashboard() {
               {navigationItems.map((item) => {
                 const Icon = item.icon
                 const isActive = activeSection === item.id
+                
+                // External link (separate page)
+                if ('isExternal' in item && item.isExternal && 'href' in item) {
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center rounded-lg border px-4 py-3 text-left transition hover:border-primary hover:bg-primary/5",
+                        "border-border bg-background text-foreground"
+                      )}
+                    >
+                      <Icon className="mr-3 size-5" />
+                      <div>
+                        <div className="font-semibold">{item.label}</div>
+                        <div className="text-sm text-muted-foreground">{item.description}</div>
+                      </div>
+                    </Link>
+                  )
+                }
+                
+                // Internal section
                 return (
                   <button
                     key={item.id}
