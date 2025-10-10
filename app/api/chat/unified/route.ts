@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
+import { z } from 'zod'
 import { pickFollowUp, PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
 // Configure Google SDK globally
@@ -577,6 +578,24 @@ CONTEXT USAGE:
 - Only cite sources when research was actively used for the current response, not for background context.
 - Don't mention research capabilities unless user explicitly asks for search/lookup.
 
+BOOKING MENTIONS:
+- When user shows interest or asks "what's next", naturally mention: "I can send you a conversation summary, and you can book a free 30-minute strategy call with Farzad to dive deeper."
+- Don't mention it in every message - only when contextually relevant (e.g., wrapping up a topic, user asks about next steps).
+- Keep it conversational: "Want to take this further? You can book a free call with Farzad—he'd love to hear more about [specific thing they mentioned]."
+- The user can also access this anytime via the chat header menu.
+
+MULTIMODAL CAPABILITIES:
+- When user wants to talk ("let's talk", "can we chat", "I'd rather speak"), call enable_voice() tool
+- When user wants to show something ("let me show you", "here's my screen"), call enable_screen_share() tool  
+- When user wants video ("turn on camera", "video call"), call enable_webcam() tool
+- User must approve each multimodal feature before it activates
+- Don't call these tools unless user clearly indicates interest
+
+ARTIFACT CREATION:
+- When discussing next steps or booking, call create_calendar_widget() to embed inline calendar
+- When presenting data, metrics, or comparisons, call create_chart() to visualize inline
+- Artifacts appear directly in the conversation for seamless interaction
+
 If conversationFlow.recommendedNext is null, you have enough information - offer a crisp recap and propose the next concrete move.`
 
     // Add voice context if available
@@ -824,10 +843,57 @@ Citations: ${researchResult.allCitations.length} sources processed
       
       const streamingModel = google('gemini-flash-lite-latest')
       
+      // Define AI tools for multimodal and artifact creation
+      const tools = {
+        enable_voice: {
+          description: 'Suggest enabling voice chat when user wants to talk verbally. Requires user approval.',
+          parameters: z.object({
+            reason: z.string().describe('Brief reason why voice would be helpful')
+          })
+        },
+        
+        enable_screen_share: {
+          description: 'Suggest enabling screen share when user wants to show something visual. Requires user approval.',
+          parameters: z.object({
+            reason: z.string().describe('Brief reason why screen share would be helpful')
+          })
+        },
+        
+        enable_webcam: {
+          description: 'Suggest enabling webcam when user wants video interaction. Requires user approval.',
+          parameters: z.object({
+            reason: z.string().describe('Brief reason why webcam would be helpful')
+          })
+        },
+        
+        create_calendar_widget: {
+          description: 'Create an inline calendar booking widget for scheduling calls',
+          parameters: z.object({
+            title: z.string().describe('Title for the calendar widget'),
+            description: z.string().optional().describe('Optional description'),
+            url: z.string().optional().describe('Custom calendar URL (defaults to Farzad\'s Calendly)')
+          })
+        },
+        
+        create_chart: {
+          description: 'Create an inline chart/graph to visualize data',
+          parameters: z.object({
+            type: z.enum(['bar', 'line', 'pie', 'area']).describe('Chart type'),
+            title: z.string().describe('Chart title'),
+            data: z.array(z.object({
+              label: z.string(),
+              value: z.number()
+            })).describe('Chart data points'),
+            description: z.string().optional()
+          })
+        }
+      };
+      
       // Streaming response using AI SDK
       const result = streamText({
         model: streamingModel,
         system: systemPrompt,
+        tools,
         messages: aiMessages,
         temperature: 0.7,
         onFinish: (result) => {
@@ -852,26 +918,44 @@ Citations: ${researchResult.allCitations.length} sources processed
             let fullContent = ''
             const messageId = crypto.randomUUID() // Stable ID across chunks
             
-            // Stream AI SDK response
-            for await (const chunk of result.textStream) {
-              fullContent += chunk
-              
-              // Send as unified message format with stable ID
-              const messageData = {
-                id: messageId,
-                role: 'assistant',
-                content: fullContent,
-                timestamp: new Date().toISOString(),
-                type: 'text',
-                metadata: {
-                  mode,
-                  isStreaming: true,
-                  reqId
-                }
+            // Stream AI SDK response including tool calls
+            for await (const chunk of result.fullStream) {
+              // Handle tool calls
+              if (chunk.type === 'tool-call') {
+                const toolCallData = {
+                  id: crypto.randomUUID(),
+                  type: 'tool_call',
+                  tool: chunk.toolName,
+                  arguments: chunk.args,
+                  requiresApproval: ['enable_voice', 'enable_screen_share', 'enable_webcam'].includes(chunk.toolName),
+                  timestamp: new Date().toISOString()
+                };
+                
+                const toolEventData = `data: ${JSON.stringify(toolCallData)}\n\n`;
+                controller.enqueue(encoder.encode(toolEventData));
               }
               
-              const eventData = `data: ${JSON.stringify(messageData)}\n\n`
-              controller.enqueue(encoder.encode(eventData))
+              // Handle text delta
+              if (chunk.type === 'text-delta') {
+                fullContent += chunk.textDelta;
+                
+                // Send as unified message format with stable ID
+                const messageData = {
+                  id: messageId,
+                  role: 'assistant',
+                  content: fullContent,
+                  timestamp: new Date().toISOString(),
+                  type: 'text',
+                  metadata: {
+                    mode,
+                    isStreaming: true,
+                    reqId
+                  }
+                };
+                
+                const eventData = `data: ${JSON.stringify(messageData)}\n\n`;
+                controller.enqueue(encoder.encode(eventData));
+              }
             }
 
             // Parse structured response for AI elements metadata

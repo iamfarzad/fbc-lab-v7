@@ -90,6 +90,8 @@ import type { ResearchSummary } from "../hooks/useChatMessages";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { ChatSuggestions } from "./ChatSuggestions";
 import { ChatTermsAcceptance } from "./ChatTermsAcceptance";
+import { ToolApprovalPrompt } from "../ToolApprovalPrompt";
+import { CalendarWidget, ChartWidget } from "../artifacts";
 
 type StreamedArtifact = {
   id: string;
@@ -537,6 +539,46 @@ export function ChatMessages({
                         </Actions>
                       )}
                     </div>
+                    
+                    {/* Tool Calls - Approval Prompts & Artifacts */}
+                    {(message as any).type === 'tool_call' && (
+                      <div className="mt-4">
+                        {/* Multimodal Tool Approval Prompts */}
+                        {(message as any).requiresApproval && (
+                          <ToolApprovalPrompt
+                            tool={(message as any).tool}
+                            reason={(message as any).arguments?.reason || 'Would you like to enable this feature?'}
+                            onApprove={() => {
+                              // Handled in ChatInterface via props
+                              console.log('Tool approved:', (message as any).tool);
+                            }}
+                            onDecline={() => {
+                              // Handled in ChatInterface via props
+                              console.log('Tool declined:', (message as any).tool);
+                            }}
+                          />
+                        )}
+                        
+                        {/* Calendar Widget Artifact */}
+                        {(message as any).tool === 'create_calendar_widget' && !(message as any).requiresApproval && (
+                          <CalendarWidget 
+                            title={(message as any).arguments?.title}
+                            description={(message as any).arguments?.description}
+                            url={(message as any).arguments?.url}
+                          />
+                        )}
+                        
+                        {/* Chart Widget Artifact */}
+                        {(message as any).tool === 'create_chart' && !(message as any).requiresApproval && (
+                          <ChartWidget 
+                            type={(message as any).arguments?.type}
+                            title={(message as any).arguments?.title}
+                            description={(message as any).arguments?.description}
+                            data={(message as any).arguments?.data}
+                          />
+                        )}
+                      </div>
+                    )}
                   </MessageContent>
                 </Message>
             );

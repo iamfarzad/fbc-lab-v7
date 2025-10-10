@@ -771,6 +771,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
               onToggleMinimize={chatStateHook.toggleMinimize}
               onToggleExpand={chatStateHook.toggleExpand}
               onToggleChat={chatStateHook.toggleChat}
+              sessionId={sessionId}
+              showNextSteps={intelligenceHook.hasAcceptedTerms && usage && (usage.messages_sent >= 5 || (Date.now() - (usage.started_at || 0)) / 60000 >= 5)}
             />
 
             {isExpanded && renderActiveStreamBanner()}

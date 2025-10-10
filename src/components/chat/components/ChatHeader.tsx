@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { ChatState } from "../types/chatTypes";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { StatusIndicator } from "./StatusIndicator";
+import { NextStepsMenu } from "../NextStepsMenu";
 import {
   Minimize2,
   Expand,
@@ -16,13 +17,17 @@ interface ChatHeaderProps {
   onToggleMinimize: () => void;
   onToggleExpand: () => void;
   onToggleChat: () => void;
+  sessionId?: string;
+  showNextSteps?: boolean;
 }
 
 export function ChatHeader({
   chatState,
   onToggleMinimize,
   onToggleExpand,
-  onToggleChat
+  onToggleChat,
+  sessionId,
+  showNextSteps = false
 }: ChatHeaderProps) {
   return (
     <>
@@ -71,6 +76,10 @@ export function ChatHeader({
         <div className="flex items-center gap-2">
                   {/* Mobile: Menu, expand/minimize, and close */}
                   <div className="flex items-center gap-1 md:hidden">
+                    {showNextSteps && sessionId && (
+                      <NextStepsMenu sessionId={sessionId} show={showNextSteps} />
+                    )}
+                    
                     <Button
                       variant="ghost"
                       size="sm"
@@ -131,6 +140,10 @@ export function ChatHeader({
 
           {/* Desktop: Full controls */}
           <div className="hidden md:flex items-center gap-1">
+            {showNextSteps && sessionId && (
+              <NextStepsMenu sessionId={sessionId} show={showNextSteps} />
+            )}
+            
             {!chatState.isExpanded && (
               <Button
                 variant="ghost"

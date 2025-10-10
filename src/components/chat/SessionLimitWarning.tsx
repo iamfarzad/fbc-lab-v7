@@ -61,29 +61,8 @@ export function SessionLimitWarning({ sessionId, usage }: SessionLimitWarningPro
     }
   };
   
-  // Show proposal download anytime after engagement
-  if (showProposal && hasEngaged && !sessionEnded) {
-    return (
-      <Alert className="border-blue-500 bg-blue-50 mb-4">
-        <AlertDescription className="space-y-3">
-          <p className="font-semibold">💼 Ready to take the next step?</p>
-          <div className="flex gap-2 flex-wrap">
-            <Button onClick={handleDownloadProposal} disabled={generating} size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              {generating ? 'Generating...' : 'Download Proposal'}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => window.open('https://calendly.com/farzad-fbc', '_blank')}>
-              <Calendar className="w-4 h-4 mr-2" />
-              Book Call
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Get your personalized proposal and next steps - available anytime during our conversation.
-          </p>
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  // Don't show any banners during conversation - only at the end
+  // The header icon provides access anytime
   
   // Session ended - show final CTA
   if (sessionEnded && showProposal) {
