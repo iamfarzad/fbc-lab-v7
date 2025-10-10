@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { X, Monitor, MonitorOff, Mic, Camera } from "lucide-react";
 import { getGradientForTheme, getMonochromeClass, getThemeAwareBackdrop } from "@/lib/theme-utils";
 import { DESIGN_TOKENS } from "../tokens/design-tokens";
 import { VoiceWaveform } from "./VoiceWaveform";
+import { useMicLevel } from "@/hooks/useMicLevel";
 
 interface ScreenShareFullScreenProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export function ScreenShareFullScreen({
   partialTranscript
 }: ScreenShareFullScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const inputLevel = useMicLevel(isOpen && isVoiceActive === true);
 
   // Set up video stream
   useEffect(() => {
@@ -61,6 +64,14 @@ export function ScreenShareFullScreen({
       document.body.style.overflow = '';
     };
   }, [isOpen]);
+
+  // Track viewport to enable swipe-down close on mobile
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Handle escape key
   useEffect(() => {
@@ -90,6 +101,16 @@ export function ScreenShareFullScreen({
           getMonochromeClass(),
           "fixed inset-0 z-[300] flex flex-col"
         )}
+        // Swipe-down to close on mobile
+        drag={isMobile ? 'y' : false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.2}
+        dragSnapToOrigin
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 80 || info.velocity.y > 500) {
+            onClose();
+          }
+        }}
       >
         {/* Top Bar */}
         <div className={cn(
@@ -155,6 +176,12 @@ export function ScreenShareFullScreen({
                 getMonochromeClass()
               )}>
                 <VoiceWaveform isActive={isProcessing} />
+                <div aria-label="Input level" className="h-6 w-1.5 rounded bg-primary-foreground/20 overflow-hidden">
+                  <div
+                    className="w-full bg-primary-foreground/90 transition-all duration-100"
+                    style={{ height: `${Math.max(4, Math.min(100, inputLevel * 100))}%` }}
+                  />
+                </div>
                 <span className={cn(DESIGN_TOKENS.typography.disclaimer, "font-medium")}>
                   {isProcessing ? "Processing..." : "Voice Active"}
                 </span>

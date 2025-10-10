@@ -37,6 +37,7 @@ interface ActionsMenuProps {
   onToggleSettings?: () => void;
   onOpenVoiceFullScreen?: () => void;
   onOpenCameraFullScreen?: () => void;
+  onOpenScreenFullScreen?: () => void;
   currentTheme?: string;
   onToggleTheme?: () => void;
 }
@@ -59,6 +60,7 @@ export function ActionsMenu({
   onToggleSettings,
   onOpenVoiceFullScreen,
   onOpenCameraFullScreen,
+  onOpenScreenFullScreen,
   currentTheme = 'default',
   onToggleTheme,
 }: ActionsMenuProps) {
@@ -88,7 +90,7 @@ export function ActionsMenu({
 
   const handleVoiceClick = () => {
     // Check if we're on mobile and should use full-screen mode
-    const isMobile = window.innerWidth < 640;
+    const isMobile = window.innerWidth < 768;
     
     if (isMobile && onOpenVoiceFullScreen) {
       onOpenVoiceFullScreen();
@@ -100,7 +102,7 @@ export function ActionsMenu({
 
   const handleCameraClick = () => {
     // Check if we're on mobile and should use full-screen mode
-    const isMobile = window.innerWidth < 640;
+    const isMobile = window.innerWidth < 768;
     
     if (isMobile && onOpenCameraFullScreen) {
       onOpenCameraFullScreen();
@@ -111,7 +113,12 @@ export function ActionsMenu({
   };
 
   const handleScreenShareClick = () => {
-    onToggleScreenShare?.();
+    const isMobile = window.innerWidth < 768;
+    if (isMobile && onOpenScreenFullScreen) {
+      onOpenScreenFullScreen();
+    } else {
+      onToggleScreenShare?.();
+    }
     onClose();
   };
 

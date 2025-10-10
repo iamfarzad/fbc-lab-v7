@@ -15,6 +15,7 @@ interface CameraFullScreenProps {
   onToggle: () => void;
   onSwitchCamera?: () => void;
   availableDevices?: number;
+  onCapture?: (blob: Blob) => void;
 }
 
 export function CameraFullScreen({
@@ -25,10 +26,12 @@ export function CameraFullScreen({
   error,
   onToggle,
   onSwitchCamera,
-  availableDevices = 1
+  availableDevices = 1,
+  onCapture
 }: CameraFullScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isFacingUser, setIsFacingUser] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Set up video stream
   useEffect(() => {
@@ -50,6 +53,14 @@ export function CameraFullScreen({
     };
   }, [isOpen]);
 
+  // Track viewport to enable swipe-down close on mobile
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -70,8 +81,40 @@ export function CameraFullScreen({
   };
 
   const handleCapture = () => {
-    // Capture functionality would go here
-    console.log('Capturing photo...');
+    const video = videoRef.current;
+    if (!video) return;
+    // Use video dimensions; fallback if not ready
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Mirror for front camera so the saved photo matches preview
+    if (isFacingUser) {
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, width, height);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      if (onCapture) {
+        onCapture(blob);
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        a.href = url;
+        a.download = `camera-capture-${ts}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    }, 'image/png', 0.92);
   };
 
   if (!isOpen) return null;
@@ -88,6 +131,16 @@ export function CameraFullScreen({
           getMonochromeClass(),
           "fixed inset-0 z-[300] flex flex-col"
         )}
+        // Swipe-down to close on mobile
+        drag={isMobile ? 'y' : false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.2}
+        dragSnapToOrigin
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 80 || info.velocity.y > 500) {
+            onClose();
+          }
+        }}
       >
         {/* Top Bar */}
         <div className={cn(

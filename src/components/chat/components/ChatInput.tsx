@@ -41,11 +41,13 @@ import { ToolsMenu } from "./ToolsMenu";
 import { ActionsMenu } from "./ActionsMenu";
 import { VoiceLiveMode } from "./VoiceLiveMode";
 import { CameraFullScreen } from "./CameraFullScreen";
+import { ScreenShareFullScreen } from "./ScreenShareFullScreen";
 import { MediaPopover } from "./MediaPopover";
 import { VoicePopoverSection } from "./VoicePopoverSection";
 import { CameraPopoverSection } from "./CameraPopoverSection";
 import { ScreenPopoverSection } from "./ScreenPopoverSection";
 import { PermissionExplanationDialog } from "./PermissionExplanationDialog";
+import { usePromptInputAttachments } from "@/components/ai-elements/interactive/prompt-input";
 
 type SendMessageInput = string | {
   text?: string;
@@ -134,12 +136,23 @@ export function ChatInput({
   // Full-screen media states
   const [isVoiceFullScreenOpen, setIsVoiceFullScreenOpen] = useState(false);
   const [isCameraFullScreenOpen, setIsCameraFullScreenOpen] = useState(false);
+  const [isScreenFullScreenOpen, setIsScreenFullScreenOpen] = useState(false);
   
   // Refs for popover positioning
   const voiceButtonRef = useRef<HTMLDivElement>(null);
   const cameraButtonRef = useRef<HTMLDivElement>(null);
   const screenButtonRef = useRef<HTMLDivElement>(null);
   const [isTogglingVoice, setIsTogglingVoice] = useState(false);
+  const attachmentsBridgeRef = useRef<{ add: (files: File[] | FileList) => void } | null>(null);
+
+  // Small bridge to lift attachments.add API from PromptInput's context
+  function AttachmentsBridge({ onReady }: { onReady: (addFn: (files: File[] | FileList) => void) => void }) {
+    const ctx = usePromptInputAttachments();
+    useEffect(() => {
+      onReady(ctx.add);
+    }, [ctx.add, onReady]);
+    return null;
+  }
 
   // Auto-open popover when media becomes active
   useEffect(() => {
@@ -178,11 +191,13 @@ export function ChatInput({
     }
     
     console.log('🎤 [ChatInput] Voice button clicked');
+    // Ensure Actions menu is closed when toggling media
+    setIsActionsMenuOpen(false);
     setIsTogglingVoice(true);
     
     try {
       // Check if we're on mobile (< 640px)
-      const isMobile = window.innerWidth < 640;
+      const isMobile = window.innerWidth < 768;
       
       if (isMobile) {
         // On mobile, use full-screen mode
@@ -225,7 +240,9 @@ export function ChatInput({
 
   const handleCameraButtonClick = async () => {
     // Check if we're on mobile (< 640px)
-    const isMobile = window.innerWidth < 640;
+    const isMobile = window.innerWidth < 768;
+    // Ensure Actions menu is closed when toggling media
+    setIsActionsMenuOpen(false);
     
     if (isMobile) {
       // On mobile, use full-screen mode
@@ -262,23 +279,33 @@ export function ChatInput({
   };
 
   const handleScreenButtonClick = async () => {
-    const willOpen = activePopover !== 'screen';
-    
-    // If opening and not already active, show permission explanation first
-    if (willOpen && !isScreenSharing) {
-      setPendingPermission('screen');
-      return;
+    // Ensure Actions menu is closed when toggling media
+    setIsActionsMenuOpen(false);
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+      setIsScreenFullScreenOpen(!isScreenFullScreenOpen);
+      if (!isScreenSharing) {
+        setPendingPermission('screen');
+        return;
+      }
+    } else {
+      const willOpen = activePopover !== 'screen';
+      // If opening and not already active, show permission explanation first
+      if (willOpen && !isScreenSharing) {
+        setPendingPermission('screen');
+        return;
+      }
+      setActivePopover(willOpen ? 'screen' : null);
+      await new Promise(resolve => requestAnimationFrame(resolve));
     }
-    
-    setActivePopover(willOpen ? 'screen' : null);
-    
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    
+
     try {
       await onToggleScreenShare();
     } catch (error) {
       console.error('Screen share toggle error:', error);
-      if (willOpen) {
+      if (isMobile) {
+        setIsScreenFullScreenOpen(false);
+      } else {
         setActivePopover(null);
       }
     }
@@ -411,7 +438,7 @@ export function ChatInput({
             }
           }}
         >
-          <PromptInputBody className="flex flex-col gap-2">
+          <PromptInputBody className="flex flex-col gap-2" data-ui-rev="2025-10-10-polish2">
             <PromptInputTextarea
               className="rounded-xl bg-transparent px-2 sm:px-3 py-1.5 text-sm leading-relaxed text-foreground/90 placeholder:text-muted-foreground/70 min-h-[36px] max-h-[120px] resize-none"
             value={getInputDisplayValue()}
@@ -450,7 +477,7 @@ export function ChatInput({
                               "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono",
                               "h-8 w-8 min-h-[32px] min-w-[32px] shadow-sm"
                             )}
-                            onClick={() => setIsActionsMenuOpen(true)}
+                            onClick={() => { setActivePopover(null); setIsActionsMenuOpen(true); }}
                             aria-label="All actions menu"
                             title="Actions, Tools & Media"
                           >
@@ -481,6 +508,24 @@ export function ChatInput({
                               )}
                             />
                           </div>
+                          {/* Inline voice status chip */}
+                          {(isVoiceProcessing || isVoiceActive) && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md border",
+                                isVoiceProcessing
+                                  ? "border-amber-500/30 bg-amber-500/10 text-amber-600"
+                                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
+                              )}
+                              aria-live="polite"
+                            >
+                              <span className={cn("inline-block h-1.5 w-1.5 rounded-full", isVoiceProcessing ? "bg-amber-500" : "bg-emerald-500")} />
+                              {isVoiceProcessing ? 'Processing' : 'Recording'}
+                            </span>
+                          )}
+                          {/* Anchor placeholders for camera/screen popovers on desktop */}
+                          <div ref={cameraButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
+                          <div ref={screenButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
 
                           {/* Send Button */}
                           <PromptInputSubmit
@@ -504,6 +549,8 @@ export function ChatInput({
                         Strategic guidance only - not legal, medical, or financial advice.
                       </div>
         </PromptInputBody>
+        {/* Bridge lives inside PromptInput to gain access to attachments context */}
+        <AttachmentsBridge onReady={(add) => { attachmentsBridgeRef.current = { add }; }} />
         </PromptInput>
       </div>
 
@@ -591,6 +638,7 @@ export function ChatInput({
         onToggleSettings={onToggleSettings}
         onOpenVoiceFullScreen={() => setIsVoiceFullScreenOpen(true)}
         onOpenCameraFullScreen={() => setIsCameraFullScreenOpen(true)}
+        onOpenScreenFullScreen={() => setIsScreenFullScreenOpen(true)}
         currentTheme="default" // TODO: Get from context
         onToggleTheme={() => {}} // TODO: Implement theme toggle
       />
@@ -620,6 +668,28 @@ export function ChatInput({
         onToggle={handleCameraButtonClick}
         onSwitchCamera={onSwitchCamera}
         availableDevices={availableCameras}
+        onCapture={(blob) => {
+          const ts = new Date().toISOString().replace(/[:.]/g, '-');
+          const file = new File([blob], `camera-capture-${ts}.png`, { type: 'image/png' });
+          attachmentsBridgeRef.current?.add([file]);
+          toast.success('Photo added to message');
+        }}
+      />
+
+      <ScreenShareFullScreen
+        isOpen={isScreenFullScreenOpen}
+        onClose={() => setIsScreenFullScreenOpen(false)}
+        isActive={isScreenSharing}
+        stream={screenShareStream}
+        error={screenShareError || undefined}
+        onToggle={handleScreenButtonClick}
+        isVoiceActive={isVoiceActive}
+        isWebcamActive={cameraState}
+        onToggleVoice={handleVoiceButtonClick}
+        onToggleWebcam={handleCameraButtonClick}
+        isProcessing={isVoiceProcessing}
+        transcript={voiceTranscript}
+        partialTranscript={voicePartialTranscript}
       />
     </div>
   );

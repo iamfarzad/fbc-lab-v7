@@ -1,56 +1,41 @@
-// PCM16 AudioWorklet processor for real-time audio
 class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.bufferSize = 2048; // Reduced for lower latency
+    this.bufferSize = 4096;
     this.buffer = new Float32Array(this.bufferSize);
     this.bufferIndex = 0;
   }
 
   process(inputs, outputs, parameters) {
     const input = inputs[0];
-    if (!input || input.length === 0) {
-      return true;
-    }
-    
-    const channelData = input[0];
-    if (!channelData || channelData.length === 0) {
-      return true;
-    }
-    
-    for (let i = 0; i < channelData.length; i++) {
-      let sample = channelData[i];
+    if (input.length > 0) {
+      const inputChannel = input[0];
       
-      // Less aggressive noise gate - reduce static without cutting off speech
-      if (Math.abs(sample) < 0.005) {
-        sample = 0;
-      }
-      
-      this.buffer[this.bufferIndex++] = sample;
-      
-      if (this.bufferIndex >= this.bufferSize) {
-        // Convert Float32 to Int16 PCM with proper clamping
-        const int16Buffer = new Int16Array(this.bufferSize);
-        for (let j = 0; j < this.bufferSize; j++) {
-          // Clamp and convert with better precision
-          const clamped = Math.max(-1.0, Math.min(1.0, this.buffer[j]));
-          int16Buffer[j] = Math.round(clamped * 32767);
-        }
+      for (let i = 0; i < inputChannel.length; i++) {
+        this.buffer[this.bufferIndex] = inputChannel[i];
+        this.bufferIndex++;
         
-        // Send to main thread
-        this.port.postMessage({
-          type: 'audioData',
-          data: {
-            float32arrayBuffer: this.buffer.slice(0),
-            int16arrayBuffer: int16Buffer.buffer
+        if (this.bufferIndex >= this.bufferSize) {
+          // Convert Float32 (-1.0 to 1.0) to Int16 (-32768 to 32767)
+          const int16Buffer = new Int16Array(this.bufferSize);
+          for (let j = 0; j < this.bufferSize; j++) {
+            const s = Math.max(-1, Math.min(1, this.buffer[j]));
+            int16Buffer[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
           }
-        });
-        
-        this.bufferIndex = 0;
+          
+          // Send the buffer to the main thread
+          this.port.postMessage({
+            type: 'audioData',
+            data: {
+              int16arrayBuffer: int16Buffer.buffer
+            }
+          });
+          this.bufferIndex = 0;
+        }
       }
     }
     
-    return true;
+    return true; // Keep the processor alive
   }
 }
 

@@ -26,10 +26,19 @@ export function ScreenPopoverSection({
     const video = videoRef.current;
     if (!video || !stream) return;
 
-    video.srcObject = stream;
+    // Only update if stream changed (prevents video reload loops)
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
     video.play().catch(err => {
-      console.error('Error playing screen share:', err);
+      const name = (err as any)?.name || 'Error';
+      const message = (err as any)?.message || String(err);
+      if (name === 'AbortError' || message.includes('interrupted by a new load request')) {
+        console.debug('Screen share preview play() interrupted — benign:', message);
+      } else {
+        console.warn('Screen share preview play() warning:', message);
+      }
     });
+    }
 
     return () => {
       if (video.srcObject) {

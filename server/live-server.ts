@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { RawData } from 'ws'
-import { GoogleGenAI } from '@google/genai'
+import { GoogleGenAI, MediaResolution, Modality } from '@google/genai'
 import { v4 as uuidv4 } from 'uuid'
 import { Buffer } from 'buffer'
 import * as https from 'https'
@@ -10,170 +10,28 @@ import * as path from 'path'
 import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
+// Load .env.local first (if exists), then fallback to .env
+dotenv.config({ path: path.join(__dirname, '.env.local') });
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 // Use PORT for Fly.io compatibility, fallback to 3001 for local development
 const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
 console.log(`🔧 Environment check: PORT=${process.env.PORT}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT}, Using: ${PORT}`);
-const IS_MOCK = (process.env.FBC_USE_MOCKS === '1' || process.env.LIVE_MOCK === '1');
+// Mock disabled: always use Live API
+const IS_MOCK = false;
 
-// Centralized logging with batching
-const LOG_INGEST_URL = process.env.LOG_INGEST_URL || 'http://localhost:3000/api/logs/ingest'
-const LOG_SECRET = process.env.LOGS_INGESTION_SECRET || ''
-const logQueue: any[] = []
-let logFlushTimer: NodeJS.Timeout | null = null
-
-async function flushLogs() {
-  if (logQueue.length === 0) return
-  
-  const batch = [...logQueue]
-  logQueue.length = 0
-  
-  try {
-    await fetch(LOG_INGEST_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Log-Secret': LOG_SECRET
-      },
-      body: JSON.stringify(batch)
-    })
-  } catch (error) {
-    // Silently fail to avoid log loops
-  }
-}
-
-function sendLog(level: 'debug' | 'info' | 'warn' | 'error', message: string, meta?: any) {
-  // Always log to console as backup
-  console[level === 'debug' ? 'log' : level](message, meta || '')
-  
-  // Queue for batch sending
-  logQueue.push({
-    service: 'websocket',
-    level,
-    message,
-    timestamp: new Date().toISOString(),
-    meta
-  })
-  
-  // Schedule flush if not already scheduled
-  if (!logFlushTimer) {
-    logFlushTimer = setTimeout(() => {
-      logFlushTimer = null
-      flushLogs().catch(() => {})
-    }, 2000)
-  }
-  
-  // Flush immediately on errors
-  if (level === 'error' && logQueue.length >= 10) {
-    if (logFlushTimer) {
-      clearTimeout(logFlushTimer)
-      logFlushTimer = null
-    }
-    flushLogs().catch(() => {})
-  }
-}
-
-// Voice & Language Utilities - Multilingual Support
+// Voice & Language Utilities
 const VOICE_BY_LANG: Record<string, string> = {
-  'en-US': 'Fenrir',
-  'en-GB': 'Fenrir',
-  'nb-NO': 'Fenrir',  // Norwegian - Testing Fenrir for Nordic languages
-  'nn-NO': 'Fenrir',  // Norwegian Nynorsk
-  'sv-SE': 'Fenrir',  // Swedish
-  'de-DE': 'Fenrir',
-  'es-ES': 'Fenrir',
-  'fr-FR': 'Fenrir',
-  'it-IT': 'Fenrir',
+  'en-US': 'Puck',
+  'en-GB': 'Puck',
+  'nb-NO': 'Puck',
+  'sv-SE': 'Puck',
+  'de-DE': 'Puck',
+  'es-ES': 'Puck',
 };
-
-// Main Chat Personality from unified API route
-const CHAT_PERSONALITY = `You are F.B/c - Farzad Bayat's AI consulting copilot. Never identify yourself as Gemini, Google's AI, or any other AI assistant. You are F.B/c AI, created specifically for Farzad Bayat Consulting.
-
-PRONUNCIATION GUIDE (for voice responses):
-- Farzad: Pronounce as "far-ZAAD" (emphasis on second syllable)
-  - "far" rhymes with "car"  
-  - "ZAAD" like "zod" in "zodiac" but with longer "ah" sound
-  - NOT "FAR-zad" (short a)
-- When speaking his name, use this pronunciation for natural flow
-
-VOICE & TONE:
-- Sound like a sharp, friendly consultant (Farzad's "no fluff" style).
-- Use plain English (or Norwegian if user speaks Norwegian), two sentences max per turn.
-- End with an open question when you still need context.
-- Keep responses natural and conversational for voice interaction.
-
-MISSION FOCUS:
-Use the conversation to uncover:
-1. Business goals
-2. Painful workflows
-3. Data reality
-4. Team readiness
-5. Budget & timeline
-6. Success metrics
-
-CONVERSATION STRATEGY:
-- Mirror the user's language and build on the latest turn.
-- Ask exactly one focused question at a time.
-- Keep answers tight for voice - expand only when asked.
-- Voice transcripts should be handled exactly like text messages.
-- Suggest multimodal actions when helpful ("Want to show me your screen?" etc.).
-
-FORMATTING FOR VOICE:
-- No headings, numbered lists, or structured reports unless explicitly asked.
-- Speak naturally - avoid robotic or formal language.
-- Reference information inline conversationally.
-
-If the user asks for legal, medical, HR, or financial advice, politely decline and recommend a licensed professional.`;
-
-const FUNCTION_DECLARATIONS: any[] = [
-  {
-    name: 'search_web',
-    description: 'Search the web for current information and return grounded, cited findings.',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query to submit to the web search tool.' },
-        urls: {
-          type: 'array',
-          description: 'Optional URLs to prioritize for context.',
-          items: { type: 'string' }
-        }
-      },
-      required: ['query']
-    }
-  },
-  {
-    name: 'capture_screen_snapshot',
-    description: 'Retrieve the latest analyzed screen-share context for this session to describe what is on the user\'s screen.',
-    parameters: {
-      type: 'object',
-      properties: {
-        summaryOnly: {
-          type: 'boolean',
-          description: 'When true, omit raw image data and return only textual context.'
-        }
-      }
-    }
-  },
-  {
-    name: 'capture_webcam_snapshot',
-    description: 'Retrieve the latest analyzed webcam context for this session to understand the user\'s environment.',
-    parameters: {
-      type: 'object',
-      properties: {
-        summaryOnly: {
-          type: 'boolean',
-          description: 'When true, omit raw image data and return only textual context.'
-        }
-      }
-    }
-  }
-];
 
 function isBcp47(s?: string) {
   return typeof s === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z]{2}|-[A-Za-z]{4})?(-[A-Za-z]{2}|-[0-9]{3})?$/.test(s)
@@ -243,7 +101,7 @@ const wss = new WebSocketServer({
   maxPayload: 10 * 1024 * 1024,
   verifyClient: (info: { origin: string; req: http.IncomingMessage; secure: boolean }) => {
     // Log connection attempts for debugging
-    sendLog('info', `🔌 WebSocket connection attempt from ${info.origin || 'unknown origin'}`)
+    console.info(`🔌 WebSocket connection attempt from ${info.origin || 'unknown origin'}`)
     return true // Accept all connections for now
   },
   handleProtocols: (protocols: Set<string>) => {
@@ -277,44 +135,85 @@ nodeProcess?.on('unhandledRejection', (reason: unknown) => {
   console.error('UNHANDLED_REJECTION:', reason)
 })
 
-type ToolFunctionCall = {
-  id?: string;
-  name?: string;
-  args?: unknown;
-};
+// --- Live Config: System instruction and tool declarations ---
+const CHAT_PERSONALITY = `
+You are F.B/c, Farzad Bayat's sharp, friendly consulting assistant.
+- Speak concisely (2 sentences max by default).
+- Ask one focused question when you need more context.
+- Keep a natural voice tone; avoid lists unless asked.
+Pronunciation: "Farzad Bayat" ~ "Fahr–zahd Bye–yaht" (soft 'a' in Farzad).
+`;
 
-type ToolResponse = {
-  id: string;
-  name: string;
-  response: { json: any };
-};
+const FUNCTION_DECLARATIONS: any[] = [
+  {
+    name: 'search_web',
+    description: 'Search the web for current information and return grounded, cited findings.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query to submit.' },
+        urls: { type: 'array', items: { type: 'string' }, description: 'Optional URLs to prioritize.' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'capture_screen_snapshot',
+    description: 'Retrieve the latest analyzed screen-share context for this session.',
+    parameters: {
+      type: 'object',
+      properties: { summaryOnly: { type: 'boolean', description: 'Omit raw image data when true.' } }
+    }
+  },
+  {
+    name: 'capture_webcam_snapshot',
+    description: 'Retrieve the latest analyzed webcam context for this session.',
+    parameters: {
+      type: 'object',
+      properties: { summaryOnly: { type: 'boolean', description: 'Omit raw image data when true.' } }
+    }
+  }
+];
 
+// Visual trigger + throttle configuration (parameterized via env)
+const VISUAL_TRIGGER_WORDS: string[] = (process.env.LIVE_SERVER_VISUAL_TRIGGERS || 'screen,showing,look at,see this,dashboard,workflow')
+  .split(',')
+  .map(s => s.trim().toLowerCase())
+  .filter(Boolean);
+const VISUAL_INJECT_THROTTLE_MS = Math.max(
+  0,
+  Number.parseInt(process.env.LIVE_SERVER_VISUAL_INJECT_THROTTLE_MS || '8000', 10) || 8000
+);
+
+// Visual context snapshot & session record types
 type Snapshot = {
   analysis: string;
   capturedAt: number;
   imageData?: string;
+  lastInjected?: number;
 };
 
 type ActiveSessionRecord = {
   ws: WebSocket;
   session: any;
-  clientSessionId?: string;
-  languageCode?: string;
-  voiceName?: string;
   latestContext: {
     screen?: Snapshot;
     webcam?: Snapshot;
   };
+  injectionTimers?: {
+    screen?: ReturnType<typeof setTimeout>;
+    webcam?: ReturnType<typeof setTimeout>;
+  };
 };
-
-const CONTEXT_MAX_AGE_MS = 60_000;
-const RUN_SERVER_TOOL_EXECUTION = process.env.LIVE_SERVER_DISABLE_TOOLS === '1' ? false : true;
-const DEFAULT_SEARCH_MODEL = process.env.GEMINI_GROUNDING_MODEL || 'gemini-2.5-flash';
-
-let searchGenAI: GoogleGenAI | null = null;
 
 // Store active Live API sessions
 const activeSessions = new Map<string, ActiveSessionRecord>();
+// Feature flag + debounce controls for CONTEXT_UPDATE → Live injection
+const INJECT_ON_CONTEXT_UPDATE = process.env.LIVE_SERVER_INJECT_ON_CONTEXT_UPDATE === '0' ? false : true;
+const CONTEXT_INJECT_DEBOUNCE_MS = Math.max(
+  0,
+  Number.parseInt(process.env.LIVE_SERVER_CONTEXT_INJECT_DEBOUNCE_MS || '600', 10) || 600
+);
 const sessionStarting = new Set<string>()
 
 // Helper function for safe WebSocket sends
@@ -328,290 +227,8 @@ function safeSend(ws: WebSocket, data: any, isBinary = false) {
   }
 }
 
-type Citation = { uri: string; title?: string; description?: string; source?: 'url' | 'search' }
-
-function ensureSearchClient(): GoogleGenAI {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY not configured on server.')
-  }
-  if (!searchGenAI) {
-    searchGenAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-  }
-  return searchGenAI
-}
-
-function extractCitations(candidate: unknown): Citation[] {
-  const citations: Citation[] = []
-  try {
-    const asRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
-    if (!asRecord(candidate)) return citations
-
-    const groundingMetadata = asRecord(candidate.groundingMetadata)
-      ? (candidate.groundingMetadata as Record<string, unknown>)
-      : undefined
-
-    const chunks = Array.isArray(groundingMetadata?.groundingChunks)
-      ? groundingMetadata?.groundingChunks
-      : []
-
-    for (const chunk of chunks) {
-      if (asRecord(chunk) && asRecord(chunk.web)) {
-        const web = chunk.web as Record<string, unknown>
-        const uri = typeof web.uri === 'string' ? web.uri : typeof web.url === 'string' ? web.url : ''
-        if (!uri) continue
-        citations.push({
-          uri,
-          title: typeof web.title === 'string' ? web.title : 'Search Result',
-          description: typeof web.snippet === 'string'
-            ? web.snippet
-            : typeof web.description === 'string'
-              ? web.description
-              : '',
-          source: 'search'
-        })
-      }
-    }
-
-    const urlContextMetadata = asRecord(candidate.urlContextMetadata)
-      ? (candidate.urlContextMetadata as Record<string, unknown>)
-      : undefined
-
-    const urlMetadata = Array.isArray(urlContextMetadata?.urlMetadata)
-      ? urlContextMetadata.urlMetadata
-      : []
-
-    for (const meta of urlMetadata) {
-      if (!asRecord(meta)) continue
-      const uri = typeof meta.retrievedUrl === 'string'
-        ? meta.retrievedUrl
-        : typeof meta.url === 'string'
-          ? meta.url
-          : typeof meta.uri === 'string'
-            ? meta.uri
-            : ''
-      if (!uri) continue
-      citations.push({
-        uri,
-        title: typeof meta.title === 'string' ? meta.title : 'URL Context',
-        description: typeof meta.snippet === 'string'
-          ? meta.snippet
-          : typeof meta.description === 'string'
-            ? meta.description
-            : '',
-        source: 'url'
-      })
-    }
-  } catch (error) {
-    console.warn('Citation extraction failed:', error)
-  }
-  return citations
-}
-
-async function runServerGroundedSearch(query: string, urls?: string[]): Promise<{ summary: string; citations: Citation[]; urlsUsed: string[] }> {
-  const client = ensureSearchClient()
-  const useUrls = Array.isArray(urls) && urls.length > 0
-  const trimmedUrls = useUrls ? urls!.filter((url): url is string => typeof url === 'string' && url.trim().length > 0).slice(0, 20) : undefined
-
-  const tools: any[] = [{ googleSearch: {} }]
-  if (trimmedUrls?.length) {
-    tools.unshift({ urlContext: {} })
-  }
-
-  const prompt = trimmedUrls?.length
-    ? `${query}\n\nRelevant URLs for context:\n${trimmedUrls.join('\n')}`
-    : query
-
-  try {
-    const response = await client.models.generateContent({
-      model: DEFAULT_SEARCH_MODEL,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { tools }
-    } as any)
-
-    let summary = ''
-    try {
-      if (typeof (response as any).text === 'function') {
-        summary = (response as any).text()
-      } else if (typeof (response as any).text === 'string') {
-        summary = (response as any).text
-      } else if ((response as any).candidates?.[0]?.content?.parts) {
-        summary = (response as any).candidates[0].content.parts
-          .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
-          .filter(Boolean)
-          .join('\n')
-      }
-    } catch {
-      summary = ''
-    }
-
-    if (!summary) {
-      summary = `I wasn't able to find detailed information about "${query}". Could you rephrase or provide more context?`
-    }
-
-    const candidate = (response as any).candidates?.[0] ?? {}
-    const citations = extractCitations(candidate)
-    const urlsUsed = citations
-      .map(citation => citation.uri)
-      .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0)
-
-    return { summary, citations, urlsUsed }
-  } catch (error) {
-    console.error('❌ [Server Grounding] Search failed:', error)
-    return {
-      summary: `I couldn't reach the search service for "${query}". Please try again in a moment.`,
-      citations: [],
-      urlsUsed: []
-    }
-  }
-}
-
-function parseFunctionArgs(raw: unknown): Record<string, unknown> {
-  if (!raw) return {}
-  if (typeof raw === 'string') {
-    try {
-      return JSON.parse(raw) as Record<string, unknown>
-    } catch {
-      return {}
-    }
-  }
-  if (typeof raw === 'object') {
-    return raw as Record<string, unknown>
-  }
-  return {}
-}
-
-function getSnapshot(record: ActiveSessionRecord | undefined, modality: 'screen' | 'webcam'): Snapshot | undefined {
-  if (!record) return undefined
-  const snapshot = modality === 'screen' ? record.latestContext.screen : record.latestContext.webcam
-  if (!snapshot) return undefined
-  if (!snapshot.analysis || typeof snapshot.capturedAt !== 'number') return undefined
-  if (Date.now() - snapshot.capturedAt > CONTEXT_MAX_AGE_MS) return undefined
-  return snapshot
-}
-
-async function executeServerToolCall(connectionId: string, toolCall: any): Promise<void> {
-  const sessionRecord = activeSessions.get(connectionId)
-  if (!sessionRecord) {
-    console.warn(`[${connectionId}] Tool call received but no active session found.`)
-    return
-  }
-
-  const functionCalls: ToolFunctionCall[] = Array.isArray(toolCall?.functionCalls) ? toolCall.functionCalls : []
-  if (functionCalls.length === 0) {
-    return
-  }
-
-  const responses: ToolResponse[] = []
-
-  for (const call of functionCalls) {
-    const name = typeof call?.name === 'string' ? call.name : 'unknown_tool'
-    const id = typeof call?.id === 'string' ? call.id : uuidv4()
-    const args = parseFunctionArgs(call?.args)
-
-    try {
-      if (name === 'search_web') {
-        const query = typeof args.query === 'string' ? args.query.trim() : ''
-        if (!query) {
-          throw new Error('Missing query for web search.')
-        }
-        const urls = Array.isArray(args.urls)
-          ? args.urls.filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
-          : undefined
-        const result = await runServerGroundedSearch(query, urls)
-        responses.push({
-          id,
-          name,
-          response: { json: { success: true, result } }
-        })
-      } else if (name === 'capture_screen_snapshot') {
-        const snapshot = getSnapshot(sessionRecord, 'screen')
-        if (!snapshot) {
-          throw new Error('No recent screen share captured yet.')
-        }
-        const summaryOnly = Boolean(args.summaryOnly)
-        responses.push({
-          id,
-          name,
-          response: {
-            json: {
-              success: true,
-              result: {
-                analysis: snapshot.analysis,
-                capturedAt: snapshot.capturedAt,
-                imageAvailable: Boolean(snapshot.imageData),
-                imageData: summaryOnly ? undefined : snapshot.imageData
-              }
-            }
-          }
-        })
-      } else if (name === 'capture_webcam_snapshot') {
-        const snapshot = getSnapshot(sessionRecord, 'webcam')
-        if (!snapshot) {
-          throw new Error('No recent webcam capture available yet.')
-        }
-        const summaryOnly = Boolean(args.summaryOnly)
-        responses.push({
-          id,
-          name,
-          response: {
-            json: {
-              success: true,
-              result: {
-                analysis: snapshot.analysis,
-                capturedAt: snapshot.capturedAt,
-                imageAvailable: Boolean(snapshot.imageData),
-                imageData: summaryOnly ? undefined : snapshot.imageData
-              }
-            }
-          }
-        })
-      } else {
-        throw new Error(`Unsupported tool: ${name}`)
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Tool execution failed.'
-      responses.push({
-        id,
-        name,
-        response: { json: { success: false, error: message } }
-      })
-    }
-  }
-
-  if (responses.length === 0) return
-
-  if (IS_MOCK || typeof sessionRecord.session?.sendToolResponse !== 'function') {
-    safeSend(sessionRecord.ws, JSON.stringify({
-      type: 'tool_result',
-      payload: { responses, source: 'server' }
-    }))
-    return
-  }
-
-  try {
-    await sessionRecord.session.sendToolResponse({ functionResponses: responses })
-  } catch (err) {
-    console.error(`[${connectionId}] Failed to forward tool responses to Live API:`, err)
-    safeSend(sessionRecord.ws, JSON.stringify({
-      type: 'tool_result',
-      payload: {
-        error: err instanceof Error ? err.message : 'Tool response failed',
-        source: 'server'
-      }
-    }))
-    return
-  }
-
-  safeSend(sessionRecord.ws, JSON.stringify({
-    type: 'tool_result',
-    payload: { responses, source: 'server' }
-  }))
-}
-
 async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
   console.info(`[${connectionId}] 🔊 handleStart called with payload:`, JSON.stringify(payload));
-
-  const clientSessionId = typeof payload?.sessionId === 'string' ? payload.sessionId : undefined
 
   // Prevent concurrent starts
   if (sessionStarting.has(connectionId)) {
@@ -628,22 +245,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     }
   }
 
-  if (IS_MOCK) {
-    // Mock session: immediately report started without touching Gemini
-    const mockLang = isBcp47(payload?.languageCode) ? payload.languageCode : 'en-US';
-    const mockVoice = typeof payload?.voiceName === 'string' ? payload.voiceName : VOICE_BY_LANG[mockLang] || 'Puck';
-    safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: mockLang, voiceName: mockVoice, mock: true } }));
-    activeSessions.set(connectionId, {
-      ws,
-      session: {} as any,
-      clientSessionId,
-      languageCode: mockLang,
-      voiceName: mockVoice,
-      latestContext: {},
-    });
-    sessionStarting.delete(connectionId)
-    return
-  }
+  // Mock disabled: always use Live API
 
   if (!process.env.GEMINI_API_KEY) {
     console.error(`[${connectionId}] FATAL: GEMINI_API_KEY not configured.`);
@@ -661,28 +263,24 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     // Use a Live-supported model. Allow override via env.
-    const model = `models/${process.env.GEMINI_LIVE_MODEL || 'gemini-2.0-flash-live-001'}`
+    const model = `models/${process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-preview-09-2025'}`
 
     console.info(`[${connectionId}] Connecting to Live API with model: ${model}`)
 
     let isOpen = false
 
-    // Create config object with Main Chat Personality
+    // Rich Live configuration
     const liveConfig = {
-      responseModalities: ['AUDIO'] as any,
+      responseModalities: [Modality.AUDIO],
+      mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
       systemInstruction: CHAT_PERSONALITY,
-      tools: [
-        {
-          functionDeclarations: FUNCTION_DECLARATIONS
-        }
-      ],
-      // Enable transcription for both input and output
+      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
       speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: {
-            voiceName: voiceName
-          }
-        }
+        voiceConfig: { prebuiltVoiceConfig: { voiceName } }
+      },
+      contextWindowCompression: {
+        triggerTokens: '25600',
+        slidingWindow: { targetTokens: '12800' }
       }
     }
 
@@ -692,153 +290,101 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       callbacks: {
         onopen: () => {
           isOpen = true
-          sendLog('info', `[${connectionId}] Live API session opened`, { connectionId })
+          console.info(`[${connectionId}] Live API session opened`)
         },
-        onmessage: (message: any) => {
+        onmessage: async (message: any) => {
           try {
-            sendLog('debug', `[${connectionId}] 🔊 Gemini Live API message`, { connectionId, message });
-            const { serverContent } = message
-
-            // Handle setup complete event
-            if (message.setupComplete) {
-              safeSend(ws, JSON.stringify({
-                type: 'setup_complete',
-                payload: { setupComplete: true }
-              }))
-              sendLog('info', `[${connectionId}] Setup complete`, { connectionId })
+            // Setup complete
+            if (message?.setupComplete) {
+              safeSend(ws, JSON.stringify({ type: 'setup_complete', payload: { setupComplete: true } }));
             }
 
-            // Handle tool calls (function calling)
-            if (message.toolCall) {
-              const sessionRecord = activeSessions.get(connectionId)
-              const toolPayload = {
-                ...message.toolCall,
-                handledByServer: RUN_SERVER_TOOL_EXECUTION,
-                handledBy: RUN_SERVER_TOOL_EXECUTION ? 'server' : 'client',
-                sessionId: sessionRecord?.clientSessionId,
-                connectionId
-              }
-              safeSend(ws, JSON.stringify({
-                type: 'tool_call',
-                payload: toolPayload
-              }))
-              sendLog('info', `[${connectionId}] Tool call: ${message.toolCall.functionCalls?.map((fc: any) => fc.name).join(', ')}`, { connectionId })
-              if (RUN_SERVER_TOOL_EXECUTION) {
-                executeServerToolCall(connectionId, message.toolCall).catch((error) => {
-                  sendLog('error', `[${connectionId}] Failed to execute tool call`, { connectionId, error })
-                })
-              }
+            // Tool calls
+            if (message?.toolCall) {
+              safeSend(ws, JSON.stringify({ type: 'tool_call', payload: message.toolCall }));
             }
 
-            if (message.toolCallCancellation) {
-              safeSend(ws, JSON.stringify({
-                type: 'tool_call_cancellation',
-                payload: message.toolCallCancellation
-              }))
-            }
+            const serverContent = message?.serverContent;
+            if (!serverContent) return;
 
-            if (!serverContent) return
-
-            // Handle interrupted event (user interrupted AI)
-            if (serverContent.interrupted) {
-              safeSend(ws, JSON.stringify({
-                type: 'interrupted',
-                payload: { interrupted: true }
-              }))
-              console.info(`[${connectionId}] User interrupted AI`)
-            }
-
-            // Handle input transcription (user speech-to-text)
+            // Transcriptions
             if (serverContent.inputTranscription) {
-              try {
-                const text = serverContent.inputTranscription.text
-                const isFinal = (serverContent.inputTranscription as any).isFinal ?? false
-                
-                safeSend(ws, JSON.stringify({
-                  type: 'input_transcript',
-                  payload: { text, isFinal }
-                }))
-                
-                if (isFinal) {
-                  console.info(`[${connectionId}] Input transcript: "${text}"`)
-                  
-                  // Simple visual context detection for consulting scenarios
-                  const transcript = text.toLowerCase();
-                  const visualTriggers = ['screen', 'showing', 'look at', 'see this', 'dashboard', 'workflow'];
-                  
-                  if (visualTriggers.some(word => transcript.includes(word))) {
-                    const client = activeSessions.get(connectionId);
-                    if (client?.latestContext?.screen || client?.latestContext?.webcam) {
-                      injectVisualContext(connectionId, client).catch((error) => {
-                        console.error(`[${connectionId}] Visual context injection failed:`, error);
-                      });
+              const text = serverContent.inputTranscription.text;
+              const isFinal = (serverContent.inputTranscription as any).isFinal ?? false;
+              safeSend(ws, JSON.stringify({ type: 'input_transcript', payload: { text, isFinal } }));
+
+              // Heuristic: if the user explicitly references visual context, inject latest snapshot
+              if (isFinal) {
+                try {
+                  const transcript = String(text || '').toLowerCase();
+                  const visualTriggers = VISUAL_TRIGGER_WORDS;
+                  if (visualTriggers.some(w => transcript.includes(w))) {
+                    const clientRec = activeSessions.get(connectionId);
+                    const snap = clientRec?.latestContext?.screen || clientRec?.latestContext?.webcam;
+                    if (clientRec && snap) {
+                      const now = Date.now();
+                      if (typeof snap.lastInjected === 'number' && snap.lastInjected > now - VISUAL_INJECT_THROTTLE_MS) {
+                        console.info(`[${connectionId}] Visual trigger detected but recent injection exists; skipping`);
+                      } else {
+                        const parts: any[] = [];
+                        if (snap.imageData) {
+                          const base64Data = snap.imageData.replace(/^data:image\/\w+;base64,/, '');
+                          parts.push({ inlineData: { mimeType: 'image/jpeg', data: base64Data } });
+                        }
+                        parts.push({ text: `Visual context: ${snap.analysis.substring(0, 200)}` });
+                        await clientRec.session.send({
+                          clientContent: {
+                            turns: [{ role: 'user', parts }],
+                            turnComplete: false
+                          }
+                        });
+                        snap.lastInjected = now;
+                        console.info(`[${connectionId}] ✅ Injected visual context due to transcript trigger`);
+                      }
+                    } else {
+                      console.info(`[${connectionId}] Visual trigger detected but no latestContext available`);
                     }
                   }
+                } catch (err) {
+                  console.error(`[${connectionId}] Visual trigger injection failed:`, err);
                 }
-              } catch (err) {
-                console.error(`[${connectionId}] Input transcript handler failed:`, err)
               }
             }
-
-            // Handle output transcription (AI speech-to-text / closed captions)
             if (serverContent.outputTranscription) {
-              try {
-                const text = serverContent.outputTranscription.text
-                const isFinal = (serverContent.outputTranscription as any).isFinal ?? false
-                
-                safeSend(ws, JSON.stringify({
-                  type: 'output_transcript',
-                  payload: { text, isFinal }
-                }))
-              } catch (err) {
-                console.error(`[${connectionId}] Output transcript handler failed:`, err)
-              }
+              const text = serverContent.outputTranscription.text;
+              const isFinal = (serverContent.outputTranscription as any).isFinal ?? false;
+              safeSend(ws, JSON.stringify({ type: 'output_transcript', payload: { text, isFinal } }));
             }
 
-            // Handle text + audio parts from Live server messages
+            // Text + audio parts
             if (serverContent.modelTurn?.parts) {
               for (const part of serverContent.modelTurn.parts) {
                 if (part.text) {
-                  safeSend(ws, JSON.stringify({ type: 'text', payload: { content: part.text } }))
+                  safeSend(ws, JSON.stringify({ type: 'text', payload: { content: part.text } }));
                 }
-                // For native audio models, audio may arrive as inlineData
                 if (part.inlineData?.data) {
-                  const audioBase64 = part.inlineData.data
-                  safeSend(ws, JSON.stringify({
-                    type: 'audio',
-                    payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' }
-                  }))
+                  const audioBase64 = part.inlineData.data;
+                  safeSend(ws, JSON.stringify({ type: 'audio', payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' } }));
                 }
               }
             }
 
-            // Handle turn complete (AI finished speaking)
             if (serverContent.turnComplete) {
-              safeSend(ws, JSON.stringify({
-                type: 'turn_complete',
-                payload: { turnComplete: true }
-              }))
-              console.info(`[${connectionId}] Turn complete`)
+              safeSend(ws, JSON.stringify({ type: 'turn_complete', payload: { turnComplete: true } }));
             }
           } catch (err) {
-            console.error(`[${connectionId}] Message handler error (non-fatal):`, err)
-            // Don't tear down connection on parse errors
+            console.error(`[${connectionId}] Live message handler error:`, err)
           }
         },
         onerror: (error: any) => {
           console.error(`[${connectionId}] Live API error:`, error)
           safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live API error' } }))
         },
-        onclose: (event: any) => {
+        onclose: () => {
           isOpen = false
-          console.error(`[${connectionId}] Live API session closed unexpectedly!`, {
-            code: event?.code,
-            reason: event?.reason,
-            wasClean: event?.wasClean,
-            timestamp: new Date().toISOString()
-          })
+          console.info(`[${connectionId}] Live API session closed`)
           activeSessions.delete(connectionId)
-          safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'live_api_closed', code: event?.code } }))
+          safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'live_api_closed' } }))
         }
       }
     })
@@ -867,14 +413,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
 
     console.info(`[${connectionId}] Live API session established and ready`)
 
-    activeSessions.set(connectionId, {
-      ws,
-      session,
-      clientSessionId,
-      languageCode: lang,
-      voiceName,
-      latestContext: {},
-    });
+    activeSessions.set(connectionId, { ws, session, latestContext: {} });
     console.info(`[${connectionId}] Live API session established.`)
 
     // Send session started message to client
@@ -888,82 +427,33 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
   }
 }
 
-// Visual context injection for consulting scenarios
-async function injectVisualContext(connectionId: string, client: any) {
-  const context = client.latestContext.screen || client.latestContext.webcam;
-  if (!context || context.lastInjected > Date.now() - 10000) return; // Avoid spam
-  
-  const modality = client.latestContext.screen ? 'screen' : 'webcam';
-  
-  try {
-    const parts: any[] = [];
-    
-    // Add image if available
-    if (context.imageData) {
-      const base64Data = context.imageData.replace(/^data:image\/\w+;base64,/, '');
-      parts.push({
-        inline_data: {
-          mime_type: 'image/jpeg',
-          data: base64Data
-        }
-      });
-    }
-    
-    // Add brief context
-    parts.push({
-      text: `Visual context: ${context.analysis.substring(0, 200)}`
-    });
-    
-    // Google's Live API format
-    await client.session.sendClientContent({
-      turns: [{ role: 'user', parts }],
-      turnComplete: false
-    });
-    
-    context.lastInjected = Date.now();
-    console.info(`[${connectionId}] Injected ${modality} context`);
-  } catch (err) {
-    console.error(`[${connectionId}] Visual injection failed:`, err);
-  }
-}
-
 async function handleUserMessage(connectionId: string, ws: WebSocket, payload: any) {
-  if (IS_MOCK) {
-    // Mock response
-    if (payload?.audioData) {
-      const mockText = 'Mock: I heard you. This is a placeholder response.'
-      safeSend(ws, JSON.stringify({ type: 'text', payload: { content: mockText } }))
-      safeSend(ws, JSON.stringify({ type: 'model_text', payload: { text: mockText } }))
-    }
-    return
-  }
+  // Always use Live API in this configuration
 
   if (payload.audioData && payload.mimeType) {
-  const client = activeSessions.get(connectionId)
-  if (!client) {
-    console.warn(`[${connectionId}] No active session to send audio to`)
+    const client = activeSessions.get(connectionId)
+    if (!client) {
+      console.warn(`[${connectionId}] No active session to send audio to`)
+      return
+    }
+
+    try {
+      // Send audio in the correct format matching official documentation
+      await client.session.send({
+        input: {
+          data: payload.audioData,  // ← Keep as base64 string
+          mimeType: payload.mimeType || 'audio/pcm;rate=16000'
+        }
+      })
+      console.info(`[${connectionId}] Audio sent to Live API (${payload.audioData.length} base64 chars)`)
+    } catch (e) {
+      console.error(`[${connectionId}] Failed to send audio to Live API:`, e)
+      safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Failed to send audio to Live API' } }))
+    }
     return
   }
 
-  try {
-    const audioData = payload.audioData
-
-    await client.session.sendRealtimeInput({
-      media: {
-        mimeType: payload.mimeType || 'audio/pcm;rate=16000',
-        data: audioData
-      }
-    })
-    console.info(`[${connectionId}] Audio sent to Live API (${audioData.length} chars base64)`)
-  } catch (e) {
-    console.error(`[${connectionId}] Failed to send audio to Live API:`, e)
-    console.error(`[${connectionId}] Error details:`, e instanceof Error ? e.message : String(e))
-    safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Failed to send audio to Live API' } }))
-  }
-  return
-}
-
-// Handle text messages if needed in the future
+  // Handle text messages if needed in the future
 }
 
 function handleClose(connectionId: string) {
@@ -980,9 +470,9 @@ function handleClose(connectionId: string) {
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const connectionId = uuidv4();
   try { (req.socket as any)?.setNoDelay?.(true) } catch (error) {
-    sendLog('warn', `[${connectionId}] Unable to disable socket delay`, { error })
+    console.warn(`[${connectionId}] Unable to disable socket delay`, error)
   }
-  sendLog('info', `[${connectionId}] Client connected`, { connectionId });
+  console.info(`[${connectionId}] Client connected.`);
 
   // Acknowledge connection
   safeSend(ws, JSON.stringify({ type: 'connected', payload: { connectionId } }))
@@ -1002,6 +492,26 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           console.info(`[${connectionId}] Handling user_audio message`);
           await handleUserMessage(connectionId, ws, parsedMessage.payload);
           break;
+        case 'TOOL_RESULT': {
+          const client = activeSessions.get(connectionId);
+          if (!client) {
+            console.warn(`[${connectionId}] TOOL_RESULT received but no active session`);
+            break;
+          }
+          const responses = parsedMessage.payload?.responses;
+          if (!Array.isArray(responses) || responses.length === 0) {
+            console.warn(`[${connectionId}] TOOL_RESULT missing responses`);
+            break;
+          }
+          try {
+            await client.session.sendToolResponse({ functionResponses: responses });
+            safeSend(ws, JSON.stringify({ type: 'tool_result', payload: { responses } }));
+          } catch (err) {
+            console.error(`[${connectionId}] Failed to forward tool responses to Live API:`, err);
+            safeSend(ws, JSON.stringify({ type: 'tool_result', payload: { error: err instanceof Error ? err.message : 'Tool response failed' } }));
+          }
+          break;
+        }
         case 'CONTEXT_UPDATE': {
           console.info(`[${connectionId}] Handling CONTEXT_UPDATE message`);
           const client = activeSessions.get(connectionId);
@@ -1028,60 +538,76 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
           client.latestContext = client.latestContext || {};
           const modalityKey = modality as 'screen' | 'webcam';
-          client.latestContext[modalityKey] = { analysis, capturedAt, imageData };
+          const prev = client.latestContext[modalityKey];
+          client.latestContext[modalityKey] = {
+            analysis,
+            capturedAt,
+            imageData,
+            lastInjected: prev?.lastInjected
+          };
 
-          if (!client.clientSessionId && typeof payload.sessionId === 'string') {
-            client.clientSessionId = payload.sessionId;
-          }
-
-          // Store context locally - DO NOT send automatically to Live API
-          // Visual context is only sent when user explicitly asks about it
-          console.info(`[${connectionId}] ${modality} context stored locally (${imageData ? 'with' : 'without'} image data)`);
-
-          break;
-        }
-        case 'TOOL_RESULT': {
-          console.info(`[${connectionId}] Handling TOOL_RESULT message`);
-          const client = activeSessions.get(connectionId);
-          if (!client) {
-            console.warn(`[${connectionId}] TOOL_RESULT received but no active session`);
+          if (!INJECT_ON_CONTEXT_UPDATE) {
+            console.info(`[${connectionId}] CONTEXT_UPDATE received; injection disabled by flag`);
             break;
           }
-          const responses = parsedMessage.payload?.responses;
-          if (!Array.isArray(responses) || responses.length === 0) {
-            console.warn(`[${connectionId}] TOOL_RESULT missing responses`);
-            break;
+
+          // Debounce injection per-modality to avoid spamming the Live API
+          client.injectionTimers = client.injectionTimers || {};
+          const timers = client.injectionTimers;
+          if (timers[modalityKey]) {
+            clearTimeout(timers[modalityKey]);
           }
-          try {
-            await client.session.sendToolResponse({ functionResponses: responses });
-            safeSend(client.ws, JSON.stringify({ type: 'tool_result', payload: { responses } }));
-          } catch (err) {
-            console.error(`[${connectionId}] Failed to forward tool responses to Live API:`, err);
-            safeSend(client.ws, JSON.stringify({ type: 'tool_result', payload: { error: err instanceof Error ? err.message : 'Tool response failed' } }));
-          }
+
+          timers[modalityKey] = setTimeout(async () => {
+            try {
+              const snap = client.latestContext[modalityKey];
+              if (!snap) return;
+              const now = Date.now();
+              if (typeof snap.lastInjected === 'number' && snap.lastInjected > now - VISUAL_INJECT_THROTTLE_MS) {
+                console.info(`[${connectionId}] ${modality} context injection skipped (recently injected)`);
+                return;
+              }
+
+              const parts: any[] = [];
+              if (snap.imageData) {
+                const base64Data = snap.imageData.replace(/^data:image\/\w+;base64,/, '');
+                parts.push({ inlineData: { mimeType: 'image/jpeg', data: base64Data } });
+              }
+              parts.push({ text: `[${modality} context]: ${snap.analysis}` });
+
+              await client.session.send({
+                clientContent: {
+                  turns: [{ role: 'user', parts }],
+                  turnComplete: false
+                }
+              });
+              snap.lastInjected = now;
+              console.info(`[${connectionId}] ✅ ${modality} context injected to Live API`);
+            } catch (err) {
+              console.error(`[${connectionId}] Failed debounced inject for ${modality}:`, err);
+            } finally {
+              timers[modalityKey] = undefined;
+            }
+          }, CONTEXT_INJECT_DEBOUNCE_MS);
+
           break;
         }
         case 'TURN_COMPLETE': {
-          sendLog('info', `[${connectionId}] Handling TURN_COMPLETE message`, { connectionId });
-          if (IS_MOCK) {
-            safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
-            break
-          }
+          console.info(`[${connectionId}] Handling TURN_COMPLETE message`);
           const client = activeSessions.get(connectionId)
           if (!client) {
-            sendLog('warn', `[${connectionId}] TURN_COMPLETE received but no active session`, { connectionId });
+            console.warn(`[${connectionId}] TURN_COMPLETE received but no active session`)
+            console.warn(`[${connectionId}] Active sessions: ${Array.from(activeSessions.keys()).join(', ')}`)
             break
           }
           try {
-            // Send turn complete using the correct SDK method
-            await client.session.sendClientContent({
-              turns: [],
-              turnComplete: true
-            });
-            sendLog('info', `[${connectionId}] turnComplete sent to Live API`, { connectionId });
+            await client.session.send({
+              clientContent: { turnComplete: true }
+            })
+            console.info(`[${connectionId}] turnComplete sent to Live API`)
             safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
           } catch (e) {
-            sendLog('error', `[${connectionId}] Failed to send turnComplete to Live API`, { connectionId, error: e });
+            console.error(`[${connectionId}] Failed to send turnComplete to Live API:`, e)
           }
           break
         }
@@ -1099,12 +625,12 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   });
 
   ws.on('close', (code: number, reason: Buffer) => {
-    sendLog('info', `[${connectionId}] WebSocket closed`, { connectionId, code, reason: reason?.toString?.() || 'N/A' })
+    console.info(`[${connectionId}] WebSocket closed. Code: ${code}, Reason: ${reason?.toString?.() || 'N/A'}`)
     handleClose(connectionId)
   });
 
   ws.on('error', (err) => {
-    sendLog('error', `[${connectionId}] WebSocket error`, { connectionId, error: err })
+    console.error(`[${connectionId}] WebSocket error:`, err)
     handleClose(connectionId)
   });
 });

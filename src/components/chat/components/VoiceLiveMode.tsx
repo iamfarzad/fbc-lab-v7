@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { X, Mic, MicOff, Camera, Monitor, Eye, EyeOff } from "lucide-react";
 import { getGradientForTheme, getMonochromeClass, getThemeAwareBackdrop } from "@/lib/theme-utils";
 import { DESIGN_TOKENS } from "../tokens/design-tokens";
 import { VoiceWaveform } from "./VoiceWaveform";
+import { useMicLevel } from "@/hooks/useMicLevel";
 
 interface VoiceLiveModeProps {
   isOpen: boolean;
@@ -37,26 +38,49 @@ export function VoiceLiveMode({
   isScreenSharing = false
 }: VoiceLiveModeProps) {
   const [waveformBars] = useState([1, 2, 3, 4, 5]);
-  
-  // Transcript toggle with responsive behavior
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Transcript toggle with persistence
+  const LOCAL_STORAGE_KEY = 'voice.showTranscript';
+  const hasStoredPrefRef = useRef(false);
   const [showTranscript, setShowTranscript] = useState(() => {
-    // Auto-show on desktop (>=768px), auto-hide on mobile
-    if (typeof window !== 'undefined') {
+    if (typeof window === 'undefined') return true;
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (stored !== null) {
+        hasStoredPrefRef.current = true;
+        return stored === 'true';
+      }
+      return window.innerWidth >= 768; // default: show on tablet/desktop
+    } catch {
       return window.innerWidth >= 768;
     }
-    return true;
   });
 
-  // Listen for resize
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768 && !showTranscript) {
-        setShowTranscript(true);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // If user has not set a preference yet, update default based on width
+      if (!hasStoredPrefRef.current) {
+        setShowTranscript(window.innerWidth >= 768);
       }
     };
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [showTranscript]);
+  }, []);
+
+  const toggleTranscript = () => {
+    setShowTranscript((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, String(next));
+        hasStoredPrefRef.current = true;
+      } catch {}
+      return next;
+    });
+  };
 
   // Prevent body scroll when voice mode is open
   useEffect(() => {
@@ -87,6 +111,9 @@ export function VoiceLiveMode({
 
   if (!isOpen) return null;
 
+  // Audio input level meter (mic access). Only active when UI is open and voice is active/processing.
+  const inputLevel = useMicLevel(isOpen && (isActive || isProcessing));
+
   return (
     <AnimatePresence>
       <motion.div
@@ -99,6 +126,16 @@ export function VoiceLiveMode({
           getMonochromeClass(),
           "fixed inset-0 z-[300] flex flex-col"
         )}
+        // Swipe-down to close on mobile
+        drag={isMobile ? 'y' : false}
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.2}
+        dragSnapToOrigin
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 80 || info.velocity.y > 500) {
+            onClose();
+          }
+        }}
       >
         {/* Top Bar */}
         <div className={cn("flex items-center justify-between p-4", DESIGN_TOKENS.safeArea.top)}>
@@ -126,8 +163,15 @@ export function VoiceLiveMode({
         {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-center px-8">
           {/* Voice Visualizer */}
-          <div className="mb-8 flex items-center justify-center gap-2">
+          <div className="mb-8 flex items-center justify-center gap-3">
             <VoiceWaveform isActive={isActive} />
+            {/* Simple RMS meter */}
+            <div aria-label="Input level" className="h-8 w-2 rounded bg-foreground/10 overflow-hidden">
+              <div
+                className="w-full bg-foreground/80 transition-all duration-100"
+                style={{ height: `${Math.max(4, Math.min(100, inputLevel * 100))}%` }}
+              />
+            </div>
           </div>
 
           {/* Status Text */}
@@ -145,7 +189,7 @@ export function VoiceLiveMode({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowTranscript(!showTranscript)}
+              onClick={toggleTranscript}
               className={cn(
                 "mb-4 px-4 py-2 rounded-full",
                 "bg-muted/20 text-foreground hover:bg-muted/30",

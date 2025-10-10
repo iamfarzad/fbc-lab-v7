@@ -41,10 +41,19 @@ export class AudioRecorder extends EventEmitter {
       });
       console.log('🎤 [AudioRecorder] Microphone access granted');
 
-      // Create audio context
+      // Create audio context with forced 16kHz for Gemini compatibility
       console.log('🎤 [AudioRecorder] Creating audio context...');
       this.audioContext = new AudioContext({ sampleRate: 16000 });
-      console.log('🎤 [AudioRecorder] Audio context created, state:', this.audioContext.state);
+      console.log('🎤 [AudioRecorder] Audio context created');
+      console.log('🎤 [AudioRecorder] Requested sample rate: 16000');
+      console.log('🎤 [AudioRecorder] Actual sample rate:', this.audioContext.sampleRate);
+      
+      if (this.audioContext.sampleRate !== 16000) {
+        console.warn('⚠️ [AudioRecorder] Hardware does not support 16kHz! Using:', this.audioContext.sampleRate);
+        console.warn('⚠️ [AudioRecorder] Audio quality may be degraded - resampling required');
+      } else {
+        console.log('✅ [AudioRecorder] Sample rate verified: 16kHz');
+      }
       
       // Create source
       console.log('🎤 [AudioRecorder] Creating media stream source...');
@@ -53,7 +62,26 @@ export class AudioRecorder extends EventEmitter {
       
       // Load and create AudioWorklet
       console.log('🎤 [AudioRecorder] Loading audio worklet module...');
-      await this.audioContext.audioWorklet.addModule('/audio-processor.js');
+      
+      // First verify the file exists
+      try {
+        const testFetch = await fetch('/audio-processor.js');
+        if (!testFetch.ok) {
+          throw new Error(`Audio processor file not found: ${testFetch.status} ${testFetch.statusText}`);
+        }
+        console.log('🎤 [AudioRecorder] Audio processor file verified');
+      } catch (fetchError) {
+        console.error('❌ [AudioRecorder] Failed to fetch audio processor:', fetchError);
+        throw new Error(`Cannot load /audio-processor.js: ${fetchError}`);
+      }
+      
+      // Add timeout to detect hanging promises
+      const addModulePromise = this.audioContext.audioWorklet.addModule('/audio-processor.js');
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AudioWorklet module loading timed out after 5s')), 5000)
+      );
+      
+      await Promise.race([addModulePromise, timeoutPromise]);
       console.log('🎤 [AudioRecorder] Audio worklet module loaded');
       
       console.log('🎤 [AudioRecorder] Creating audio worklet node...');
@@ -64,7 +92,22 @@ export class AudioRecorder extends EventEmitter {
       this.recordingWorklet.port.onmessage = (event) => {
         if (event.data.type === 'audioData') {
           const arrayBuffer = event.data.data.int16arrayBuffer;
+          if (!arrayBuffer) {
+            console.error('❌ [AudioRecorder] No int16arrayBuffer in worklet message!', event.data);
+            return;
+          }
           const base64 = this.arrayBufferToBase64(arrayBuffer);
+          
+          // Log sample verification periodically (every ~5 seconds at 4096 samples/256ms)
+          if (Math.random() < 0.02) {
+            console.log('🎤 [AudioRecorder] Sending audio chunk:', {
+              declaredRate: 16000,
+              actualContextRate: this.audioContext?.sampleRate,
+              pcm16BufferSize: arrayBuffer.byteLength,
+              base64Length: base64.length
+            });
+          }
+          
           this.emit('data', base64);
         }
       };
