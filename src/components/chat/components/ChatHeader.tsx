@@ -11,7 +11,7 @@ import {
   Shrink,
   X,
   Menu,
-  MessageSquare,
+  Subtitles,
 } from "lucide-react";
 interface ChatHeaderProps {
   chatState: ChatState;
@@ -102,7 +102,7 @@ export function ChatHeader({
                         title="Toggle transcript"
                         aria-label="Toggle transcript"
                       >
-                        <MessageSquare className="h-4 w-4" />
+                        <Subtitles className="h-4 w-4" />
                       </Button>
                     )}
                     
@@ -185,7 +185,7 @@ export function ChatHeader({
                 title="Toggle transcript"
                 aria-label="Toggle transcript"
               >
-                <MessageSquare className="h-3 w-3" />
+                <Subtitles className="h-3 w-3" />
               </Button>
             )}
             
