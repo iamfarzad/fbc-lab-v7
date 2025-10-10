@@ -61,10 +61,9 @@ export const chatAnimations = {
       opacity: 1
     },
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       stiffness: 300,
-      damping: 30,
-      duration: 0.4
+      damping: 30
     }
   },
   
@@ -89,10 +88,9 @@ export const chatAnimations = {
       scale: 0.95
     },
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       stiffness: 300,
-      damping: 30,
-      duration: 0.3
+      damping: 30
     }
   }
 };

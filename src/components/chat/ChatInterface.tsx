@@ -52,72 +52,13 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const [sessionId] = useState(() => id ?? crypto.randomUUID());
   const [usage, setUsage] = useState<any>(null);
 
-  // New chat state management
-  const [chatLayoutState, setChatLayoutState] = useState<ChatState>('normal');
-  const [mediaState, setMediaState] = useState<MediaState>({
-    voice: false,
-    webcam: false,
-    screenShare: false,
-    showTranscript: typeof window !== 'undefined' ? window.innerWidth >= 768 : true
-  });
+  // Keep only the existing chatStateHook - no conflicting state
 
   const messagesHook = useChatMessages(sessionId);
   const [lastScreenSnapshot, setLastScreenSnapshot] = useState<{ analysis: string; imageData?: string; capturedAt: number } | null>(null);
   const [lastWebcamSnapshot, setLastWebcamSnapshot] = useState<{ analysis: string; capturedAt: number } | null>(null);
 
-  // State persistence
-  useEffect(() => {
-    localStorage.setItem('chatLayoutState', chatLayoutState);
-    localStorage.setItem('mediaState', JSON.stringify(mediaState));
-  }, [chatLayoutState, mediaState]);
-
-  // Restore state on mount
-  useEffect(() => {
-    const savedChatLayoutState = localStorage.getItem('chatLayoutState') as ChatState;
-    const savedMediaState = localStorage.getItem('mediaState');
-    
-    if (savedChatLayoutState) setChatLayoutState(savedChatLayoutState);
-    if (savedMediaState) {
-      try {
-        setMediaState(JSON.parse(savedMediaState));
-      } catch (error) {
-        console.warn('Failed to parse saved media state:', error);
-      }
-    }
-  }, []);
-
-  // Media control handlers
-  const handleToggleVoice = useCallback(() => {
-    setMediaState(prev => ({ ...prev, voice: !prev.voice }));
-  }, []);
-
-  const handleToggleWebcam = useCallback(() => {
-    setMediaState(prev => ({ ...prev, webcam: !prev.webcam }));
-  }, []);
-
-  const handleToggleScreenShare = useCallback(() => {
-    setMediaState(prev => ({ ...prev, screenShare: !prev.screenShare }));
-  }, []);
-
-  const handleToggleTranscript = useCallback(() => {
-    setMediaState(prev => ({ ...prev, showTranscript: !prev.showTranscript }));
-  }, []);
-
-  // Chat state handlers
-  const handleExpand = useCallback(() => {
-    setChatLayoutState('normal');
-  }, []);
-
-  const handleMinimize = useCallback(() => {
-    const isMobile = window.innerWidth < 640;
-    if (isMobile) {
-      // On mobile, minimize means close
-      chatStateHook.onToggleChat();
-    } else {
-      // On desktop, minimize to ConversationBar
-      setChatLayoutState('minimized');
-    }
-  }, [chatStateHook]);
+  // Use existing chatStateHook handlers directly
 
   // Poll usage every 10 seconds
   useEffect(() => {
@@ -773,22 +714,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
       </motion.div>
 
       {/* Main Chat Interface */}
-      <ChatContainer 
-        chatState={chatLayoutState}
-        mediaState={mediaState}
-        onToggleVoice={handleToggleVoice}
-        onToggleWebcam={handleToggleWebcam}
-        onToggleScreenShare={handleToggleScreenShare}
-        onToggleTranscript={handleToggleTranscript}
-        webcamStream={null} // TODO: Add webcam stream
-        screenStream={null} // TODO: Add screen stream
-        isProcessing={audioHookRef.current?.isProcessing || false}
-        transcript={audioHookRef.current?.transcript || ''}
-        partialTranscript={audioHookRef.current?.partialTranscript || ''}
-        onExpand={handleExpand}
-        onMinimize={handleMinimize}
-      >
-        {chatLayoutState === 'minimized' ? (
+      <ChatContainer chatState={chatStateHook.chatState}>
+        {chatStateHook.chatState.isMinimized ? (
           /* Minimized State */
           <motion.div
             key="chat-minimized"

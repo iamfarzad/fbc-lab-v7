@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Camera, Monitor, Mic, X } from 'lucide-react';
 import { DESIGN_TOKENS } from '../tokens/design-tokens';
 import { getMonochromeClass } from '@/lib/theme-utils';

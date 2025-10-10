@@ -176,7 +176,7 @@ export function ScreenShareFullScreen({
                 <div className="absolute bottom-1 left-1">
                   <span className={cn(
                     "text-xs px-2 py-1 bg-primary text-primary-foreground rounded",
-                    DESIGN_TOKENS.corners.sm
+                    DESIGN_TOKENS.corners.default
                   )}>
                     Webcam
                   </span>
