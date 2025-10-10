@@ -72,7 +72,8 @@ export class AudioRecorder extends EventEmitter {
       // Connect audio nodes
       console.log('🎤 [AudioRecorder] Connecting audio nodes...');
       this.source.connect(this.recordingWorklet);
-      this.recordingWorklet.connect(this.audioContext.destination);
+      // DON'T connect to destination - we're recording, not playing back!
+      // This prevents echo/feedback and reduces noise
       console.log('🎤 [AudioRecorder] Audio nodes connected');
       
       this.isActive = true;
