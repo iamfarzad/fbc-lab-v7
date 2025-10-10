@@ -355,10 +355,11 @@ export function ChatInterface({ id }: { id?: string | null }) {
     }
 
     // Add assistant output transcript if available
-    if (audioHook.assistantText) {
+    if (audioHook.modelReplies && audioHook.modelReplies.length > 0) {
+      const latestReply = audioHook.modelReplies[audioHook.modelReplies.length - 1];
       entries.push({
         id: `assistant-${Date.now()}`,
-        text: audioHook.assistantText,
+        text: latestReply,
         type: 'assistant',
         isPartial: false,
         timestamp: Date.now()
@@ -366,7 +367,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     }
 
     return entries;
-  }, [audioHook.partialTranscript, audioHook.transcript, audioHook.assistantText]);
+  }, [audioHook.partialTranscript, audioHook.transcript, audioHook.modelReplies]);
   
   const intelligenceHook = useChatIntelligence(sessionId);
   const artifactsState = useArtifacts();
