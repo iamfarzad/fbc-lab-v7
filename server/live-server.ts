@@ -545,6 +545,8 @@ async function executeServerToolCall(connectionId: string, toolCall: any): Promi
 }
 
 async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
+  let connectionTimeout: NodeJS.Timeout | null = null
+  
   console.info(`[${connectionId}] 🔊 handleStart called with payload:`, JSON.stringify(payload));
 
   const clientSessionId = typeof payload?.sessionId === 'string' ? payload.sessionId : undefined
@@ -622,11 +624,30 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       }
     }
 
+    // Add connection timeout to prevent hanging
+    connectionTimeout = setTimeout(() => {
+      if (!isOpen) {
+        console.error(`[${connectionId}] Gemini Live API connection timeout - falling back to mock mode`);
+        // Fall back to mock behavior
+        safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: lang, voiceName, mock: true } }));
+        activeSessions.set(connectionId, {
+          ws,
+          session: {} as any,
+          clientSessionId,
+          languageCode: lang,
+          voiceName,
+          latestContext: {},
+        });
+        sessionStarting.delete(connectionId);
+      }
+    }, 3000); // 3 second timeout
+
     const session: any = await ai.live.connect({
       model,
       config: liveConfig,  // ← Pass config as separate parameter
       callbacks: {
         onopen: () => {
+          if (connectionTimeout) clearTimeout(connectionTimeout);
           isOpen = true
           console.info(`[${connectionId}] Live API session opened`)
         },
@@ -751,10 +772,12 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
           }
         },
         onerror: (error: any) => {
+          if (connectionTimeout) clearTimeout(connectionTimeout);
           console.error(`[${connectionId}] Live API error:`, error)
           safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live API error' } }))
         },
         onclose: () => {
+          if (connectionTimeout) clearTimeout(connectionTimeout);
           isOpen = false
           console.info(`[${connectionId}] Live API session closed`)
           activeSessions.delete(connectionId)
@@ -801,6 +824,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: lang, voiceName } }));
 
   } catch (error) {
+    if (connectionTimeout) clearTimeout(connectionTimeout);
     console.error(`[${connectionId}] Failed to start Live API session:`, error);
     safeSend(ws, JSON.stringify({ type: 'error', payload: { message: error instanceof Error ? error.message : 'Failed to start session' } }));
   } finally {
