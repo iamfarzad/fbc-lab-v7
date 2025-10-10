@@ -632,6 +632,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
         },
         onmessage: (message: any) => {
           try {
+            console.log(`[${connectionId}] 🔊 Gemini Live API message:`, JSON.stringify(message, null, 2));
             const { serverContent } = message
 
             // Handle setup complete event
@@ -754,11 +755,16 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
           console.error(`[${connectionId}] Live API error:`, error)
           safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live API error' } }))
         },
-        onclose: () => {
+        onclose: (event: any) => {
           isOpen = false
-          console.info(`[${connectionId}] Live API session closed`)
+          console.error(`[${connectionId}] Live API session closed unexpectedly!`, {
+            code: event?.code,
+            reason: event?.reason,
+            wasClean: event?.wasClean,
+            timestamp: new Date().toISOString()
+          })
           activeSessions.delete(connectionId)
-          safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'live_api_closed' } }))
+          safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'live_api_closed', code: event?.code } }))
         }
       }
     })
