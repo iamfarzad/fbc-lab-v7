@@ -982,22 +982,41 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             client.clientSessionId = payload.sessionId;
           }
 
-          // Send context to Gemini Live API as text message
+          // Send context to Gemini Live API as multimodal message
           try {
-            const contextMessage = `[Visual Context Update - ${modality}]: ${analysis}`;
             console.info(`[${connectionId}] Sending ${modality} context to Gemini Live API`);
             
-            // Send as text input to provide context
+            const parts: any[] = [];
+            
+            // Add image data if available
+            if (imageData) {
+              // Remove data URL prefix if present
+              const base64Data = imageData.includes(',') ? imageData.split(',')[1] : imageData;
+              parts.push({
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: base64Data
+                }
+              });
+            }
+            
+            // Add text analysis
+            parts.push({
+              text: `[${modality.charAt(0).toUpperCase() + modality.slice(1)} Context]: ${analysis}`
+            });
+            
+            // Send as multimodal input with turnComplete: false to not trigger response
             await client.session.send({
               clientContent: {
                 turns: [{
                   role: 'user',
-                  parts: [{ text: contextMessage }]
-                }]
+                  parts: parts
+                }],
+                turnComplete: false // Don't trigger AI response, just update context
               }
             });
             
-            console.info(`[${connectionId}] ${modality} context sent successfully`);
+            console.info(`[${connectionId}] ${modality} context sent successfully (multimodal with ${imageData ? 'image + ' : ''}text)`);
           } catch (err) {
             console.error(`[${connectionId}] Failed to send ${modality} context to Gemini:`, err);
           }

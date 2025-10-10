@@ -11,6 +11,7 @@ import {
   Shrink,
   X,
   Menu,
+  MessageSquare,
 } from "lucide-react";
 interface ChatHeaderProps {
   chatState: ChatState;
@@ -19,6 +20,9 @@ interface ChatHeaderProps {
   onToggleChat: () => void;
   sessionId?: string;
   showNextSteps?: boolean;
+  isVoiceActive?: boolean;
+  showTranscript?: boolean;
+  onToggleTranscript?: () => void;
 }
 
 export function ChatHeader({
@@ -27,7 +31,10 @@ export function ChatHeader({
   onToggleExpand,
   onToggleChat,
   sessionId,
-  showNextSteps = false
+  showNextSteps = false,
+  isVoiceActive = false,
+  showTranscript = false,
+  onToggleTranscript
 }: ChatHeaderProps) {
   return (
     <>
@@ -78,6 +85,25 @@ export function ChatHeader({
                   <div className="flex items-center gap-1 md:hidden">
                     {showNextSteps && sessionId && (
                       <NextStepsMenu sessionId={sessionId} show={showNextSteps} />
+                    )}
+                    
+                    {/* Transcript toggle button - only show when voice is active */}
+                    {isVoiceActive && onToggleTranscript && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onToggleTranscript}
+                        className={cn(
+                          "h-8 w-8 p-0 touch-manipulation transition-colors",
+                          showTranscript 
+                            ? "bg-blue-600/20 text-blue-400" 
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                        title="Toggle transcript"
+                        aria-label="Toggle transcript"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
                     )}
                     
                     <Button
@@ -142,6 +168,25 @@ export function ChatHeader({
           <div className="hidden md:flex items-center gap-1">
             {showNextSteps && sessionId && (
               <NextStepsMenu sessionId={sessionId} show={showNextSteps} />
+            )}
+            
+            {/* Transcript toggle button - only show when voice is active */}
+            {isVoiceActive && onToggleTranscript && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onToggleTranscript}
+                className={cn(
+                  "h-6 w-6 p-0 touch-manipulation transition-colors",
+                  showTranscript 
+                    ? "bg-blue-600/20 text-blue-400" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Toggle transcript"
+                aria-label="Toggle transcript"
+              >
+                <MessageSquare className="h-3 w-3" />
+              </Button>
             )}
             
             {!chatState.isExpanded && (

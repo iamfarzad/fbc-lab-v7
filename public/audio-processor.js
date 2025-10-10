@@ -2,7 +2,7 @@
 class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.bufferSize = 4096;
+    this.bufferSize = 2048; // Reduced for lower latency
     this.buffer = new Float32Array(this.bufferSize);
     this.bufferIndex = 0;
   }
@@ -21,8 +21,8 @@ class AudioProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < channelData.length; i++) {
       let sample = channelData[i];
       
-      // Simple noise gate - reduce very quiet samples to prevent background noise
-      if (Math.abs(sample) < 0.01) {
+      // Less aggressive noise gate - reduce static without cutting off speech
+      if (Math.abs(sample) < 0.005) {
         sample = 0;
       }
       

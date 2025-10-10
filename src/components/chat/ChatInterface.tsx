@@ -14,6 +14,7 @@ import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
 import { ChatInput } from "./components/ChatInput";
 import { SessionLimitWarning } from "./SessionLimitWarning";
+import { LiveTranscriptPanel } from "./components/LiveTranscriptPanel";
 
 // Hooks - extracted logic
 import { useChatState } from "./hooks/useChatState";
@@ -22,7 +23,7 @@ import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 import { useChatIntelligence } from "./hooks/useChatIntelligence";
 
 // Constants - centralized configuration
-import { CHAT_CONSTANTS, ChatState, MediaState } from "./constants/chatConstants";
+import { CHAT_CONSTANTS } from "./constants/chatConstants";
 
 // Utils
 import { useAIElements } from "@/hooks/useAIElements";
@@ -51,6 +52,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   const [sessionId] = useState(() => id ?? crypto.randomUUID());
   const [usage, setUsage] = useState<any>(null);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   // Keep only the existing chatStateHook - no conflicting state
 
@@ -308,11 +310,63 @@ export function ChatInterface({ id }: { id?: string | null }) {
     if (hook.isSessionActive) {
       console.log('🎤 [ChatInterface] Stopping session...');
       await hook.stopSession();
+      // Hide transcript when voice session ends
+      setShowTranscript(false);
     } else {
       console.log('🎤 [ChatInterface] Starting session...');
       await hook.startSession({ sessionId });
     }
   }, [sessionId]);
+
+  const toggleTranscript = useCallback(() => {
+    setShowTranscript(prev => !prev);
+  }, []);
+
+  // Transform voice data into transcript entries
+  const transcriptEntries = useMemo(() => {
+    const entries: Array<{
+      id: string;
+      text: string;
+      type: 'user' | 'assistant';
+      isPartial?: boolean;
+      timestamp: number;
+    }> = [];
+
+    // Add partial transcript if available (user speaking)
+    if (audioHook.partialTranscript) {
+      entries.push({
+        id: `partial-${Date.now()}`,
+        text: audioHook.partialTranscript,
+        type: 'user',
+        isPartial: true,
+        timestamp: Date.now()
+      });
+    }
+
+    // Add final transcript if available
+    if (audioHook.transcript) {
+      entries.push({
+        id: `final-${Date.now()}`,
+        text: audioHook.transcript,
+        type: 'user',
+        isPartial: false,
+        timestamp: Date.now()
+      });
+    }
+
+    // Add assistant output transcript if available
+    if (audioHook.assistantText) {
+      entries.push({
+        id: `assistant-${Date.now()}`,
+        text: audioHook.assistantText,
+        type: 'assistant',
+        isPartial: false,
+        timestamp: Date.now()
+      });
+    }
+
+    return entries;
+  }, [audioHook.partialTranscript, audioHook.transcript, audioHook.assistantText]);
   
   const intelligenceHook = useChatIntelligence(sessionId);
   const artifactsState = useArtifacts();
@@ -572,11 +626,14 @@ export function ChatInterface({ id }: { id?: string | null }) {
           const analysis = data?.analysis || data?.output?.analysis;
           if (analysis) {
             const capturedAt = Date.now();
+            // Convert canvas to data URL for image data
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
             setLastWebcamSnapshot({ analysis, capturedAt });
             audioHook.sendContextUpdate({
               sessionId,
               modality: 'webcam',
               analysis,
+              imageData: dataUrl, // Add image data
               capturedAt,
               metadata: { source: 'webcam_capture', connectionId: voiceConnectionId },
             });
@@ -773,6 +830,9 @@ export function ChatInterface({ id }: { id?: string | null }) {
               onToggleChat={chatStateHook.toggleChat}
               sessionId={sessionId}
               showNextSteps={intelligenceHook.hasAcceptedTerms && usage && (usage.messages_sent >= 5 || (Date.now() - (usage.started_at || 0)) / 60000 >= 5)}
+              isVoiceActive={audioHook.isSessionActive}
+              showTranscript={showTranscript}
+              onToggleTranscript={toggleTranscript}
             />
 
             {isExpanded && renderActiveStreamBanner()}
@@ -869,6 +929,12 @@ export function ChatInterface({ id }: { id?: string | null }) {
           }}
         />
       )}
+
+      {/* Live Transcript Panel */}
+      <LiveTranscriptPanel
+        isVisible={showTranscript && audioHook.isSessionActive}
+        transcripts={transcriptEntries}
+      />
     </ErrorBoundary>
   );
 }
