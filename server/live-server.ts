@@ -982,27 +982,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             client.clientSessionId = payload.sessionId;
           }
 
-          // Send context to Gemini Live API as text message
-          try {
-            console.info(`[${connectionId}] Sending ${modality} context to Gemini Live API`);
-            
-            // Build context message (Gemini Live API only accepts audio/text via sendRealtimeInput)
-            const message = imageData 
-              ? `[${modality.charAt(0).toUpperCase() + modality.slice(1)} Visual Context Available]\n${analysis}`
-              : `[${modality.charAt(0).toUpperCase() + modality.slice(1)} Context]: ${analysis}`;
-            
-            // Send as text using the correct SDK method
-            await client.session.sendRealtimeInput({
-              media: {
-                mimeType: 'text/plain',
-                data: Buffer.from(message).toString('base64')
-              }
-            });
-            
-            console.info(`[${connectionId}] ${modality} context sent successfully (text description)`);
-          } catch (err) {
-            console.error(`[${connectionId}] Failed to send ${modality} context to Gemini:`, err);
-          }
+          // Store context locally - DO NOT send automatically to Live API
+          // Visual context is only sent when user explicitly asks about it
+          console.info(`[${connectionId}] ${modality} context stored locally (${imageData ? 'with' : 'without'} image data)`);
 
           break;
         }
@@ -1039,11 +1021,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             break
           }
           try {
-            // Send turn complete using the correct API format
-            await client.session.send({
-              clientContent: {
-                turnComplete: true
-              }
+            // Send turn complete using the correct SDK method
+            await client.session.sendClientContent({
+              turns: [],
+              turnComplete: true
             });
             sendLog('info', `[${connectionId}] turnComplete sent to Live API`, { connectionId });
             safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
