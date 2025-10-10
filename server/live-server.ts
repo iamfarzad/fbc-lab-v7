@@ -982,41 +982,24 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             client.clientSessionId = payload.sessionId;
           }
 
-          // Send context to Gemini Live API as multimodal message
+          // Send context to Gemini Live API as text message
           try {
             console.info(`[${connectionId}] Sending ${modality} context to Gemini Live API`);
             
-            const parts: any[] = [];
+            // Build context message (Gemini Live API only accepts audio/text via sendRealtimeInput)
+            const message = imageData 
+              ? `[${modality.charAt(0).toUpperCase() + modality.slice(1)} Visual Context Available]\n${analysis}`
+              : `[${modality.charAt(0).toUpperCase() + modality.slice(1)} Context]: ${analysis}`;
             
-            // Add image data if available
-            if (imageData) {
-              // Remove data URL prefix if present
-              const base64Data = imageData.includes(',') ? imageData.split(',')[1] : imageData;
-              parts.push({
-                inlineData: {
-                  mimeType: 'image/jpeg',
-                  data: base64Data
-                }
-              });
-            }
-            
-            // Add text analysis
-            parts.push({
-              text: `[${modality.charAt(0).toUpperCase() + modality.slice(1)} Context]: ${analysis}`
-            });
-            
-            // Send as multimodal input with turnComplete: false to not trigger response
-            await client.session.send({
-              clientContent: {
-                turns: [{
-                  role: 'user',
-                  parts: parts
-                }],
-                turnComplete: false // Don't trigger AI response, just update context
+            // Send as text using the correct SDK method
+            await client.session.sendRealtimeInput({
+              media: {
+                mimeType: 'text/plain',
+                data: Buffer.from(message).toString('base64')
               }
             });
             
-            console.info(`[${connectionId}] ${modality} context sent successfully (multimodal with ${imageData ? 'image + ' : ''}text)`);
+            console.info(`[${connectionId}] ${modality} context sent successfully (text description)`);
           } catch (err) {
             console.error(`[${connectionId}] Failed to send ${modality} context to Gemini:`, err);
           }
