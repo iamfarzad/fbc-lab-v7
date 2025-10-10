@@ -75,22 +75,26 @@ export function ChatInterface({ id }: { id?: string | null }) {
   }, []);
 
   const handleVoiceFinalTranscript = useCallback((text: string) => {
+    console.log('🎤 [ChatInterface] Final transcript received:', text);
     appendVoiceUserMessage(text);
     
     // Store in multimodal context (non-blocking)
     import('@/core/context/multimodal-context').then(({ multimodalContextManager }) => {
       multimodalContextManager.addVoiceTranscript(sessionId, text, 'user', true)
-        .catch(err => console.error('Failed to store voice context:', err))
+        .then(() => console.log('✅ Voice transcript stored in context'))
+        .catch(err => console.error('❌ Failed to store voice context:', err))
     })
   }, [appendVoiceUserMessage, sessionId]);
 
   const handleVoiceAssistantText = useCallback((text: string) => {
+    console.log('🤖 [ChatInterface] Assistant text chunk:', text);
     appendVoiceAssistantChunk(text);
     
     // Store assistant voice output (non-blocking)
     import('@/core/context/multimodal-context').then(({ multimodalContextManager }) => {
       multimodalContextManager.addVoiceTranscript(sessionId, text, 'assistant', true)
-        .catch(err => console.error('Failed to store assistant voice:', err))
+        .then(() => console.log('✅ Assistant voice stored in context'))
+        .catch(err => console.error('❌ Failed to store assistant voice:', err))
     })
   }, [appendVoiceAssistantChunk, sessionId]);
 

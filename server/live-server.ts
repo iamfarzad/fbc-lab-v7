@@ -921,6 +921,26 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             client.clientSessionId = payload.sessionId;
           }
 
+          // Send context to Gemini Live API as text message
+          try {
+            const contextMessage = `[Visual Context Update - ${modality}]: ${analysis}`;
+            console.info(`[${connectionId}] Sending ${modality} context to Gemini Live API`);
+            
+            // Send as text input to provide context
+            await client.session.send({
+              clientContent: {
+                turns: [{
+                  role: 'user',
+                  parts: [{ text: contextMessage }]
+                }]
+              }
+            });
+            
+            console.info(`[${connectionId}] ${modality} context sent successfully`);
+          } catch (err) {
+            console.error(`[${connectionId}] Failed to send ${modality} context to Gemini:`, err);
+          }
+
           break;
         }
         case 'TOOL_RESULT': {
