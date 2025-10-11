@@ -7,6 +7,9 @@ import { workshopSalesAgent } from './workshop-sales-agent'
 import { consultingSalesAgent } from './consulting-sales-agent'
 import { closerAgent } from './closer-agent'
 import { summaryAgent } from './summary-agent'
+import { proposalAgent } from './proposal-agent'
+import { adminAgent } from './admin-agent'
+import { retargetingAgent } from './retargeting-agent'
 
 /**
  * Multi-Agent Orchestrator - Routes conversations to specialized agents
@@ -120,6 +123,27 @@ export async function routeToAgent({
 
       case 'SUMMARY':
         result = await summaryAgent(messages, enhancedContext)
+        break
+
+      case 'PROPOSAL':
+        result = await proposalAgent(messages, enhancedContext)
+        break
+
+      case 'ADMIN':
+        result = await adminAgent(messages, {
+          sessionId: context.sessionId || 'admin',
+          adminId: context.intelligenceContext?.email
+        })
+        break
+
+      case 'RETARGETING':
+        // Retargeting is typically triggered by scheduled jobs, not chat
+        // But we support it here for completeness
+        result = await retargetingAgent({
+          leadContext: context.intelligenceContext,
+          conversationSummary: messages.map(m => m.content).join('\n'),
+          scenario: 'no_booking_high_score'
+        })
         break
 
       default:

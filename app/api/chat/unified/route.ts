@@ -19,6 +19,7 @@ import { GoogleGroundingProvider } from '@/core/intelligence/providers/search/go
 import { ContextStorage } from '@/core/context/context-storage'
 import { routeToAgent } from '@/core/agents'
 import type { AgentContext } from '@/core/agents'
+import { wrap } from '@ai-sdk-tools/devtools'
 
 // Type definitions
 interface ChatMessage {
@@ -835,8 +836,15 @@ Citations: ${researchResult.allCitations.length} sources processed
           voiceActive: context?.voiceActive || false
         }
 
-        // Route to appropriate agent
-        const agentResult = await routeToAgent({
+        // Route to appropriate agent (wrapped with devtools)
+        const agentResult = await wrap(routeToAgent, {
+          name: 'multi-agent-orchestrator',
+          metadata: {
+            sessionId: context?.sessionId,
+            mode,
+            voiceActive: context?.voiceActive
+          }
+        })({
           messages: aiMessages,
           context: agentContext,
           trigger: context?.voiceActive ? 'voice' : 'chat'
