@@ -40,13 +40,8 @@ function calculateServerUrl() {
   
   const protocol = 'https:' ? 'wss' : 'ws';
   const host = 'www.farzadbayat.com';
-  
-  // In production, use the same host without port (Fly.io handles routing)
-  // In development, use the configured port
-  const isProduction = process.env.NODE_ENV === 'production';
-  const fallbackUrl = isProduction 
-    ? `${protocol}://${host.replace(/:\d+$/, '')}`
-    : `${protocol}://${host.replace(/:\d+$/, '')}:${process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001'}`;
+  const port = process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001';
+  const fallbackUrl = `${protocol}://${host.replace(/:\d+$/, '')}:${port}`;
   
   console.log('   ❌ Using fallback URL:', fallbackUrl);
   return fallbackUrl;
