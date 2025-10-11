@@ -836,15 +836,9 @@ Citations: ${researchResult.allCitations.length} sources processed
           voiceActive: context?.voiceActive || false
         }
 
-        // Route to appropriate agent (wrapped with devtools)
-        const agentResult = await wrap(routeToAgent, {
-          name: 'multi-agent-orchestrator',
-          metadata: {
-            sessionId: context?.sessionId,
-            mode,
-            voiceActive: context?.voiceActive
-          }
-        })({
+        // Route to appropriate agent
+        // Note: AIDevtools UI component in ChatInterface already tracks this
+        const agentResult = await routeToAgent({
           messages: aiMessages,
           context: agentContext,
           trigger: context?.voiceActive ? 'voice' : 'chat'

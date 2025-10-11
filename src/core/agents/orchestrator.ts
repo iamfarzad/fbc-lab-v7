@@ -212,6 +212,11 @@ function determineFunnelStage({
     return 'SCORING'
   }
 
+  // Closing phase - pitch delivered but no booking (check this FIRST)
+  if (intelligenceContext.pitchDelivered && !intelligenceContext.calendarBooked) {
+    return 'CLOSING'
+  }
+
   // Sales pitch phase - fit determined
   const { workshop, consulting } = intelligenceContext.fitScore
   if (workshop > consulting && workshop > 0.7) {
@@ -219,11 +224,6 @@ function determineFunnelStage({
   }
   if (consulting > workshop && consulting > 0.7) {
     return 'CONSULTING_PITCH'
-  }
-
-  // Closing phase - pitch delivered but no booking
-  if (intelligenceContext.pitchDelivered && !intelligenceContext.calendarBooked) {
-    return 'CLOSING'
   }
 
   // If fit scores are low or equal, stay in discovery
