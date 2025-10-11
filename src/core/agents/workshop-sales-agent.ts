@@ -80,8 +80,7 @@ STYLE: Conversational, no fluff, focus on value`
     messages,
     system: systemPrompt,
     tools,
-    temperature: 0.7,
-    maxTokens: 600
+    temperature: 0.7
   })
 
   // Convert stream to text

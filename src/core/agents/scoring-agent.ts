@@ -90,8 +90,7 @@ OUTPUT REQUIRED (JSON only, no explanation):
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Calculate the lead score and fit scores based on the provided context.' }
     ],
-    temperature: 0.3,
-    maxSteps: 3
+    temperature: 0.3
   })
 
   // Parse JSON from response

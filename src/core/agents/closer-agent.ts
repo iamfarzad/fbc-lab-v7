@@ -81,8 +81,7 @@ STYLE: Confident, direct, use their own experience as the close`
     messages,
     system: systemPrompt,
     tools,
-    temperature: 0.7,
-    maxTokens: 500
+    temperature: 0.7
   })
 
   // Convert stream to text

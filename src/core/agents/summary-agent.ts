@@ -82,8 +82,7 @@ TONE: Professional but conversational. This is a valuable document they'll share
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Generate the conversation summary based on all provided context.' }
     ],
-    temperature: 0.3,
-    maxSteps: 10
+    temperature: 0.3
   })
 
   // Parse JSON from response

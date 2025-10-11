@@ -79,8 +79,7 @@ ${conversationFlow?.shouldOfferRecap
     model: google('gemini-2.5-flash'),
     messages,
     system: systemPrompt,
-    temperature: 0.7,
-    maxSteps: 5
+    temperature: 0.7
   })
 
   return {
