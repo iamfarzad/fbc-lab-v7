@@ -56,7 +56,7 @@ CLOSING TACTICS:
 
 STYLE: Confident, direct, use their own experience as the close`
 
-  const tools = {
+  const tools: any = {
     create_chart: {
       description: 'Show cost vs benefit analysis',
       parameters: z.object({

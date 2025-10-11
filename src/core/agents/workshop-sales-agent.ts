@@ -55,7 +55,7 @@ CONSTRAINTS:
 
 STYLE: Conversational, no fluff, focus on value`
 
-  const tools = {
+  const tools: any = {
     create_chart: {
       description: 'Create ROI visualization showing workshop value',
       parameters: z.object({

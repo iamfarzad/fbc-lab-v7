@@ -56,7 +56,7 @@ CONSTRAINTS:
 
 STYLE: Executive-level, ROI-focused, direct`
 
-  const tools = {
+  const tools: any = {
     create_chart: {
       description: 'Create ROI visualization showing cost savings or revenue impact',
       parameters: z.object({

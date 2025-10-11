@@ -91,7 +91,7 @@ OUTPUT REQUIRED (JSON only, no explanation):
       { role: 'user', content: 'Calculate the lead score and fit scores based on the provided context.' }
     ],
     temperature: 0.3,
-    maxTokens: 300
+    maxSteps: 3
   })
 
   // Parse JSON from response

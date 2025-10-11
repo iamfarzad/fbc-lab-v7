@@ -83,7 +83,7 @@ TONE: Professional but conversational. This is a valuable document they'll share
       { role: 'user', content: 'Generate the conversation summary based on all provided context.' }
     ],
     temperature: 0.3,
-    maxTokens: 1500
+    maxSteps: 10
   })
 
   // Parse JSON from response

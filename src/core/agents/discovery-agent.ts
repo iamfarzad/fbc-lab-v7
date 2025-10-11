@@ -80,7 +80,7 @@ ${conversationFlow?.shouldOfferRecap
     messages,
     system: systemPrompt,
     temperature: 0.7,
-    maxTokens: 500
+    maxSteps: 5
   })
 
   return {
