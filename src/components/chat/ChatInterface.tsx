@@ -28,6 +28,7 @@ import { CHAT_CONSTANTS } from "./constants/chatConstants";
 // Utils
 import { useAIElements } from "@/hooks/useAIElements";
 import { MeetingOverlay } from "@/components/meeting/MeetingOverlay";
+import { ConversationBar } from "@/components/ui/conversation-bar";
 import { AIDevtools } from "@ai-sdk-tools/devtools";
 import { useArtifacts } from "@ai-sdk-tools/artifacts/client";
 import { toast } from "sonner";
@@ -764,54 +765,21 @@ export function ChatInterface({ id }: { id?: string | null }) {
       {/* Main Chat Interface */}
       <ChatContainer chatState={chatStateHook.chatState}>
         {chatStateHook.chatState.isMinimized ? (
-          /* Minimized State */
-          <motion.div
-            key="chat-minimized"
-            className="h-full flex items-center justify-between px-4 cursor-pointer"
-            onClick={chatStateHook.toggleMinimize}
-          >
-            <div className="flex items-center gap-2">
-              {/* Voice indicator with wavebar animation */}
-              {chatState.isListening ? (
-                <div className="flex items-center gap-1" title="Voice active">
-                  <div className="flex items-center gap-0.5">
-                    <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-2 w-2 animate-pulse rounded-full bg-primary"></div>
-              )}
-              
-              <span className="text-sm truncate font-mono">
-                F.B/c AI
-              </span>
-              
-              {/* Status indicators */}
-              <div className="flex items-center gap-1">
-                {chatState.isCameraActive && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Camera active"></div>
-                )}
-                {chatState.isScreenSharing && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" title="Screen sharing active"></div>
-                )}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                chatStateHook.toggleChat();
-              }}
-              className="h-6 w-6 p-0 transition-colors"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </motion.div>
+          <div key="chat-minimized" className="h-full flex items-center justify-center px-2">
+            <ConversationBar
+              isConnected={audioHook.isSessionActive}
+              isVoiceActive={audioHook.isRecording}
+              isVoiceProcessing={audioHook.isProcessing}
+              voiceTranscript={audioHook.transcript}
+              voicePartialTranscript={audioHook.partialTranscript}
+              isCameraActive={chatState.isCameraActive}
+              isScreenSharing={chatState.isScreenSharing}
+              onExpand={chatStateHook.toggleMinimize}
+              onToggleVoice={toggleVoiceSession}
+              onToggleCamera={chatStateHook.toggleCamera}
+              onToggleScreenShare={chatStateHook.toggleScreenShare}
+            />
+          </div>
         ) : (
           <div key="chat-expanded" className={cn("flex h-full w-full flex-col", isExpanded ? "" : "overflow-hidden")}>
             <ChatHeader
