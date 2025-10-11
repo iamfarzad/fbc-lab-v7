@@ -41,11 +41,10 @@ import { ToolsMenu } from "./ToolsMenu";
 import { ActionsMenu } from "./ActionsMenu";
 import { VoiceLiveMode } from "./VoiceLiveMode";
 import { CameraFullScreen } from "./CameraFullScreen";
-import { MediaPopover } from "./MediaPopover";
-import { VoicePopoverSection } from "./VoicePopoverSection";
-import { CameraPopoverSection } from "./CameraPopoverSection";
-import { ScreenPopoverSection } from "./ScreenPopoverSection";
+import { ScreenShareFullScreen } from "./ScreenShareFullScreen";
 import { PermissionExplanationDialog } from "./PermissionExplanationDialog";
+import { useMediaController } from "../hooks/useMediaController";
+import type { MediaType } from "../hooks/useMediaController";
 
 type SendMessageInput = string | {
   text?: string;
@@ -125,196 +124,61 @@ export function ChatInput({
   onAutoOpenPopoverHandled,
 }: ChatInputProps) {
   const [hasAttachments, setHasAttachments] = useState(false);
-  const [activePopover, setActivePopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
-  const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
-  
-              // Bottom sheet states
-              const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  
-  // Full-screen media states
-  const [isVoiceFullScreenOpen, setIsVoiceFullScreenOpen] = useState(false);
-  const [isCameraFullScreenOpen, setIsCameraFullScreenOpen] = useState(false);
-  
-  // Refs for popover positioning
-  const voiceButtonRef = useRef<HTMLDivElement>(null);
-  const cameraButtonRef = useRef<HTMLDivElement>(null);
-  const screenButtonRef = useRef<HTMLDivElement>(null);
-  const [isTogglingVoice, setIsTogglingVoice] = useState(false);
+  // Bottom sheet state
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
 
-  // Auto-open popover when media becomes active
-  useEffect(() => {
-    if ((isVoiceActive || isVoiceProcessing) && !activePopover) {
-      setActivePopover('voice');
-    } else if (cameraState && !activePopover) {
-      setActivePopover('camera');
-    } else if (isScreenSharing && !activePopover) {
-      setActivePopover('screen');
-    }
-  }, [isVoiceActive, isVoiceProcessing, cameraState, isScreenSharing, activePopover]);
-
-  // Close popover when media stops
-  useEffect(() => {
-    if (activePopover === 'voice' && !isVoiceActive && !isVoiceProcessing) {
-      setActivePopover(null);
-    } else if (activePopover === 'camera' && !cameraState) {
-      setActivePopover(null);
-    } else if (activePopover === 'screen' && !isScreenSharing) {
-      setActivePopover(null);
-    }
-  }, [activePopover, isVoiceActive, isVoiceProcessing, cameraState, isScreenSharing]);
-
-  const closePopover = () => setActivePopover(null);
+  // Unified media controller (full-screen overlays on all viewports)
+  const media = useMediaController({
+    voice: {
+      isActive: isVoiceActive,
+      isProcessing: isVoiceProcessing,
+      isSupported: isVoiceSupported,
+      isInitializing: isVoiceInitializing,
+      transcript: voiceTranscript,
+      partialTranscript: voicePartialTranscript,
+      error: voiceError,
+      onToggle: onToggleVoice,
+    },
+    camera: {
+      isActive: cameraState,
+      isInitializing: isCameraInitializing,
+      stream: cameraStream ?? undefined,
+      error: cameraError,
+      availableDevices: availableCameras,
+      onToggle: onToggleCamera,
+      onSwitchCamera,
+    },
+    screen: {
+      isActive: isScreenSharing,
+      isInitializing: isScreenShareInitializing,
+      stream: screenShareStream ?? undefined,
+      error: screenShareError,
+      onToggle: onToggleScreenShare,
+    },
+  })
 
   useEffect(() => {
     if (!autoOpenPopover) return;
-    setActivePopover(autoOpenPopover);
+    // Show permission explainer for targeted media; controller will handle start after accept
+    media.setPendingPermission(autoOpenPopover as MediaType);
     onAutoOpenPopoverHandled?.();
-  }, [autoOpenPopover, onAutoOpenPopoverHandled]);
+  }, [autoOpenPopover, media, onAutoOpenPopoverHandled]);
 
   const handleVoiceButtonClick = async () => {
-    if (isTogglingVoice) {
-      console.log('🎤 [ChatInput] Voice toggle already in progress - ignoring click');
-      return;
-    }
-    
-    console.log('🎤 [ChatInput] Voice button clicked');
-    setIsTogglingVoice(true);
-    
-    try {
-      // Check if we're on mobile (< 640px)
-      const isMobile = window.innerWidth < 640;
-      
-      if (isMobile) {
-        // On mobile, use full-screen mode
-        setIsVoiceFullScreenOpen(!isVoiceFullScreenOpen);
-        if (!isVoiceActive) {
-          setPendingPermission('voice');
-          return;
-        }
-      } else {
-        // On desktop, use popover mode
-        const willOpen = activePopover !== 'voice';
-        
-        // If opening and not already active, show permission explanation first
-        if (willOpen && !isVoiceActive) {
-          setPendingPermission('voice');
-          return;
-        }
-        
-        // Update popover state first
-        setActivePopover(willOpen ? 'voice' : null);
-        
-        // Then trigger media in next frame to avoid race condition
-        await new Promise(resolve => requestAnimationFrame(resolve));
-      }
-      
-      await onToggleVoice();
-    } catch (error) {
-      console.error('🎤 [ChatInput] Voice toggle error:', error);
-      // Close full-screen if media failed to start
-      if (window.innerWidth < 640) {
-        setIsVoiceFullScreenOpen(false);
-      } else {
-        setActivePopover(null);
-      }
-    } finally {
-      // Delay clearing toggle state to prevent rapid re-clicks
-      setTimeout(() => setIsTogglingVoice(false), 500);
-    }
+    await media.handleVoicePress();
   };
 
   const handleCameraButtonClick = async () => {
-    // Check if we're on mobile (< 640px)
-    const isMobile = window.innerWidth < 640;
-    
-    if (isMobile) {
-      // On mobile, use full-screen mode
-      setIsCameraFullScreenOpen(!isCameraFullScreenOpen);
-      if (!cameraState) {
-        setPendingPermission('camera');
-        return;
-      }
-    } else {
-      // On desktop, use popover mode
-      const willOpen = activePopover !== 'camera';
-      
-      // If opening and not already active, show permission explanation first
-      if (willOpen && !cameraState) {
-        setPendingPermission('camera');
-        return;
-      }
-      
-      setActivePopover(willOpen ? 'camera' : null);
-      
-      await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-    
-    try {
-      await onToggleCamera();
-    } catch (error) {
-      console.error('Camera toggle error:', error);
-      if (isMobile) {
-        setIsCameraFullScreenOpen(false);
-      } else if (window.innerWidth >= 640) {
-        setActivePopover(null);
-      }
-    }
+    await media.handleCameraPress();
   };
 
   const handleScreenButtonClick = async () => {
-    const willOpen = activePopover !== 'screen';
-    
-    // If opening and not already active, show permission explanation first
-    if (willOpen && !isScreenSharing) {
-      setPendingPermission('screen');
-      return;
-    }
-    
-    setActivePopover(willOpen ? 'screen' : null);
-    
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    
-    try {
-      await onToggleScreenShare();
-    } catch (error) {
-      console.error('Screen share toggle error:', error);
-      if (willOpen) {
-        setActivePopover(null);
-      }
-    }
+    await media.handleScreenPress();
   };
 
-  // Handle permission dialog acceptance
-  const handlePermissionAccept = async () => {
-    const permissionType = pendingPermission;
-    setPendingPermission(null);
-    
-    if (!permissionType) return;
-    
-    // Open popover
-    setActivePopover(permissionType);
-    
-    // Wait for next frame
-    await new Promise(resolve => requestAnimationFrame(resolve));
-    
-    // Trigger the actual permission request
-    try {
-      if (permissionType === 'voice') {
-        await onToggleVoice();
-      } else if (permissionType === 'camera') {
-        await onToggleCamera();
-      } else if (permissionType === 'screen') {
-        await onToggleScreenShare();
-      }
-    } catch (error) {
-      console.error('Permission request failed:', error);
-      setActivePopover(null);
-    }
-  };
-
-  const handlePermissionDecline = () => {
-    setPendingPermission(null);
-  };
+  // Permission dialog handlers (delegated to controller)
+  const handlePermissionAccept = media.acceptPermissionExplainer;
+  const handlePermissionDecline = media.declinePermissionExplainer;
 
   // Keyboard shortcuts for media controls
   useEffect(() => {
@@ -322,34 +186,24 @@ export function ChatInput({
       // Ctrl/Cmd + M = Toggle microphone/voice
       if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
         e.preventDefault();
-        if (isVoiceActive || activePopover !== 'voice') {
-          setPendingPermission('voice');
-        }
+        void media.handleVoicePress();
       }
       // Ctrl/Cmd + Shift + C = Toggle camera
       else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'c') {
         e.preventDefault();
-        if (cameraState || activePopover !== 'camera') {
-          setPendingPermission('camera');
-        }
+        void media.handleCameraPress();
       }
       // Ctrl/Cmd + Shift + S = Toggle screen share
       else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 's') {
         e.preventDefault();
-        if (isScreenSharing || activePopover !== 'screen') {
-          setPendingPermission('screen');
-        }
+        void media.handleScreenPress();
       }
-      // ESC = Close active popover
-      else if (e.key === 'Escape' && activePopover) {
-        e.preventDefault();
-        closePopover();
-      }
+      // ESC handled by overlays and dialogs
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePopover, isVoiceActive, cameraState, isScreenSharing]);
+  }, [media]);
 
   // Don't render input in minimized state
   if (isMinimized) {
@@ -507,61 +361,53 @@ export function ChatInput({
         </PromptInput>
       </div>
 
-      {/* Popovers for media controls */}
-      <MediaPopover
-        type="voice"
-        isOpen={activePopover === 'voice'}
-        onClose={closePopover}
-        triggerRef={voiceButtonRef}
-      >
-        <VoicePopoverSection
-          isActive={isVoiceActive}
-          isProcessing={isVoiceProcessing}
-          isSupported={isVoiceSupported}
-          isInitializing={isVoiceInitializing}
-          transcript={voiceTranscript}
-          partialTranscript={voicePartialTranscript}
-          error={voiceError}
-          onToggle={handleVoiceButtonClick}
-        />
-      </MediaPopover>
+      {/* Full-screen overlays for all media (desktop + mobile) */}
+      <VoiceLiveMode
+        isOpen={media.isVoiceOverlayOpen}
+        onClose={() => media.closeOverlay('voice')}
+        isActive={isVoiceActive}
+        isProcessing={isVoiceProcessing}
+        transcript={voiceTranscript}
+        partialTranscript={voicePartialTranscript}
+        error={voiceError}
+        onToggle={handleVoiceButtonClick}
+        onToggleCamera={handleCameraButtonClick}
+        onToggleScreenShare={handleScreenButtonClick}
+        isCameraActive={cameraState}
+        isScreenSharing={isScreenSharing}
+      />
 
-      <MediaPopover
-        type="camera"
-        isOpen={activePopover === 'camera'}
-        onClose={closePopover}
-        triggerRef={cameraButtonRef}
-      >
-        <CameraPopoverSection
-          isActive={cameraState}
-          isInitializing={isCameraInitializing}
-          stream={cameraStream}
-          error={cameraError}
-          onToggle={handleCameraButtonClick}
-          onSwitchCamera={onSwitchCamera}
-          availableDevices={availableCameras}
-        />
-      </MediaPopover>
+      <CameraFullScreen
+        isOpen={media.isCameraOverlayOpen}
+        onClose={() => media.closeOverlay('camera')}
+        isActive={cameraState}
+        stream={cameraStream}
+        error={cameraError}
+        onToggle={handleCameraButtonClick}
+        onSwitchCamera={onSwitchCamera}
+        availableDevices={availableCameras}
+      />
 
-      <MediaPopover
-        type="screen"
-        isOpen={activePopover === 'screen'}
-        onClose={closePopover}
-        triggerRef={screenButtonRef}
-      >
-        <ScreenPopoverSection
-          isActive={isScreenSharing}
-          isInitializing={isScreenShareInitializing}
-          stream={screenShareStream}
-          error={screenShareError}
-          onToggle={handleScreenButtonClick}
-        />
-      </MediaPopover>
+      <ScreenShareFullScreen
+        isOpen={media.isScreenOverlayOpen}
+        onClose={() => media.closeOverlay('screen')}
+        isActive={isScreenSharing}
+        stream={screenShareStream}
+        error={screenShareError || undefined}
+        onToggle={handleScreenButtonClick}
+        isVoiceActive={isVoiceActive}
+        isWebcamActive={cameraState}
+        onToggleVoice={handleVoiceButtonClick}
+        onToggleWebcam={handleCameraButtonClick}
+        isProcessing={isVoiceProcessing}
+        transcript={voiceTranscript}
+        partialTranscript={voicePartialTranscript}
+      />
 
       {/* Permission Explanation Dialog */}
       <PermissionExplanationDialog
-        type={pendingPermission}
-        isOpen={pendingPermission !== null}
+        type={media.pendingPermission}
+        isOpen={media.pendingPermission !== null}
         onAccept={handlePermissionAccept}
         onDecline={handlePermissionDecline}
       />
@@ -589,37 +435,10 @@ export function ChatInput({
         isScreenSharing={isScreenSharing}
         onToggleScreenShare={handleScreenButtonClick}
         onToggleSettings={onToggleSettings}
-        onOpenVoiceFullScreen={() => setIsVoiceFullScreenOpen(true)}
-        onOpenCameraFullScreen={() => setIsCameraFullScreenOpen(true)}
+        onOpenVoiceFullScreen={() => media.openOverlay('voice')}
+        onOpenCameraFullScreen={() => media.openOverlay('camera')}
         currentTheme="default" // TODO: Get from context
         onToggleTheme={() => {}} // TODO: Implement theme toggle
-      />
-
-      {/* Full-Screen Media Components */}
-      <VoiceLiveMode
-        isOpen={isVoiceFullScreenOpen}
-        onClose={() => setIsVoiceFullScreenOpen(false)}
-        isActive={isVoiceActive}
-        isProcessing={isVoiceProcessing}
-        transcript={voiceTranscript}
-        partialTranscript={voicePartialTranscript}
-        error={voiceError}
-        onToggle={handleVoiceButtonClick}
-        onToggleCamera={handleCameraButtonClick}
-        onToggleScreenShare={handleScreenButtonClick}
-        isCameraActive={cameraState}
-        isScreenSharing={isScreenSharing}
-      />
-
-      <CameraFullScreen
-        isOpen={isCameraFullScreenOpen}
-        onClose={() => setIsCameraFullScreenOpen(false)}
-        isActive={cameraState}
-        stream={cameraStream}
-        error={cameraError}
-        onToggle={handleCameraButtonClick}
-        onSwitchCamera={onSwitchCamera}
-        availableDevices={availableCameras}
       />
     </div>
   );
