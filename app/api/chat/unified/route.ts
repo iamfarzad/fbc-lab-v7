@@ -17,6 +17,8 @@ if (process.env.GEMINI_API_KEY) {
 import { multimodalContextManager } from '@/core/context/multimodal-context'
 import { GoogleGroundingProvider } from '@/core/intelligence/providers/search/google-grounding'
 import { ContextStorage } from '@/core/context/context-storage'
+import { routeToAgent } from '@/core/agents'
+import type { AgentContext } from '@/core/agents'
 
 // Type definitions
 interface ChatMessage {
@@ -83,6 +85,14 @@ interface MultimodalContextResult {
 
 const isMockUnifiedChat = (() => {
   const flag = process.env.MOCK_UNIFIED_CHAT
+  if (!flag) return false
+  const normalized = flag.toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes'
+})()
+
+// Feature flag for multi-agent system
+const ENABLE_MULTI_AGENT = (() => {
+  const flag = process.env.ENABLE_MULTI_AGENT
   if (!flag) return false
   const normalized = flag.toLowerCase()
   return normalized === '1' || normalized === 'true' || normalized === 'yes'
@@ -811,7 +821,127 @@ Citations: ${researchResult.allCitations.length} sources processed
       }, { status: 400 })
     }
 
-    // Handle streaming vs non-streaming
+    // ⭐ MULTI-AGENT SYSTEM (if enabled)
+    if (ENABLE_MULTI_AGENT && stream !== false) {
+      console.log('🤖 [Multi-Agent] Routing to specialized agent...')
+      
+      try {
+        // Build agent context
+        const agentContext: AgentContext = {
+          sessionId: context?.sessionId || 'anonymous',
+          intelligenceContext: context?.intelligenceContext as any,
+          conversationFlow: conversationFlow as any,
+          mode: mode,
+          voiceActive: context?.voiceActive || false
+        }
+
+        // Route to appropriate agent
+        const agentResult = await routeToAgent({
+          messages: aiMessages,
+          context: agentContext,
+          trigger: context?.voiceActive ? 'voice' : 'chat'
+        })
+
+        console.log(`✅ [Multi-Agent] Routed to: ${agentResult.agent} (${agentResult.metadata?.stage})`)
+
+        // Stream the agent's response using AI SDK streaming
+        // (Agent returns text, we stream it to client using existing SSE format)
+        const encoder = new TextEncoder()
+        const messageId = crypto.randomUUID()
+
+        const stream = new ReadableStream({
+          start(controller) {
+            try {
+              // Send meta event
+              const metaEvent = `event: meta\ndata: ${JSON.stringify({ 
+                reqId, 
+                type: 'meta',
+                agent: agentResult.agent,
+                stage: agentResult.metadata?.stage
+              })}\n\n`
+              controller.enqueue(encoder.encode(metaEvent))
+
+              // Send agent response as chunks (simulate streaming)
+              const text = agentResult.output
+              const chunkSize = 50
+              let accumulated = ''
+
+              for (let i = 0; i < text.length; i += chunkSize) {
+                const chunk = text.slice(i, i + chunkSize)
+                accumulated += chunk
+
+                const messageData = {
+                  id: messageId,
+                  role: 'assistant',
+                  content: accumulated,
+                  timestamp: new Date().toISOString(),
+                  type: 'text',
+                  metadata: {
+                    mode,
+                    isStreaming: true,
+                    reqId,
+                    agent: agentResult.agent,
+                    stage: agentResult.metadata?.stage
+                  }
+                }
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(messageData)}\n\n`))
+              }
+
+              // Parse structured metadata if present
+              const structuredMetadata = parseStructuredResponse(agentResult.output)
+
+              // Send completion with agent metadata
+              const completionData = {
+                id: messageId,
+                role: 'assistant',
+                content: agentResult.output,
+                timestamp: new Date().toISOString(),
+                type: 'text',
+                metadata: {
+                  mode,
+                  isComplete: true,
+                  finalChunk: true,
+                  reqId,
+                  agent: agentResult.agent,
+                  stage: agentResult.metadata?.stage,
+                  leadScore: agentResult.metadata?.leadScore,
+                  fitScore: agentResult.metadata?.fitScore,
+                  ...structuredMetadata
+                }
+              }
+
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(completionData)}\n\n`))
+              controller.close()
+
+            } catch (error) {
+              console.error('[Multi-Agent] Stream error:', error)
+              controller.error(error)
+            }
+          }
+        })
+
+        return new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+            'x-fbc-endpoint': 'unified-multi-agent',
+            'x-request-id': reqId,
+            'X-Chat-Mode': mode,
+            'X-Session-Id': context?.sessionId || 'anonymous',
+            'X-Agent-Used': agentResult.agent,
+            'X-Funnel-Stage': agentResult.metadata?.stage || 'unknown'
+          }
+        })
+
+      } catch (error) {
+        console.error('[Multi-Agent] Error:', error)
+        // Fall through to standard flow
+      }
+    }
+
+    // Handle streaming vs non-streaming (STANDARD FLOW)
     if (stream !== false) {
       if (isMockUnifiedChat) {
         return createMockUnifiedStreamResponse({
