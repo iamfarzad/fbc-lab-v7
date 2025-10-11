@@ -110,7 +110,7 @@ TONE: Professional but conversational. This is a valuable document they'll share
     agent: 'Summary Agent',
     model: 'gemini-2.5-pro',
     metadata: {
-      stage: 'SUMMARY',
+      stage: 'SUMMARY' as const,
       summary,
       multimodalEngagement: {
         voice: multimodalData.audioContext.length > 0,

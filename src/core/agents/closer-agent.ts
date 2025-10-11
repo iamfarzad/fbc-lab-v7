@@ -96,7 +96,7 @@ STYLE: Confident, direct, use their own experience as the close`
     agent: 'Closer Agent',
     model: 'gemini-2.5-flash',
     metadata: {
-      stage: 'CLOSING',
+      stage: 'CLOSING' as const,
       objectionHandled: true,
       multimodalProofUsed: multimodalContext?.hasRecentAudio || multimodalContext?.hasRecentImages
     }

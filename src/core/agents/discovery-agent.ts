@@ -88,7 +88,7 @@ ${conversationFlow?.shouldOfferRecap
     agent: 'Discovery Agent',
     model: 'gemini-2.5-flash',
     metadata: {
-      stage: 'DISCOVERY',
+      stage: 'DISCOVERY' as const,
       categoriesCovered: conversationFlow 
         ? Object.values(conversationFlow.covered).filter(Boolean).length 
         : 0,

@@ -96,7 +96,7 @@ STYLE: Executive-level, ROI-focused, direct`
     agent: 'Consulting Sales Agent',
     model: 'gemini-2.5-flash',
     metadata: {
-      stage: 'CONSULTING_PITCH',
+      stage: 'CONSULTING_PITCH' as const,
       pitchDelivered: true,
       multimodalReferenced: multimodalContext?.hasRecentImages || false
     }

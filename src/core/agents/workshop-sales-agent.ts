@@ -95,7 +95,7 @@ STYLE: Conversational, no fluff, focus on value`
     agent: 'Workshop Sales Agent',
     model: 'gemini-2.5-flash',
     metadata: {
-      stage: 'WORKSHOP_PITCH',
+      stage: 'WORKSHOP_PITCH' as const,
       pitchDelivered: true,
       multimodalReferenced: multimodalContext?.hasRecentImages || false
     }

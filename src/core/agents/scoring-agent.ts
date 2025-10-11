@@ -122,7 +122,7 @@ OUTPUT REQUIRED (JSON only, no explanation):
     agent: 'Scoring Agent',
     model: 'gemini-2.5-flash',
     metadata: {
-      stage: 'SCORING',
+      stage: 'SCORING' as const,
       leadScore: scores.leadScore,
       fitScore: scores.fitScore,
       reasoning: scores.reasoning
