@@ -16,59 +16,24 @@ export async function adminAgent(
     adminId?: string
   }
 ) {
-  // Get recent conversations for context with timeout protection
+  // Get recent conversations for context
   let recentConversations: any[] = []
-  let dbStatus = 'unknown'
-  
   try {
-    // Add timeout protection for Supabase query
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Database query timeout after 5 seconds')), 5000)
-    })
-    
-    const queryPromise = supabaseService
+    const { data } = await supabaseService
       .from('conversations')
       .select('id, name, email, summary, lead_score, research_json, created_at')
       .order('created_at', { ascending: false })
       .limit(10)
 
-    const { data } = await Promise.race([queryPromise, timeoutPromise]) as any
     recentConversations = data || []
-    dbStatus = 'connected'
-    
   } catch (error) {
     console.warn('Failed to load conversations for admin agent:', error)
-    dbStatus = 'failed'
-    
-    // Provide mock data when database fails
-    recentConversations = [
-      {
-        id: 'mock-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        summary: 'Interested in AI dashboard solutions',
-        lead_score: 85,
-        research_json: null,
-        created_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
-      },
-      {
-        id: 'mock-2',
-        name: 'Jane Smith',
-        email: 'jane@company.com',
-        summary: 'Exploring workflow automation',
-        lead_score: 92,
-        research_json: null,
-        created_at: new Date(Date.now() - 172800000).toISOString() // 2 days ago
-      }
-    ]
   }
 
   const systemPrompt = `You are F.B/c Admin AI - Farzad Bayat's business intelligence assistant.
 
 YOUR ROLE:
 Help Farzad understand leads, draft follow-ups, and prioritize opportunities.
-
-DATABASE STATUS: ${dbStatus === 'connected' ? '✅ Connected to live database' : '⚠️ Using sample data (database unavailable)'}
 
 YOU HAVE ACCESS TO:
 ${recentConversations.length > 0 ? `Recent conversations (${recentConversations.length}):
@@ -77,11 +42,6 @@ ${i+1}. ${c.name} (${c.email}) - Score: ${c.lead_score || 'N/A'}/100
    Summary: ${c.summary?.substring(0, 150) || 'No summary'}...
    Date: ${new Date(c.created_at).toLocaleDateString()}
 `).join('\n')}` : 'No recent conversations'}
-
-${dbStatus === 'failed' ? `
-NOTE: Database connection failed - showing sample data.
-You can still provide insights and draft emails based on the sample conversations above.
-` : ''}
 
 CAPABILITIES:
 1. Search conversations: "Show me healthcare leads from last week"
@@ -116,9 +76,7 @@ If insight: Summary with key metrics`
     model: 'gemini-2.5-pro',
     metadata: {
       stage: 'ADMIN' as const,
-      conversationsAnalyzed: recentConversations.length,
-      databaseStatus: dbStatus,
-      usingMockData: dbStatus === 'failed'
+      conversationsAnalyzed: recentConversations.length
     }
   }
 }

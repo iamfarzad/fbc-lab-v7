@@ -35,4 +35,3 @@ export type {
   MultimodalContextData,
   ChatMessage
 } from './types'
-

@@ -107,4 +107,3 @@ function calculateInitialFitScore(research: any): { workshop: number; consulting
 
   return { workshop: workshopFit, consulting: consultingFit }
 }
-

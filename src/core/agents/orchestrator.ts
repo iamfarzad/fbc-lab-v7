@@ -71,8 +71,7 @@ export async function routeToAgent({
   const stage = determineFunnelStage({
     conversationFlow: context.conversationFlow,
     intelligenceContext: context.intelligenceContext,
-    trigger,
-    mode: context.mode
+    trigger
   })
 
   // Build enhanced context for agent
@@ -102,8 +101,7 @@ export async function routeToAgent({
         const nextStage = determineFunnelStage({
           conversationFlow: context.conversationFlow,
           intelligenceContext: context.intelligenceContext,
-          trigger,
-          mode: context.mode
+          trigger
         })
         if (nextStage !== 'SCORING') {
           // Re-route to sales agent
@@ -186,16 +184,14 @@ export async function routeToAgent({
 function determineFunnelStage({
   conversationFlow,
   intelligenceContext,
-  trigger,
-  mode
+  trigger
 }: {
   conversationFlow?: any
   intelligenceContext?: any
   trigger?: string
-  mode?: string
 }): FunnelStage {
-  // Admin queries - check both trigger and mode
-  if (trigger === 'admin' || mode === 'admin') return 'ADMIN'
+  // Admin queries
+  if (trigger === 'admin') return 'ADMIN'
 
   // Conversation ended
   if (trigger === 'conversation_end') return 'SUMMARY'

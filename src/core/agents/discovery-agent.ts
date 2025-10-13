@@ -109,4 +109,3 @@ Total user turns: ${flow.totalUserTurns || 0}
 ${flow.recommendedNext ? `Next recommended: ${flow.recommendedNext}` : 'All categories covered'}
 `
 }
-

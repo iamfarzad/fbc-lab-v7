@@ -126,4 +126,3 @@ function formatDiscoveryStatus(flow: any): string {
     `${cat}: ${flow.covered[cat] ? '✅ Covered' : '❌ Not covered'}`
   ).join('\n')
 }
-

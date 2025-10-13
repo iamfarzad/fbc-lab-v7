@@ -132,4 +132,3 @@ function calculateSendTime(scenario: string): string {
       return now.toISOString()
   }
 }
-

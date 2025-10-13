@@ -101,4 +101,3 @@ STYLE: Executive-level, ROI-focused, direct`
     }
   }
 }
-
