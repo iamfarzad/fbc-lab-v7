@@ -73,6 +73,7 @@ docs/
 project-tasks/
 cookies.txt
 supabase/.temp/
+app/chat-ui-test/
 
-# Environment examples (already have .env.example in repo)
+# Environment examples (production-specific)
 .env.production
