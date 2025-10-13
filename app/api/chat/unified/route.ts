@@ -18,6 +18,7 @@ import { multimodalContextManager } from '@/core/context/multimodal-context'
 import { routeToAgent } from '@/core/agents'
 import { GoogleGroundingProvider } from '@/core/intelligence/providers/search/google-grounding'
 import { ContextStorage } from '@/core/context/context-storage'
+import type { AgentContext } from '@/core/agents/types'
 
 // Type definitions
 interface ChatMessage {
@@ -835,7 +836,7 @@ Citations: ${researchResult.allCitations.length} sources processed
       // STREAMING (SSE) via Multi-Agent Orchestrator (single-chunk stream)
       if (multiAgentEnabled) {
         const agentMessages = messages as any // Same shape: { role, content }
-        const agentContext = {
+        const agentContext: AgentContext = {
           sessionId: context?.sessionId || 'unknown',
           intelligenceContext: context?.intelligenceContext ? {
             email: context.intelligenceContext.lead?.email || '',
@@ -846,7 +847,7 @@ Citations: ${researchResult.allCitations.length} sources processed
               ...context.intelligenceContext.person
             } : undefined
           } : undefined,
-          conversationFlow: context?.conversationFlow,
+          conversationFlow: context?.conversationFlow as any,
           mode,
           voiceActive: mode === 'realtime'
         }
@@ -1160,7 +1161,7 @@ Citations: ${researchResult.allCitations.length} sources processed
       // NON-STREAMING response path
       if (multiAgentEnabled) {
         const agentMessages = aiMessages as any
-        const agentContext = {
+        const agentContext: AgentContext = {
           sessionId: context?.sessionId || 'unknown',
           intelligenceContext: context?.intelligenceContext ? {
             email: context.intelligenceContext.lead?.email || '',
@@ -1171,7 +1172,7 @@ Citations: ${researchResult.allCitations.length} sources processed
               ...context.intelligenceContext.person
             } : undefined
           } : undefined,
-          conversationFlow: context?.conversationFlow,
+          conversationFlow: context?.conversationFlow as any,
           mode,
           voiceActive: mode === 'realtime'
         }
