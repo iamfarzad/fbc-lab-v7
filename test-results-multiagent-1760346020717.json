@@ -1,0 +1,212 @@
+{
+  "timestamp": "2025-10-13T08:59:40.345Z",
+  "agentTests": {
+    "discovery": {
+      "Initial greeting": {
+        "passed": true,
+        "validations": {
+          "hasContent": true,
+          "correctAgent": true,
+          "correctStage": true,
+          "hasMetadata": true
+        },
+        "response": {
+          "agent": "Discovery Agent",
+          "stage": "DISCOVERY",
+          "contentLength": 130,
+          "metadata": {
+            "mode": "standard",
+            "tokensUsed": 0,
+            "reqId": "test-1760345994666-z7fudwa8t",
+            "contextUsage": {
+              "usedTokens": 32,
+              "maxTokens": 8192,
+              "usage": 0.00390625,
+              "modelId": "gemini-flash-latest"
+            },
+            "agent": "Discovery Agent",
+            "stage": "DISCOVERY"
+          }
+        }
+      },
+      "Goals category": {
+        "passed": false,
+        "validations": {
+          "hasContent": true,
+          "correctAgent": true,
+          "correctStage": true,
+          "hasMetadata": true,
+          "categoriesCovered": false
+        },
+        "response": {
+          "agent": "Discovery Agent",
+          "stage": "DISCOVERY",
+          "contentLength": 115,
+          "metadata": {
+            "mode": "standard",
+            "tokensUsed": 0,
+            "reqId": "test-1760345997332-yvj7ynz75",
+            "contextUsage": {
+              "usedTokens": 28,
+              "maxTokens": 8192,
+              "usage": 0.00341796875,
+              "modelId": "gemini-flash-latest"
+            },
+            "agent": "Discovery Agent",
+            "stage": "DISCOVERY"
+          }
+        }
+      }
+    },
+    "scoring": {
+      "Transition to scoring": {
+        "passed": true,
+        "validations": {
+          "hasContent": true,
+          "correctAgent": true,
+          "correctStage": true,
+          "hasMetadata": true
+        },
+        "response": {
+          "agent": "Scoring Agent",
+          "stage": "SCORING",
+          "contentLength": 277,
+          "metadata": {
+            "mode": "standard",
+            "tokensUsed": 0,
+            "reqId": "test-1760346001455-pee0bxg5h",
+            "contextUsage": {
+              "usedTokens": 69,
+              "maxTokens": 8192,
+              "usage": 0.0084228515625,
+              "modelId": "gemini-flash-latest"
+            },
+            "agent": "Scoring Agent",
+            "stage": "SCORING"
+          }
+        }
+      }
+    },
+    "workshopSales": {
+      "Workshop pitch": {
+        "passed": true,
+        "validations": {
+          "hasContent": true,
+          "correctAgent": true,
+          "correctStage": true,
+          "hasMetadata": true
+        },
+        "response": {
+          "agent": "Workshop Sales Agent",
+          "stage": "WORKSHOP_PITCH",
+          "contentLength": 350,
+          "metadata": {
+            "mode": "standard",
+            "tokensUsed": 0,
+            "reqId": "test-1760346007908-0qfioxms2",
+            "contextUsage": {
+              "usedTokens": 87,
+              "maxTokens": 8192,
+              "usage": 0.0106201171875,
+              "modelId": "gemini-flash-latest"
+            },
+            "agent": "Workshop Sales Agent",
+            "stage": "WORKSHOP_PITCH"
+          }
+        }
+      }
+    },
+    "consultingSales": {
+      "Consulting pitch": {
+        "passed": true,
+        "validations": {
+          "hasContent": true,
+          "correctAgent": true,
+          "correctStage": true,
+          "hasMetadata": true
+        },
+        "response": {
+          "agent": "Consulting Sales Agent",
+          "stage": "CONSULTING_PITCH",
+          "contentLength": 324,
+          "metadata": {
+            "mode": "standard",
+            "tokensUsed": 0,
+            "reqId": "test-1760346012357-w1mg5clgp",
+            "contextUsage": {
+              "usedTokens": 81,
+              "maxTokens": 8192,
+              "usage": 0.0098876953125,
+              "modelId": "gemini-flash-latest"
+            },
+            "agent": "Consulting Sales Agent",
+            "stage": "CONSULTING_PITCH"
+          }
+        }
+      }
+    },
+    "admin": {
+      "Admin query": {
+        "passed": false,
+        "validations": {
+          "hasContent": true,
+          "correctAgent": false,
+          "correctStage": false,
+          "hasMetadata": true
+        },
+        "response": {
+          "agent": "Discovery Agent",
+          "stage": "DISCOVERY",
+          "contentLength": 119,
+          "metadata": {
+            "mode": "admin",
+            "tokensUsed": 0,
+            "reqId": "test-1760346015547-jgsfndkdy",
+            "contextUsage": {
+              "usedTokens": 29,
+              "maxTokens": 8192,
+              "usage": 0.0035400390625,
+              "modelId": "gemini-flash-latest"
+            },
+            "agent": "Discovery Agent",
+            "stage": "DISCOVERY"
+          }
+        }
+      }
+    }
+  },
+  "orchestratorTests": {
+    "Discovery routing": {
+      "passed": true,
+      "expected": "DISCOVERY",
+      "actual": "DISCOVERY"
+    },
+    "Scoring routing": {
+      "passed": true,
+      "expected": "SCORING",
+      "actual": "SCORING"
+    }
+  },
+  "apiIntegrationTests": {
+    "streaming": {
+      "passed": "Discovery Agent",
+      "agentUsed": "Discovery Agent",
+      "funnelStage": "DISCOVERY",
+      "contentType": "text/event-stream; charset=utf-8"
+    }
+  },
+  "featureFlagTests": {
+    "multiAgentEnabled": {
+      "passed": "DISCOVERY",
+      "agentUsed": "Discovery Agent",
+      "funnelStage": "DISCOVERY",
+      "hasContent": true
+    }
+  },
+  "summary": {
+    "total": 10,
+    "passed": 8,
+    "failed": 2,
+    "errors": []
+  }
+}

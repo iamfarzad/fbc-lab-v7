@@ -18,10 +18,20 @@ class AudioProcessor extends AudioWorkletProcessor {
         if (this.bufferIndex >= this.bufferSize) {
           // Convert Float32 (-1.0 to 1.0) to Int16 (-32768 to 32767)
           const int16Buffer = new Int16Array(this.bufferSize);
-          for (let j = 0; j < this.bufferSize; j++) {
-            const s = Math.max(-1, Math.min(1, this.buffer[j]));
-            int16Buffer[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-          }
+      // Simple noise gate + soft DC removal before PCM16 conversion
+      let last = 0;
+      const gate = 0.008; // ~-42 dB
+      const hp = 0.995;   // one-pole high-pass coefficient
+      for (let j = 0; j < this.bufferSize; j++) {
+        let s = Math.max(-1, Math.min(1, this.buffer[j]));
+        // 1) Noise gate
+        if (Math.abs(s) < gate) s = 0;
+        // 2) Very light DC removal (high-pass)
+        const hpOut = s - last + hp * (last || 0);
+        last = s;
+        const v = Math.max(-1, Math.min(1, hpOut));
+        int16Buffer[j] = v < 0 ? v * 0x8000 : v * 0x7FFF;
+      }
           
           // Send the buffer to the main thread
           this.port.postMessage({

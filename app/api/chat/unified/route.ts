@@ -15,6 +15,7 @@ if (process.env.GEMINI_API_KEY) {
   // Google SDK is configured via environment variable
 }
 import { multimodalContextManager } from '@/core/context/multimodal-context'
+import { routeToAgent } from '@/core/agents'
 import { GoogleGroundingProvider } from '@/core/intelligence/providers/search/google-grounding'
 import { ContextStorage } from '@/core/context/context-storage'
 
@@ -425,7 +426,8 @@ Here is your mock response with enriched metadata.
       'X-Enhanced-Research': researchMetadata ? 'true' : 'false',
       'x-mock-system-prompt': (() => {
         const sanitized = systemPrompt.replace(/[\r\n]+/g, ' ')
-        return sanitized.slice(Math.max(0, sanitized.length - 1024))
+        const asciiOnly = sanitized.replace(/[^\x00-\x7F]+/g, '?')
+        return asciiOnly.slice(Math.max(0, asciiOnly.length - 1024))
       })()
     }
   })
@@ -811,6 +813,14 @@ Citations: ${researchResult.allCitations.length} sources processed
       }, { status: 400 })
     }
 
+    // Feature flag for multi-agent orchestrator
+    const multiAgentEnabled = (() => {
+      const flag = process.env.ENABLE_MULTI_AGENT
+      if (!flag) return false
+      const normalized = flag.toLowerCase()
+      return normalized === '1' || normalized === 'true' || normalized === 'yes'
+    })()
+
     // Handle streaming vs non-streaming
     if (stream !== false) {
       if (isMockUnifiedChat) {
@@ -819,6 +829,74 @@ Citations: ${researchResult.allCitations.length} sources processed
           mode,
           researchMetadata,
           systemPrompt
+        })
+      }
+
+      // STREAMING (SSE) via Multi-Agent Orchestrator (single-chunk stream)
+      if (multiAgentEnabled) {
+        const agentMessages = messages as any // Same shape: { role, content }
+        const agentContext = {
+          sessionId: context?.sessionId || 'unknown',
+          intelligenceContext: context?.intelligenceContext ? {
+            email: context.intelligenceContext.lead?.email || '',
+            name: context.intelligenceContext.lead?.name || '',
+            ...context.intelligenceContext,
+            person: context.intelligenceContext.person ? {
+              fullName: context.intelligenceContext.person.role || '',
+              ...context.intelligenceContext.person
+            } : undefined
+          } : undefined,
+          conversationFlow: context?.conversationFlow,
+          mode,
+          voiceActive: mode === 'realtime'
+        }
+
+        const agentResult = await routeToAgent({
+          messages: agentMessages,
+          context: agentContext,
+          trigger: mode === 'realtime' ? 'voice' : 'chat'
+        })
+
+        const encoder = new TextEncoder()
+        const messageId = crypto.randomUUID()
+
+        const stream = new ReadableStream({
+          start(controller) {
+            const metaEvent = `event: meta\ndata: ${JSON.stringify({ reqId, type: 'meta' })}\n\n`
+            controller.enqueue(encoder.encode(metaEvent))
+
+            const messageData = {
+              id: messageId,
+              role: 'assistant' as const,
+              content: agentResult.output,
+              timestamp: new Date().toISOString(),
+              type: 'text' as const,
+              metadata: {
+                mode,
+                isStreaming: true,
+                reqId,
+                agent: agentResult.agent,
+                stage: agentResult.metadata?.stage
+              }
+            }
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(messageData)}\n\n`))
+            controller.close()
+          }
+        })
+
+        return new NextResponse(stream as any, {
+          headers: {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            'X-Accel-Buffering': 'no',
+            'x-fbc-endpoint': 'unified-ai-sdk',
+            'x-request-id': reqId,
+            'X-Chat-Mode': mode ?? 'standard',
+            'X-Session-Id': context?.sessionId || 'unknown',
+            'X-Agent-Used': agentResult.agent,
+            'X-Funnel-Stage': agentResult.metadata?.stage || ''
+          }
         })
       }
       // For streaming, use direct Google model (ai-retry doesn't support streaming)
@@ -1075,6 +1153,58 @@ Citations: ${researchResult.allCitations.length} sources processed
             'x-fbc-endpoint': 'unified-ai-sdk',
             'x-request-id': reqId,
             'X-Enhanced-Research': researchMetadata ? 'true' : 'false'
+          }
+        })
+      }
+
+      // NON-STREAMING response path
+      if (multiAgentEnabled) {
+        const agentMessages = aiMessages as any
+        const agentContext = {
+          sessionId: context?.sessionId || 'unknown',
+          intelligenceContext: context?.intelligenceContext ? {
+            email: context.intelligenceContext.lead?.email || '',
+            name: context.intelligenceContext.lead?.name || '',
+            ...context.intelligenceContext,
+            person: context.intelligenceContext.person ? {
+              fullName: context.intelligenceContext.person.role || '',
+              ...context.intelligenceContext.person
+            } : undefined
+          } : undefined,
+          conversationFlow: context?.conversationFlow,
+          mode,
+          voiceActive: mode === 'realtime'
+        }
+
+        const agentResult = await routeToAgent({
+          messages: agentMessages,
+          context: agentContext,
+          trigger: mode === 'realtime' ? 'voice' : 'chat'
+        })
+
+        const structuredMetadata = parseStructuredResponse(agentResult.output)
+
+        return NextResponse.json({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: agentResult.output,
+          timestamp: new Date().toISOString(),
+          type: 'text',
+          metadata: {
+            mode,
+            tokensUsed: 0,
+            reqId,
+            ...structuredMetadata,
+            agent: agentResult.agent,
+            stage: agentResult.metadata?.stage
+          }
+        }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+            'x-fbc-endpoint': 'unified-ai-sdk',
+            'x-request-id': reqId,
+            'X-Agent-Used': agentResult.agent,
+            'X-Funnel-Stage': agentResult.metadata?.stage || ''
           }
         })
       }

@@ -94,6 +94,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const callbacksRef = useRef(options);
   const isSessionActiveRef = useRef(false);
   const pendingChunksRef = useRef<MediaRecorderVoiceResult[]>([]);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
 
   useEffect(() => {
     callbacksRef.current = options;
@@ -370,6 +372,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         console.log('🎤 [RealtimeVoice] WebSocket opened successfully');
         setSocketReady(true);
         setError(null);
+        reconnectAttemptsRef.current = 0; // Reset on successful connection
       };
 
       socket.onmessage = (event) => {
@@ -392,11 +395,25 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         setSocketReady(false);
         resetState({ soft: true });
 
+        // Check if we should attempt reconnection
+        if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+          const msg = 'Failed to connect to voice server after multiple attempts. Please check if the server is running.';
+          console.error('🎤 [RealtimeVoice] Max reconnection attempts reached');
+          setError(msg);
+          callbacksRef.current?.onError?.(msg);
+          return;
+        }
+
         if (!reconnectTimerRef.current) {
+          reconnectAttemptsRef.current++;
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 16000);
+          console.log(`🎤 [RealtimeVoice] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+          
           reconnectTimerRef.current = setTimeout(() => {
             reconnectTimerRef.current = null;
             connectWebSocket();
-          }, 1500);
+          }, delay);
         }
       };
     } catch (err) {

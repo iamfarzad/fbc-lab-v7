@@ -88,17 +88,15 @@ export class AudioRecorder extends EventEmitter {
       this.recordingWorklet = new AudioWorkletNode(this.audioContext, 'audio-processor');
       console.log('🎤 [AudioRecorder] Audio worklet node created');
       
-      // Handle audio data from worklet
+      // Handle audio data from worklet (supports PCM16 or Float32 fallback)
       this.recordingWorklet.port.onmessage = (event) => {
-        if (event.data.type === 'audioData') {
-          const arrayBuffer = event.data.data.int16arrayBuffer;
-          if (!arrayBuffer) {
-            console.error('❌ [AudioRecorder] No int16arrayBuffer in worklet message!', event.data);
-            return;
-          }
+        if (event.data.type !== 'audioData') return;
+        const payload = event.data?.data;
+
+        // Preferred: PCM16 from worklet
+        if (payload && payload.int16arrayBuffer instanceof ArrayBuffer) {
+          const arrayBuffer = payload.int16arrayBuffer as ArrayBuffer;
           const base64 = this.arrayBufferToBase64(arrayBuffer);
-          
-          // Log sample verification periodically (every ~5 seconds at 4096 samples/256ms)
           if (Math.random() < 0.02) {
             console.log('🎤 [AudioRecorder] Sending audio chunk:', {
               declaredRate: 16000,
@@ -107,9 +105,24 @@ export class AudioRecorder extends EventEmitter {
               base64Length: base64.length
             });
           }
-          
           this.emit('data', base64);
+          return;
         }
+
+        // Fallback: older worklet posted Float32Array directly
+        if (payload && (payload instanceof Float32Array || (payload?.buffer instanceof ArrayBuffer && payload?.BYTES_PER_ELEMENT === 4))) {
+          const float32 = payload instanceof Float32Array ? payload : new Float32Array(payload.buffer);
+          const pcm16 = new Int16Array(float32.length);
+          for (let i = 0; i < float32.length; i++) {
+            const s = Math.max(-1, Math.min(1, float32[i]));
+            pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+          }
+          const base64 = this.arrayBufferToBase64(pcm16.buffer);
+          this.emit('data', base64);
+          return;
+        }
+
+        console.warn('🎤 [AudioRecorder] Unrecognized worklet payload shape', payload);
       };
       
       // Connect audio nodes
@@ -180,4 +193,3 @@ export class AudioRecorder extends EventEmitter {
     return this.isActive;
   }
 }
-

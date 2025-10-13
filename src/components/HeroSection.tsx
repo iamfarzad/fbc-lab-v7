@@ -16,7 +16,7 @@ export function HeroSection({ className, ...props }: HeroSectionProps) {
       {/* Animated Background */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Subtle Grid Overlay */}
-        <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 opacity-[0.16] dark:opacity-[0.24] [.monochrome_&]:opacity-[0.28]">
           <div 
             className="absolute inset-0 bg-dotted"
             style={{
@@ -144,8 +144,16 @@ export function HeroSection({ className, ...props }: HeroSectionProps) {
           />
         </div>
         
-        {/* Subtle Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-background/50 via-transparent to-background/30" />
+        {/* Subtle Gradient Overlay (slightly stronger for contrast across themes) */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background/70 via-transparent to-background/50 dark:from-background/80 dark:to-background/60 [.monochrome_&]:from-background/90 [.monochrome_&]:to-background/70" />
+
+        {/* Radial vignette using foreground tint for subtle depth */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `radial-gradient(1200px 600px at 50% 10%, transparent 0%, transparent 40%, hsl(var(--foreground) / 0.06) 100%)`
+          }}
+        />
       </div>
       
       <div className="max-w-5xl mx-auto text-center relative z-10">

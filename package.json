@@ -40,6 +40,7 @@
     "dev:all": "pnpm concurrently \"pnpm dev\" \"pnpm --dir server dev\"",
     "dev:all:clean": "rm -rf .next && pnpm dev:all",
     "logs": "tsx scripts/tail-logs.ts",
+    "logs:view": "node scripts/view-logs.cjs",
     "logs:start": "tsx scripts/start-collectors.ts",
     "logs:ws": "tsx scripts/tail-logs.ts --services=websocket",
     "logs:errors": "tsx scripts/tail-logs.ts --level=error",

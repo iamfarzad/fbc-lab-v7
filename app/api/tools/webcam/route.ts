@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache';
+import { logJsonl } from '@/src/lib/jsonl-logger';
 import { createHash } from 'crypto';
 
 // Create a cached function for webcam analysis (30 min TTL)
@@ -15,8 +16,10 @@ const cachedAnalyzeImage = createCachedFunction(
 
     try {
       const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Prefer explicit v1beta model names with required "models/" prefix
+      const model = process.env.WEB_VISION_MODEL || 'models/gemini-2.0-flash';
       const result = await genAI.models.generateContent({
-        model: 'gemini-2.0-flash-latest',
+        model,
         contents: [{
           role: 'user',
           parts: [
@@ -51,6 +54,7 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('webcamCapture') as File;
     if (!file) {
+      logJsonl('webcam', 'missing_file')
       return NextResponse.json({ error: 'No webcam capture provided' }, { status: 400 });
     }
 
@@ -62,14 +66,17 @@ export async function POST(req: NextRequest) {
     const imageHash = generateImageHash(buffer);
 
     console.log('📷 Analyzing webcam image with hash:', imageHash);
+    logJsonl('webcam', 'received', { hash: imageHash, bytes: buffer.byteLength, mimeType })
 
     // Use cached analysis
     const result = await cachedAnalyzeImage(imageHash, base64, mimeType);
+    logJsonl('webcam', 'analysis_complete', { hash: imageHash, analysisChars: result?.analysis?.length || 0 })
 
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Analysis failed';
     console.error('❌ [Webcam] Analysis error:', message);
+    logJsonl('webcam', 'error', { message })
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

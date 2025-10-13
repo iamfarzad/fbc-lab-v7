@@ -1,0 +1,120 @@
+================================================================================
+  VOICE/WEBCAM/SCREENSHARE RECOVERY - QUICK GUIDE
+================================================================================
+
+WORKING CODE FOUND AT: Commit 8d97985 (October 7th, 2025 20:53:56)
+
+STATUS: Voice ✓ | Webcam ✓ | Screen Share ✓
+
+BROKEN BY: Commit 4d3f417 (October 9th) - useMediaRecorderVoice hook refactor
+
+================================================================================
+
+FASTEST RECOVERY (2 minutes):
+
+  $ ./scripts/recover-working-version.sh
+  $ pnpm dev:all
+  
+  Done! Test voice/webcam/screenshare
+
+================================================================================
+
+MANUAL RECOVERY (5 minutes):
+
+  $ git checkout -b backup/current-state
+  $ git checkout -b recovery/oct7-working
+  
+  $ git checkout 8d97985 -- \
+      src/hooks/useRealtimeVoice.ts \
+      src/lib/audio-recorder.ts \
+      src/lib/audio-streamer.ts \
+      src/components/chat/components/*PopoverSection.tsx \
+      src/components/chat/components/MediaPopover.tsx
+  
+  $ rm src/hooks/useMediaRecorderVoice.ts
+  
+  $ git commit -m "fix: Restore working voice/webcam/screen from Oct 7th"
+  $ pnpm dev:all
+
+================================================================================
+
+FILES TO RESTORE:
+  ✓ src/hooks/useRealtimeVoice.ts
+  ✓ src/lib/audio-recorder.ts  
+  ✓ src/lib/audio-streamer.ts
+  ✓ src/components/chat/components/VoicePopoverSection.tsx
+  ✓ src/components/chat/components/CameraPopoverSection.tsx
+  ✓ src/components/chat/components/ScreenPopoverSection.tsx
+  ✓ src/components/chat/components/MediaPopover.tsx
+
+FILES TO REMOVE:
+  ✗ src/hooks/useMediaRecorderVoice.ts (causes re-render loops)
+
+================================================================================
+
+WHY IT BROKE:
+
+  Oct 7th (WORKING):    AudioRecorder class → EventEmitter → WebSocket
+                        Simple, direct, ~200 lines
+  
+  Oct 9th (BROKEN):     useMediaRecorderVoice hook → Multiple state → 
+                        Re-render loops → Race conditions
+                        Complex, indirect, ~450 lines
+
+  Root Cause:           Unnecessary hook wrapper broke simple working code
+
+================================================================================
+
+DOCUMENTATION:
+
+  1. RECOVERY_SUMMARY.md           - Executive summary (this info + more)
+  2. WORKING_CODE_RECOVERY_REPORT.md - Full investigation report
+  3. CODE_COMPARISON_OCT7_VS_CURRENT.md - Side-by-side code analysis
+  4. scripts/recover-working-version.sh - Automated recovery script
+
+================================================================================
+
+TESTING AFTER RECOVERY:
+
+  Voice:
+    ☐ Mic button works
+    ☐ Permission prompt (once only)
+    ☐ Recording stays active
+    ☐ No auto-closing
+    ☐ Clean stop/start
+  
+  Webcam:
+    ☐ Camera button works
+    ☐ Video preview shows
+    ☐ Can capture frames
+  
+  Screen Share:
+    ☐ Share button works
+    ☐ Screen picker appears
+    ☐ Can capture screenshots
+
+================================================================================
+
+MERGE TO MAIN (after testing):
+
+  $ git checkout main
+  $ git merge recovery/oct7-working-version
+  $ git push
+
+================================================================================
+
+ROLLBACK IF NEEDED:
+
+  $ git checkout backup/pre-recovery-YYYYMMDD-HHMMSS
+
+================================================================================
+
+SUPABASE INVESTIGATION RESULT:
+  
+  ✗ No activity data found for October 6-8, 2025
+  ✗ Database essentially empty
+  ✓ Used git history instead (successful)
+
+================================================================================
+
+

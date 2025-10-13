@@ -5,6 +5,7 @@ const customJestConfig = {
     // Handle module aliases (this will be automatically configured for you based on your tsconfig.json paths)
     '^@/app/(.*)$': '<rootDir>/app/$1',
     '^@/core/(.*)$': '<rootDir>/src/core/$1',
+    '^@/src/(.*)$': '<rootDir>/src/$1',
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   testEnvironment: 'jest-environment-jsdom',

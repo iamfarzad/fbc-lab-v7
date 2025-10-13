@@ -1,0 +1,2 @@
+{"ts":"2025-10-11T14:55:55.225Z","category":"screen","event":"received","data":{"bytes":43271,"trigger":"unknown","hasImage":true,"model":"models/gemini-2.5-flash"}}
+{"ts":"2025-10-11T14:56:06.876Z","category":"screen","event":"analysis_complete","data":{"bytes":43271,"chars":18,"model":"gemini-2.5-flash"}}

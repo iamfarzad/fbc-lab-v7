@@ -8,6 +8,7 @@ import { ScreenShareSchema } from '@/src/core/services/tool-service'
 import { recordCapabilityUsed } from '@/src/core/context/capabilities'
 import { multimodalContextManager } from '@/src/core/context/multimodal-context'
 import { APIErrorHandler, rateLimiter, performanceMonitor } from '@/src/core/api/error-handler'
+import { logJsonl } from '@/src/lib/jsonl-logger'
 
 
 export async function POST(req: NextRequest) {
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
     const userId = req.headers.get('x-user-id') || undefined
 
     if (!process.env.GEMINI_API_KEY) {
+      logJsonl('screen', 'received', { bytes: image?.length || 0, trigger: context?.trigger || 'unknown', hasImage: Boolean(image) })
       // Return mock response for testing
       const response = { success: true, output: {
         analysis: "Screen analysis completed (mock mode).",
@@ -79,6 +81,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      logJsonl('screen', 'analysis_complete', { bytes: image?.length || 0, mock: true, chars: response.output.analysis.length })
       return NextResponse.json(response, { status: 200 })
     }
 
@@ -114,8 +117,11 @@ export async function POST(req: NextRequest) {
 
       const optimizedConfig = createOptimizedConfig('analysis', { maxOutputTokens: 1024, temperature: 0.3, topP: 0.8, topK: 40 })
 
+      // Ensure required v1beta prefix for model names
+      const model = modelName?.startsWith('models/') ? modelName : `models/${modelName}`
+      logJsonl('screen', 'received', { bytes: image?.length || 0, trigger: context?.trigger || 'unknown', hasImage: Boolean(image), model })
       const result = await genAI.models.generateContent({
-        model: modelName,
+        model,
         config: optimizedConfig,
         contents: [{ role: 'user', parts: [ { text: analysisPrompt }, { inlineData: { mimeType: 'image/jpeg', data: image.split(',')[1] } } ] }],
 
@@ -124,6 +130,7 @@ export async function POST(req: NextRequest) {
 
     } catch (e) {
       console.error('Screen analysis generation failed:', e)
+      logJsonl('screen', 'error', { message: e instanceof Error ? e.message : String(e) })
       return NextResponse.json({ ok: false, error: 'AI analysis failed' }, { status: 500 })
 
     }
@@ -165,6 +172,7 @@ export async function POST(req: NextRequest) {
       model: modelName
     })
 
+    logJsonl('screen', 'analysis_complete', { bytes: image?.length || 0, chars: analysisResult.length, model: modelName })
     return NextResponse.json(response, { status: 200 })
   } catch (error: unknown) {
     // 📊 Performance Monitoring: Complete failed operation
@@ -183,6 +191,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 🚨 Enhanced Error Handling
+    logJsonl('screen', 'error', { message: (error as any)?.message || 'UNKNOWN_ERROR' })
     return APIErrorHandler.createErrorResponse(error)
   }
 }

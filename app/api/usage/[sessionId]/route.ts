@@ -3,10 +3,10 @@ import { usageLimiter } from '@/src/lib/usage-limits';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    const sessionId = params.sessionId;
+    const { sessionId } = await params;
     const usage = await usageLimiter.getUsage(sessionId);
     
     if (!usage) {
@@ -19,4 +19,3 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to fetch usage' }, { status: 500 });
   }
 }
-

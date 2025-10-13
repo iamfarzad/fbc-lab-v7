@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SpeechClient } from '@google-cloud/speech';
+import { logJsonl } from '@/src/lib/jsonl-logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -7,6 +8,7 @@ export async function POST(request: NextRequest) {
     const audioFile = formData.get('audio') as File;
 
     if (!audioFile || audioFile.size === 0) {
+      logJsonl('transcribe', 'missing_audio')
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
 
@@ -28,9 +30,16 @@ export async function POST(request: NextRequest) {
       ?.map((result) => result.alternatives[0]?.transcript)
       ?.join('\n') || 'No speech detected';
 
+    logJsonl('transcribe', 'success', {
+      size: audioFile.size,
+      mime: audioFile.type || 'unknown',
+      chars: transcription.length,
+    })
+
     return NextResponse.json({ transcription });
   } catch (error: any) {
     console.error('Transcription error:', error);
+    logJsonl('transcribe', 'error', { message: error?.message || 'Internal server error' })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -671,19 +671,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
   };
 
   const renderResearchStatus = () => {
-    if (!intelligenceHook.sessionId) return null;
-
-    return (
-      <div className="mx-auto w-full max-w-3xl px-6 sm:px-10 pb-6">
-        <div className="flex items-center gap-3 rounded-full border border-border/40 bg-card/80 px-5 py-3 text-xs text-muted-foreground shadow-chat">
-          <div className="h-2 w-2 animate-pulse rounded-full bg-[hsl(var(--accent))]" />
-          <span className="tracking-[0.35em] uppercase">Enhanced Research Active</span>
-          <Badge variant="secondary" className="ml-auto text-[10px] tracking-[0.3em] uppercase">
-            Auto-grounding
-          </Badge>
-        </div>
-      </div>
-    );
+    return null;
   };
 
   const renderVoiceProcessingBanner = () => {
