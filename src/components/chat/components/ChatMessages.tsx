@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ai-elements/core/loader";
@@ -160,6 +161,14 @@ interface ChatMessagesProps {
   onAcceptTerms?: () => void;
 }
 
+const STREAMING_PHRASES = [
+  "Streaming",
+  "Processing",
+  "Analyzing",
+  "Generating",
+  "Thinking",
+];
+
 export function ChatMessages({
   messages,
   enhancedMessages,
@@ -180,6 +189,26 @@ export function ChatMessages({
   onAgreedChange,
   onAcceptTerms,
 }: ChatMessagesProps) {
+  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+
+  // Cycle through streaming phrases
+  useEffect(() => {
+    const hasStreamingMessage = enhancedMessages.some(
+      msg => msg.role === 'assistant' && msg.isStreaming
+    );
+    
+    if (!hasStreamingMessage) {
+      setCurrentPhraseIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentPhraseIndex((prev) => (prev + 1) % STREAMING_PHRASES.length);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [enhancedMessages]);
+
   const followUpSuggestion = useMemo(() => {
     // DISABLED: Follow-ups don't work as user prompts
     return null;
@@ -319,7 +348,23 @@ export function ChatMessages({
                             <span className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}} />
                             <span className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.4s'}} />
                           </span>
-                          <ShimmeringText text="Streaming" duration={1.8} repeat repeatDelay={0.4} className="opacity-90" />
+                          <AnimatePresence mode="wait">
+                            <motion.div
+                              key={currentPhraseIndex}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -8 }}
+                              transition={{ duration: 0.25 }}
+                            >
+                              <ShimmeringText 
+                                text={STREAMING_PHRASES[currentPhraseIndex]} 
+                                duration={1.8} 
+                                repeat 
+                                repeatDelay={0.4} 
+                                className="opacity-90" 
+                              />
+                            </motion.div>
+                          </AnimatePresence>
                         </span>
                       </div>
                     )}
@@ -638,7 +683,18 @@ export function ChatMessages({
                   <div className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}}></div>
                   <div className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.4s'}}></div>
                 </div>
-                <span className="tracking-[0.3em] uppercase">AI Thinking</span>
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={currentPhraseIndex}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25 }}
+                    className="tracking-[0.3em] uppercase"
+                  >
+                    AI {STREAMING_PHRASES[currentPhraseIndex]}
+                  </motion.span>
+                </AnimatePresence>
               </div>
             </div>
           )}
