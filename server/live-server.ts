@@ -502,19 +502,33 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
 
     try {
       client.logger?.log('audio_chunk', { direction: 'client_to_server', bytes: approxBytes, mimeType })
+      
+      // Debug: log available session methods
+      console.log(`[${connectionId}] Session methods:`, {
+        hasSendRealtimeInput: typeof client.session.sendRealtimeInput,
+        hasSend: typeof client.session.send,
+        sessionKeys: Object.keys(client.session),
+      })
+      
       if (typeof client.session.sendRealtimeInput === 'function') {
         await client.session.sendRealtimeInput({ media: { mimeType, data: audioData } })
-        console.info(`[${connectionId}] Audio sent via sendRealtimeInput (${audioData.length} chars, ${mimeType})`)
+        console.info(`[${connectionId}] ✅ Audio sent via sendRealtimeInput (${audioData.length} chars, ${mimeType})`)
       } else if (typeof client.session.send === 'function') {
         await client.session.send({ input: { data: audioData, mimeType } })
-        console.info(`[${connectionId}] Audio sent via session.send(input) (${audioData.length} chars, ${mimeType})`)
+        console.info(`[${connectionId}] ✅ Audio sent via session.send(input) (${audioData.length} chars, ${mimeType})`)
       } else {
-        console.error(`[${connectionId}] Live session has no supported audio send method`) 
+        console.error(`[${connectionId}] ❌ Live session has no supported audio send method`) 
         safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live session cannot accept audio (no method)' } }))
       }
     } catch (e: any) {
       const msg = e?.message || String(e)
-      console.error(`[${connectionId}] Failed to send audio to Live API:`, msg, { hasRealtime: typeof (client.session as any).sendRealtimeInput === 'function' })
+      const stack = e?.stack || 'No stack trace'
+      console.error(`[${connectionId}] ❌ Failed to send audio to Live API:`, { 
+        error: msg, 
+        stack,
+        hasRealtimeMethod: typeof client.session.sendRealtimeInput === 'function',
+        hasSendMethod: typeof client.session.send === 'function'
+      })
       safeSend(ws, JSON.stringify({ type: 'error', payload: { message: `Failed to send audio to Live API: ${msg}` } }))
     }
     return
