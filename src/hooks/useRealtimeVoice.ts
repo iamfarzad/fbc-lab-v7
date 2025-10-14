@@ -119,6 +119,13 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     if (typeof window === 'undefined') return undefined;
     const envUrl = process.env.NEXT_PUBLIC_LIVE_SERVER_URL;
     if (envUrl) return envUrl;
+    
+    // In production, use Fly.io WebSocket server
+    if (process.env.NODE_ENV === 'production') {
+      return 'wss://fb-consulting-websocket.fly.dev';
+    }
+    
+    // Local development fallback
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const host = window.location.host;
     return `${protocol}://${host.replace(/:\d+$/, '')}:${process.env.NEXT_PUBLIC_LIVE_SERVER_PORT ?? '3001'}`;
