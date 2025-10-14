@@ -12,6 +12,7 @@ RUN pnpm install --prod
 
 # Copy server files
 COPY live-server.ts ./
+COPY session-logger.ts ./
 
 # Install tsx for TypeScript execution
 RUN pnpm add tsx
