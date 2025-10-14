@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
+import { blobToBase64 } from '@/src/lib/utils';
 // import { useSessionStore } from '@/stores/sessionStore'; // TODO: Re-enable when store is created
 
 export interface UseCameraOptions {
@@ -360,9 +361,11 @@ export function useCamera(options: UseCameraOptions = {}) {
       // Send frame via sendRealtimeInput for continuous streaming (prototype pattern)
       if (sendRealtimeInput) {
         try {
+          // Strip data URL prefix for Gemini Live API compatibility
+          const base64Data = await blobToBase64(blob);
           sendRealtimeInput([{
             mimeType: 'image/jpeg',
-            data: imageData,
+            data: base64Data,
           }]);
           console.log('📹 Webcam frame streamed to Live API');
         } catch (err) {

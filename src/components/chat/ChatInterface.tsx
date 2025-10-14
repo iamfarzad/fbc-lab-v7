@@ -6,7 +6,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, MessageCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, blobToBase64 } from "@/lib/utils";
 
 // Core chat components - clean imports
 import { ChatContainer } from "./components/ChatContainer";
@@ -553,92 +553,108 @@ export function ChatInterface({ id }: { id?: string | null }) {
       isUploading = true;
       try {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-
-        const isVoiceActive = audioHook.isSessionActive;
-
-        if (audioHook.sendRealtimeInput) {
-          // Prototype pattern: Send frame directly to Live API via sendRealtimeInput
-          try {
-            audioHook.sendRealtimeInput([{
-              mimeType: 'image/jpeg',
-              data: dataUrl,
-            }]);
-            console.log('📺 Screen frame streamed to Live API');
-
-            // Update local snapshot for UI (but not for analysis)
-            const capturedAt = Date.now();
-            setLastScreenSnapshot({
-              analysis: 'Screen frame streamed to AI (no analysis needed)',
-              imageData: dataUrl,
-              capturedAt
-            });
-
-            // Show toast on first successful capture
-            if (!hasNotifiedCapture) {
-              toast.success('Screen sharing active - streaming frames continuously');
-              setHasNotifiedCapture(true);
-            }
-          } catch (err) {
-            console.error('❌ Failed to stream screen frame:', err);
+        
+        // Convert to blob and get clean base64 for Live API
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            isUploading = false;
+            return;
           }
-        } else {
-          // Fallback: Send to analysis API (legacy mode)
-          const response = await fetch('/api/tools/screen', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-intelligence-session-id': sessionId,
-              ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
-            },
-            body: JSON.stringify({
-              image: dataUrl,
-              type: 'screen',
-              context: {
-                trigger: isVoiceActive ? 'voice' : 'manual',
-                prompt: isVoiceActive
-                  ? 'Provide a concise summary aligned with the current voice conversation.'
-                  : 'Analyze this screen and provide key insights.',
-              },
-            }),
-          });
 
-          if (response.ok) {
-            const data = await response.json().catch(() => null);
-            const analysis = data?.output?.analysis || data?.analysis;
-            if (analysis) {
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7); // For UI display only
+
+          if (audioHook.sendRealtimeInput) {
+            // Prototype pattern: Send frame directly to Live API via sendRealtimeInput
+            try {
+              // Strip data URL prefix for Gemini Live API compatibility
+              const base64Data = await blobToBase64(blob);
+              audioHook.sendRealtimeInput([{
+                mimeType: 'image/jpeg',
+                data: base64Data,
+              }]);
+              console.log('📺 Screen frame streamed to Live API');
+
+              // Update local snapshot for UI (but not for analysis)
               const capturedAt = Date.now();
-              setLastScreenSnapshot({ analysis, imageData: dataUrl, capturedAt });
-
-              console.log('📸 Screen captured and analyzed', {
-                trigger: isVoiceActive ? 'voice' : 'manual',
-                analysisLength: analysis.length,
-                timestamp: new Date(capturedAt).toLocaleTimeString()
+              setLastScreenSnapshot({
+                analysis: 'Screen frame streamed to AI (no analysis needed)',
+                imageData: dataUrl,
+                capturedAt
               });
 
               // Show toast on first successful capture
               if (!hasNotifiedCapture) {
-                toast.success('Screen sharing active - capturing every 8 seconds');
+                toast.success('Screen sharing active - streaming frames continuously');
                 setHasNotifiedCapture(true);
               }
+            } catch (err) {
+              console.error('❌ Failed to stream screen frame:', err);
+            } finally {
+              isUploading = false;
+            }
+          } else {
+            // Fallback: Send to analysis API (legacy mode)
+            try {
+              const response = await fetch('/api/tools/screen', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-intelligence-session-id': sessionId,
+                  ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
+                },
+                body: JSON.stringify({
+                  image: dataUrl,
+                  type: 'screen',
+                  context: {
+                    trigger: audioHook.isSessionActive ? 'voice' : 'manual',
+                    prompt: audioHook.isSessionActive
+                      ? 'Provide a concise summary aligned with the current voice conversation.'
+                      : 'Analyze this screen and provide key insights.',
+                  },
+                }),
+              });
 
-              // Send to voice session if active (legacy mode)
-              if (isVoiceActive && audioHook.sendContextUpdate) {
-                audioHook.sendContextUpdate({
-                  sessionId,
-                  modality: 'screen',
-                  analysis,
-                  imageData: dataUrl,
-                  capturedAt,
-                  metadata: { source: 'screen_capture', connectionId: voiceConnectionId },
-                });
+              if (response.ok) {
+                const data = await response.json().catch(() => null);
+                const analysis = data?.output?.analysis || data?.analysis;
+                if (analysis) {
+                  const capturedAt = Date.now();
+                  setLastScreenSnapshot({ analysis, imageData: dataUrl, capturedAt });
+
+                  console.log('📸 Screen captured and analyzed', {
+                    trigger: audioHook.isSessionActive ? 'voice' : 'manual',
+                    analysisLength: analysis.length,
+                    timestamp: new Date(capturedAt).toLocaleTimeString()
+                  });
+
+                  // Show toast on first successful capture
+                  if (!hasNotifiedCapture) {
+                    toast.success('Screen sharing active - capturing every 8 seconds');
+                    setHasNotifiedCapture(true);
+                  }
+
+                  // Send to voice session if active (legacy mode)
+                  if (audioHook.isSessionActive && audioHook.sendContextUpdate) {
+                    audioHook.sendContextUpdate({
+                      sessionId,
+                      modality: 'screen',
+                      analysis,
+                      imageData: dataUrl,
+                      capturedAt,
+                      metadata: { source: 'screen_capture', connectionId: voiceConnectionId },
+                    });
+                  }
+                }
               }
+            } catch (err) {
+              console.error('❌ Failed to analyze screen frame:', err);
+            } finally {
+              isUploading = false;
             }
           }
-        }
+        }, 'image/jpeg', 0.7);
       } catch (err) {
         console.error('Screen share capture failed:', err);
-      } finally {
         isUploading = false;
       }
     };

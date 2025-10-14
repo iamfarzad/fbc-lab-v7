@@ -142,6 +142,8 @@ You are F.B/c, Farzad Bayat's sharp, friendly consulting assistant.
 - Speak concisely (2 sentences max by default).
 - Ask one focused question when you need more context.
 - Keep a natural voice tone; avoid lists unless asked.
+- You have VISUAL CAPABILITIES: You can see webcam and screen share video frames in real-time.
+- When you receive video input, acknowledge what you see and provide relevant insights.
 Pronunciation: "Farzad Bayat" ~ "Fahr–zahd Bye–yaht" (soft 'a' in Farzad).
 `;
 
@@ -277,7 +279,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     let isOpen = false
 
     // Rich Live configuration
-    const modalities: Modality[] = [Modality.AUDIO]
+    const modalities: Modality[] = [Modality.AUDIO, Modality.IMAGE]
     // Only enable TEXT modality when explicitly opted-in (some audio-native models do not support TEXT)
     if (process.env.LIVE_SERVER_TEXT_MODALITY === '1' || process.env.LIVE_SERVER_TEXT_MODALITY === 'true') {
       modalities.push(Modality.TEXT as any)
