@@ -358,13 +358,6 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
                             turns: [{ role: 'user', parts }],
                             turnComplete: false,
                           });
-                        } else if (typeof clientRec.session.send === 'function') {
-                          await clientRec.session.send({
-                            clientContent: {
-                              turns: [{ role: 'user', parts }],
-                              turnComplete: false,
-                            },
-                          });
                         } else {
                           throw new Error('Live session cannot accept client content (no method)');
                         }
@@ -513,12 +506,9 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
       if (typeof client.session.sendRealtimeInput === 'function') {
         await client.session.sendRealtimeInput({ media: { mimeType, data: audioData } })
         console.info(`[${connectionId}] ✅ Audio sent via sendRealtimeInput (${audioData.length} chars, ${mimeType})`)
-      } else if (typeof client.session.send === 'function') {
-        await client.session.send({ input: { data: audioData, mimeType } })
-        console.info(`[${connectionId}] ✅ Audio sent via session.send(input) (${audioData.length} chars, ${mimeType})`)
       } else {
-        console.error(`[${connectionId}] ❌ Live session has no supported audio send method`) 
-        safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live session cannot accept audio (no method)' } }))
+        console.error(`[${connectionId}] ❌ sendRealtimeInput method not available on session`) 
+        safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live session cannot accept audio (no sendRealtimeInput method)' } }))
       }
     } catch (e: any) {
       const msg = e?.message || String(e)
@@ -708,15 +698,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
                   turns: [{ role: 'user', parts }],
                   turnComplete: false,
                 });
-              } else if (typeof client.session.send === 'function') {
-                await client.session.send({
-                  clientContent: {
-                    turns: [{ role: 'user', parts }],
-                    turnComplete: false,
-                  },
-                });
               } else {
-                throw new Error('Live session cannot accept client content (no method)');
+                throw new Error('Live session cannot accept client content (no sendClientContent method)');
               }
               snap.lastInjected = now;
               console.info(`[${connectionId}] ✅ ${modality} context injected to Live API`);
@@ -742,10 +725,8 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           try {
             if (typeof client.session.sendClientContent === 'function') {
               await client.session.sendClientContent({ turnComplete: true })
-            } else if (typeof client.session.send === 'function') {
-              await client.session.send({ clientContent: { turnComplete: true } })
             } else {
-              throw new Error('Live session cannot accept turnComplete (no method)')
+              throw new Error('Live session cannot accept turnComplete (no sendClientContent method)')
             }
             console.info(`[${connectionId}] turnComplete sent to Live API`)
             safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
