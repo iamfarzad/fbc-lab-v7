@@ -16,9 +16,11 @@ export class SessionLogger {
   private opened = false
 
   constructor(private readonly connectionId: string, baseDir?: string) {
-    // Default to repo-root logs/live (ESM-safe __dirname)
+    // Use /tmp in production (Docker), local logs/live in dev
     const moduleDir = path.dirname(fileURLToPath(import.meta.url))
-    const defaultBase = path.resolve(moduleDir, '..', 'logs', 'live')
+    const defaultBase = process.env.NODE_ENV === 'production' 
+      ? '/tmp/live-logs'
+      : path.resolve(moduleDir, '..', 'logs', 'live')
     this.dir = baseDir ? path.resolve(baseDir) : defaultBase
     this.filePath = path.join(this.dir, `${connectionId}.jsonl`)
   }
