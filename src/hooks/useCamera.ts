@@ -11,10 +11,15 @@ import { toast } from 'sonner';
 
 export interface UseCameraOptions {
   onCapture?: (blob: Blob, imageData?: string) => void;
+  onAnalysis?: (analysis: string, imageData: string, capturedAt: number) => void; // NEW
   captureInterval?: number; // Auto-capture interval in ms
   enableAutoCapture?: boolean;
   maxDimension?: number; // Max width/height for compression
   quality?: number; // JPEG quality 0-1
+  sessionId?: string; // NEW
+  voiceConnectionId?: string; // NEW
+  requireVoiceSession?: boolean; // NEW - only capture when voice active
+  sendRealtimeInput?: (chunks: Array<{ mimeType: string; data: string }>) => void; // NEW - for prototype pattern
 }
 
 export interface CameraCapture {
@@ -37,10 +42,15 @@ interface CameraMetrics {
 export function useCamera(options: UseCameraOptions = {}) {
   const {
     onCapture,
+    onAnalysis,
     captureInterval = 12000,
     enableAutoCapture = false,
     maxDimension = 1280,
     quality = 0.7,
+    sessionId,
+    voiceConnectionId,
+    requireVoiceSession = false,
+    sendRealtimeInput,
   } = options;
 
   // Session store integration
@@ -223,6 +233,37 @@ export function useCamera(options: UseCameraOptions = {}) {
     await startCamera(nextDevice.deviceId);
   }, [isActive, availableDevices, currentDeviceId, startCamera]);
 
+  // Upload frame to backend for analysis
+  const uploadToBackend = useCallback(async (
+    blob: Blob,
+    imageData: string,
+    sessionId: string,
+    voiceConnectionId?: string
+  ): Promise<{ analysis?: string } | null> => {
+    try {
+      const formData = new FormData();
+      formData.append('webcamCapture', blob, `webcam-${Date.now()}.jpg`);
+
+      const response = await fetch('/api/tools/webcam', {
+        method: 'POST',
+        headers: {
+          'x-intelligence-session-id': sessionId,
+          ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        return data;
+      }
+      return null;
+    } catch (err) {
+      console.error('Webcam upload failed:', err);
+      return null;
+    }
+  }, []);
+
   // Capture frame from video element
   const captureFrame = useCallback(async (
     videoElement?: HTMLVideoElement
@@ -231,9 +272,8 @@ export function useCamera(options: UseCameraOptions = {}) {
     const canvas = canvasRef.current;
 
     if (!video || !canvas) {
-      console.warn('Video or canvas not available for capture');
       metricsRef.current.failedCaptures++;
-      return null;
+      return null; // Silent - normal during init
     }
 
     // ✅ CRITICAL FIX: Check video readyState before drawing
@@ -317,13 +357,40 @@ export function useCamera(options: UseCameraOptions = {}) {
       // Call capture callback if provided
       onCapture?.(blob, imageData);
 
+      // Send frame via sendRealtimeInput for continuous streaming (prototype pattern)
+      if (sendRealtimeInput) {
+        try {
+          sendRealtimeInput([{
+            mimeType: 'image/jpeg',
+            data: imageData,
+          }]);
+          console.log('📹 Webcam frame streamed to Live API');
+        } catch (err) {
+          console.error('❌ Failed to stream webcam frame:', err);
+        }
+      } else if (sessionId) {
+        // Fallback: Upload to backend for analysis (legacy mode)
+        const result = await uploadToBackend(blob, imageData, sessionId, voiceConnectionId);
+        if (result?.analysis) {
+          onAnalysis?.(result.analysis, imageData, capture.timestamp);
+        }
+      }
+
+      // Debug logging
+      console.log('📷 Camera capture:', {
+        dimensions: `${capture.metadata.width}x${capture.metadata.height}`,
+        blobSize: `${Math.round(capture.blob.size / 1024)}KB`,
+        deviceId: capture.metadata.deviceId,
+        timestamp: capture.timestamp,
+      });
+
       return capture;
     } catch (err) {
       console.error('Frame capture failed:', err);
       metricsRef.current.failedCaptures++;
       return null;
     }
-  }, [currentDeviceId, maxDimension, quality, onCapture]);
+  }, [currentDeviceId, maxDimension, quality, onCapture, sessionId, voiceConnectionId, onAnalysis, uploadToBackend]);
 
   // Attach video element for capture
   const attachVideoElement = useCallback((element: HTMLVideoElement | null) => {
@@ -335,30 +402,55 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
   }, []);
 
-  // Auto-capture setup
+  // Auto-capture setup - use continuous streaming for prototype pattern
   useEffect(() => {
-    if (enableAutoCapture && isActive && !autoCaptureTimerRef.current) {
+    const shouldCapture = enableAutoCapture && isActive && 
+      (!requireVoiceSession || (sessionId && voiceConnectionId));
+    
+    if (shouldCapture && sendRealtimeInput) {
+      // Prototype pattern: Continuous frame streaming at 2 FPS
+      console.log('Starting continuous webcam streaming at 2 FPS');
+
+      // ✅ Delay 1 second for video element to be ready (prototype pattern)
+      const startDelay = setTimeout(() => {
+        autoCaptureTimerRef.current = window.setInterval(() => {
+          void captureFrame();
+        }, 500); // 2 FPS (500ms intervals)
+      }, 1000);
+      
+      return () => {
+        clearTimeout(startDelay);
+        if (autoCaptureTimerRef.current) {
+          clearInterval(autoCaptureTimerRef.current);
+          autoCaptureTimerRef.current = null;
+        }
+      };
+    } else if (shouldCapture && !autoCaptureTimerRef.current) {
+      // Legacy mode: Periodic capture for analysis
       console.log(`Starting auto-capture every ${captureInterval}ms`);
       
-      autoCaptureTimerRef.current = window.setInterval(() => {
-        void captureFrame();
-      }, captureInterval);
+      const startDelay = setTimeout(() => {
+        autoCaptureTimerRef.current = window.setInterval(() => {
+          void captureFrame();
+        }, captureInterval);
+      }, 1000);
+      
+      return () => {
+        clearTimeout(startDelay);
+        if (autoCaptureTimerRef.current) {
+          clearInterval(autoCaptureTimerRef.current);
+          autoCaptureTimerRef.current = null;
+        }
+      };
     }
 
-    if (!enableAutoCapture || !isActive) {
+    if (!shouldCapture) {
       if (autoCaptureTimerRef.current) {
         clearInterval(autoCaptureTimerRef.current);
         autoCaptureTimerRef.current = null;
       }
     }
-
-    return () => {
-      if (autoCaptureTimerRef.current) {
-        clearInterval(autoCaptureTimerRef.current);
-        autoCaptureTimerRef.current = null;
-      }
-    };
-  }, [enableAutoCapture, isActive, captureInterval, captureFrame]);
+  }, [enableAutoCapture, isActive, captureInterval, captureFrame, requireVoiceSession, sessionId, voiceConnectionId, sendRealtimeInput]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -389,6 +481,7 @@ export function useCamera(options: UseCameraOptions = {}) {
     switchCamera,
     captureFrame,
     attachVideoElement,
+    uploadToBackend,
     getMetrics,
   };
 }

@@ -3,6 +3,8 @@
  * Extracted from working HTML test - prevents distortion by scheduling chunks sequentially
  */
 
+import { base64PCM16ToFloat32 } from './audio-utils'
+
 export class AudioStreamingQueue {
   private queue: Float32Array[] = []
   private playbackContext: AudioContext | null = null
@@ -20,17 +22,7 @@ export class AudioStreamingQueue {
   addChunk(pcm16Base64: string): void {
     try {
       // Decode base64 → PCM16 → Float32
-      const binaryString = atob(pcm16Base64)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
-      }
-
-      const pcm16 = new Int16Array(bytes.buffer)
-      const float32 = new Float32Array(pcm16.length)
-      for (let i = 0; i < pcm16.length; i++) {
-        float32[i] = pcm16[i] / 32768.0
-      }
+      const float32 = base64PCM16ToFloat32(pcm16Base64)
 
       this.queue.push(float32)
 

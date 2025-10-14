@@ -9,6 +9,7 @@ import {
   CameraOff,
   MonitorOff
 } from "lucide-react";
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ToolsMenuProps {
   isOpen: boolean;
@@ -42,34 +43,24 @@ export function ToolsMenu({
   onOpenVoiceFullScreen,
   onOpenCameraFullScreen
 }: ToolsMenuProps) {
-  const handleVoiceClick = () => {
-    // Check if we're on mobile and should use full-screen mode
-    const isMobile = window.innerWidth < 640;
-    
-    if (isMobile && onOpenVoiceFullScreen) {
-      onOpenVoiceFullScreen();
+  const isMobile = useIsMobile();
+
+  // Unified media handler factory
+  const createMediaHandler = (
+    toggleFn: () => void,
+    openFullScreenFn?: () => void
+  ) => () => {
+    if (isMobile && openFullScreenFn) {
+      openFullScreenFn();
     } else {
-      onToggleVoice();
+      toggleFn();
     }
     onClose();
   };
 
-  const handleCameraClick = () => {
-    // Check if we're on mobile and should use full-screen mode
-    const isMobile = window.innerWidth < 640;
-    
-    if (isMobile && onOpenCameraFullScreen) {
-      onOpenCameraFullScreen();
-    } else {
-      onToggleCamera();
-    }
-    onClose();
-  };
-
-  const handleScreenShareClick = () => {
-    onToggleScreenShare();
-    onClose();
-  };
+  const handleVoiceClick = createMediaHandler(onToggleVoice, onOpenVoiceFullScreen);
+  const handleCameraClick = createMediaHandler(onToggleCamera, onOpenCameraFullScreen);
+  const handleScreenShareClick = createMediaHandler(onToggleScreenShare);
 
   const handleSettingsClick = () => {
     onToggleSettings();

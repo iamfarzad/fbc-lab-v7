@@ -58,7 +58,7 @@ export function useChatMessages(initialSessionId?: string) {
   // Use unified chat hook with store integration
   const unifiedChat = useUnifiedChat({
     sessionId,
-    mode: 'standard',
+    // mode removed - HTTP transport implies text/multimodal
     context: {
       sessionId,
       enhancedResearch: false  // Smart triggers will override when needed

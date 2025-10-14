@@ -16,6 +16,7 @@ import {
   Settings
 } from "lucide-react";
 import { SettingsDialog } from './SettingsDialog';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface ActionsMenuProps {
   isOpen: boolean;
@@ -88,39 +89,24 @@ export function ActionsMenu({
     onClose();
   };
 
-  const handleVoiceClick = () => {
-    // Check if we're on mobile and should use full-screen mode
-    const isMobile = window.innerWidth < 768;
-    
-    if (isMobile && onOpenVoiceFullScreen) {
-      onOpenVoiceFullScreen();
+  const isMobile = useIsMobile();
+
+  // Unified media handler factory
+  const createMediaHandler = (
+    toggleFn?: () => void,
+    openFullScreenFn?: () => void
+  ) => () => {
+    if (isMobile && openFullScreenFn) {
+      openFullScreenFn();
     } else {
-      onToggleVoice?.();
+      toggleFn?.();
     }
     onClose();
   };
 
-  const handleCameraClick = () => {
-    // Check if we're on mobile and should use full-screen mode
-    const isMobile = window.innerWidth < 768;
-    
-    if (isMobile && onOpenCameraFullScreen) {
-      onOpenCameraFullScreen();
-    } else {
-      onToggleCamera?.();
-    }
-    onClose();
-  };
-
-  const handleScreenShareClick = () => {
-    const isMobile = window.innerWidth < 768;
-    if (isMobile && onOpenScreenFullScreen) {
-      onOpenScreenFullScreen();
-    } else {
-      onToggleScreenShare?.();
-    }
-    onClose();
-  };
+  const handleVoiceClick = createMediaHandler(onToggleVoice, onOpenVoiceFullScreen);
+  const handleCameraClick = createMediaHandler(onToggleCamera, onOpenCameraFullScreen);
+  const handleScreenShareClick = createMediaHandler(onToggleScreenShare, onOpenScreenFullScreen);
 
   const handleSettingsClick = () => {
     setIsSettingsOpen(true);

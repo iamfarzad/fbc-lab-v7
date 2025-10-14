@@ -21,6 +21,10 @@ import { useChatState } from "./hooks/useChatState";
 import { useChatMessages } from "./hooks/useChatMessages";
 import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
 import { useChatIntelligence } from "./hooks/useChatIntelligence";
+import { useCamera } from "@/hooks/useCamera";
+
+// Media display components
+import { DraggableVideoPlayer } from "./components/DraggableVideoPlayer";
 
 // Constants - centralized configuration
 import { CHAT_CONSTANTS } from "./constants/chatConstants";
@@ -53,6 +57,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const [sessionId] = useState(() => id ?? crypto.randomUUID());
   const [usage, setUsage] = useState<any>(null);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [screenThumbnail, setScreenThumbnail] = useState<string | null>(null);
+  const [hasNotifiedCapture, setHasNotifiedCapture] = useState(false);
 
   // Keep only the existing chatStateHook - no conflicting state
 
@@ -142,7 +148,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
   }, [finalizeVoiceAssistantMessage]);
 
   const handleVoiceSetupComplete = useCallback(() => {
-    console.log('✅ Voice session setup complete')
+    // Silent - tracked via state
   }, []);
 
   const handleVoiceToolCall = useCallback(async (toolCall: any) => {
@@ -294,6 +300,46 @@ export function ChatInterface({ id }: { id?: string | null }) {
   audioHookRef.current = audioHook;
   const voiceConnectionId = audioHook.session?.connectionId ?? null;
 
+  // Camera integration with continuous frame streaming (prototype pattern)
+  const camera = useCamera({
+    sessionId,
+    voiceConnectionId,
+    requireVoiceSession: false, // ✅ Allow camera to work without voice session
+    enableAutoCapture: true,
+    captureInterval: 500, // 2 FPS for continuous streaming
+    maxDimension: 640,
+    quality: 0.85,
+    sendRealtimeInput: audioHook.sendRealtimeInput,
+    onAnalysis: useCallback((analysis: string, imageData: string, capturedAt: number) => {
+      // Keep for legacy compatibility but not used in prototype pattern
+      setLastWebcamSnapshot({ analysis, capturedAt });
+    }, [sessionId]),
+  });
+
+  // Sync camera state
+  useEffect(() => {
+    if (camera.isActive && camera.stream) {
+      chatStateHook.setChatState(prev => ({
+        ...prev,
+        isCameraActive: true,
+        cameraStream: camera.stream,
+        cameraError: null,
+        isCameraInitializing: false,
+      }));
+      if (camera.availableCameraCount !== undefined) {
+        chatStateHook.setAvailableCameras(camera.availableCameraCount);
+      }
+    } else if (camera.isActive === false) {
+      chatStateHook.setChatState(prev => ({
+        ...prev,
+        isCameraActive: false,
+        cameraStream: null,
+        cameraError: camera.error || null,
+        isCameraInitializing: camera.isInitializing,
+      }));
+    }
+  }, [camera.isActive, camera.stream, camera.error, camera.isInitializing, camera.availableCameraCount]);
+
   // Toggle voice session (start/stop, not just mute)
   const toggleVoiceSession = useCallback(async () => {
     const hook = audioHookRef.current;
@@ -321,6 +367,15 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const toggleTranscript = useCallback(() => {
     setShowTranscript(prev => !prev);
   }, []);
+
+  // Camera control handlers
+  const handleToggleCamera = useCallback(async () => {
+    await camera.toggleCamera();
+  }, [camera]);
+
+  const handleSwitchCamera = useCallback(async () => {
+    await camera.switchCamera();
+  }, [camera]);
 
   // Transform voice data into transcript entries - FULL HISTORY
   const transcriptEntries = useMemo(() => {
@@ -436,12 +491,12 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   const sessionIdForExport = messagesHook.sessionId || intelligenceHook.sessionId;
 
-  // Capture screen share frames during voice sessions so Gemini can use them via tool calls
+  // Capture screen share frames and send to Gemini for analysis
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const stream = chatState.screenShareStream;
-    if (!chatState.isScreenSharing || !stream || !audioHook.isSessionActive || !sessionId) {
+    if (!chatState.isScreenSharing || !stream || !sessionId) {
       return;
     }
 
@@ -452,6 +507,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) {
+      toast.error('Failed to initialize screen capture');
       return;
     }
 
@@ -479,47 +535,105 @@ export function ChatInterface({ id }: { id?: string | null }) {
       configureCanvas();
     }
 
-    const CAPTURE_INTERVAL_MS = 8000;
-    let intervalId: number | null = null;
+    const CAPTURE_INTERVAL_MS = 500; // 2 FPS for continuous streaming (prototype pattern)
+    const THUMBNAIL_INTERVAL_MS = 2000;
+    let captureIntervalId: number | null = null;
+    let thumbnailIntervalId: number | null = null;
 
     const captureFrame = async () => {
-      if (cancelled || !ready || isUploading || !audioHook.isSessionActive) {
+      if (cancelled || !ready || isUploading) {
         return;
       }
+      
+      // ✅ Check video is ready (prototype MediaStreamContext.tsx:162)
+      if (video.readyState < 2) {
+        return; // Skip this frame
+      }
+      
       isUploading = true;
       try {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        const response = await fetch('/api/tools/screen', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-intelligence-session-id': sessionId,
-            ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
-          },
-          body: JSON.stringify({
-            image: dataUrl,
-            type: 'screen',
-            context: {
-              trigger: 'voice',
-              prompt: 'Provide a concise summary aligned with the current voice conversation.',
-            },
-          }),
-        });
-        if (response.ok) {
-          const data = await response.json().catch(() => null);
-          const analysis = data?.output?.analysis || data?.analysis;
-          if (analysis) {
+
+        const isVoiceActive = audioHook.isSessionActive;
+
+        if (audioHook.sendRealtimeInput) {
+          // Prototype pattern: Send frame directly to Live API via sendRealtimeInput
+          try {
+            audioHook.sendRealtimeInput([{
+              mimeType: 'image/jpeg',
+              data: dataUrl,
+            }]);
+            console.log('📺 Screen frame streamed to Live API');
+
+            // Update local snapshot for UI (but not for analysis)
             const capturedAt = Date.now();
-            setLastScreenSnapshot({ analysis, imageData: dataUrl, capturedAt });
-            audioHook.sendContextUpdate({
-              sessionId,
-              modality: 'screen',
-              analysis,
+            setLastScreenSnapshot({
+              analysis: 'Screen frame streamed to AI (no analysis needed)',
               imageData: dataUrl,
-              capturedAt,
-              metadata: { source: 'screen_capture', connectionId: voiceConnectionId },
+              capturedAt
             });
+
+            // Show toast on first successful capture
+            if (!hasNotifiedCapture) {
+              toast.success('Screen sharing active - streaming frames continuously');
+              setHasNotifiedCapture(true);
+            }
+          } catch (err) {
+            console.error('❌ Failed to stream screen frame:', err);
+          }
+        } else {
+          // Fallback: Send to analysis API (legacy mode)
+          const response = await fetch('/api/tools/screen', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-intelligence-session-id': sessionId,
+              ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
+            },
+            body: JSON.stringify({
+              image: dataUrl,
+              type: 'screen',
+              context: {
+                trigger: isVoiceActive ? 'voice' : 'manual',
+                prompt: isVoiceActive
+                  ? 'Provide a concise summary aligned with the current voice conversation.'
+                  : 'Analyze this screen and provide key insights.',
+              },
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json().catch(() => null);
+            const analysis = data?.output?.analysis || data?.analysis;
+            if (analysis) {
+              const capturedAt = Date.now();
+              setLastScreenSnapshot({ analysis, imageData: dataUrl, capturedAt });
+
+              console.log('📸 Screen captured and analyzed', {
+                trigger: isVoiceActive ? 'voice' : 'manual',
+                analysisLength: analysis.length,
+                timestamp: new Date(capturedAt).toLocaleTimeString()
+              });
+
+              // Show toast on first successful capture
+              if (!hasNotifiedCapture) {
+                toast.success('Screen sharing active - capturing every 8 seconds');
+                setHasNotifiedCapture(true);
+              }
+
+              // Send to voice session if active (legacy mode)
+              if (isVoiceActive && audioHook.sendContextUpdate) {
+                audioHook.sendContextUpdate({
+                  sessionId,
+                  modality: 'screen',
+                  analysis,
+                  imageData: dataUrl,
+                  capturedAt,
+                  metadata: { source: 'screen_capture', connectionId: voiceConnectionId },
+                });
+              }
+            }
           }
         }
       } catch (err) {
@@ -529,127 +643,45 @@ export function ChatInterface({ id }: { id?: string | null }) {
       }
     };
 
-    intervalId = window.setInterval(captureFrame, CAPTURE_INTERVAL_MS);
-    captureFrame();
-
-    return () => {
-      cancelled = true;
-      if (intervalId) {
-        window.clearInterval(intervalId);
-      }
-      video.pause();
-      video.srcObject = null;
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-    };
-  }, [chatState.isScreenSharing, chatState.screenShareStream, audioHook.isSessionActive, audioHook.sendContextUpdate, voiceConnectionId, sessionId]);
-
-  // Capture webcam frames while voice is active to maintain up-to-date visual context
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const stream = chatState.cameraStream;
-    if (!chatState.isCameraActive || !stream || !audioHook.isSessionActive || !sessionId) {
-      return;
-    }
-
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    video.muted = true;
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-
-    let ready = false;
-    let cancelled = false;
-    let isUploading = false;
-
-    const configureCanvas = () => {
-      const width = video.videoWidth || 640;
-      const height = video.videoHeight || 480;
-      const maxWidth = 640;
-      const scale = width > maxWidth ? maxWidth / width : 1;
-      canvas.width = Math.floor(width * scale) || 640;
-      canvas.height = Math.floor(height * scale) || 480;
-      ready = true;
-      video.play().catch(() => undefined);
-    };
-
-    const handleLoadedMetadata = () => {
-      configureCanvas();
-    };
-
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    if (video.readyState >= 1) {
-      configureCanvas();
-    }
-
-    const CAPTURE_INTERVAL_MS = 12000;
-    let intervalId: number | null = null;
-
-    const captureFrame = async () => {
-      if (cancelled || !ready || isUploading || !audioHook.isSessionActive) {
-        return;
-      }
-      isUploading = true;
+    const updateThumbnail = () => {
+      if (cancelled || !ready) return;
+      
+      // ✅ Check video is ready
+      if (video.readyState < 2) return;
+      
       try {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, 'image/jpeg', 0.85)
-        );
-        if (!blob) return;
-
-        const formData = new FormData();
-        formData.append('webcamCapture', blob, `webcam-${Date.now()}.jpg`);
-
-        const response = await fetch('/api/tools/webcam', {
-          method: 'POST',
-          headers: {
-            'x-intelligence-session-id': sessionId,
-            ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
-          },
-          body: formData,
-        });
-        if (response.ok) {
-          const data = await response.json().catch(() => null);
-          const analysis = data?.analysis || data?.output?.analysis;
-          if (analysis) {
-            const capturedAt = Date.now();
-            // Convert canvas to data URL for image data
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-            setLastWebcamSnapshot({ analysis, capturedAt });
-            audioHook.sendContextUpdate({
-              sessionId,
-              modality: 'webcam',
-              analysis,
-              imageData: dataUrl, // Add image data
-              capturedAt,
-              metadata: { source: 'webcam_capture', connectionId: voiceConnectionId },
-            });
-          }
-        }
+        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.5);
+        setScreenThumbnail(thumbnailUrl);
       } catch (err) {
-        console.error('Webcam capture failed:', err);
-      } finally {
-        isUploading = false;
+        console.debug('Thumbnail update skipped:', err);
       }
     };
 
-    intervalId = window.setInterval(captureFrame, CAPTURE_INTERVAL_MS);
-    captureFrame();
+    // ✅ Delay 1 second for video to be ready (prototype pattern)
+    const startDelay = setTimeout(() => {
+      captureIntervalId = window.setInterval(captureFrame, CAPTURE_INTERVAL_MS);
+      thumbnailIntervalId = window.setInterval(updateThumbnail, THUMBNAIL_INTERVAL_MS);
+      captureFrame();
+      updateThumbnail();
+    }, 1000);
 
     return () => {
       cancelled = true;
-      if (intervalId) {
-        window.clearInterval(intervalId);
+      clearTimeout(startDelay);
+      if (captureIntervalId) {
+        window.clearInterval(captureIntervalId);
+      }
+      if (thumbnailIntervalId) {
+        window.clearInterval(thumbnailIntervalId);
       }
       video.pause();
       video.srcObject = null;
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      setScreenThumbnail(null);
+      setHasNotifiedCapture(false);
     };
-  }, [chatState.isCameraActive, chatState.cameraStream, audioHook.isSessionActive, audioHook.sendContextUpdate, voiceConnectionId, sessionId]);
+  }, [chatState.isScreenSharing, chatState.screenShareStream, audioHook.isSessionActive, audioHook.sendContextUpdate, voiceConnectionId, sessionId, hasNotifiedCapture]);
 
   const handleExportSummary = () => {
     if (!sessionIdForExport) {
@@ -719,7 +751,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     if (trigger) {
       setRequestedPopover(trigger);
     }
-  }, [messagesHook.messages]);
+  }, [messagesHook.messages.length]); // Only depend on array length, not the array itself
 
   // Main render - clean and organized
   return (
@@ -824,6 +856,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
                   <SessionLimitWarning sessionId={sessionId} usage={usage} />
                 </div>
               )}
+
               <ChatMessages
                 messages={messagesHook.messages}
                 enhancedMessages={messagesHook.enhancedMessages}
@@ -836,6 +869,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
                 aiElements={aiConfig}
                 isExpanded={isExpanded}
                 artifacts={artifactCards}
+                transcriptEntries={transcriptEntries}
                 name={intelligenceHook.name}
                 email={intelligenceHook.email}
                 agreed={intelligenceHook.agreed}
@@ -870,12 +904,13 @@ export function ChatInterface({ id }: { id?: string | null }) {
                   isScreenSharing={chatState.isScreenSharing}
                   isScreenShareInitializing={chatState.isScreenShareInitializing}
                   screenShareStream={chatState.screenShareStream}
+                  screenThumbnail={screenThumbnail}
                   screenShareError={chatState.screenShareError}
-                  onInputChange={messagesHook.setInputValue}
-                  onSendMessage={messagesHook.handleSendMessage}
-                  onToggleVoice={toggleVoiceSession}
-                onToggleCamera={chatStateHook.toggleCamera}
-                onSwitchCamera={chatStateHook.switchCamera}
+                onInputChange={messagesHook.setInputValue}
+                onSendMessage={messagesHook.handleSendMessage}
+                onToggleVoice={toggleVoiceSession}
+                onToggleCamera={handleToggleCamera}
+                onSwitchCamera={handleSwitchCamera}
                 onToggleScreenShare={chatStateHook.toggleScreenShare}
                 onToggleSettings={chatStateHook.toggleSettings}
                 isExpanded={isExpanded}
@@ -914,6 +949,25 @@ export function ChatInterface({ id }: { id?: string | null }) {
         isVisible={showTranscript && audioHook.isSessionActive}
         transcripts={transcriptEntries}
       />
+
+      {/* Draggable Video Players - Prototype Style */}
+      {chatState.isCameraActive && camera.stream && (
+        <DraggableVideoPlayer
+          stream={camera.stream}
+          onClose={camera.stopCamera}
+          title="Webcam Feed"
+          type="webcam"
+        />
+      )}
+
+      {chatState.isScreenSharing && chatState.screenShareStream && (
+        <DraggableVideoPlayer
+          stream={chatState.screenShareStream}
+          onClose={chatStateHook.stopScreenShare}
+          title="Screen Share"
+          type="screen"
+        />
+      )}
     </ErrorBoundary>
   );
 }

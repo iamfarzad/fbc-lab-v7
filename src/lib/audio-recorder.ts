@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from 'events';
+import { arrayBufferToBase64, STANDARD_AUDIO_CONSTRAINTS } from './audio-utils';
 
 export interface AudioRecorderEvents {
   data: (base64: string) => void;
@@ -30,14 +31,7 @@ export class AudioRecorder extends EventEmitter {
       // Get microphone access
       console.log('🎤 [AudioRecorder] Requesting microphone access...');
       this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          sampleRate: 16000,
-          sampleSize: 16,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
+        audio: STANDARD_AUDIO_CONSTRAINTS
       });
       console.log('🎤 [AudioRecorder] Microphone access granted');
 
@@ -96,7 +90,7 @@ export class AudioRecorder extends EventEmitter {
         // Preferred: PCM16 from worklet
         if (payload && payload.int16arrayBuffer instanceof ArrayBuffer) {
           const arrayBuffer = payload.int16arrayBuffer as ArrayBuffer;
-          const base64 = this.arrayBufferToBase64(arrayBuffer);
+          const base64 = arrayBufferToBase64(arrayBuffer);
           if (Math.random() < 0.02) {
             console.log('🎤 [AudioRecorder] Sending audio chunk:', {
               declaredRate: 16000,
@@ -117,7 +111,7 @@ export class AudioRecorder extends EventEmitter {
             const s = Math.max(-1, Math.min(1, float32[i]));
             pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
           }
-          const base64 = this.arrayBufferToBase64(pcm16.buffer);
+          const base64 = arrayBufferToBase64(pcm16.buffer);
           this.emit('data', base64);
           return;
         }
@@ -178,15 +172,6 @@ export class AudioRecorder extends EventEmitter {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
     }
-  }
-
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
   }
 
   get isRecording(): boolean {

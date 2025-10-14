@@ -231,9 +231,12 @@ export function AdminDashboard() {
         timestamp: new Date().toISOString()
       }
 
-      const response = await fetch('/api/chat/unified?mode=admin', {
+      const response = await fetch('/api/chat/unified', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-admin-query': 'true'
+        },
         credentials: 'include',
         body: JSON.stringify({
           messages: [
@@ -244,8 +247,9 @@ export function AdminDashboard() {
             ...chatMessages,
             userMessage
           ],
-          sessionId: 'admin-session',
-          mode: 'admin'
+          context: {
+            sessionId: 'admin-session',
+          }
         })
       })
 

@@ -49,7 +49,7 @@ export interface UnifiedContext {
 
 export interface UnifiedChatOptions {
   sessionId?: string
-  mode?: ChatMode
+  // mode?: ChatMode // DEPRECATED: Transport determined by connection (HTTP vs WebSocket)
   context?: UnifiedContext
   initialMessages?: UnifiedMessage[]
   onMessage?: (message: UnifiedMessage) => void
@@ -82,27 +82,26 @@ export interface UnifiedChatReturn {
 export interface UnifiedChatRequest {
   messages: UnifiedMessage[]
   context?: UnifiedContext
-  mode?: ChatMode
+  // mode?: ChatMode // DEPRECATED: Transport determined by connection (HTTP vs WebSocket)
   stream?: boolean
 }
 
-export type ChatMode = 'standard' | 'realtime' | 'admin' | 'multimodal' | 'automation'
+// DEPRECATED: Mode parameter removed - transport determined by connection type
+// HTTP = text/multimodal chat, WebSocket = voice/realtime
+// export type ChatMode = 'standard' | 'realtime' | 'admin' | 'multimodal' | 'automation'
 
 export interface ChatCapabilities {
   supportsStreaming: boolean
   supportsMultimodal: boolean
   supportsRealtime: boolean
   maxTokens: number
-  supportedModes: ChatMode[]
 }
 
 export interface UnifiedChatProvider {
   generate(input: {
     messages: UnifiedMessage[]
     context?: UnifiedContext
-    mode?: ChatMode
   }): AsyncIterable<UnifiedMessage>
   
-  supportsMode(mode: ChatMode): boolean
   getCapabilities(): ChatCapabilities
 }

@@ -151,6 +151,14 @@ interface ChatMessagesProps {
   isExpanded?: boolean;
   isMinimized?: boolean;
   artifacts: StreamedArtifact[];
+  // Voice transcript entries
+  transcriptEntries?: Array<{
+    id: string;
+    text: string;
+    type: 'user' | 'assistant';
+    isPartial?: boolean;
+    timestamp: number;
+  }>;
   // Terms acceptance props
   name?: string;
   email?: string;
@@ -181,6 +189,7 @@ export function ChatMessages({
   isExpanded = false,
   isMinimized = false,
   artifacts,
+  transcriptEntries = [],
   name,
   email,
   agreed,
@@ -642,6 +651,59 @@ export function ChatMessages({
                 </Message>
             );
           })}
+          
+          {/* Voice Transcript Messages */}
+          {transcriptEntries.length > 0 && transcriptEntries.map((entry) => {
+            const meta = MESSAGE_PRESENTATION[entry.type];
+            const Icon = meta.icon;
+            const isUserMessage = entry.type === "user";
+            const userLabel = isUserMessage && name ? name : meta.label;
+
+            return (
+              <Message
+                key={entry.id}
+                from={entry.type}
+                className={entry.isPartial ? "opacity-70" : ""}
+              >
+                {/* Avatar */}
+                <MessageAvatar name={userLabel} />
+                
+                <MessageContent
+                  variant="flat"
+                  className={cn(
+                    "space-y-2",
+                    // Monochrome themes: terminal aesthetic
+                    "[.monochrome_&]:rounded-none",
+                    "[.monochrome_&]:border-l-2",
+                    isUserMessage 
+                      ? "[.monochrome_&]:border-[hsl(0,0%,85%)]"
+                      : "[.monochrome_&]:border-[hsl(0,0%,15%)]",
+                  )}
+                >
+                  {/* Terminal prompt - only in monochrome */}
+                  <div className={cn("hidden [.monochrome_&]:block font-mono text-muted-foreground", DESIGN_TOKENS.typography.disclaimer)}>
+                    {isUserMessage ? (
+                      <span>user@fbc:~$ </span>
+                    ) : (
+                      <span>[F.B/c AI] </span>
+                    )}
+                  </div>
+
+                  <div className={cn(
+                    "text-[13px] leading-relaxed",
+                    "[.monochrome_&]:font-mono",
+                    entry.isPartial && "italic text-muted-foreground"
+                  )}>
+                    <Response>{entry.text}</Response>
+                    {entry.isPartial && (
+                      <span className="ml-1 text-xs text-muted-foreground">(speaking...)</span>
+                    )}
+                  </div>
+                </MessageContent>
+              </Message>
+            );
+          })}
+          
           {/* DISABLED: Follow-up feature removed
           {followUpSuggestion && (
             <div className="flex justify-end">

@@ -5,7 +5,7 @@ export interface AgentContext {
   intelligenceContext?: IntelligenceContext
   conversationFlow?: ConversationFlowState
   multimodalContext?: MultimodalContextData
-  mode?: 'standard' | 'admin' | 'realtime' | 'multimodal'
+  // mode removed - transport determined by connection type (HTTP vs WebSocket)
   voiceActive?: boolean
   stage?: FunnelStage
 }

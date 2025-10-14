@@ -591,6 +591,37 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           }
           break;
         }
+        case 'REALTIME_INPUT': {
+          console.info(`[${connectionId}] Handling REALTIME_INPUT message`);
+          const client = activeSessions.get(connectionId);
+          if (!client) {
+            console.warn(`[${connectionId}] REALTIME_INPUT received but no active session`);
+            break;
+          }
+
+          const payload = parsedMessage.payload ?? {};
+          const chunks = Array.isArray(payload?.chunks) ? payload.chunks : [];
+
+          if (chunks.length === 0) {
+            console.warn(`[${connectionId}] REALTIME_INPUT received but no chunks`);
+            break;
+          }
+
+          try {
+            // Send chunks directly to Live API using sendRealtimeInput
+            if (typeof client.session.sendRealtimeInput === 'function') {
+              await client.session.sendRealtimeInput({ media: chunks[0] }); // Send first chunk
+              console.info(`[${connectionId}] ✅ Webcam frame sent to Live API via sendRealtimeInput`);
+              client.logger?.log('realtime_input_sent', { chunks: chunks.length, mimeType: chunks[0]?.mimeType });
+            } else {
+              console.warn(`[${connectionId}] sendRealtimeInput not available on session`);
+            }
+          } catch (err) {
+            console.error(`[${connectionId}] Failed to send realtime input:`, err);
+            client.logger?.log('error', { where: 'realtime_input', message: err instanceof Error ? err.message : String(err) });
+          }
+          break;
+        }
         case 'CONTEXT_UPDATE': {
           console.info(`[${connectionId}] Handling CONTEXT_UPDATE message`);
           const client = activeSessions.get(connectionId);

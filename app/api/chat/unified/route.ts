@@ -71,7 +71,7 @@ const CONVERSATION_CATEGORIES = ['goals', 'pain', 'data', 'readiness', 'budget',
 interface ChatRequestBody {
   messages: UnifiedMessage[]
   context?: ChatContext
-  mode?: 'standard' | 'admin' | 'realtime' | 'multimodal'
+  // mode removed - transport determined by connection type (HTTP vs WebSocket)
   stream?: boolean
 }
 
@@ -300,11 +300,10 @@ function cleanParsedContent(content: string): string {
 
 function createMockUnifiedStreamResponse(params: {
   reqId: string
-  mode: string | undefined
   researchMetadata: any
   systemPrompt: string
 }) {
-  const { reqId, mode, researchMetadata, systemPrompt } = params
+  const { reqId, researchMetadata, systemPrompt } = params
 
   const mockContent = `
 <reasoning>The assistant considers prior context and user intent.</reasoning>
@@ -352,7 +351,6 @@ Here is your mock response with enriched metadata.
           timestamp: new Date().toISOString(),
           type: 'text' as const,
           metadata: {
-            mode,
             isStreaming: true,
             reqId
           }
@@ -410,7 +408,6 @@ Here is your mock response with enriched metadata.
         timestamp: new Date().toISOString(),
         type: 'text' as const,
         metadata: {
-          mode,
           isComplete: true,
           finalChunk: true,
           reqId,
@@ -431,7 +428,7 @@ Here is your mock response with enriched metadata.
       'X-Accel-Buffering': 'no',
       'x-fbc-endpoint': 'unified-ai-sdk',
       'x-request-id': reqId,
-      'X-Chat-Mode': mode ?? 'standard',
+      'X-Chat-Mode': 'multimodal',
       'X-Session-Id': 'mock-session',
       'X-Enhanced-Research': researchMetadata ? 'true' : 'false',
       'x-mock-system-prompt': (() => {
@@ -516,7 +513,7 @@ export async function POST(req: NextRequest) {
     console.log('[UNIFIED_AI_SDK] Request:', reqId)
 
     const body = await req.json() as ChatRequestBody
-    const { messages: rawMessages, context, mode = 'standard', stream = true } = body
+    const { messages: rawMessages, context, stream = true } = body
 
     if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
       return NextResponse.json({ ok: false, error: 'At least one message is required.' }, { status: 400 })
@@ -627,7 +624,9 @@ If conversationFlow.recommendedNext is null, you have enough information - offer
       systemPrompt += `\n\nNOTE: User is currently in a voice conversation. Keep responses conversational and concise for voice playback.`
     }
     
-    if (mode === 'admin') {
+    // Check if admin query via header (mode parameter removed)
+    const isAdminQuery = req.headers.get('x-admin-query') === 'true';
+    if (isAdminQuery) {
       systemPrompt = `You are F.B/c AI Admin Assistant, specialized in business intelligence and management.
       
 Your capabilities:
@@ -832,7 +831,7 @@ Citations: ${researchResult.allCitations.length} sources processed
           sessionId: context?.sessionId || 'anonymous',
           intelligenceContext: context?.intelligenceContext as any,
           conversationFlow: conversationFlow as any,
-          mode: mode,
+          // mode removed - transport determined by connection type
           voiceActive: context?.voiceActive || false
         }
 
@@ -879,7 +878,6 @@ Citations: ${researchResult.allCitations.length} sources processed
                   timestamp: new Date().toISOString(),
                   type: 'text',
                   metadata: {
-                    mode,
                     isStreaming: true,
                     reqId,
                     agent: agentResult.agent,
@@ -900,7 +898,6 @@ Citations: ${researchResult.allCitations.length} sources processed
                 timestamp: new Date().toISOString(),
                 type: 'text',
                 metadata: {
-                  mode,
                   isComplete: true,
                   finalChunk: true,
                   reqId,
@@ -930,7 +927,7 @@ Citations: ${researchResult.allCitations.length} sources processed
             'X-Accel-Buffering': 'no',
             'x-fbc-endpoint': 'unified-multi-agent',
             'x-request-id': reqId,
-            'X-Chat-Mode': mode,
+            'X-Chat-Mode': 'multimodal',
             'X-Session-Id': context?.sessionId || 'anonymous',
             'X-Agent-Used': agentResult.agent,
             'X-Funnel-Stage': agentResult.metadata?.stage || 'unknown'
@@ -948,7 +945,6 @@ Citations: ${researchResult.allCitations.length} sources processed
       if (isMockUnifiedChat) {
         return createMockUnifiedStreamResponse({
           reqId,
-          mode,
           researchMetadata,
           systemPrompt
         })
@@ -1079,7 +1075,6 @@ Citations: ${researchResult.allCitations.length} sources processed
                   timestamp: new Date().toISOString(),
                   type: 'text',
                   metadata: {
-                    mode,
                     isStreaming: true,
                     reqId
                   }
@@ -1151,7 +1146,6 @@ Citations: ${researchResult.allCitations.length} sources processed
               timestamp: new Date().toISOString(),
               type: 'text',
               metadata: {
-                mode,
                 isComplete: true,
                 finalChunk: true,
                 reqId,
@@ -1179,7 +1173,7 @@ Citations: ${researchResult.allCitations.length} sources processed
           'X-Accel-Buffering': 'no',
           'x-fbc-endpoint': 'unified-ai-sdk',
           'x-request-id': reqId,
-          'X-Chat-Mode': mode,
+          'X-Chat-Mode': 'multimodal',
           'X-Session-Id': context?.sessionId || 'anonymous',
               'X-Enhanced-Research': researchMetadata && !researchHasError ? 'true' : 'false'
             }
@@ -1196,7 +1190,6 @@ Citations: ${researchResult.allCitations.length} sources processed
           timestamp: new Date().toISOString(),
           type: 'text',
           metadata: {
-            mode,
             tokensUsed: 0,
             reqId,
             research: researchMetadata
@@ -1275,7 +1268,6 @@ Citations: ${researchResult.allCitations.length} sources processed
         timestamp: new Date().toISOString(),
         type: 'text',
         metadata: {
-          mode,
           tokensUsed: result.usage?.totalTokens || 0,
           reqId,
           ...mergedMetadata,

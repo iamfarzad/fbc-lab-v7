@@ -45,12 +45,14 @@ export function MediaPopover({
         align={computedAlign}
         sideOffset={12}
         className={cn(
-          // Responsive width: full width on mobile (minus padding), fixed on desktop
-          "w-[calc(100vw-2rem)] sm:w-96 max-w-[480px]",
+          // Responsive width: full width on mobile (minus padding), wider on desktop
+          "w-[calc(100vw-2rem)] sm:w-[400px] max-w-[480px]",
+          type === 'voice' && "sm:w-[420px]", // Slightly wider for voice to accommodate waveform
           // Responsive height and scrolling
           "max-h-[60vh] sm:max-h-[70vh] overflow-y-auto overscroll-contain",
-          // Visual styling
-          "bg-background/98 backdrop-blur-md border border-border/40 shadow-xl p-0",
+          // Visual styling with proper padding
+          "bg-background/98 backdrop-blur-md border border-border/40 shadow-xl",
+          "p-4", // Add padding for content
           // Z-index above everything
           "z-[200]",
           VISUAL.CORNER_RADIUS,

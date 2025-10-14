@@ -135,7 +135,7 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       const request: UnifiedChatRequest = {
         messages: requestMessages,
         context: chatContextRef.current,
-        mode: options.mode ?? 'standard',
+        // mode removed - transport determined by connection type (HTTP)
         stream: true
       }
 

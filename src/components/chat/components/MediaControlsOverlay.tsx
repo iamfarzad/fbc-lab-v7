@@ -16,8 +16,8 @@ interface MediaControlsOverlayProps {
   onToggleScreenShare: () => void;
   onToggleTranscript: () => void;
   webcamStream?: MediaStream | null;
-  screenStream?: MediaStream | null;
   isProcessing?: boolean;
+  screenThumbnail?: string | null;
 }
 
 export function MediaControlsOverlay({
@@ -28,24 +28,17 @@ export function MediaControlsOverlay({
   onToggleScreenShare,
   onToggleTranscript,
   webcamStream,
-  screenStream,
-  isProcessing = false
+  isProcessing = false,
+  screenThumbnail
 }: MediaControlsOverlayProps) {
   const webcamVideoRef = useRef<HTMLVideoElement>(null);
-  const screenVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Set up video streams
+  // Set up webcam video stream
   useEffect(() => {
     if (webcamVideoRef.current && webcamStream) {
       webcamVideoRef.current.srcObject = webcamStream;
     }
   }, [webcamStream]);
-
-  useEffect(() => {
-    if (screenVideoRef.current && screenStream) {
-      screenVideoRef.current.srcObject = screenStream;
-    }
-  }, [screenStream]);
 
   // Minimized state: return null (handled by MinimizedChatBar)
   if (chatState === 'minimized') return null;
@@ -99,7 +92,7 @@ export function MediaControlsOverlay({
         )}
 
         {/* Screen share preview */}
-        {mediaState.screenShare && screenStream && (
+        {mediaState.screenShare && screenThumbnail && (
           <motion.div
             initial={{ opacity: 0, x: 20, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -111,10 +104,9 @@ export function MediaControlsOverlay({
               getMonochromeClass()
             )}
           >
-            <video
-              ref={screenVideoRef}
-              autoPlay
-              playsInline
+            <img
+              src={screenThumbnail}
+              alt="Screen share preview"
               className="w-full h-full object-cover"
             />
             <Button

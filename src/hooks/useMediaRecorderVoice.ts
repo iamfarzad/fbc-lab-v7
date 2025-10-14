@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioRecorder } from '@/lib/audio-recorder';
+import {
+  arrayBufferToBase64,
+  mixToMono,
+  resampleAudio,
+  float32ToPCM16,
+  STANDARD_AUDIO_CONSTRAINTS
+} from '@/lib/audio-utils';
 
 export type MediaRecorderVoiceResult = {
   base64: string;
@@ -29,80 +36,6 @@ const estimateDurationMs = (base64: string, sampleRate: number): number => {
   const samples = bytes / 2;
   return samples > 0 ? (samples / sampleRate) * 1000 : 0;
 };
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  for (let i = 0; i < bytes.byteLength; i += 1) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function mixToMono(buffer: AudioBuffer): Float32Array {
-  if (buffer.numberOfChannels === 1) {
-    return new Float32Array(buffer.getChannelData(0));
-  }
-
-  const frameCount = buffer.length;
-  const mixed = new Float32Array(frameCount);
-
-  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
-    const channelData = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i += 1) {
-      mixed[i] += channelData[i];
-    }
-  }
-
-  for (let i = 0; i < frameCount; i += 1) {
-    mixed[i] /= buffer.numberOfChannels;
-  }
-
-  return mixed;
-}
-
-function resampleToRate(input: Float32Array, sourceRate: number, targetRate: number): Float32Array {
-  if (sourceRate === targetRate) {
-    return input;
-  }
-
-  const ratio = sourceRate / targetRate;
-  const newLength = Math.max(1, Math.round(input.length / ratio));
-  const result = new Float32Array(newLength);
-
-  let offsetResult = 0;
-  let offsetInput = 0;
-
-  while (offsetResult < newLength) {
-    const nextOffsetInput = Math.round((offsetResult + 1) * ratio);
-    let accum = 0;
-    let count = 0;
-
-    for (let i = offsetInput; i < nextOffsetInput && i < input.length; i += 1) {
-      accum += input[i];
-      count += 1;
-    }
-
-    result[offsetResult] = count > 0 ? accum / count : 0;
-    offsetResult += 1;
-    offsetInput = nextOffsetInput;
-  }
-
-  return result;
-}
-
-function float32ToPCM(buffer: Float32Array): ArrayBuffer {
-  const pcmBuffer = new ArrayBuffer(buffer.length * 2);
-  const view = new DataView(pcmBuffer);
-
-  for (let i = 0; i < buffer.length; i += 1) {
-    const clampedSample = Math.max(-1, Math.min(1, buffer[i]));
-    const intSample = clampedSample < 0 ? clampedSample * 0x8000 : clampedSample * 0x7fff;
-    view.setInt16(i * 2, intSample, true);
-  }
-
-  return pcmBuffer;
-}
 
 export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}) {
   const targetSampleRate = options.targetSampleRate ?? 16000;
@@ -206,8 +139,8 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
     }
 
     const monoData = mixToMono(decoded);
-    const resampled = resampleToRate(monoData, decoded.sampleRate, targetSampleRate);
-    const pcmBuffer = float32ToPCM(resampled);
+    const resampled = resampleAudio(monoData, decoded.sampleRate, targetSampleRate);
+    const pcmBuffer = float32ToPCM16(resampled);
     const durationMs = resampled.length > 0 ? (resampled.length / targetSampleRate) * 1000 : 0;
 
     return { pcmBuffer, durationMs };
@@ -283,14 +216,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          sampleRate: targetSampleRate,
-          sampleSize: 16,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: STANDARD_AUDIO_CONSTRAINTS,
       });
 
       const mimeType = pickMimeType();
