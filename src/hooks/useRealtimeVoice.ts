@@ -132,8 +132,22 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, []);
 
   const sendMessage = useCallback((message: Record<string, unknown>) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify(message));
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.error('🎤 [RealtimeVoice] Cannot send message - socket not ready:', {
+        hasSocket: !!wsRef.current,
+        readyState: wsRef.current?.readyState,
+        message
+      });
+      return;
+    }
+    try {
+      const messageStr = JSON.stringify(message);
+      console.log('🎤 [RealtimeVoice] Sending message:', message.type, messageStr.substring(0, 100));
+      wsRef.current.send(messageStr);
+      console.log('🎤 [RealtimeVoice] Message sent successfully:', message.type);
+    } catch (err) {
+      console.error('🎤 [RealtimeVoice] Failed to send message:', err, message);
+    }
   }, []);
 
   const sendToolResult = useCallback((responses: Array<Record<string, unknown>>) => {
