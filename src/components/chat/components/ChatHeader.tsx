@@ -11,7 +11,9 @@ import {
   X,
   Menu,
   Subtitles,
+  Monitor
 } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 interface ChatHeaderProps {
   chatState: ChatState;
   onToggleMinimize: () => void;
@@ -22,6 +24,7 @@ interface ChatHeaderProps {
   isVoiceActive?: boolean;
   showTranscript?: boolean;
   onToggleTranscript?: () => void;
+  onOpenMedia?: () => void;
 }
 
 export function ChatHeader({
@@ -33,7 +36,8 @@ export function ChatHeader({
   showNextSteps = false,
   isVoiceActive = false,
   showTranscript = false,
-  onToggleTranscript
+  onToggleTranscript,
+  onOpenMedia
 }: ChatHeaderProps) {
   return (
     <>
@@ -84,6 +88,25 @@ export function ChatHeader({
                   <div className="flex items-center gap-1 md:hidden">
                     {showNextSteps && sessionId && (
                       <NextStepsMenu sessionId={sessionId} show={showNextSteps} />
+                    )}
+                    {/* Media button (mobile opens drawer via ChatInput ref) */}
+                    {onOpenMedia && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={onOpenMedia}
+                              className="h-8 w-8 p-0 touch-manipulation"
+                              aria-label="Open media panel"
+                            >
+                              <Monitor className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom">Open media panel</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                     
                     {/* Transcript toggle button - only show when voice is active */}
@@ -238,7 +261,26 @@ export function ChatHeader({
           </div>
 
           {/* Status indicator - only on desktop for now */}
-          <div className="hidden lg:block">
+          <div className="hidden lg:flex items-center gap-1">
+            {/* Media button (desktop opens side panel) */}
+            {onOpenMedia && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onOpenMedia}
+                      className="h-6 w-6 p-0 touch-manipulation transition-colors"
+                      aria-label="Open media panel"
+                    >
+                      <Monitor className="h-3 w-3" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Open media panel</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <StatusIndicator />
           </div>
         </div>

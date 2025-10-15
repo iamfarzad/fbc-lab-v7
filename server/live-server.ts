@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { RawData } from 'ws'
-import { GoogleGenAI, MediaResolution, Modality } from '@google/genai'
+import { GoogleGenAI, Modality } from '@google/genai'
 import { v4 as uuidv4 } from 'uuid'
 import { Buffer } from 'buffer'
 import * as https from 'https'
@@ -277,24 +277,26 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
 
     let isOpen = false
 
-    // Rich Live configuration
-    const modalities: Modality[] = [Modality.AUDIO, Modality.IMAGE]
-    // Only enable TEXT modality when explicitly opted-in (some audio-native models do not support TEXT)
-    if (process.env.LIVE_SERVER_TEXT_MODALITY === '1' || process.env.LIVE_SERVER_TEXT_MODALITY === 'true') {
-      modalities.push(Modality.TEXT as any)
-    }
-    const liveConfig = {
-      responseModalities: modalities,
-      mediaResolution: MediaResolution.MEDIA_RESOLUTION_MEDIUM,
-      systemInstruction: CHAT_PERSONALITY,
-      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+    // FIXED Live configuration (from working prototype + IMAGE for webcam/screen)
+    const liveConfig: any = {
+      responseModalities: [Modality.AUDIO, Modality.IMAGE],
       speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName } }
+        voiceConfig: {
+          prebuiltVoiceConfig: {
+            voiceName: voiceName,
+          },
+        },
       },
-      contextWindowCompression: {
-        triggerTokens: '25600',
-        slidingWindow: { targetTokens: '12800' }
-      }
+      inputAudioTranscription: {},  // Enable input transcription
+      outputAudioTranscription: {}, // Enable output transcription
+      systemInstruction: {
+        parts: [
+          {
+            text: CHAT_PERSONALITY,
+          },
+        ],
+      },
+      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     }
 
     const session: any = await ai.live.connect({
@@ -412,9 +414,15 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
           safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live API error' } }))
           activeSessions.get(connectionId)?.logger?.log('error', { where: 'live_api', message: error instanceof Error ? error.message : String(error) })
         },
-        onclose: () => {
+        onclose: (event: any) => {
           isOpen = false
-          console.info(`[${connectionId}] Live API session closed`)
+          console.error(`[${connectionId}] ⚠️ Live API session closed`, {
+            code: event?.code,
+            reason: event?.reason,
+            wasClean: event?.wasClean,
+            timestamp: new Date().toISOString(),
+            hadError: Boolean(event?.error)
+          })
           const rec = activeSessions.get(connectionId)
           rec?.logger?.log('session_closed', { source: 'live_api' })
           rec?.logger?.close()

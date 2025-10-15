@@ -38,7 +38,7 @@ export const GEMINI_MODELS = {
   
   // DEFAULTS: What each use case should use
   DEFAULT_CHAT: 'gemini-flash-latest',               // Auto-updates to best
-  DEFAULT_VOICE: 'gemini-2.5-flash-native-audio-preview-09-2025', // Voice optimized
+  DEFAULT_VOICE: 'gemini-2.0-flash-exp', // Voice optimized (testing: was gemini-2.5-flash-native-audio-preview-09-2025)
   DEFAULT_MULTIMODAL: 'gemini-flash-latest',         // Best for images/video
   DEFAULT_WEBCAM: 'gemini-flash-latest',             // Webcam analysis
   DEFAULT_SCREEN: 'gemini-flash-latest',             // Screen capture

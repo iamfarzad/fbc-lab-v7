@@ -39,6 +39,9 @@ interface ActionsMenuProps {
   onOpenScreenFullScreen?: () => void;
   currentTheme?: string;
   onToggleTheme?: () => void;
+  // Preferences
+  autoShowMediaPanel?: boolean;
+  onToggleAutoShowMediaPanel?: (value: boolean) => void;
 }
 
 export function ActionsMenu({
@@ -61,6 +64,8 @@ export function ActionsMenu({
   onOpenScreenFullScreen,
   currentTheme = 'default',
   onToggleTheme,
+  autoShowMediaPanel = true,
+  onToggleAutoShowMediaPanel,
 }: ActionsMenuProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -209,6 +214,13 @@ export function ActionsMenu({
               label="Settings"
               description="Configure chat preferences"
               onClick={handleSettingsClick}
+            />
+
+            <BottomSheetListItem
+              icon={<span className="inline-block h-5 w-5 rounded-sm border border-border/50 flex items-center justify-center text-[10px]">{autoShowMediaPanel ? '✓' : ''}</span>}
+              label="Auto-show media panel"
+              description="Open media panel when voice/camera/screen activate"
+              onClick={() => onToggleAutoShowMediaPanel?.(!autoShowMediaPanel)}
             />
           </div>
         </div>

@@ -89,6 +89,14 @@ export interface EnhancedChatMessage {
       state?: string;
       [key: string]: any;
     }>;
+    // Server-emitted tool-call event payload (HTTP chat path)
+    toolCall?: {
+      id?: string;
+      tool: string;
+      arguments?: Record<string, any>;
+      requiresApproval?: boolean;
+      timestamp?: string;
+    };
     annotations?: Array<Record<string, any>>;
     // Added missing fields
     chainOfThought?: {

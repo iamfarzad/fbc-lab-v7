@@ -1,5 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import React, { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
@@ -87,7 +86,6 @@ import {
 import type { ResearchSummary } from "../hooks/useChatMessages";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { ChatSuggestions } from "./ChatSuggestions";
-import { ShimmeringText } from "@/components/ui/shimmering-text";
 import { ChatTermsAcceptance } from "./ChatTermsAcceptance";
 import { ToolApprovalPrompt } from "../ToolApprovalPrompt";
 import { CalendarWidget, ChartWidget } from "../artifacts";
@@ -142,15 +140,10 @@ interface ChatMessagesProps {
   onEmailChange?: (email: string) => void;
   onAgreedChange?: (agreed: boolean) => void;
   onAcceptTerms?: () => void;
+  // Tool approval handlers (HTTP SSE tool-call flow)
+  onApproveTool?: (tool: string, args?: Record<string, any>) => void;
+  onDeclineTool?: (tool: string) => void;
 }
-
-const STREAMING_PHRASES = [
-  "Streaming",
-  "Processing",
-  "Analyzing",
-  "Generating",
-  "Thinking",
-];
 
 export function ChatMessages({
   messages,
@@ -171,26 +164,10 @@ export function ChatMessages({
   onEmailChange,
   onAgreedChange,
   onAcceptTerms,
+  onApproveTool,
+  onDeclineTool,
 }: ChatMessagesProps) {
-  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
-
-  // Cycle through streaming phrases
-  useEffect(() => {
-    const hasStreamingMessage = enhancedMessages.some(
-      msg => msg.role === 'assistant' && msg.isStreaming
-    );
-    
-    if (!hasStreamingMessage) {
-      setCurrentPhraseIndex(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setCurrentPhraseIndex((prev) => (prev + 1) % STREAMING_PHRASES.length);
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [enhancedMessages]);
+  // Calm UI: remove streaming shimmer here; composer shows a compact status line.
 
   // Follow-up suggestions disabled
   // const followUpSuggestion = useMemo(() => {
@@ -284,6 +261,9 @@ export function ChatMessages({
                 : null,
             ].filter(Boolean) as string[];
 
+            // Tool-call extraction from metadata (HTTP path) or legacy top-level
+            const toolCall = (message.metadata as any)?.toolCall || ((message as any).type === 'tool_call' ? (message as any) : undefined);
+
             return (
               <Message
                 key={message.id}
@@ -317,35 +297,7 @@ export function ChatMessages({
                     "text-[13px] leading-relaxed",
                     "[.monochrome_&]:font-mono",
                   )}>
-                    {/* Shimmering hint while streaming (non-intrusive) */}
-                    {message.role === 'assistant' && message.isStreaming && (
-                      <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                        <span className="inline-flex items-center gap-2">
-                          <span className="flex items-center gap-1">
-                            <span className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" />
-                            <span className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}} />
-                            <span className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.4s'}} />
-                          </span>
-                          <AnimatePresence mode="wait">
-                            <motion.div
-                              key={currentPhraseIndex}
-                              initial={{ opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -8 }}
-                              transition={{ duration: 0.25 }}
-                            >
-                              <ShimmeringText 
-                                text={STREAMING_PHRASES[currentPhraseIndex]} 
-                                duration={1.8} 
-                                repeat 
-                                repeatDelay={0.4} 
-                                className="opacity-90" 
-                              />
-                            </motion.div>
-                          </AnimatePresence>
-                        </span>
-                      </div>
-                    )}
+                    {/* Streaming hint removed: handled by composer status line */}
                     <div className={cn(
                       message.metadata?.isPartial && "opacity-70 italic text-muted-foreground"
                     )}>
@@ -585,40 +537,38 @@ export function ChatMessages({
                     </div>
                     
                     {/* Tool Calls - Approval Prompts & Artifacts */}
-                    {(message as any).type === 'tool_call' && (
+                    {(toolCall) && (
                       <div className="mt-4">
                         {/* Multimodal Tool Approval Prompts */}
-                        {(message as any).requiresApproval && (
+                        {(toolCall.requiresApproval) && (
                           <ToolApprovalPrompt
-                            tool={(message as any).tool}
-                            reason={(message as any).arguments?.reason || 'Would you like to enable this feature?'}
+                            tool={toolCall.tool}
+                            reason={toolCall.arguments?.reason || 'Would you like to enable this feature?'}
                             onApprove={() => {
-                              // Handled in ChatInterface via props
-                              console.log('Tool approved:', (message as any).tool);
+                              onApproveTool?.(toolCall.tool, toolCall.arguments || {});
                             }}
                             onDecline={() => {
-                              // Handled in ChatInterface via props
-                              console.log('Tool declined:', (message as any).tool);
+                              onDeclineTool?.(toolCall.tool);
                             }}
                           />
                         )}
                         
                         {/* Calendar Widget Artifact */}
-                        {(message as any).tool === 'create_calendar_widget' && !(message as any).requiresApproval && (
+                        {toolCall?.tool === 'create_calendar_widget' && !toolCall?.requiresApproval && (
                           <CalendarWidget 
-                            title={(message as any).arguments?.title}
-                            description={(message as any).arguments?.description}
-                            url={(message as any).arguments?.url}
+                            title={toolCall.arguments?.title}
+                            description={toolCall.arguments?.description}
+                            url={toolCall.arguments?.url}
                           />
                         )}
                         
                         {/* Chart Widget Artifact */}
-                        {(message as any).tool === 'create_chart' && !(message as any).requiresApproval && (
+                        {toolCall?.tool === 'create_chart' && !toolCall?.requiresApproval && (
                           <ChartWidget 
-                            type={(message as any).arguments?.type}
-                            title={(message as any).arguments?.title}
-                            description={(message as any).arguments?.description}
-                            data={(message as any).arguments?.data}
+                            type={toolCall.arguments?.type}
+                            title={toolCall.arguments?.title}
+                            description={toolCall.arguments?.description}
+                            data={toolCall.arguments?.data}
                           />
                         )}
                       </div>
@@ -669,18 +619,9 @@ export function ChatMessages({
                   <div className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}}></div>
                   <div className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.4s'}}></div>
                 </div>
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={currentPhraseIndex}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25 }}
-                    className="tracking-[0.3em] uppercase"
-                  >
-                    AI {STREAMING_PHRASES[currentPhraseIndex]}
-                  </motion.span>
-                </AnimatePresence>
+                <span className="tracking-[0.3em] uppercase">
+                  AI RESPONDING
+                </span>
               </div>
             </div>
           )}

@@ -90,6 +90,9 @@ export function useChatMessages(initialSessionId?: string) {
       const toolInvocations = Array.isArray(msg.metadata?.toolInvocations)
         ? (msg.metadata!.toolInvocations as Array<Record<string, any>>)
         : undefined;
+      const toolCall = msg.metadata && (msg.metadata as any).toolCall && typeof (msg.metadata as any).toolCall === 'object'
+        ? (msg.metadata as any).toolCall as { id?: string; tool: string; arguments?: Record<string, any>; requiresApproval?: boolean; timestamp?: string }
+        : undefined;
       const annotations = Array.isArray(msg.metadata?.annotations)
         ? (msg.metadata!.annotations as Array<Record<string, any>>)
         : undefined;
@@ -199,6 +202,9 @@ export function useChatMessages(initialSessionId?: string) {
       }
       if (toolInvocations) {
         metadataPayload.toolInvocations = toolInvocations;
+      }
+      if (toolCall) {
+        metadataPayload.toolCall = toolCall;
       }
       if (annotations) {
         metadataPayload.annotations = annotations;

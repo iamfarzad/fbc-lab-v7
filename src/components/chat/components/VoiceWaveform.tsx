@@ -1,6 +1,25 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
+// Helper to resolve CSS variable colors for Canvas
+function getCSSColor(variable: string, alpha: number): string {
+  if (typeof window === 'undefined') return `rgba(0, 0, 0, ${alpha})`;
+  
+  const root = document.documentElement;
+  const value = getComputedStyle(root).getPropertyValue(variable).trim();
+  
+  if (!value) {
+    // Fallback colors
+    if (variable === '--primary') return `hsl(262 83% 58% / ${alpha})`;
+    if (variable === '--muted-foreground') return `hsl(215 16% 47% / ${alpha})`;
+    return `rgba(0, 0, 0, ${alpha})`;
+  }
+  
+  // CSS variables in Tailwind are often in format: "262 83% 58%"
+  // Need to wrap in hsl() with alpha
+  return `hsl(${value} / ${alpha})`;
+}
+
 interface VoiceWaveformProps {
   isActive: boolean;
   isProcessing?: boolean;
@@ -85,16 +104,16 @@ export function VoiceWaveform({
         
         if (isActive) {
           // Active: vibrant gradient
-          gradient.addColorStop(0, 'hsl(var(--primary) / 0.8)');
-          gradient.addColorStop(1, 'hsl(var(--primary) / 0.4)');
+          gradient.addColorStop(0, getCSSColor('--primary', 0.8));
+          gradient.addColorStop(1, getCSSColor('--primary', 0.4));
         } else if (isProcessing) {
           // Processing: subtle pulse
-          gradient.addColorStop(0, 'hsl(var(--muted-foreground) / 0.5)');
-          gradient.addColorStop(1, 'hsl(var(--muted-foreground) / 0.3)');
+          gradient.addColorStop(0, getCSSColor('--muted-foreground', 0.5));
+          gradient.addColorStop(1, getCSSColor('--muted-foreground', 0.3));
         } else {
           // Inactive: very muted
-          gradient.addColorStop(0, 'hsl(var(--muted-foreground) / 0.2)');
-          gradient.addColorStop(1, 'hsl(var(--muted-foreground) / 0.1)');
+          gradient.addColorStop(0, getCSSColor('--muted-foreground', 0.2));
+          gradient.addColorStop(1, getCSSColor('--muted-foreground', 0.1));
         }
 
         ctx.fillStyle = gradient;

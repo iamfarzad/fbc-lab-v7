@@ -12,7 +12,7 @@ import { cn, blobToBase64 } from "@/lib/utils";
 import { ChatContainer } from "./components/ChatContainer";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
-import { ChatInput } from "./components/ChatInput";
+import { ChatInput, type ChatInputHandle } from "./components/ChatInput";
 import { SessionLimitWarning } from "./SessionLimitWarning";
 
 // Hooks - extracted logic
@@ -82,6 +82,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     return () => clearInterval(interval);
   }, [sessionId]);
   const audioHookRef = useRef<ReturnType<typeof useRealtimeVoice> | null>(null);
+  const chatInputRef = useRef<ChatInputHandle | null>(null);
   const {
     appendVoiceUserMessage,
     updatePartialUserTranscript,
@@ -372,6 +373,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
   
   const intelligenceHook = useChatIntelligence(sessionId);
   const artifactsState = useArtifacts();
+  const isMobile = typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false;
 
   useEffect(() => {
     if (!intelligenceHook.hasAcceptedTerms) return;
@@ -446,6 +448,38 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const exportArtifacts = artifactCards;
 
   const sessionIdForExport = messagesHook.sessionId || intelligenceHook.sessionId;
+
+  // Map HTTP chat tool approvals to actual UI toggles
+  const handleApproveTool = useCallback(async (tool: string, args?: Record<string, any>) => {
+    const t = String(tool || '').trim();
+    try {
+      if (t === 'enable_voice') {
+        setRequestedPopover('voice');
+        await toggleVoiceSession();
+      } else if (t === 'enable_screen_share') {
+        setRequestedPopover('screen');
+        await chatStateHook.toggleScreenShare();
+      } else if (t === 'enable_webcam') {
+        setRequestedPopover('camera');
+        await handleToggleCamera();
+      } else {
+        console.info('Unhandled tool approval:', t, args);
+      }
+    } catch (e) {
+      console.error('Failed to approve tool:', t, e);
+    }
+  }, [chatStateHook, handleToggleCamera, toggleVoiceSession]);
+
+  const handleDeclineTool = useCallback((tool: string) => {
+    console.info('Tool declined:', tool);
+  }, []);
+
+  // Header media opener → delegates to ChatInput's media UI
+  const openMediaFromHeader = useCallback(() => {
+    try {
+      chatInputRef.current?.openMedia();
+    } catch {}
+  }, []);
 
   // Capture screen share frames and send to Gemini for analysis
   useEffect(() => {
@@ -814,6 +848,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
               sessionId={sessionId}
               showNextSteps={intelligenceHook.hasAcceptedTerms && usage && (usage.messages_sent >= 5 || (Date.now() - (usage.started_at || 0)) / 60000 >= 5)}
               isVoiceActive={audioHook.isSessionActive}
+              onOpenMedia={openMediaFromHeader}
             />
 
             {isExpanded && renderActiveStreamBanner()}
@@ -827,26 +862,28 @@ export function ChatInterface({ id }: { id?: string | null }) {
                 </div>
               )}
 
-              <ChatMessages
-                messages={messagesHook.messages}
-                enhancedMessages={messagesHook.enhancedMessages}
-                researchSummaries={messagesHook.researchSummaries}
-                isLoading={messagesHook.isLoading}
-                contextReady={intelligenceHook.contextReady}
-                currentContext={intelligenceHook.currentContext}
-                hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
-                onSendMessage={messagesHook.handleSendMessage}
-                aiElements={aiConfig}
-                isExpanded={isExpanded}
-                artifacts={artifactCards}
-                name={intelligenceHook.name}
-                email={intelligenceHook.email}
-                agreed={intelligenceHook.agreed}
-                onNameChange={intelligenceHook.setName}
-                onEmailChange={intelligenceHook.setEmail}
-                onAgreedChange={intelligenceHook.setAgreed}
-                onAcceptTerms={intelligenceHook.handleTermsAcceptance}
-              />
+            <ChatMessages
+              messages={messagesHook.messages}
+              enhancedMessages={messagesHook.enhancedMessages}
+              researchSummaries={messagesHook.researchSummaries}
+              isLoading={messagesHook.isLoading}
+              contextReady={intelligenceHook.contextReady}
+              currentContext={intelligenceHook.currentContext}
+              hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
+              onSendMessage={messagesHook.handleSendMessage}
+              aiElements={aiConfig}
+              isExpanded={isExpanded}
+              artifacts={artifactCards}
+              name={intelligenceHook.name}
+              email={intelligenceHook.email}
+              agreed={intelligenceHook.agreed}
+              onNameChange={intelligenceHook.setName}
+              onEmailChange={intelligenceHook.setEmail}
+              onAgreedChange={intelligenceHook.setAgreed}
+              onAcceptTerms={intelligenceHook.handleTermsAcceptance}
+              onApproveTool={handleApproveTool}
+              onDeclineTool={handleDeclineTool}
+            />
             </div>
 
             <div className={cn(
@@ -854,6 +891,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
               isExpanded ? "px-4 sm:px-8 py-4 pb-6" : "px-4 py-4 pb-5"
             )}>
               <ChatInput
+                ref={chatInputRef}
                 inputValue={messagesHook.inputValue}
                 isLoading={messagesHook.isLoading}
                 isListening={chatState.isListening}
@@ -914,7 +952,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
       )}
 
       {/* Draggable Video Players - Prototype Style */}
-      {chatState.isCameraActive && camera.stream && (
+      {(!isMobile) && chatState.isCameraActive && camera.stream && (
         <DraggableVideoPlayer
           stream={camera.stream}
           onClose={camera.stopCamera}
@@ -923,7 +961,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
         />
       )}
 
-      {chatState.isScreenSharing && chatState.screenShareStream && (
+      {(!isMobile) && chatState.isScreenSharing && chatState.screenShareStream && (
         <DraggableVideoPlayer
           stream={chatState.screenShareStream}
           onClose={chatStateHook.stopScreenShare}

@@ -13,6 +13,7 @@
 
 import { exec } from 'child_process';
 import fs from 'fs';
+import { WEBSOCKET_CONFIG } from '../config/constants.js';
 import fsPromises from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';

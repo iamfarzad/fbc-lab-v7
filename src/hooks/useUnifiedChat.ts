@@ -185,7 +185,33 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
             const payloadText = dataLine.replace(/^data:\s*/, '')
             if (payloadText && payloadText !== '[DONE]') {
               try {
-                const parsed = JSON.parse(payloadText)
+                const parsed: any = JSON.parse(payloadText)
+
+                // Handle tool-call events emitted by the server stream
+                if (parsed && parsed.type === 'tool_call') {
+                  const toolId = typeof parsed.id === 'string' && parsed.id.length > 0 ? parsed.id : crypto.randomUUID()
+                  const toolMessage = {
+                    id: toolId,
+                    role: 'assistant' as const,
+                    content: '',
+                    timestamp: new Date(),
+                    metadata: {
+                      type: 'tool' as const,
+                      // Preserve original payload under metadata.toolCall for UI rendering
+                      toolCall: {
+                        id: toolId,
+                        tool: parsed.tool,
+                        arguments: parsed.arguments,
+                        requiresApproval: Boolean(parsed.requiresApproval),
+                        timestamp: parsed.timestamp
+                      }
+                    }
+                  }
+
+                  commitMessages(prev => ([...prev, toolMessage]))
+                  continue
+                }
+
                 const normalised = normaliseStreamMessage(parsed, activeAssistantId)
                 if (normalised) {
                   activeAssistantId = normalised.id

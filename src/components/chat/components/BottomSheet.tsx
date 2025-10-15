@@ -22,6 +22,8 @@ export function BottomSheet({
   className 
 }: BottomSheetProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = React.useMemo(() => `sheet-title-${Math.random().toString(36).slice(2)}`, []);
 
   // Prevent body scroll when sheet is open
   useEffect(() => {
@@ -61,6 +63,38 @@ export function BottomSheet({
     return undefined
   }, [isOpen, onClose]);
 
+  // Focus trap within sheet
+  useEffect(() => {
+    if (!isOpen) return;
+    const root = panelRef.current;
+    if (!root) return;
+    const focusable = root.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    // Focus first element
+    first?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      if (focusable.length === 0) return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          (last || first).focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          (first || last).focus();
+        }
+      }
+    };
+    root.addEventListener('keydown', onKeyDown);
+    return () => root.removeEventListener('keydown', onKeyDown);
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -98,7 +132,11 @@ export function BottomSheet({
               getMonochromeClass(),
               className
             )}
+            ref={panelRef}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={title ? titleId : undefined}
             // Swipe-down to close on touch devices
             drag="y"
             dragConstraints={{ top: 0, bottom: 0 }}
@@ -122,7 +160,7 @@ export function BottomSheet({
             {/* Header */}
             {title && (
               <div className="flex items-center justify-between px-6 pb-4">
-                <h2 className={cn(DESIGN_TOKENS.typography.heading, "text-foreground")}>{title}</h2>
+                <h2 id={titleId} className={cn(DESIGN_TOKENS.typography.heading, "text-foreground")}>{title}</h2>
                 <Button
                   variant="ghost"
                   size="sm"

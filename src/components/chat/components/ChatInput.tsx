@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   PromptInput,
@@ -20,16 +20,15 @@ import {
 import { VoiceButton } from "@/components/ui/voice-button";
 import { ActionsMenu } from "./ActionsMenu";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
-import { VoicePopover } from "./voice/VoicePopover";
 import { CameraFullScreen } from "./camera/CameraFullScreen";
-import { CameraPopover } from "./camera/CameraPopover";
 import { ScreenFullScreen } from "./screen/ScreenFullScreen";
-import { ScreenPopover } from "./screen/ScreenPopover";
-import { MediaPopover } from "./MediaPopover";
 import { PermissionExplanationDialog } from "./PermissionExplanationDialog";
 import { usePromptInputAttachments } from "@/components/ai-elements/interactive/prompt-input";
 import { useMediaToggle } from "@/hooks/useMediaToggle";
 import { useMediaKeyboardShortcuts } from "@/hooks/useMediaKeyboardShortcuts";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { MediaDrawer } from "./MediaDrawer";
+import { MediaPanel } from "./MediaPanel";
 
 type SendMessageInput = string | {
   text?: string;
@@ -74,7 +73,11 @@ interface ChatInputProps {
   onAutoOpenPopoverHandled?: () => void;
 }
 
-export function ChatInput({
+export type ChatInputHandle = {
+  openMedia: (tab?: 'voice' | 'camera' | 'screen') => void;
+}
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput({
   inputValue,
   isLoading,
   isListening,
@@ -105,10 +108,37 @@ export function ChatInput({
   sessionIdForExport,
   autoOpenPopover = null,
   onAutoOpenPopoverHandled,
-}: ChatInputProps) {
+}, ref) {
   const [activePopover, setActivePopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [isMediaDrawerOpen, setIsMediaDrawerOpen] = useState(false);
+  const [mediaDrawerTab, setMediaDrawerTab] = useState<'voice' | 'camera' | 'screen'>('voice');
+  const isMobile = useIsMobile();
+  const [isMediaPanelOpen, setIsMediaPanelOpen] = useState(false);
+  const [mediaPanelTab, setMediaPanelTab] = useState<'voice' | 'camera' | 'screen'>('voice');
+  const [autoShowMediaPanel, setAutoShowMediaPanel] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try { return localStorage.getItem('fbc-auto-show-media-panel') !== 'false' } catch { return true }
+  });
+
+  // Expose imperative method to open media from header
+  useImperativeHandle(ref, () => ({
+    openMedia: (tab?: 'voice' | 'camera' | 'screen') => {
+      const targetTab = tab || 'voice';
+      if (isMobile) {
+        setMediaDrawerTab(targetTab);
+        setIsMediaDrawerOpen(true);
+      } else {
+        setMediaPanelTab(targetTab);
+        setIsMediaPanelOpen(true);
+      }
+    }
+  }), [isMobile]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { localStorage.setItem('fbc-auto-show-media-panel', String(autoShowMediaPanel)) } catch {}
+  }, [autoShowMediaPanel]);
   
   // Refs for popover positioning
   const voiceButtonRef = useRef<HTMLDivElement>(null);
@@ -157,14 +187,31 @@ export function ChatInput({
 
   // Auto-open popover when media becomes active
   useEffect(() => {
-    if ((isVoiceActive || isVoiceProcessing) && !activePopover) {
-      setActivePopover('voice');
-    } else if (cameraState && !activePopover) {
-      setActivePopover('camera');
-    } else if (isScreenSharing && !activePopover) {
-      setActivePopover('screen');
+    if (!autoShowMediaPanel) return;
+    if (isMobile) {
+      if ((isVoiceActive || isVoiceProcessing) && !isMediaDrawerOpen) {
+        setMediaDrawerTab('voice');
+        setIsMediaDrawerOpen(true);
+      } else if (cameraState && !isMediaDrawerOpen) {
+        setMediaDrawerTab('camera');
+        setIsMediaDrawerOpen(true);
+      } else if (isScreenSharing && !isMediaDrawerOpen) {
+        setMediaDrawerTab('screen');
+        setIsMediaDrawerOpen(true);
+      }
+    } else {
+      if ((isVoiceActive || isVoiceProcessing) && !isMediaPanelOpen) {
+        setMediaPanelTab('voice');
+        setIsMediaPanelOpen(true);
+      } else if (cameraState && !isMediaPanelOpen) {
+        setMediaPanelTab('camera');
+        setIsMediaPanelOpen(true);
+      } else if (isScreenSharing && !isMediaPanelOpen) {
+        setMediaPanelTab('screen');
+        setIsMediaPanelOpen(true);
+      }
     }
-  }, [isVoiceActive, isVoiceProcessing, cameraState, isScreenSharing, activePopover]);
+  }, [autoShowMediaPanel, isVoiceActive, isVoiceProcessing, cameraState, isScreenSharing, isMobile, isMediaDrawerOpen, isMediaPanelOpen]);
 
   // Close popover when media stops
   useEffect(() => {
@@ -177,38 +224,53 @@ export function ChatInput({
     }
   }, [activePopover, isVoiceActive, isVoiceProcessing, cameraState, isScreenSharing]);
 
-  const closePopover = () => setActivePopover(null);
+  // closePopover removed - popovers replaced by MediaPanel/MediaDrawer
 
   useEffect(() => {
     if (!autoOpenPopover) return;
-    setActivePopover(autoOpenPopover);
+    if (isMobile) {
+      setMediaDrawerTab(autoOpenPopover);
+      setIsMediaDrawerOpen(true);
+    } else {
+      setMediaPanelTab(autoOpenPopover);
+      setIsMediaPanelOpen(true);
+    }
     onAutoOpenPopoverHandled?.();
-  }, [autoOpenPopover, onAutoOpenPopoverHandled]);
+  }, [autoOpenPopover, onAutoOpenPopoverHandled, isMobile]);
 
   // Simplified handlers that close actions menu and delegate to hooks
   const handleVoiceButtonClick = () => {
     setIsActionsMenuOpen(false);
-    if (!voiceToggle.isMobile) {
-      const willOpen = activePopover !== 'voice';
-      setActivePopover(willOpen ? 'voice' : null);
+    if (isMobile) {
+      setMediaDrawerTab('voice');
+      setIsMediaDrawerOpen(true);
+    } else {
+      setMediaPanelTab('voice');
+      setIsMediaPanelOpen(true);
     }
     voiceToggle.handleButtonClick();
   };
 
   const handleCameraButtonClick = () => {
     setIsActionsMenuOpen(false);
-    if (!cameraToggle.isMobile) {
-      const willOpen = activePopover !== 'camera';
-      setActivePopover(willOpen ? 'camera' : null);
+    if (isMobile) {
+      setMediaDrawerTab('camera');
+      setIsMediaDrawerOpen(true);
+    } else {
+      setMediaPanelTab('camera');
+      setIsMediaPanelOpen(true);
     }
     cameraToggle.handleButtonClick();
   };
 
   const handleScreenButtonClick = () => {
     setIsActionsMenuOpen(false);
-    if (!screenToggle.isMobile) {
-      const willOpen = activePopover !== 'screen';
-      setActivePopover(willOpen ? 'screen' : null);
+    if (isMobile) {
+      setMediaDrawerTab('screen');
+      setIsMediaDrawerOpen(true);
+    } else {
+      setMediaPanelTab('screen');
+      setIsMediaPanelOpen(true);
     }
     screenToggle.handleButtonClick();
   };
@@ -267,6 +329,14 @@ export function ChatInput({
         "mx-auto w-full",
         isExpanded ? "max-w-3xl px-4" : "px-4"
       )}>
+        {(isLoading || isVoiceProcessing || isVoiceActive) && (
+          <div className="mb-1 text-[11px] text-muted-foreground flex items-center gap-2" role="status" aria-live="polite" aria-atomic="true">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))] animate-pulse" />
+            <span>
+              {isVoiceProcessing ? 'Processing voice…' : isVoiceActive ? 'Recording…' : 'AI is responding…'}
+            </span>
+          </div>
+        )}
         <PromptInput
           className={cn(
             "flex flex-col gap-2 border border-border/30 bg-card/95 px-4 sm:px-6 pb-3 pt-3 shadow-[0_20px_60px_-40px_rgba(12,18,26,0.45)]",
@@ -414,53 +484,55 @@ export function ChatInput({
         </PromptInput>
       </div>
 
-      {/* Popovers for media controls */}
-      <MediaPopover
-        type="voice"
-        isOpen={activePopover === 'voice'}
-        onClose={closePopover}
-        triggerRef={voiceButtonRef}
-      >
-        <VoicePopover
-          isActive={isVoiceActive}
-          isProcessing={isVoiceProcessing}
-          transcript={voiceTranscript}
-          partialTranscript={voicePartialTranscript}
-          error={voiceError}
-          onToggle={onToggleVoice}
-        />
-      </MediaPopover>
+      {/* Mobile Media Drawer */}
+      <MediaDrawer
+        isOpen={isMediaDrawerOpen}
+        onClose={() => setIsMediaDrawerOpen(false)}
+        defaultTab={mediaDrawerTab}
+        voiceActive={isVoiceActive}
+        voiceProcessing={isVoiceProcessing}
+        voiceTranscript={voiceTranscript}
+        voicePartial={voicePartialTranscript}
+        voiceError={voiceError}
+        onToggleVoice={onToggleVoice}
+        cameraActive={cameraState}
+        cameraStream={cameraStream ?? null}
+        cameraError={cameraError}
+        onToggleCamera={onToggleCamera}
+        onSwitchCamera={onSwitchCamera}
+        hasMultipleCameras={(availableCameras || 0) > 1}
+        screenActive={isScreenSharing}
+        screenStream={screenShareStream ?? null}
+        screenThumbnail={screenThumbnail}
+        screenError={screenShareError}
+        onToggleScreen={onToggleScreenShare}
+      />
 
-      <MediaPopover
-        type="camera"
-        isOpen={activePopover === 'camera'}
-        onClose={closePopover}
-        triggerRef={cameraButtonRef}
-      >
-        <CameraPopover
-          isActive={cameraState}
-          stream={cameraStream ?? null}
-          error={cameraError}
-          onToggle={onToggleCamera}
+      {/* Desktop Media Panel */}
+      {!isMobile && (
+        <MediaPanel
+          isOpen={isMediaPanelOpen}
+          onClose={() => setIsMediaPanelOpen(false)}
+          defaultTab={mediaPanelTab}
+          voiceActive={isVoiceActive}
+          voiceProcessing={isVoiceProcessing}
+          voiceTranscript={voiceTranscript}
+          voicePartial={voicePartialTranscript}
+          voiceError={voiceError}
+          onToggleVoice={onToggleVoice}
+          cameraActive={cameraState}
+          cameraStream={cameraStream ?? null}
+          cameraError={cameraError}
+          onToggleCamera={onToggleCamera}
           onSwitchCamera={onSwitchCamera}
-          hasMultipleCameras={availableCameras > 1}
+          hasMultipleCameras={(availableCameras || 0) > 1}
+          screenActive={isScreenSharing}
+          screenStream={screenShareStream ?? null}
+          screenThumbnail={screenThumbnail}
+          screenError={screenShareError}
+          onToggleScreen={onToggleScreenShare}
         />
-      </MediaPopover>
-
-      <MediaPopover
-        type="screen"
-        isOpen={activePopover === 'screen'}
-        onClose={closePopover}
-        triggerRef={screenButtonRef}
-      >
-        <ScreenPopover
-          isActive={isScreenSharing}
-          stream={screenShareStream ?? null}
-          thumbnail={screenThumbnail}
-          error={screenShareError}
-          onToggle={onToggleScreenShare}
-        />
-      </MediaPopover>
+      )}
 
       {/* Permission Explanation Dialog */}
       <PermissionExplanationDialog
@@ -498,6 +570,8 @@ export function ChatInput({
         onOpenScreenFullScreen={screenToggle.openFullScreen}
         currentTheme="default" // TODO: Get from context
         onToggleTheme={() => {}} // TODO: Implement theme toggle
+        autoShowMediaPanel={autoShowMediaPanel}
+        onToggleAutoShowMediaPanel={(value) => setAutoShowMediaPanel(!!value)}
       />
 
       {/* Full-Screen Media Components */}
@@ -534,4 +608,4 @@ export function ChatInput({
       />
     </div>
   );
-}
+});
