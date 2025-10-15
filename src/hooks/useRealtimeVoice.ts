@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioStreamingQueue } from '@/lib/audio-streaming-queue';
 import { useMediaRecorderVoice, type MediaRecorderVoiceResult } from '@/hooks/useMediaRecorderVoice';
+import { WEBSOCKET_CONFIG } from '@/config/constants';
 
 export type VoiceSession = {
   connectionId: string;
