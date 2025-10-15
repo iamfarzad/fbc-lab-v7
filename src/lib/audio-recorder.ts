@@ -177,4 +177,13 @@ export class AudioRecorder extends EventEmitter {
   get isRecording(): boolean {
     return this.isActive;
   }
+
+  /**
+   * Returns the underlying MediaStream used for capture, if available.
+   * Useful for visualizers or diagnostics. May be null if not started yet
+   * or if capture has been stopped.
+   */
+  public getStream(): MediaStream | null {
+    return this.stream;
+  }
 }

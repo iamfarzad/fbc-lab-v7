@@ -4,7 +4,6 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { X, MessageCircle } from "lucide-react";
 import { cn, blobToBase64 } from "@/lib/utils";
 
@@ -12,7 +11,8 @@ import { cn, blobToBase64 } from "@/lib/utils";
 import { ChatContainer } from "./components/ChatContainer";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
-import { ChatInput, type ChatInputHandle } from "./components/ChatInput";
+import { type ChatInputHandle } from "./components/ChatInput";
+import { ConversationBar } from "./components/ConversationBar";
 import { SessionLimitWarning } from "./SessionLimitWarning";
 
 // Hooks - extracted logic
@@ -30,6 +30,7 @@ import { CHAT_CONSTANTS } from "./constants/chatConstants";
 
 // Utils
 import { MeetingOverlay } from "@/components/meeting/MeetingOverlay";
+import { SettingsDialog } from "./components/SettingsDialog";
 import { AIDevtools } from "@ai-sdk-tools/devtools";
 import { useArtifacts } from "@ai-sdk-tools/artifacts/client";
 import { toast } from "sonner";
@@ -298,6 +299,14 @@ export function ChatInterface({ id }: { id?: string | null }) {
   });
   audioHookRef.current = audioHook;
   const voiceConnectionId = audioHook.session?.connectionId ?? undefined;
+  // Map voice hook state to visualizer state
+  const visualizerState = useMemo(() => {
+    if (!audioHook.isSocketReady) return 'connecting' as const;
+    if (audioHook.isProcessing && !audioHook.isRecording) return 'initializing' as const;
+    if (audioHook.isRecording) return 'listening' as const;
+    // If we recently received model replies, treat as speaking; otherwise thinking
+    return (audioHook.modelReplies?.length ?? 0) > 0 ? ('speaking' as const) : ('thinking' as const);
+  }, [audioHook.isSocketReady, audioHook.isProcessing, audioHook.isRecording, audioHook.modelReplies]);
 
   // Camera integration with continuous frame streaming (prototype pattern)
   const camera = useCamera({
@@ -430,6 +439,21 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const [isMeetingOpen, setIsMeetingOpen] = useState(false);
   const [requestedPopover, setRequestedPopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const lastProcessedMessageRef = useRef<string | null>(null);
+  // Conversation Bar feature flag with runtime fallbacks
+  const useBar = (() => {
+    // SSR safety check
+    if (typeof window === 'undefined') return false;
+    
+    // Build-time env var (highest priority for production)
+    if (process.env.NEXT_PUBLIC_CHAT_BAR === '1') return true;
+    
+    // Runtime overrides for testing (no rebuild needed)
+    if (localStorage.getItem('fbc-bar') === '1') return true;
+    if (new URLSearchParams(window.location.search).get('bar') === '1') return true;
+    
+    // Default: false (safe rollout - old UI by default)
+    return false;
+  })();
 
   // Handle opening meeting booking
   const openMeeting = useCallback(() => {
@@ -472,13 +496,6 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   const handleDeclineTool = useCallback((tool: string) => {
     console.info('Tool declined:', tool);
-  }, []);
-
-  // Header media opener → delegates to ChatInput's media UI
-  const openMediaFromHeader = useCallback(() => {
-    try {
-      chatInputRef.current?.openMedia();
-    } catch {}
   }, []);
 
   // Capture screen share frames and send to Gemini for analysis
@@ -702,40 +719,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     });
   };
 
-  // Camera and screen share now live entirely in their popovers
-  // No background banners needed
-  const renderActiveStreamBanner = () => {
-    return null;
-  };
-
-  const renderResearchStatus = () => {
-    return null;
-  };
-
-  const renderVoiceProcessingBanner = () => {
-    if (!isExpanded) return null;
-    if (!chatState.isListening) return null;
-
-    return (
-      <div className="mx-auto w-full max-w-3xl px-6 sm:px-10 pb-6">
-        <div className="flex items-center gap-3 rounded-full border border-border/40 bg-card/80 px-5 py-3 text-xs text-muted-foreground shadow-chat">
-          <div className="flex items-center gap-1">
-            <div className="flex items-center gap-0.5">
-              <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-              <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-              <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-              <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-              <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-            </div>
-          </div>
-          <span className="tracking-[0.35em] uppercase">Voice Active</span>
-          <Badge variant="secondary" className="ml-auto text-[10px] tracking-[0.3em] uppercase">
-            {audioHook.isProcessing ? 'Processing' : audioHook.isRecording ? 'Recording' : 'Listening'}
-          </Badge>
-        </div>
-      </div>
-    );
-  };
+  // Camera, screen, and voice banners removed - now handled by ConversationBar
 
   useEffect(() => {
     const lastUserMessage = [...messagesHook.messages].reverse().find((message) => message.role === 'user');
@@ -848,12 +832,10 @@ export function ChatInterface({ id }: { id?: string | null }) {
               sessionId={sessionId}
               showNextSteps={intelligenceHook.hasAcceptedTerms && usage && (usage.messages_sent >= 5 || (Date.now() - (usage.started_at || 0)) / 60000 >= 5)}
               isVoiceActive={audioHook.isSessionActive}
-              onOpenMedia={openMediaFromHeader}
+              onOpenMedia={undefined}
             />
 
-            {isExpanded && renderActiveStreamBanner()}
-            {isExpanded && renderResearchStatus()}
-            {isExpanded && renderVoiceProcessingBanner()}
+            {/* Legacy banners are disabled under the unified Conversation Bar */}
 
             <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>
               {intelligenceHook.hasAcceptedTerms && usage && (
@@ -886,23 +868,22 @@ export function ChatInterface({ id }: { id?: string | null }) {
             />
             </div>
 
-            <div className={cn(
-              "flex-shrink-0 border-t border-border/20 safe-area-inset-bottom",
-              isExpanded ? "px-4 sm:px-8 py-4 pb-6" : "px-4 py-4 pb-5"
-            )}>
-              <ChatInput
-                ref={chatInputRef}
-                inputValue={messagesHook.inputValue}
-                isLoading={messagesHook.isLoading}
-                isListening={chatState.isListening}
-                voiceTranscript={audioHook.transcript}
-                voicePartialTranscript={audioHook.partialTranscript}
-                isMinimized={chatState.isMinimized}
-                voiceError={audioHook.error}
-                isVoiceActive={audioHook.isRecording}
-                isVoiceProcessing={audioHook.isProcessing}
-                isVoiceSupported={audioHook.isVoiceSupported}
-                isVoiceInitializing={!audioHook.isSocketReady && !audioHook.isRecording}
+            <div className={cn("flex-shrink-0 border-t border-border/20 safe-area-inset-bottom", isExpanded ? "px-0 sm:px-0 py-0 pb-0" : "px-0 py-0 pb-0") }>
+              {
+                <ConversationBar
+                  ref={chatInputRef}
+                  inputValue={messagesHook.inputValue}
+                  isLoading={messagesHook.isLoading}
+                  isListening={chatState.isListening}
+                  voiceTranscript={audioHook.transcript}
+                  voicePartialTranscript={audioHook.partialTranscript}
+                  isMinimized={chatState.isMinimized}
+                  voiceError={audioHook.error}
+                  isVoiceActive={audioHook.isRecording}
+                  isVoiceProcessing={audioHook.isProcessing}
+                  isVoiceSupported={audioHook.isVoiceSupported}
+                  isVoiceInitializing={!audioHook.isSocketReady && !audioHook.isRecording}
+                  micStream={audioHook.micStream}
                   cameraState={chatState.isCameraActive}
                   isCameraInitializing={chatState.isCameraInitializing}
                   cameraStream={chatState.cameraStream}
@@ -913,20 +894,22 @@ export function ChatInterface({ id }: { id?: string | null }) {
                   screenShareStream={chatState.screenShareStream}
                   screenThumbnail={screenThumbnail}
                   screenShareError={chatState.screenShareError ?? undefined}
-                onInputChange={messagesHook.setInputValue}
-                onSendMessage={messagesHook.handleSendMessage}
-                onToggleVoice={toggleVoiceSession}
-                onToggleCamera={handleToggleCamera}
-                onSwitchCamera={handleSwitchCamera}
-                onToggleScreenShare={chatStateHook.toggleScreenShare}
-                onToggleSettings={chatStateHook.toggleSettings}
-                isExpanded={isExpanded}
-                onOpenMeeting={openMeeting}
-                onExportSummary={handleExportSummary}
-                sessionIdForExport={sessionIdForExport}
-                autoOpenPopover={requestedPopover}
-                onAutoOpenPopoverHandled={() => setRequestedPopover(null)}
-              />
+                  onInputChange={messagesHook.setInputValue}
+                  onSendMessage={messagesHook.handleSendMessage}
+                  onToggleVoice={toggleVoiceSession}
+                  onToggleCamera={handleToggleCamera}
+                  onSwitchCamera={handleSwitchCamera}
+                  onToggleScreenShare={chatStateHook.toggleScreenShare}
+                  onToggleSettings={chatStateHook.toggleSettings}
+                  isExpanded={isExpanded}
+                  onOpenMeeting={openMeeting}
+                  onExportSummary={handleExportSummary}
+                  sessionIdForExport={sessionIdForExport}
+                  autoOpenPopover={requestedPopover}
+                  onAutoOpenPopoverHandled={() => setRequestedPopover(null)}
+                  visualizerState={visualizerState}
+                />
+              }
             </div>
           </div>
         )}
@@ -936,6 +919,12 @@ export function ChatInterface({ id }: { id?: string | null }) {
       <MeetingOverlay
         open={isMeetingOpen}
         onClose={() => setIsMeetingOpen(false)}
+      />
+
+      {/* Settings Dialog */}
+      <SettingsDialog
+        isOpen={chatState.showSettings}
+        onClose={chatStateHook.toggleSettings}
       />
 
       {/* AI SDK Devtools - Development Only */}
@@ -952,7 +941,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
       )}
 
       {/* Draggable Video Players - Prototype Style */}
-      {(!isMobile) && chatState.isCameraActive && camera.stream && (
+      {/* Hide draggable overlays when Conversation Bar is active to avoid surface duplication */}
+      {(!useBar && !isMobile) && chatState.isCameraActive && camera.stream && (
         <DraggableVideoPlayer
           stream={camera.stream}
           onClose={camera.stopCamera}
@@ -961,7 +951,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
         />
       )}
 
-      {(!isMobile) && chatState.isScreenSharing && chatState.screenShareStream && (
+      {(!useBar && !isMobile) && chatState.isScreenSharing && chatState.screenShareStream && (
         <DraggableVideoPlayer
           stream={chatState.screenShareStream}
           onClose={chatStateHook.stopScreenShare}

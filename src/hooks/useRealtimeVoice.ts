@@ -76,6 +76,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     isRecording,
     isProcessing: recorderProcessing,
     error: recorderError,
+    micStream,
   } = useMediaRecorderVoice({ targetSampleRate: 16000 });
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -589,6 +590,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     modelReplies,
     error,
     isVoiceSupported,
+    micStream,
     startSession,
     stopSession,
     sendToolResult,

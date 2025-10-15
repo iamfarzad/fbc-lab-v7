@@ -44,6 +44,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -80,6 +81,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
     }
+    setMicStream(null);
     mediaRecorderRef.current = null;
   }, []);
 
@@ -95,6 +97,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
       audioWorkletRecorderRef.current = null;
     }
     usingAudioWorkletRef.current = false;
+    setMicStream(null);
   }, [handleWorkletData, handleWorkletError]);
 
   const pickMimeType = useCallback(() => {
@@ -202,6 +205,10 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
         await audioWorkletRecorderRef.current.start();
         usingAudioWorkletRef.current = true;
         setIsRecording(true);
+        try {
+          const stream = (audioWorkletRecorderRef.current as any)?.getStream?.() ?? null;
+          if (stream) setMicStream(stream);
+        } catch {}
         return;
       } catch (err) {
         console.warn('[useMediaRecorderVoice] AudioWorklet start failed, falling back to MediaRecorder.', err);
@@ -231,6 +238,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
       recorder.start(250);
       mediaRecorderRef.current = recorder;
       mediaStreamRef.current = stream;
+      setMicStream(stream);
       usingAudioWorkletRef.current = false;
       setIsRecording(true);
     } catch (err) {
@@ -255,6 +263,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
         chunkHandlerRef.current = null;
         usingAudioWorkletRef.current = false;
         setIsRecording(false);
+        setMicStream(null);
       }
       return;
     }
@@ -309,6 +318,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
     cleanupStream();
     chunkHandlerRef.current = null;
     setIsRecording(false);
+    setMicStream(null);
   }, [cleanupStream, handleDataAvailable, handleRecorderError]);
 
   const resetRecording = useCallback(async () => {
@@ -362,5 +372,6 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
     isRecording,
     isProcessing,
     error,
+    micStream,
   };
 }
