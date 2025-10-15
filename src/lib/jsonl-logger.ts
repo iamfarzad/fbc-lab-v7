@@ -19,7 +19,7 @@ export function logJsonl(category: string, event: string, data?: any) {
     appendFileSync(file, JSON.stringify(record) + '\n', { encoding: 'utf8' })
   } catch (err) {
     // Never crash the route on logging failures
-    // eslint-disable-next-line no-console
+     
     console.warn(`[jsonl-logger] Failed to write ${category}:${event}:`, err)
   }
 }

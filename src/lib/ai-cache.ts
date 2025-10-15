@@ -43,7 +43,7 @@ function loadOptionalDependencies() {
 
   let localRequire: RequireFn | undefined
   try {
-    // eslint-disable-next-line no-eval
+     
     localRequire = eval('require')
   } catch {
     localRequire = undefined

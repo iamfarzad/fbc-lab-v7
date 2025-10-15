@@ -25,6 +25,6 @@ export function logConversationMilestone(milestone: ConversationMilestone) {
     }
   }
 
-  // eslint-disable-next-line no-console
+   
   console.debug('[ChatFlow][Milestone]', payload)
 }

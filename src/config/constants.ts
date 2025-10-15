@@ -22,17 +22,28 @@ export const WEBSOCKET_CONFIG = {
 
 // Gemini Model Names
 export const GEMINI_MODELS = {
-  // Current models
-  FLASH: 'gemini-2.0-flash-exp',
-  PRO: 'gemini-2.5-pro',
-  FLASH_LEGACY: 'gemini-2.5-flash',
+  // NEW: Google's latest models (auto-update to newest)
+  FLASH_LATEST: 'gemini-flash-latest',              // Auto-updates to latest Flash
+  FLASH_LITE_LATEST: 'gemini-flash-lite-latest',    // Auto-updates to latest Lite
   
-  // Default selections by use case
-  DEFAULT_CHAT: 'gemini-2.0-flash-exp',
-  DEFAULT_VOICE: 'gemini-2.0-flash-exp',
-  DEFAULT_MULTIMODAL: 'gemini-2.0-flash-exp',
-  DEFAULT_WEBCAM: 'gemini-2.0-flash-exp',
-  DEFAULT_SCREEN: 'gemini-2.0-flash-exp',
+  // NEW: Specific versions (predictable behavior)
+  FLASH_2025_09: 'gemini-2.5-flash-preview-09-2025',
+  FLASH_LITE_2025_09: 'gemini-2.5-flash-lite-preview-09-2025',
+  AUDIO_2025_09: 'gemini-2.5-flash-native-audio-preview-09-2025',
+  
+  // LEGACY: For backward compatibility (deprecated models)
+  PRO: 'gemini-2.5-pro',
+  FLASH_LEGACY: 'gemini-2.5-flash',                 // Deprecated Dec 9, 2025
+  FLASH_EXP: 'gemini-2.0-flash-exp',                // Old experimental
+  
+  // DEFAULTS: What each use case should use
+  DEFAULT_CHAT: 'gemini-flash-latest',               // Auto-updates to best
+  DEFAULT_VOICE: 'gemini-2.5-flash-native-audio-preview-09-2025', // Voice optimized
+  DEFAULT_MULTIMODAL: 'gemini-flash-latest',         // Best for images/video
+  DEFAULT_WEBCAM: 'gemini-flash-latest',             // Webcam analysis
+  DEFAULT_SCREEN: 'gemini-flash-latest',             // Screen capture
+  DEFAULT_FAST: 'gemini-flash-lite-latest',          // When speed matters
+  DEFAULT_RELIABLE: 'gemini-2.5-flash-preview-09-2025', // When predictability matters
 } as const
 
 // Gemini API Endpoints

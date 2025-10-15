@@ -44,7 +44,7 @@ export class SessionLogger {
       this.stream?.write(JSON.stringify(record) + '\n')
     } catch (err) {
       // Ensure logging never crashes the server
-      // eslint-disable-next-line no-console
+       
       console.warn(`[${this.connectionId}] JSONL log failed:`, err)
     }
   }

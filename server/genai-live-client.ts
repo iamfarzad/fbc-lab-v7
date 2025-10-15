@@ -212,7 +212,7 @@ export class GenAILiveClient extends EventEmitter<LiveClientEventTypes> {
       }
 
       if (serverContent.modelTurn) {
-        let parts: Part[] = serverContent.modelTurn.parts || [];
+        const parts: Part[] = serverContent.modelTurn.parts || [];
 
         const audioParts = parts.filter(p =>
           p.inlineData?.mimeType?.startsWith('audio/pcm'),

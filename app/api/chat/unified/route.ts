@@ -139,7 +139,7 @@ function parseStructuredResponse(content: string) {
   const metadata: any = {}
   
   // Extract reasoning - try both formats
-  let reasoningMatch = content.match(/<reasoning>(.*?)<\/reasoning>/s)
+  const reasoningMatch = content.match(/<reasoning>(.*?)<\/reasoning>/s)
   if (reasoningMatch) {
     metadata.reasoning = reasoningMatch[1].trim()
   } else {
