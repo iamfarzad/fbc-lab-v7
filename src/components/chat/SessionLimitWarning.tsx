@@ -11,16 +11,15 @@ interface SessionLimitWarningProps {
 }
 
 export function SessionLimitWarning({ sessionId, usage }: SessionLimitWarningProps) {
+  // Hooks must be called before any conditional returns
   const [showProposal, setShowProposal] = useState(false);
   const [generating, setGenerating] = useState(false);
   
-  if (!usage) return null;
-  
-  const sessionMinutes = (Date.now() - usage.started_at) / 60000;
-  const timeLeft = Math.max(0, usage.max_session_duration - sessionMinutes);
+  const sessionMinutes = usage ? (Date.now() - usage.started_at) / 60000 : 0;
+  const timeLeft = usage ? Math.max(0, usage.max_session_duration - sessionMinutes) : 0;
   
   // Show proposal option after user has engaged (5+ messages OR 5+ minutes)
-  const hasEngaged = usage.messages_sent >= 5 || sessionMinutes >= 5;
+  const hasEngaged = usage && (usage.messages_sent >= 5 || sessionMinutes >= 5);
   
   // Show warning at 5 minutes left
   const showWarning = timeLeft <= 5 && timeLeft > 0;
@@ -33,6 +32,9 @@ export function SessionLimitWarning({ sessionId, usage }: SessionLimitWarningPro
       setShowProposal(true);
     }
   }, [sessionEnded, hasEngaged]);
+  
+  // Early return after hooks
+  if (!usage) return null;
   
   const handleDownloadProposal = async () => {
     setGenerating(true);

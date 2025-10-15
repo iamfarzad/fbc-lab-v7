@@ -34,8 +34,7 @@ export function VoiceButton({
   isExpanded = false,
   isMinimized = false,
 }: VoiceButtonProps) {
-  // Don't render in minimized mode
-  if (isMinimized) return null;
+  // Hooks must be called before any conditional returns
   const [internalState, setInternalState] = useState<VoiceButtonState>(state);
 
   // Sync with external state
@@ -53,6 +52,9 @@ export function VoiceButton({
     }
     return undefined
   }, [internalState, feedbackDuration]);
+
+  // Don't render in minimized mode (conditional return after hooks)
+  if (isMinimized) return null;
 
   const getIcon = () => {
     switch (internalState) {

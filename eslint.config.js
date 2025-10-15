@@ -53,6 +53,9 @@ export default defineConfig([
       '@typescript-eslint/no-misused-promises': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
       '@typescript-eslint/unbound-method': 'off',
+      '@typescript-eslint/no-base-to-string': 'warn', // Allow error.toString() in debug code
+      '@typescript-eslint/no-unsafe-function-type': 'warn', // Allow Function type in wrappers
+      '@typescript-eslint/triple-slash-reference': 'off', // Allow in next-env.d.ts
       'no-case-declarations': 'off',
       'no-empty': 'warn',
       'prefer-const': 'warn',
