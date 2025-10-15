@@ -1,6 +1,7 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import type { AgentContext, ChatMessage } from './types'
+import { GEMINI_MODELS } from '@/config/constants'
 import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
 /**
@@ -76,7 +77,7 @@ ${conversationFlow?.shouldOfferRecap
   : ''}`
 
   const result = await generateText({
-    model: google('gemini-2.5-flash'),
+    model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages,
     system: systemPrompt,
     temperature: 0.7
@@ -85,7 +86,7 @@ ${conversationFlow?.shouldOfferRecap
   return {
     output: result.text,
     agent: 'Discovery Agent',
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
       stage: 'DISCOVERY' as const,
       categoriesCovered: conversationFlow 

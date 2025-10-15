@@ -1,6 +1,7 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import type { AgentContext, ChatMessage } from './types'
+import { GEMINI_MODELS } from '@/config/constants'
 import { multimodalContextManager } from '@/core/context/multimodal-context'
 
 /**
@@ -77,7 +78,7 @@ OUTPUT REQUIRED (JSON only):
 TONE: Professional but conversational. This is a valuable document they'll share internally.`
 
   const result = await generateText({
-    model: google('gemini-2.5-pro'), // Use Pro for reliability
+    model: google(GEMINI_MODELS.PRO), // Use Pro for reliability
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Generate the conversation summary based on all provided context.' }
@@ -107,7 +108,7 @@ TONE: Professional but conversational. This is a valuable document they'll share
   return {
     output: JSON.stringify(summary, null, 2),
     agent: 'Summary Agent',
-    model: 'gemini-2.5-pro',
+    model: GEMINI_MODELS.PRO,
     metadata: {
       stage: 'SUMMARY' as const,
       summary,

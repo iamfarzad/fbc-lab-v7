@@ -2,6 +2,7 @@ import { google } from '@ai-sdk/google'
 import { streamText } from 'ai'
 import { z } from 'zod'
 import type { AgentContext, ChatMessage } from './types'
+import { GEMINI_MODELS } from '@/config/constants'
 
 /**
  * Workshop Sales Agent - Pitches in-person AI workshops
@@ -76,7 +77,7 @@ STYLE: Conversational, no fluff, focus on value`
   }
 
   const result = await streamText({
-    model: google('gemini-2.5-flash'),
+    model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages,
     system: systemPrompt,
     tools,
@@ -92,7 +93,7 @@ STYLE: Conversational, no fluff, focus on value`
   return {
     output: fullText,
     agent: 'Workshop Sales Agent',
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
       stage: 'WORKSHOP_PITCH' as const,
       pitchDelivered: true,

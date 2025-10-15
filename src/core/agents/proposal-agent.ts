@@ -1,6 +1,7 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import type { AgentContext, ChatMessage } from './types'
+import { GEMINI_MODELS } from '@/config/constants'
 
 /**
  * Proposal Agent - Generates formal consulting proposals
@@ -107,7 +108,7 @@ Adjust based on:
 OUTPUT: Valid JSON only, no explanation.`
 
   const result = await generateText({
-    model: google('gemini-2.5-pro'), // Use Pro for pricing accuracy
+    model: google(GEMINI_MODELS.PRO), // Use Pro for pricing accuracy
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Generate the formal consulting proposal based on the conversation and context.' }
@@ -143,7 +144,7 @@ OUTPUT: Valid JSON only, no explanation.`
   return {
     output: JSON.stringify(proposal, null, 2),
     agent: 'Proposal Agent',
-    model: 'gemini-2.5-pro',
+    model: GEMINI_MODELS.PRO,
     metadata: {
       stage: 'PROPOSAL' as const,
       proposal,

@@ -1,6 +1,7 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import type { AgentContext, ChatMessage } from './types'
+import { GEMINI_MODELS } from '@/config/constants'
 
 /**
  * Scoring Agent - Calculates lead score (0-100) and fit scores
@@ -85,7 +86,7 @@ OUTPUT REQUIRED (JSON only, no explanation):
 }`
 
   const result = await generateText({
-    model: google('gemini-2.5-flash'),
+    model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Calculate the lead score and fit scores based on the provided context.' }
@@ -119,7 +120,7 @@ OUTPUT REQUIRED (JSON only, no explanation):
   return {
     output: `Lead Score: ${scores.leadScore}/100\nWorkshop Fit: ${(scores.fitScore.workshop * 100).toFixed(0)}%\nConsulting Fit: ${(scores.fitScore.consulting * 100).toFixed(0)}%\n\n${scores.reasoning}`,
     agent: 'Scoring Agent',
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
       stage: 'SCORING' as const,
       leadScore: scores.leadScore,

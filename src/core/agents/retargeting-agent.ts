@@ -1,5 +1,6 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
+import { GEMINI_MODELS } from '@/config/constants'
 
 /**
  * Retargeting Agent - Automated follow-up email generation
@@ -66,7 +67,7 @@ OUTPUT FORMAT:
 TONE: Professional but warm. This is Farzad reaching out, not a marketing bot.`
 
   const result = await generateText({
-    model: google('gemini-2.5-flash'),
+    model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Generate a ${scenario} follow-up email for this lead.` }
@@ -97,7 +98,7 @@ TONE: Professional but warm. This is Farzad reaching out, not a marketing bot.`
   return {
     output: JSON.stringify(email, null, 2),
     agent: 'Retargeting Agent',
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
       stage: 'RETARGETING' as const,
       scenario,

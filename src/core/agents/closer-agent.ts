@@ -2,6 +2,7 @@ import { google } from '@ai-sdk/google'
 import { streamText } from 'ai'
 import { z } from 'zod'
 import type { AgentContext, ChatMessage } from './types'
+import { GEMINI_MODELS } from '@/config/constants'
 
 /**
  * Closer Agent - Handles objections and final push to booking
@@ -77,7 +78,7 @@ STYLE: Confident, direct, use their own experience as the close`
   }
 
   const result = await streamText({
-    model: google('gemini-2.5-flash'),
+    model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages,
     system: systemPrompt,
     tools,
@@ -93,7 +94,7 @@ STYLE: Confident, direct, use their own experience as the close`
   return {
     output: fullText,
     agent: 'Closer Agent',
-    model: 'gemini-2.5-flash',
+    model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
       stage: 'CLOSING' as const,
       objectionHandled: true,

@@ -2,6 +2,7 @@ import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import type { ChatMessage } from './types'
 import { supabaseService } from '@/core/supabase/client'
+import { GEMINI_MODELS } from '@/config/constants'
 
 /**
  * Admin AI Agent - Farzad's business intelligence assistant
@@ -64,7 +65,7 @@ If email draft: Subject + body with personalization
 If insight: Summary with key metrics`
 
   const result = await generateText({
-    model: google('gemini-2.5-pro'), // Admin needs reliability
+    model: google(GEMINI_MODELS.PRO), // Admin needs reliability
     messages,
     system: systemPrompt,
     temperature: 0.5
@@ -73,7 +74,7 @@ If insight: Summary with key metrics`
   return {
     output: result.text,
     agent: 'Admin AI Agent',
-    model: 'gemini-2.5-pro',
+    model: GEMINI_MODELS.PRO,
     metadata: {
       stage: 'ADMIN' as const,
       conversationsAnalyzed: recentConversations.length
@@ -163,7 +164,7 @@ Body:
 [email body]`
 
   const result = await generateText({
-    model: google('gemini-2.5-flash'),
+    model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.7
   })
