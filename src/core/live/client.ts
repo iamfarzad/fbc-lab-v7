@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { GEMINI_MODELS } from '@/config/constants'
 
 export type LiveConnectOptions = {
   apiKey: string
@@ -14,7 +15,7 @@ export type LiveConnectOptions = {
  */
 export async function connectLive({ apiKey, model, config }: LiveConnectOptions) {
   const genAI = new GoogleGenAI({ apiKey })
-  const liveModel = model ?? 'gemini-2.5-flash-native-audio-preview-09-2025'
+  const liveModel = model ?? GEMINI_MODELS.DEFAULT_VOICE
 
   let isOpen = false
 

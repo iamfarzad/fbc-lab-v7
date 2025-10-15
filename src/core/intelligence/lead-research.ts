@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai'
+import { GEMINI_MODELS } from '@/config/constants'
 import { GoogleGroundingProvider } from './providers/search/google-grounding'
 import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache'
 
@@ -193,7 +194,7 @@ Be thorough and accurate. If information is not available, use null for that fie
 `
 
     const result = await this.genAI.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_MODELS.DEFAULT_CHAT,
       contents: [{ role: 'user', parts: [{ text: prompt }]}],
     } as any)
     const text = typeof (result as any).text === 'function'

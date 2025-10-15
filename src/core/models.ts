@@ -1,4 +1,6 @@
 // Model definitions and token estimation
+import { GEMINI_MODELS } from '@/config/constants'
+
 export type UseCase =
   | 'chat'
   | 'image_analysis'
@@ -19,24 +21,24 @@ export interface ModelConfig {
 }
 
 export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
-  'gemini-2.5-flash': {
-    name: 'gemini-2.5-flash',
+  [GEMINI_MODELS.FLASH_LEGACY]: {
+    name: GEMINI_MODELS.FLASH_LEGACY,
     contextWindow: 1048576,
     maxOutputTokens: 8192,
     inputCostPerToken: 0.000000075, // $0.075 per 1M tokens
     outputCostPerToken: 0.0000003, // $0.3 per 1M tokens
     capabilities: ['chat', 'image_analysis', 'screenshot_analysis', 'document_analysis', 'voice_transcription']
   },
-  'gemini-2.5-pro': {
-    name: 'gemini-2.5-pro',
+  [GEMINI_MODELS.PRO]: {
+    name: GEMINI_MODELS.PRO,
     contextWindow: 2097152,
     maxOutputTokens: 8192,
     inputCostPerToken: 0.00000125, // $1.25 per 1M tokens
     outputCostPerToken: 0.000005, // $5 per 1M tokens
     capabilities: ['chat', 'image_analysis', 'screenshot_analysis', 'document_analysis', 'voice_transcription', 'code_generation']
   },
-  'gemini-2.5-flash-native-audio-preview-09-2025': {
-    name: 'gemini-2.5-flash-native-audio-preview-09-2025',
+  [GEMINI_MODELS.AUDIO_2025_09]: {
+    name: GEMINI_MODELS.AUDIO_2025_09,
     contextWindow: 1048576,
     maxOutputTokens: 8192,
     inputCostPerToken: 0.00000015, // $0.15 per 1M tokens

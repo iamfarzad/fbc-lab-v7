@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache'
+import { GEMINI_MODELS } from '@/config/constants'
 
 export type GroundedCitation = { uri: string; title?: string; description?: string; source?: 'url' | 'search' }
 export type GroundedAnswer = { text: string; citations: GroundedCitation[]; raw?: unknown }
@@ -150,7 +151,7 @@ export class GoogleGroundingProvider {
         : query
 
       const res = await this.genAI.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODELS.DEFAULT_CHAT,
         contents: [{ role: 'user', parts: [{ text: prompt }]}],
         config: { tools },
       } as any)
@@ -383,7 +384,7 @@ If there are conflicting information between sources, mention this and explain y
       }
 
       const response = await this.genAI.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODELS.DEFAULT_CHAT,
         contents: [{ role: 'user', parts: [{ text: prompt }]}],
       })
 
