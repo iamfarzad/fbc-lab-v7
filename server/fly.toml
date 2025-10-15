@@ -8,7 +8,9 @@ primary_region = 'iad'
   NODE_ENV = 'production'
   PORT = '3001'
   GEMINI_API_KEY = '${GEMINI_API_KEY}'
-  GEMINI_LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025'
+  # GEMINI_LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025'
+  # Optional override - if not set, uses DEFAULT_VOICE from src/config/constants.ts
+  # Keeping this commented so code default is used (easier to update in one place)
 
 [http_service]
   internal_port = 3001

@@ -10,6 +10,7 @@ import * as path from 'path'
 import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { SessionLogger } from './session-logger'
+import { GEMINI_MODELS } from '../src/config/constants.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -269,8 +270,8 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    // Use a Live-supported model. Allow override via env.
-    const model = `models/${process.env.GEMINI_LIVE_MODEL || 'gemini-2.5-flash-native-audio-preview-09-2025'}`
+    // Use a Live-supported model. Allow override via env, fallback to config
+    const model = `models/${process.env.GEMINI_LIVE_MODEL || GEMINI_MODELS.DEFAULT_VOICE}`
 
     console.info(`[${connectionId}] Connecting to Live API with model: ${model}`)
 
