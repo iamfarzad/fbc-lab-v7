@@ -1,5 +1,6 @@
 // Model selection based on features and token requirements
 import { estimateTokens as estimateTokensBase, getModelForUseCase, UseCase } from './models'
+import { GEMINI_MODELS } from '@/config/constants'
 
 export function selectModelForFeature(
   feature: string,
@@ -32,17 +33,17 @@ export function selectModelForFeature(
     // Fallback to simple selection
     if (estimatedTokens > 8000) {
       return {
-        model: 'gemini-2.5-pro',
+        model: GEMINI_MODELS.PRO,
         reason: 'High token requirement'
       }
     } else if (estimatedTokens > 4000) {
       return {
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODELS.DEFAULT_CHAT,
         reason: 'Medium token requirement'
       }
     } else {
       return {
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODELS.DEFAULT_CHAT,
         reason: 'Standard token requirement'
       }
     }
