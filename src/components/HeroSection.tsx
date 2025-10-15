@@ -2,9 +2,7 @@ import { Button } from "./ui/button"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
 
-interface HeroSectionProps extends ComponentProps<"section"> {}
-
-export function HeroSection({ className, ...props }: HeroSectionProps) {
+export function HeroSection({ className, ...props }: ComponentProps<"section">) {
   return (
     <section 
       className={cn(

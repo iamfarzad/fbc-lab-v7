@@ -3,9 +3,7 @@ import { Button } from "./ui/button"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
 
-interface WorkSectionProps extends ComponentProps<"section"> {}
-
-export function WorkSection({ className, ...props }: WorkSectionProps) {
+export function WorkSection({ className, ...props }: ComponentProps<"section">) {
   const scrollToContact = () => {
     const element = document.getElementById('contact')
     if (element) {

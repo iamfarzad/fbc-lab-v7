@@ -4,9 +4,7 @@ import { Users, Clock, Star, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
 
-interface WorkshopsSectionProps extends ComponentProps<"section"> {}
-
-export function WorkshopsSection({ className, ...props }: WorkshopsSectionProps) {
+export function WorkshopsSection({ className, ...props }: ComponentProps<"section">) {
   const workshops = [
     {
       title: "AI FUNDAMENTALS FOR LEADERS",

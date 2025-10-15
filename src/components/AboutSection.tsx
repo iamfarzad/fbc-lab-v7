@@ -2,9 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
 
-interface AboutSectionProps extends ComponentProps<"section"> {}
-
-export function AboutSection({ className, ...props }: AboutSectionProps) {
+export function AboutSection({ className, ...props }: ComponentProps<"section">) {
   return (
     <section 
       id="about" 

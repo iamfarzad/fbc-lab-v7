@@ -6,9 +6,7 @@ import { ThemeSwitcher } from "./ThemeSwitcher"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
 
-interface NavigationProps extends ComponentProps<"nav"> {}
-
-export function Navigation({ className, ...props }: NavigationProps) {
+export function Navigation({ className, ...props }: ComponentProps<"nav">) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const scrollToChat = () => {
@@ -258,9 +256,7 @@ export function Navigation({ className, ...props }: NavigationProps) {
 }
 
 // Helper component for desktop navigation buttons
-interface NavButtonProps extends ComponentProps<"button"> {}
-
-function NavButton({ className, children, ...props }: NavButtonProps) {
+function NavButton({ className, children, ...props }: ComponentProps<"button">) {
   return (
     <button 
       className={cn(
@@ -275,9 +271,7 @@ function NavButton({ className, children, ...props }: NavButtonProps) {
 }
 
 // Helper component for mobile navigation buttons
-interface MobileNavButtonProps extends ComponentProps<"button"> {}
-
-function MobileNavButton({ className, children, ...props }: MobileNavButtonProps) {
+function MobileNavButton({ className, children, ...props }: ComponentProps<"button">) {
   return (
     <button 
       className={cn(

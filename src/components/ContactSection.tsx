@@ -4,9 +4,7 @@ import { Mail, Phone, MapPin, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
 
-interface ContactSectionProps extends ComponentProps<"section"> {}
-
-export function ContactSection({ className, ...props }: ContactSectionProps) {
+export function ContactSection({ className, ...props }: ComponentProps<"section">) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     // Get form data

@@ -2,9 +2,7 @@ import { Mail, Phone, MapPin, Linkedin, Twitter, Github } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
 
-interface FooterProps extends ComponentProps<"footer"> {}
-
-export function Footer({ className, ...props }: FooterProps) {
+export function Footer({ className, ...props }: ComponentProps<"footer">) {
   return (
     <footer 
       className={cn(
