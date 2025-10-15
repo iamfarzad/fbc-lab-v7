@@ -1,10 +1,13 @@
 # Voice Hooks - Single Source of Truth
 
 ## ✅ USE THIS:
-- **`useRealtimeVoice.ts`** - For ALL voice interactions
+- **`useRealtimeVoice.ts`** - For ALL voice interactions (primary hook)
+
+## 🔧 INTERNAL (Used by useRealtimeVoice):
+- **`useMediaRecorderVoice.ts`** - Audio recording utility (dependency, not standalone)
 
 ## ❌ DEPRECATED (DO NOT USE):
-- **`useWebSocketVoice.ts`** - Scheduled for deletion after migration
+- **`useWebSocketVoice.ts`** - Already deleted ✅
 
 ## Correct Gemini Live API Usage
 
