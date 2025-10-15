@@ -49,6 +49,20 @@ export default defineConfig([
       'no-constant-binary-expression': 'off',
       '@typescript-eslint/no-redundant-type-constituents': 'off',
       ...reactHooks.configs['recommended-latest'].rules,
+      
+      // TYPE SYSTEM GUARD: Prevent duplicate Message type definitions
+      // Only src/types/core.ts should define Message types
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSInterfaceDeclaration[id.name="Message"]:not([loc.start.line=9])',
+          message: 'Do not define Message interface outside of src/types/core.ts. Import from @/types/core instead.',
+        },
+        {
+          selector: 'TSTypeAliasDeclaration[id.name="Message"]:not([loc.start.line=9])',
+          message: 'Do not define Message type outside of src/types/core.ts. Import from @/types/core instead.',
+        },
+      ],
     },
   },
 ])

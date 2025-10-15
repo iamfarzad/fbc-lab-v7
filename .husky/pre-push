@@ -1,5 +1,4 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
+#!/usr/bin/env sh
 
 echo "🔍 Checking for hardcoded secrets in commits..."
 if git diff origin/main..HEAD --name-only | xargs grep -l "AIza\|sk-" 2>/dev/null; then
