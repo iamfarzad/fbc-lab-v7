@@ -63,6 +63,7 @@ export default defineConfig([
       'react-refresh/only-export-components': 'warn',
       'no-constant-binary-expression': 'off',
       '@typescript-eslint/no-redundant-type-constituents': 'off',
+      'react-hooks/exhaustive-deps': 'warn', // Warn but don't block on hook deps
       ...reactHooks.configs['recommended-latest'].rules,
       
       // TYPE SYSTEM GUARD: Prevent duplicate Message type definitions
