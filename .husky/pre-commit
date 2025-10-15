@@ -1,25 +1,25 @@
-# 🔧 F.B/c Lab V7: Pre-commit hooks
-echo "🔍 Running pre-commit checks..."
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
 
-# Check for sensitive data (excluding documentation, scripts, and husky files)
-# Temporarily disabled for initial repository setup
-# if grep -r "AIzaSy" . --exclude-dir=node_modules --exclude-dir=.git --exclude=".env*" --exclude="*.md" --exclude="scripts/*" --exclude="README.md" --exclude="*.txt" --exclude=".husky/*" > /dev/null 2>&1; then
-#   echo "❌ Error: API keys found in code. Please use environment variables."
-#   exit 1
-# fi
+echo "🔍 Running type checks..."
+pnpm type-check || {
+  echo "❌ Type check failed. Fix types before committing."
+  echo "   Run 'pnpm type-check' to see errors"
+  exit 1
+}
 
-# Run linting (temporarily disabled for initial setup)
-# echo "🧹 Running linter..."
-# pnpm lint --fix
+echo "🔍 Running linter..."
+pnpm lint || {
+  echo "❌ Lint failed. Fix issues before committing."
+  echo "   Run 'pnpm lint:fix' to auto-fix some issues"
+  exit 1
+}
 
-# Run type checking
-echo "🔍 Running type check..."
-pnpm tsc --noEmit
-
-# Run tests if they exist
-if [ -f "jest.config.js" ] || [ -f "jest.config.ts" ]; then
-  echo "🧪 Running tests..."
-  pnpm test --passWithNoTests
+echo "🔍 Checking for API key leaks..."
+if git diff --cached | grep -E "AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{48}"; then
+  echo "❌ Found potential API keys in staged changes!"
+  echo "   Use environment variables instead of hardcoding keys"
+  exit 1
 fi
 
-echo "✅ Pre-commit checks passed!"
+echo "✅ All pre-commit checks passed"

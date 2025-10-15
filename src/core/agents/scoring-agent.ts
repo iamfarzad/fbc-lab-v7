@@ -9,7 +9,7 @@ import type { AgentContext, ChatMessage } from './types'
  * Multimodal bonuses: voice (+10), screen (+15), webcam (+5), uploads (+10)
  */
 export async function scoringAgent(
-  messages: ChatMessage[],
+  _messages: ChatMessage[],
   context: AgentContext
 ) {
   const { intelligenceContext, conversationFlow, multimodalContext } = context

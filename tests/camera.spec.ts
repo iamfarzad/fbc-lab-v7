@@ -1,6 +1,5 @@
 import { test, expect } from './utils/fixtures'
-import { mockAllAPIs } from './mocks/api'
-import { SELECTORS, TIMEOUTS } from './utils/test-data'
+import { SELECTORS } from './utils/test-data'
 
 test.describe('Camera Features', () => {
   test.beforeEach(async ({ page, mockAPIs }) => {
@@ -81,7 +80,7 @@ test.describe('Camera Features', () => {
     expect(count >= 0).toBe(true)
   })
 
-  test('should show camera initialization loading state', async ({ page, chat, camera }) => {
+  test('should show camera initialization loading state', async ({ page, chat }) => {
     await chat.openChat()
     await page.context().grantPermissions(['camera'])
     
@@ -92,7 +91,6 @@ test.describe('Camera Features', () => {
     await page.waitForTimeout(500)
     
     // Loading indicator might appear
-    const loadingIndicators = page.locator('[data-camera-initializing], .animate-spin, text=/loading/i')
     await page.waitForTimeout(1500)
     
     // App should still be responsive

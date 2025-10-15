@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
   PromptInput,
   PromptInputBody,
@@ -18,8 +17,7 @@ import { VISUAL } from "../design-tokens";
 import {
   Plus,
 } from "lucide-react";
-import { VoiceButton, type VoiceButtonState } from "@/components/ui/voice-button";
-import { ToolsMenu } from "./ToolsMenu";
+import { VoiceButton } from "@/components/ui/voice-button";
 import { ActionsMenu } from "./ActionsMenu";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
 import { VoicePopover } from "./voice/VoicePopover";
@@ -85,12 +83,8 @@ export function ChatInput({
   voiceError,
   isVoiceActive,
   isVoiceProcessing,
-  isVoiceSupported,
-  isVoiceInitializing = false,
   cameraState,
-  isCameraInitializing = false,
   isScreenSharing,
-  isScreenShareInitializing = false,
   cameraStream,
   screenShareStream,
   screenThumbnail,
@@ -445,7 +439,7 @@ export function ChatInput({
       >
         <CameraPopover
           isActive={cameraState}
-          stream={cameraStream}
+          stream={cameraStream ?? null}
           error={cameraError}
           onToggle={onToggleCamera}
           onSwitchCamera={onSwitchCamera}
@@ -461,7 +455,7 @@ export function ChatInput({
       >
         <ScreenPopover
           isActive={isScreenSharing}
-          stream={screenShareStream}
+          stream={screenShareStream ?? null}
           thumbnail={screenThumbnail}
           error={screenShareError}
           onToggle={onToggleScreenShare}
@@ -522,7 +516,7 @@ export function ChatInput({
         isOpen={cameraToggle.isFullScreenOpen}
         onClose={cameraToggle.closeFullScreen}
         isActive={cameraState}
-        stream={cameraStream}
+        stream={cameraStream ?? null}
         error={cameraError}
         onToggle={onToggleCamera}
         onSwitchCamera={onSwitchCamera}
@@ -533,7 +527,7 @@ export function ChatInput({
         isOpen={screenToggle.isFullScreenOpen}
         onClose={screenToggle.closeFullScreen}
         isActive={isScreenSharing}
-        stream={screenShareStream}
+        stream={screenShareStream ?? null}
         thumbnail={screenThumbnail}
         error={screenShareError}
         onToggle={onToggleScreenShare}

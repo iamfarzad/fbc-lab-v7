@@ -12,6 +12,8 @@ export interface EnhancedChatMessage {
     fileType?: string;
     fileSize?: number;
     duration?: number; // For voice messages
+    isPartial?: boolean; // For live transcripts
+    isStreaming?: boolean; // For streaming messages
     sources?: Array<{
       id: string;
       title: string;

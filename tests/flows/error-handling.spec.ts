@@ -1,6 +1,6 @@
 import { test, expect } from '../utils/fixtures'
-import { setupMockWebSocket, MockWebSocketServer } from '../mocks/websocket-server'
-import { mockAllAPIs, simulateNetworkError, simulateSlowNetwork } from '../mocks/api'
+import { setupMockWebSocket } from '../mocks/websocket-server'
+import { simulateNetworkError, simulateSlowNetwork } from '../mocks/api'
 import { TIMEOUTS } from '../utils/test-data'
 
 test.describe('Error Handling and Recovery', () => {
@@ -35,9 +35,6 @@ test.describe('Error Handling and Recovery', () => {
     await camera.toggleCamera()
     await page.waitForTimeout(2000)
 
-    // Should show error or remain inactive
-    const errors = page.locator('[role="alert"], text=/permission/i, text=/denied/i')
-    
     // App should still be functional
     expect(await chat.isChatOpen()).toBe(true)
   })

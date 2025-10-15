@@ -1,4 +1,3 @@
-import { GoogleGroundingProvider } from './providers/search/google-grounding'
 import { LeadResearchService } from './lead-research'
 import { detectRole } from './role-detector'
 import type { ContextSnapshot } from '../context/context-schema'
@@ -38,7 +37,6 @@ interface RoleDetectionInput {
 }
 
 export class ConversationalIntelligence {
-  private grounding = new GoogleGroundingProvider()
   private research = new LeadResearchService()
   private lastStableTranscript = new Map<string, string>()
 

@@ -11,7 +11,7 @@ import { supabaseService } from '@/core/supabase/client'
  */
 export async function adminAgent(
   messages: ChatMessage[],
-  context: {
+  _context: {
     sessionId: string
     adminId?: string
   }
@@ -134,7 +134,7 @@ export async function searchConversations(query: {
  * Helper: Draft follow-up email for a lead
  */
 export async function draftFollowUpEmail({
-  leadId,
+  leadId: _leadId,
   leadName,
   conversationSummary,
   specificMention

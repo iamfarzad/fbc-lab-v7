@@ -29,8 +29,6 @@ interface VoiceSettings {
 export function SettingsDialog({
   isOpen,
   onClose,
-  onToggleTheme,
-  currentTheme = 'default',
   onVoiceSettingsChange,
   voiceSettings = {
     autoStart: false,

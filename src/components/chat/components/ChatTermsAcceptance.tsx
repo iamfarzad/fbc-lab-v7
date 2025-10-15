@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { VISUAL, SPACING } from "../design-tokens";
+import { VISUAL } from "../design-tokens";
 
 interface ChatTermsAcceptanceProps {
   name: string;

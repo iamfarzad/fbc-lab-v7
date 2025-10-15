@@ -1,9 +1,9 @@
 // Token usage logging and budget enforcement
 export async function enforceBudgetAndLog(
-  userId: string,
-  sessionId: string,
+  _userId: string,
+  _sessionId: string,
   operation: string,
-  model: string,
+  _model: string,
   inputTokens: number,
   outputTokens: number,
   isTool: boolean = false

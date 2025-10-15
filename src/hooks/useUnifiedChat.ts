@@ -38,9 +38,9 @@ function normaliseStreamMessage(
     ? payload.id
     : fallbackId || crypto.randomUUID()
 
-  const validTypes: UnifiedMessage['type'][] = ['text', 'tool', 'multimodal', 'meta']
-  const messageType = typeof payload.type === 'string' && validTypes.includes(payload.type as any)
-    ? (payload.type as UnifiedMessage['type'])
+  const validTypes = ['text', 'tool', 'multimodal', 'meta'] as const
+  const messageType = typeof (payload as any).type === 'string' && validTypes.includes((payload as any).type)
+    ? (payload as any).type
     : 'text'
 
   return {
@@ -48,8 +48,10 @@ function normaliseStreamMessage(
     role: payload.role === 'user' ? 'user' : 'assistant',
     content: typeof payload.content === 'string' ? payload.content : '',
     timestamp: payload.timestamp ? new Date(payload.timestamp as string) : new Date(),
-    type: messageType,
-    metadata
+    metadata: {
+      ...metadata,
+      type: messageType
+    }
   }
 }
 
@@ -88,8 +90,10 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       ...rest,
       id: id && id.length > 0 ? id : crypto.randomUUID(),
       timestamp: rest.timestamp ?? new Date(),
-      type: rest.type ?? 'text',
-      metadata: rest.metadata ?? {}
+      metadata: {
+        ...rest.metadata,
+        type: rest.metadata?.type ?? 'text'
+      }
     }
 
     commitMessages(prev => [...prev, normalised])
@@ -240,11 +244,13 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
         ...prev,
         {
           id: crypto.randomUUID(),
-          role: 'assistant',
+          role: 'assistant' as const,
           content: `I apologize, but I encountered an error: ${normalisedError.message}. Please try again.`,
           timestamp: new Date(),
-          type: 'text',
-          metadata: { error: true }
+          metadata: { 
+            type: 'text' as const, 
+            error: { code: 'error', message: normalisedError.message }
+          }
         }
       ]))
     } finally {
@@ -267,8 +273,10 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       role: 'user',
       content: trimmed,
       timestamp: new Date(),
-      type: 'text',
-      metadata: options.metadata ?? {}
+      metadata: {
+        type: 'text',
+        ...options.metadata
+      }
     }
 
     const nextMessages = [...messagesRef.current, userMessage]

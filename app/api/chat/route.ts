@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       // Return a mock response for testing
       return new Response(
         JSON.stringify({
-          response: `This is a test response to: "${body.message || body.messages[body.messages.length - 1].content}". Google API key not configured for actual AI responses.`,
+          response: `This is a test response to: "${body.message || messages[messages.length - 1].content}". Google API key not configured for actual AI responses.`,
           usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 }
         }),
         {

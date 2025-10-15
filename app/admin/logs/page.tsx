@@ -104,6 +104,7 @@ export default function AdminLogsPage() {
       }, 3000) // Refresh every 3s
       return () => clearInterval(interval)
     }
+    return undefined
   }, [serviceFilter, levelFilter, searchTerm, autoRefresh, isAuthenticated])
 
   const exportLogs = () => {

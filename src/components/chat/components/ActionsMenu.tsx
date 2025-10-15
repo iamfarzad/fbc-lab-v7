@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { BottomSheet, BottomSheetListItem } from './BottomSheet';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import {
   Calendar,
   Download,
@@ -58,7 +56,6 @@ export function ActionsMenu({
   onToggleCamera,
   isScreenSharing = false,
   onToggleScreenShare,
-  onToggleSettings,
   onOpenVoiceFullScreen,
   onOpenCameraFullScreen,
   onOpenScreenFullScreen,

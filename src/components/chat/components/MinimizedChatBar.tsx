@@ -34,7 +34,6 @@ export function MinimizedChatBar({
   transcript,
   partialTranscript
 }: MinimizedChatBarProps) {
-  const hasActiveMedia = isVoiceActive || isWebcamActive || isScreenSharing;
   const currentTranscript = partialTranscript || transcript;
 
   return (

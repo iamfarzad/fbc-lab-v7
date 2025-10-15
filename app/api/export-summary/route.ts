@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       }
     });
   } catch (error) {
-    logger.error('Export summary failed', error);
+    logger.error('Export summary failed', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: 'Failed to generate summary' }, { status: 500 });
   }
 }

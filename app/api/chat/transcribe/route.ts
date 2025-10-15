@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
 
     const [response] = await client.recognize(requestConfig);
     const transcription = response.results
-      ?.map((result) => result.alternatives[0]?.transcript)
+      ?.map((result) => result.alternatives?.[0]?.transcript)
+      ?.filter(Boolean)
       ?.join('\n') || 'No speech detected';
 
     logJsonl('transcribe', 'success', {

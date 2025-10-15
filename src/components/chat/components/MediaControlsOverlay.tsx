@@ -26,7 +26,6 @@ export function MediaControlsOverlay({
   onToggleVoice,
   onToggleWebcam,
   onToggleScreenShare,
-  onToggleTranscript,
   webcamStream,
   isProcessing = false,
   screenThumbnail

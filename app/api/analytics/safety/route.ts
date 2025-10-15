@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     logger.warn('safety-escalation', body)
     return NextResponse.json({ ok: true })
   } catch (error) {
-    logger.error('safety-escalation failed', error)
+    logger.error('safety-escalation failed', error instanceof Error ? error : undefined)
     return NextResponse.json({ ok: false }, { status: 400 })
   }
 }

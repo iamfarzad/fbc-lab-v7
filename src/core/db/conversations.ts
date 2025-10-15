@@ -39,7 +39,7 @@ export async function saveConversation(record: ConversationRecord): Promise<Conv
     summary: record.summary,
     lead_score: record.leadScore,
     research_json: record.researchJson,
-    pdf_url: record.pdfUrl,
+    pdf_url: record.pdfUrl ?? null,
     email_status: record.emailStatus ?? 'pending',
     email_retries: record.emailRetries ?? 0
   }

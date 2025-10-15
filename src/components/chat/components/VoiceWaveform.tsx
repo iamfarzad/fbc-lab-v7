@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface VoiceWaveformProps {
@@ -39,25 +39,6 @@ export function VoiceWaveform({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Get computed colors from CSS variables
-    const root = document.documentElement;
-    const computedStyle = getComputedStyle(root);
-    
-    const getColor = (varName: string, alpha: number) => {
-      const value = computedStyle.getPropertyValue(varName).trim();
-      if (!value) return `rgba(136, 136, 136, ${alpha})`; // fallback
-      
-      // If it's HSL values like "25 95% 53%", convert to hsla()
-      if (/^\d+\s+\d+%\s+\d+%$/.test(value)) {
-        return `hsla(${value} / ${alpha})`;
-      }
-      // If it's RGB values like "255 107 53", convert to rgba()
-      if (/^\d+\s+\d+\s+\d+$/.test(value)) {
-        return `rgba(${value} / ${alpha})`;
-      }
-      return `rgba(136, 136, 136, ${alpha})`; // fallback
-    };
-
     // Set canvas size accounting for device pixel ratio
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
@@ -75,7 +56,7 @@ export function VoiceWaveform({
       // Update phase for smooth animation
       phaseRef.current += isActive ? 0.08 : 0.02;
 
-      barsRef.current.forEach((bar, i) => {
+      barsRef.current.forEach((_bar, i) => {
         // Generate smooth wave-like targets
         if (isActive) {
           const wave1 = Math.sin(phaseRef.current + i * 0.3) * 0.5 + 0.5;
@@ -104,26 +85,21 @@ export function VoiceWaveform({
         
         if (isActive) {
           // Active: vibrant gradient
-          gradient.addColorStop(0, getColor('--primary', 0.8));
-          gradient.addColorStop(1, getColor('--primary', 0.4));
+          gradient.addColorStop(0, 'hsl(var(--primary) / 0.8)');
+          gradient.addColorStop(1, 'hsl(var(--primary) / 0.4)');
         } else if (isProcessing) {
           // Processing: subtle pulse
-          gradient.addColorStop(0, getColor('--muted-foreground', 0.5));
-          gradient.addColorStop(1, getColor('--muted-foreground', 0.3));
+          gradient.addColorStop(0, 'hsl(var(--muted-foreground) / 0.5)');
+          gradient.addColorStop(1, 'hsl(var(--muted-foreground) / 0.3)');
         } else {
           // Inactive: very muted
-          gradient.addColorStop(0, getColor('--muted-foreground', 0.2));
-          gradient.addColorStop(1, getColor('--muted-foreground', 0.1));
+          gradient.addColorStop(0, 'hsl(var(--muted-foreground) / 0.2)');
+          gradient.addColorStop(1, 'hsl(var(--muted-foreground) / 0.1)');
         }
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        // Use roundRect if available, otherwise use regular rect
-        if (typeof ctx.roundRect === 'function') {
-          ctx.roundRect(x, y, barWidth, barHeight, barWidth / 2);
-        } else {
-          ctx.rect(x, y, barWidth, barHeight);
-        }
+        ctx.roundRect(x, y, barWidth, barHeight, barWidth / 2);
         ctx.fill();
       });
 

@@ -51,6 +51,7 @@ export function VoiceButton({
       }, feedbackDuration);
       return () => clearTimeout(timer);
     }
+    return undefined
   }, [internalState, feedbackDuration]);
 
   const getIcon = () => {

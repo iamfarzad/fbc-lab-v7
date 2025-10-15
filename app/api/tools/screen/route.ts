@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 
 
     if (userId && process.env.NODE_ENV !== 'test') {
-      const budgetCheck = await enforceBudgetAndLog(userId, sessionId, 'image_analysis', modelName, estimatedTokens, estimatedTokens * 0.5, true)
+      const budgetCheck = await enforceBudgetAndLog(userId ?? 'anonymous', sessionId ?? 'anonymous', 'image_analysis', modelName, estimatedTokens, estimatedTokens * 0.5, true)
 
       if (!budgetCheck.allowed) return NextResponse.json({ ok: false, error: 'Budget limit reached' }, { status: 429 })
 

@@ -1,5 +1,5 @@
 // Chat interface constants - centralized configuration
-import { CHAT_DESIGN, chatStyles } from '../design-tokens';
+import { CHAT_DESIGN } from '../design-tokens';
 
 // Chat state types
 export type ChatState = 'minimized' | 'normal' | 'expanded';

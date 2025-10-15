@@ -1,5 +1,4 @@
 import { LeadResearchService } from '@/core/intelligence/lead-research'
-import type { AgentContext } from './types'
 
 /**
  * Lead Intelligence Agent - Background research worker

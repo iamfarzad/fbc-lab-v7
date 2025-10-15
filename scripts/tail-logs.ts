@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+// @ts-expect-error - eventsource types not available
 import EventSource from 'eventsource'
 import chalk from 'chalk'
 
@@ -64,7 +65,7 @@ es.onopen = () => {
   console.log(chalk.green('✓ Connected\n'))
 }
 
-es.onmessage = (event) => {
+es.onmessage = (event: any) => {
   try {
     const log = JSON.parse(event.data)
     
@@ -120,7 +121,7 @@ es.onmessage = (event) => {
   }
 }
 
-es.onerror = (error) => {
+es.onerror = (_error: any) => {
   console.error(chalk.red('\n✗ Connection lost, retrying...\n'))
 }
 

@@ -43,7 +43,8 @@ export interface AdminChatContext {
 
 export class AdminChatService {
   private static instance: AdminChatService
-  private sessionCache = new Map<string, AdminChatContext>()
+  // Session cache for future use
+  // private _sessionCache = new Map<string, AdminChatContext>()
 
   static getInstance(): AdminChatService {
     if (!AdminChatService.instance) {

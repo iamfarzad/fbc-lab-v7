@@ -100,7 +100,7 @@ TONE: Professional but conversational. This is a valuable document they'll share
     summary = {
       executiveSummary: 'Conversation summary generation failed',
       keyFindings: {},
-      recommendedSolution: intelligenceContext?.fitScore?.consulting > intelligenceContext?.fitScore?.workshop ? 'consulting' : 'workshop'
+      recommendedSolution: (intelligenceContext?.fitScore?.consulting ?? 0) > (intelligenceContext?.fitScore?.workshop ?? 0) ? 'consulting' : 'workshop'
     }
   }
 

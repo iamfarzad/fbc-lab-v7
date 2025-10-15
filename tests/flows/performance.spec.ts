@@ -1,6 +1,5 @@
 import { test, expect } from '../utils/fixtures'
 import { setupMockWebSocket } from '../mocks/websocket-server'
-import { mockAllAPIs } from '../mocks/api'
 import { TEST_MESSAGES, TIMEOUTS } from '../utils/test-data'
 
 test.describe('Performance Tests', () => {
@@ -11,7 +10,7 @@ test.describe('Performance Tests', () => {
     await page.goto('/')
   })
 
-  test('should load chat within acceptable time', async ({ page, chat }) => {
+  test('should load chat within acceptable time', async ({ chat }) => {
     const startTime = Date.now()
     
     await chat.openChat()

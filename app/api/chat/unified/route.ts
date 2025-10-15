@@ -8,7 +8,7 @@ import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { z } from 'zod'
-import { pickFollowUp, PHRASE_BANK } from '@/core/chat/conversation-phrases'
+import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
 // Configure Google SDK globally
 if (process.env.GEMINI_API_KEY) {
@@ -19,13 +19,8 @@ import { GoogleGroundingProvider } from '@/core/intelligence/providers/search/go
 import { ContextStorage } from '@/core/context/context-storage'
 import { routeToAgent } from '@/core/agents'
 import type { AgentContext } from '@/core/agents'
+import type { Message as ChatMessage } from '@/types/core'
 // Note: @ai-sdk-tools/devtools only exports AIDevtools component, not wrap()
-
-// Type definitions
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
 
 interface UnifiedMessage {
   id: string
@@ -181,7 +176,7 @@ function parseStructuredResponse(content: string) {
   // Extract code blocks
   const codeMatches = content.match(/<code(?:\s+language="([^"]*)")?>(.*?)<\/code>/gs)
   if (codeMatches) {
-    metadata.codeBlocks = codeMatches.map((match, index) => {
+    metadata.codeBlocks = codeMatches.map((match, _index) => {
       const languageMatch = match.match(/language="([^"]*)"/)
       const codeMatch = match.match(/<code(?:\s+language="[^"]*")?>(.*?)<\/code>/s)
       return {
@@ -490,12 +485,6 @@ function truncate(value: string, maxLength: number) {
   return value.slice(0, maxLength - 1).trimEnd() + '…'
 }
 
-function getFollowUp(flow?: ConversationFlowSnapshot | null) {
-  if (!flow?.recommendedNext) return null
-  const key = flow.recommendedNext as keyof typeof PHRASE_BANK
-  if (!PHRASE_BANK[key]) return null
-  return pickFollowUp(key, Math.random() * 1000)
-}
 
 // Node.js runtime for streaming compatibility
 export const runtime = 'nodejs'
@@ -541,8 +530,10 @@ export async function POST(req: NextRequest) {
 
     // Convert UnifiedMessage to ChatMessage format for AI SDK
     const messages: ChatMessage[] = rawMessages.map((msg) => ({
+      id: msg.id || crypto.randomUUID(),
       role: msg.role,
-      content: msg.content.trim()
+      content: msg.content.trim(),
+      timestamp: new Date()
     }))
     const model = getModel()
 
@@ -810,8 +801,10 @@ Citations: ${researchResult.allCitations.length} sources processed
     const aiMessages = messages
       .filter((msg: ChatMessage) => msg.content && msg.content.trim().length > 0)
       .map((msg: ChatMessage) => ({
+        id: msg.id || crypto.randomUUID(),
         role: msg.role as 'user' | 'assistant' | 'system',
-        content: msg.content
+        content: msg.content,
+        timestamp: msg.timestamp || new Date()
       }))
 
     // Ensure we have at least one message

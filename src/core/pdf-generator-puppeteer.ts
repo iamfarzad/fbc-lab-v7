@@ -98,7 +98,7 @@ export async function generatePdfWithPuppeteer(
           printBackground: true,
           preferCSSPageSize: true
         })
-        return
+        return new Uint8Array()
       } finally {
         await browser.close()
       }
@@ -336,7 +336,7 @@ export function sanitizeTextForPdf(text: string) {
     .trim()
 }
 
-async function generateHtmlContent(summaryData: SummaryData, mode: Mode, language: string) {
+async function generateHtmlContent(summaryData: SummaryData, _mode: Mode, language: string) {
   const leadName = summaryData.leadInfo.name || 'Valued Client'
   const translatedSummary = await translateText(summaryData.leadResearch?.conversation_summary || '')
   const translatedBrief = await translateText(summaryData.leadResearch?.consultant_brief || '')

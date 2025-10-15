@@ -1,5 +1,4 @@
 import { test, expect } from './utils/fixtures'
-import { mockAllAPIs } from './mocks/api'
 import { TEST_MESSAGES, SELECTORS, TIMEOUTS } from './utils/test-data'
 
 test.describe('Chat Interface', () => {
@@ -8,7 +7,7 @@ test.describe('Chat Interface', () => {
     await page.goto('/')
   })
 
-  test('should open and close chat widget', async ({ page, chat }) => {
+  test('should open and close chat widget', async ({ chat }) => {
     // Chat should be closed initially
     expect(await chat.isChatOpen()).toBe(false)
 
@@ -93,9 +92,6 @@ test.describe('Chat Interface', () => {
     await chat.openChat()
     await chat.sendMessage(TEST_MESSAGES.simple)
     await page.waitForTimeout(1000)
-
-    // Get initial message count
-    const initialCount = await chat.getMessageCount()
 
     // Reload page
     await page.reload()

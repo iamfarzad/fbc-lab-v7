@@ -8,16 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import type { Message as ChatMessage } from '@/types/core'
 import {
-  Activity,
   Brain,
-  Calendar,
-  DollarSign,
   Download,
-  Filter,
   Home,
   Mail,
-  Search,
   Server,
   TrendingUp,
   Users,
@@ -60,11 +56,6 @@ interface Conversation {
   summary: string | null
   leadScore: number | null
   createdAt: string
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
 }
 
 const API_ENDPOINTS = [
@@ -217,7 +208,12 @@ export function AdminDashboard() {
   const sendAdminChatMessage = async () => {
     if (!chatInput.trim()) return
 
-    const userMessage: ChatMessage = { role: 'user', content: chatInput }
+    const userMessage: ChatMessage = { 
+      id: crypto.randomUUID(),
+      role: 'user', 
+      content: chatInput,
+      timestamp: new Date()
+    }
     setChatMessages(prev => [...prev, userMessage])
     setChatInput('')
     setChatLoading(true)
@@ -256,20 +252,26 @@ export function AdminDashboard() {
       if (response.ok) {
         const data = await response.json()
         const assistantMessage: ChatMessage = { 
+          id: crypto.randomUUID(),
           role: 'assistant', 
-          content: data.content || data.message || 'Response received'
+          content: data.content || data.message || 'Response received',
+          timestamp: new Date()
         }
         setChatMessages(prev => [...prev, assistantMessage])
       } else {
         setChatMessages(prev => [...prev, { 
+          id: crypto.randomUUID(),
           role: 'assistant', 
-          content: 'Error: Failed to get response from admin chat endpoint'
+          content: 'Error: Failed to get response from admin chat endpoint',
+          timestamp: new Date()
         }])
       }
     } catch (error) {
       setChatMessages(prev => [...prev, { 
+        id: crypto.randomUUID(),
         role: 'assistant', 
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date()
       }])
     } finally {
       setChatLoading(false)

@@ -1,0 +1,70 @@
+# CRITICAL AI RULES - NEVER VIOLATE THESE
+
+## 1. NEVER DELETE CODE WITHOUT EXPLICIT USER PERMISSION
+- Do not delete files to "fix" OAuth issues or push failures
+- Do not remove working features to resolve type errors
+- Always ask before removing any file over 50 lines
+- Git push failures are NOT solved by deleting code
+- When you can't push, tell the user - don't delete files
+
+## 2. TYPE SYSTEM RULES
+- Types must be defined BEFORE implementation
+- Use existing types from src/types/core.ts
+- DO NOT create new Message/Chat types - use Message from @/types/core
+- All new code must pass strict TypeScript checks
+- No 'any' types except in migration code marked with // TODO: migrate
+- When creating a "unified" solution, DELETE the old solutions in the SAME commit
+
+## 3. DUPLICATE PREVENTION RULES
+- Before creating a new type/hook/component, search for existing ones
+- If creating a "unified" solution, you MUST delete old solutions immediately
+- No more: "Create unified X" → old X still exists → now have both
+- Pattern: "Replace X with unified X" → delete old X → only one X exists
+- If you find duplicates, consolidate to ONE and delete the others
+
+## 4. CONFIGURATION RULES
+- NO hardcoded URLs - use environment variables
+- NO hardcoded API keys - use env vars
+- NO hardcoded model names - use constants from src/config/constants.ts
+- All config in src/config/* files
+- WebSocket URLs must come from WEBSOCKET_CONFIG
+- Model names must come from GEMINI_MODELS
+
+## 5. TESTING RULES
+- Changes must not break existing tests
+- New features require at least one test
+- Run `pnpm type-check` before committing
+- If tests fail, fix them - don't disable or delete tests
+
+## 6. VOICE/WEBSOCKET RULES
+- WebSocket URL: use WEBSOCKET_CONFIG.URL from @/config/constants
+- Gemini Live API: use sendRealtimeInput() not session.send()
+- Voice hooks: ONLY use useRealtimeVoice.ts (NOT useWebSocketVoice.ts)
+- Model names: use GEMINI_MODELS constants from @/config/constants
+
+## 7. COMMIT RULES
+- No "comprehensive fixes" - be specific about what you fixed
+- No "major refactors" without explicit approval
+- Fixes should target one subsystem at a time
+- Commit format: "fix: Specific thing in Specific file" not "fix: types"
+- When consolidating duplicates, commit message must say what was deleted
+
+## 8. FILE ORGANIZATION RULES
+- Types: src/types/core.ts (canonical types only)
+- Config: src/config/constants.ts (all constants)
+- Voice: src/hooks/useRealtimeVoice.ts (single voice hook)
+- Chat API: app/api/chat/unified/route.ts (single route)
+- NO local type definitions - import from @/types/core
+
+## 9. MIGRATION RULES
+- When migrating to new pattern, update ALL usages
+- Don't leave half-migrated code
+- If migration is incomplete, mark with // TODO: complete migration to [pattern]
+- Delete deprecated code after migration is complete
+
+## 10. ERROR HANDLING RULES
+- TypeScript errors mean FIX THE TYPES, not disable strict mode
+- Build failures mean FIX THE CODE, not relax the checks
+- If you can't fix an error, ASK THE USER, don't workaround
+- Never add @ts-ignore without a detailed comment explaining why
+

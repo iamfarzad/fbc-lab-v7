@@ -1,10 +1,14 @@
 import type { MultimodalInput, AIResponse, AIProvider } from '../types';
 
 class AIService {
-  private provider: AIProvider;
+  private _provider: AIProvider;
 
   constructor(provider: AIProvider) {
-    this.provider = provider;
+    this._provider = provider;
+  }
+
+  getProvider(): AIProvider {
+    return this._provider;
   }
 
   async sendMultimodalRequest(input: MultimodalInput): Promise<AIResponse> {
@@ -35,7 +39,7 @@ class AIService {
   }
 
   setProvider(provider: AIProvider) {
-    this.provider = provider;
+    this._provider = provider;
   }
 }
 

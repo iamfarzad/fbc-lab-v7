@@ -6,7 +6,7 @@ import { createHash } from 'crypto';
 
 // Create a cached function for webcam analysis (30 min TTL)
 const cachedAnalyzeImage = createCachedFunction(
-  async (imageHash: string, base64: string, mimeType: string) => {
+  async (_imageHash: string, base64: string, mimeType: string) => {
     // If no API key, return a mock analysis to avoid 500s in dev/demo
     if (!process.env.GEMINI_API_KEY) {
       return {

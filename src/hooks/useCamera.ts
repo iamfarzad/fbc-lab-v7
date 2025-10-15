@@ -237,7 +237,7 @@ export function useCamera(options: UseCameraOptions = {}) {
   // Upload frame to backend for analysis
   const uploadToBackend = useCallback(async (
     blob: Blob,
-    imageData: string,
+    _imageData: string,
     sessionId: string,
     voiceConnectionId?: string
   ): Promise<{ analysis?: string } | null> => {
@@ -381,9 +381,9 @@ export function useCamera(options: UseCameraOptions = {}) {
 
       // Debug logging
       console.log('📷 Camera capture:', {
-        dimensions: `${capture.metadata.width}x${capture.metadata.height}`,
+        dimensions: `${capture.metadata?.width ?? 0}x${capture.metadata?.height ?? 0}`,
         blobSize: `${Math.round(capture.blob.size / 1024)}KB`,
-        deviceId: capture.metadata.deviceId,
+        deviceId: capture.metadata?.deviceId ?? 'unknown',
         timestamp: capture.timestamp,
       });
 
@@ -453,6 +453,7 @@ export function useCamera(options: UseCameraOptions = {}) {
         autoCaptureTimerRef.current = null;
       }
     }
+    return undefined
   }, [enableAutoCapture, isActive, captureInterval, captureFrame, requireVoiceSession, sessionId, voiceConnectionId, sendRealtimeInput]);
 
   // Cleanup on unmount

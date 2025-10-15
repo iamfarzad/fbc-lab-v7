@@ -1,6 +1,5 @@
 import { test, expect } from '../utils/fixtures'
 import { setupMockWebSocket } from '../mocks/websocket-server'
-import { mockAllAPIs } from '../mocks/api'
 
 test.describe('Visual Regression Tests', () => {
   test.beforeEach(async ({ page, mockAPIs }) => {

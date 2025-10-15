@@ -1,5 +1,4 @@
 import { Page } from '@playwright/test'
-import { VOICE_EVENTS } from '../utils/test-data'
 
 export class MockWebSocketServer {
   constructor(private page: Page) {}

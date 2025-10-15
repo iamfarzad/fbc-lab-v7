@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { usageLimiter } from '@/src/lib/usage-limits';
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {

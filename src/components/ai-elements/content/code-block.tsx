@@ -10,7 +10,6 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { Badge } from "@/components/ui/badge";
 
 type CodeBlockContextType = {
   code: string;

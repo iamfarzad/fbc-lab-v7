@@ -1,14 +1,11 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Loader } from "@/components/ai-elements/core/loader";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
 import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw, Search } from "lucide-react";
 import { DESIGN_TOKENS } from "../tokens/design-tokens";
-import { getMonochromeClass } from "@/lib/theme-utils";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -107,20 +104,6 @@ type StreamedArtifact = {
   error?: string;
 };
 
-const MESSAGE_PRESENTATION = {
-  user: {
-    label: "You",
-    icon: MessageCircle,
-  },
-  assistant: {
-    label: "Assistant",
-    icon: Sparkles,
-  },
-} as const satisfies Record<EnhancedChatMessage["role"], {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}>;
-
 interface ChatMessagesProps {
   messages: ChatMessage[];
   enhancedMessages: EnhancedChatMessage[];
@@ -151,14 +134,6 @@ interface ChatMessagesProps {
   isExpanded?: boolean;
   isMinimized?: boolean;
   artifacts: StreamedArtifact[];
-  // Voice transcript entries
-  transcriptEntries?: Array<{
-    id: string;
-    text: string;
-    type: 'user' | 'assistant';
-    isPartial?: boolean;
-    timestamp: number;
-  }>;
   // Terms acceptance props
   name?: string;
   email?: string;
@@ -189,7 +164,6 @@ export function ChatMessages({
   isExpanded = false,
   isMinimized = false,
   artifacts,
-  transcriptEntries = [],
   name,
   email,
   agreed,
@@ -218,21 +192,21 @@ export function ChatMessages({
     return () => clearInterval(interval);
   }, [enhancedMessages]);
 
-  const followUpSuggestion = useMemo(() => {
-    // DISABLED: Follow-ups don't work as user prompts
-    return null;
-    
-    // Original code commented:
-    // for (let index = enhancedMessages.length - 1; index >= 0; index--) {
-    //   const message = enhancedMessages[index];
-    //   if (message.role !== "assistant") continue;
-    //   const followUp = message.metadata?.followUp;
-    //   if (typeof followUp === "string" && followUp.trim().length > 0) {
-    //     return followUp.trim();
-    //   }
-    // }
-    // return null;
-  }, [enhancedMessages]);
+  // Follow-up suggestions disabled
+  // const followUpSuggestion = useMemo(() => {
+  //   // DISABLED: Follow-ups don't work as user prompts
+  //   return null;
+  //   // for (let index = enhancedMessages.length - 1; index >= 0; index--) {
+  //   //   const message = enhancedMessages[index];
+  //   //   if (message.role !== "assistant") continue;
+  //   //   const followUp = message.metadata?.followUp;
+  //   //   if (typeof followUp === "string" && followUp.trim().length > 0) {
+  //   //     return followUp.trim();
+  //   //   }
+  //   // }
+  //   // return null;
+  // }, [enhancedMessages]);
+  
   // Don't render messages in minimized state
   if (isMinimized) {
     return null;
@@ -278,12 +252,7 @@ export function ChatMessages({
         ) : (
           <>
           {enhancedMessages.map((message) => {
-            const meta = MESSAGE_PRESENTATION[message.role];
-            const Icon = meta.icon;
             const isUserMessage = message.role === "user";
-
-            // Use the user's name from terms acceptance for user messages
-            const userLabel = isUserMessage && name ? name : meta.label;
 
             const rawResearchSummary = message.metadata?.researchSummary as unknown;
             const researchSummary = rawResearchSummary && typeof rawResearchSummary === 'object'
@@ -377,10 +346,17 @@ export function ChatMessages({
                         </span>
                       </div>
                     )}
-                    <Response>{message.content}</Response>
+                    <div className={cn(
+                      message.metadata?.isPartial && "opacity-70 italic text-muted-foreground"
+                    )}>
+                      <Response>{message.content}</Response>
+                      {message.metadata?.isPartial && (
+                        <span className="ml-1 text-xs text-muted-foreground">(speaking...)</span>
+                      )}
+                    </div>
                     
                     {/* Blinking cursor - only for assistant in monochrome */}
-                    {!isUserMessage && (
+                    {!isUserMessage && !message.metadata?.isPartial && (
                       <span className={cn("hidden [.monochrome_&]:inline-block w-2 h-4 bg-current ml-1 align-middle", DESIGN_TOKENS.animations.pulse)} />
                     )}
                   </div>
@@ -649,58 +625,6 @@ export function ChatMessages({
                     )}
                   </MessageContent>
                 </Message>
-            );
-          })}
-          
-          {/* Voice Transcript Messages */}
-          {transcriptEntries.length > 0 && transcriptEntries.map((entry) => {
-            const meta = MESSAGE_PRESENTATION[entry.type];
-            const Icon = meta.icon;
-            const isUserMessage = entry.type === "user";
-            const userLabel = isUserMessage && name ? name : meta.label;
-
-            return (
-              <Message
-                key={entry.id}
-                from={entry.type}
-                className={entry.isPartial ? "opacity-70" : ""}
-              >
-                {/* Avatar */}
-                <MessageAvatar name={userLabel} />
-                
-                <MessageContent
-                  variant="flat"
-                  className={cn(
-                    "space-y-2",
-                    // Monochrome themes: terminal aesthetic
-                    "[.monochrome_&]:rounded-none",
-                    "[.monochrome_&]:border-l-2",
-                    isUserMessage 
-                      ? "[.monochrome_&]:border-[hsl(0,0%,85%)]"
-                      : "[.monochrome_&]:border-[hsl(0,0%,15%)]",
-                  )}
-                >
-                  {/* Terminal prompt - only in monochrome */}
-                  <div className={cn("hidden [.monochrome_&]:block font-mono text-muted-foreground", DESIGN_TOKENS.typography.disclaimer)}>
-                    {isUserMessage ? (
-                      <span>user@fbc:~$ </span>
-                    ) : (
-                      <span>[F.B/c AI] </span>
-                    )}
-                  </div>
-
-                  <div className={cn(
-                    "text-[13px] leading-relaxed",
-                    "[.monochrome_&]:font-mono",
-                    entry.isPartial && "italic text-muted-foreground"
-                  )}>
-                    <Response>{entry.text}</Response>
-                    {entry.isPartial && (
-                      <span className="ml-1 text-xs text-muted-foreground">(speaking...)</span>
-                    )}
-                  </div>
-                </MessageContent>
-              </Message>
             );
           })}
           

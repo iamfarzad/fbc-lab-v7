@@ -1,6 +1,5 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
-import type { AgentContext } from './types'
 
 /**
  * Retargeting Agent - Automated follow-up email generation

@@ -108,13 +108,14 @@ class TestRunner {
         console.log(`  ${result.connected ? '✅' : '❌'} ${test.name}: ${result.error || 'Connected'}`);
         
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
         this.results.push({
           test: `WebSocket - ${test.name}`,
           passed: false,
-          details: error.message,
+          details: errorMessage,
           timestamp: new Date()
         });
-        console.log(`  ❌ ${test.name}: ${error.message}`);
+        console.log(`  ❌ ${test.name}: ${errorMessage}`);
       }
     }
     
@@ -158,24 +159,26 @@ class TestRunner {
           console.log(`  ${issues.length === 0 ? '✅' : '⚠️'} ${path.basename(file)}: ${issues.length > 0 ? issues.length + ' issues' : 'Clean'}`);
           
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
           this.results.push({
             test: `React Analysis - ${path.basename(file)}`,
             passed: false,
-            details: error.message,
+            details: errorMessage,
             timestamp: new Date()
           });
-          console.log(`  ❌ ${path.basename(file)}: ${error.message}`);
+          console.log(`  ❌ ${path.basename(file)}: ${errorMessage}`);
         }
       }
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
       this.results.push({
         test: 'React Analysis',
         passed: false,
-        details: error.message,
+        details: errorMessage,
         timestamp: new Date()
       });
-      console.log(`  ❌ React Analysis: ${error.message}`);
+      console.log(`  ❌ React Analysis: ${errorMessage}`);
     }
     
     console.log('');
@@ -215,13 +218,14 @@ class TestRunner {
         console.log(`  ${passed ? '✅' : '❌'} ${route.method} ${route.path}: ${response.status}`);
         
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
         this.results.push({
           test: `API - ${route.method} ${route.path}`,
           passed: false,
-          details: error.message,
+          details: errorMessage,
           timestamp: new Date()
         });
-        console.log(`  ❌ ${route.method} ${route.path}: ${error.message}`);
+        console.log(`  ❌ ${route.method} ${route.path}: ${errorMessage}`);
       }
     }
     
@@ -254,13 +258,14 @@ class TestRunner {
           console.log(`  ${hasPerfMonitoring ? '✅' : '⚠️'} ${path.basename(file)}: ${hasPerfMonitoring ? 'Monitored' : 'Not monitored'}`);
           
         } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
           this.results.push({
             test: `Performance - ${path.basename(file)}`,
             passed: false,
-            details: error.message,
+            details: errorMessage,
             timestamp: new Date()
           });
-          console.log(`  ❌ ${path.basename(file)}: ${error.message}`);
+          console.log(`  ❌ ${path.basename(file)}: ${errorMessage}`);
         }
       }
       
@@ -282,13 +287,14 @@ class TestRunner {
       console.log(`  ${loadTime < 3000 ? '✅' : '⚠️'} Page Load: ${loadTime}ms`);
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
       this.results.push({
         test: 'Performance Analysis',
         passed: false,
-        details: error.message,
+        details: errorMessage,
         timestamp: new Date()
       });
-      console.log(`  ❌ Performance Analysis: ${error.message}`);
+      console.log(`  ❌ Performance Analysis: ${errorMessage}`);
     }
     
     console.log('');
@@ -353,13 +359,14 @@ class TestRunner {
         console.log(`  ${passed ? '✅' : '❌'} ${scenario.name}: ${passed ? 'Handled' : 'Not handled'}`);
         
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
         this.results.push({
           test: `Error Scenario - ${scenario.name}`,
           passed: false,
-          details: error.message,
+          details: errorMessage,
           timestamp: new Date()
         });
-        console.log(`  ❌ ${scenario.name}: ${error.message}`);
+        console.log(`  ❌ ${scenario.name}: ${errorMessage}`);
       }
     }
     

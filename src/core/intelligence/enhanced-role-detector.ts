@@ -469,7 +469,7 @@ export class EnhancedRoleDetector {
     return false;
   }
 
-  private getFallbackRoleResult(context: RoleContext, processingTime: number): RoleDetectionResult {
+  private getFallbackRoleResult(_context: RoleContext, processingTime: number): RoleDetectionResult {
     return {
       detectedRole: {
         title: 'Business Professional',

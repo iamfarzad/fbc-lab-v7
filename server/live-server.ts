@@ -21,8 +21,6 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 // Use PORT for Fly.io compatibility, fallback to 3001 for local development
 const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
 console.log(`🔧 Environment check: PORT=${process.env.PORT}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT}, Using: ${PORT}`);
-// Mock disabled: always use Live API
-const IS_MOCK = false;
 
 // Voice & Language Utilities
 const VOICE_BY_LANG: Record<string, string> = {

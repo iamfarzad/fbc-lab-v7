@@ -1,18 +1,7 @@
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 
-// Core chat message interface
-export interface ChatMessage {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: Date;
-  type?: 'text' | 'voice' | 'image' | 'screen';
-  metadata?: {
-    fileName?: string;
-    fileType?: string;
-    [key: string]: any;
-  };
-}
+// Use canonical Message type from @/types/core (DELETE duplicate, import instead)
+export type { Message as ChatMessage } from '@/types/core'
 
 // Chat state management
 export interface ChatState {

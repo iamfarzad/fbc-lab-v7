@@ -44,9 +44,9 @@ export function ChartWidget({ type, title, description, data }: ChartWidgetProps
         return (
           <PieChart>
             <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
+            {chartData.map((_entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
             </Pie>
             <Tooltip />
             <Legend />

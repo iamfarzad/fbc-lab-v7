@@ -22,7 +22,7 @@ export const getThemeColors = () => ({
   ring: 'hsl(var(--ring))',
 });
 
-export const getGradientForTheme = (theme?: string) => {
+export const getGradientForTheme = (_theme?: string) => {
   // Return theme-aware gradients
   return {
     voice: 'bg-gradient-to-b from-background via-muted to-background',

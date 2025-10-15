@@ -2,7 +2,6 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChatState } from "../types/chatTypes";
-import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { StatusIndicator } from "./StatusIndicator";
 import { NextStepsMenu } from "../NextStepsMenu";
 import {

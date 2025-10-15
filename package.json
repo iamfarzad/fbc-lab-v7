@@ -14,6 +14,8 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch",
+    "precommit": "pnpm type-check && pnpm lint",
     "prepare": "husky",
     "commit": "git-cz",
     "commit:retry": "git commit --amend --no-edit",

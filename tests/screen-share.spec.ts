@@ -1,6 +1,5 @@
 import { test, expect } from './utils/fixtures'
-import { mockAllAPIs } from './mocks/api'
-import { SELECTORS, TIMEOUTS } from './utils/test-data'
+import { SELECTORS } from './utils/test-data'
 
 test.describe('Screen Share Features', () => {
   test.beforeEach(async ({ page, mockAPIs }) => {

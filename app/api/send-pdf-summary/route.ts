@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, messageId: data?.id });
   } catch (error) {
-    logger.error('Send PDF summary failed', error);
+    logger.error('Send PDF summary failed', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: 'Failed to send summary' }, { status: 500 });
   }
 }

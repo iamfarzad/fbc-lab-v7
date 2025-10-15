@@ -712,7 +712,7 @@ export class EnhancedToolSuggestionEngine {
     return Math.abs(hash).toString(36);
   }
 
-  private getFallbackToolResult(context: SuggestionContext, processingTime: number): ToolSuggestionResult {
+  private getFallbackToolResult(_context: SuggestionContext, processingTime: number): ToolSuggestionResult {
     return {
       suggestions: [],
       reasoning: ['Tool suggestion failed, using fallback'],

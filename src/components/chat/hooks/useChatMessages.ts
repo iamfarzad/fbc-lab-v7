@@ -7,7 +7,7 @@ import { useConversationFlow } from "./useConversationFlow";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import type { PromptInputFile } from "@/components/ai-elements/interactive/prompt-input";
-import type { AttachmentUploadResponse, ChatAttachment } from "@/types/attachments";
+import type { AttachmentUploadResponse } from "@/types/attachments";
 import { logConversationMilestone } from "@/lib/analytics/chat-flow";
 import { detectSafetyCategory, logSafetyEvent } from "@/lib/analytics/safety";
 
@@ -48,6 +48,7 @@ export function useChatMessages(initialSessionId?: string) {
   const [inputValue, setInputValue] = useState('');
   const [sessionId, setSessionId] = useState(() => initialSessionId ?? crypto.randomUUID());
   const voiceAssistantMessageIdRef = useRef<string | null>(null);
+  const partialUserMessageIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (initialSessionId && initialSessionId !== sessionId) {
@@ -76,7 +77,6 @@ export function useChatMessages(initialSessionId?: string) {
       content: msg.content,
       role: msg.role === 'system' ? 'assistant' : msg.role,
       timestamp: msg.timestamp,
-      type: (msg.type as ChatMessage['type']) || 'text',
       metadata: msg.metadata
     })),
     [unifiedChat.messages]
@@ -95,23 +95,37 @@ export function useChatMessages(initialSessionId?: string) {
         : undefined;
 
       // Extract AI elements metadata
-      const reasoning = msg.metadata?.reasoning
+      const reasoning = typeof msg.metadata?.reasoning === 'string' ? msg.metadata.reasoning : undefined
       const chainOfThought = msg.metadata?.chainOfThought
-      const contextUsage = msg.metadata?.contextUsage
-      const codeBlocks = msg.metadata?.codeBlocks
+      const contextUsage = msg.metadata?.contextUsage && typeof msg.metadata.contextUsage === 'object' 
+        && 'usedTokens' in msg.metadata.contextUsage 
+        ? msg.metadata.contextUsage as { usedTokens: number; maxTokens: number; usage: number; modelId: string }
+        : undefined
+      const codeBlocks = Array.isArray(msg.metadata?.codeBlocks) ? msg.metadata.codeBlocks as Array<{
+        id: string; code: string; language: string; showLineNumbers?: boolean; title?: string; description?: string
+      }> : undefined
       const aiSources = Array.isArray(msg.metadata?.sources)
         ? (msg.metadata!.sources as SourceMetadata[])
         : undefined
-      const images = msg.metadata?.images
-      const inlineCitations = msg.metadata?.inlineCitations
-      const tasks = msg.metadata?.tasks
-      const webPreview = msg.metadata?.webPreview
+      const images = Array.isArray(msg.metadata?.images) ? msg.metadata.images as Array<{
+        base64: string; mediaType: string; alt: string
+      }> : undefined
+      const inlineCitations = Array.isArray(msg.metadata?.inlineCitations) ? msg.metadata.inlineCitations as Array<{
+        url: string; title: string; text: string
+      }> : undefined
+      const tasks = Array.isArray(msg.metadata?.tasks) ? msg.metadata.tasks as Array<{
+        title: string; description?: string; status: 'pending' | 'in_progress' | 'completed' | 'failed'; files?: Array<{ name: string }>
+      }> : undefined
+      const webPreview = msg.metadata?.webPreview && typeof msg.metadata.webPreview === 'object'
+        && 'url' in msg.metadata.webPreview && 'title' in msg.metadata.webPreview
+        ? msg.metadata.webPreview as { url: string; title: string; description?: string }
+        : undefined
       const followUp =
         typeof msg.metadata?.followUp === 'string' && msg.metadata.followUp.trim().length > 0
           ? msg.metadata.followUp.trim()
           : undefined
       const attachments = Array.isArray(msg.metadata?.attachments)
-        ? (msg.metadata!.attachments as ChatAttachment[])
+        ? msg.metadata.attachments
         : undefined;
 
       const metadataPayload: Partial<NonNullable<EnhancedChatMessage['metadata']>> = {};
@@ -217,7 +231,19 @@ export function useChatMessages(initialSessionId?: string) {
         metadataPayload.followUp = followUp;
       }
       if (attachments && attachments.length > 0) {
-        metadataPayload.attachments = attachments;
+        // Convert Attachment[] from core to EnhancedChatMessage attachment format
+        metadataPayload.attachments = attachments.map(att => ({
+          id: att.id,
+          name: att.name || 'Unnamed attachment',
+          type: att.type,
+          size: att.size || 0,
+          url: att.url,
+          thumbnail: undefined,
+          analysis: undefined,
+          summary: undefined,
+          pages: undefined,
+          uploadedAt: undefined
+        }));
       }
 
       const metadata: EnhancedChatMessage['metadata'] | undefined =
@@ -236,11 +262,14 @@ export function useChatMessages(initialSessionId?: string) {
         content: msg.content,
         role: msg.role === 'assistant' ? 'assistant' : 'user',
         timestamp,
-        type: msg.type === 'tool' ? 'code' : 'text',
+        type: msg.metadata?.type === 'tool' ? 'code' : 'text',
         metadata,
         status,
-        error: msg.metadata?.error ? msg.metadata?.errorMessage || 'An error occurred' : undefined,
-        isStreaming: Boolean(msg.metadata?.isStreaming && !msg.metadata?.isComplete)
+        error: msg.metadata?.error ? String(msg.metadata.error.message || 'An error occurred') : undefined,
+        isStreaming: Boolean(
+          msg.metadata?.isStreaming && !msg.metadata?.isComplete ||
+          msg.metadata?.isPartial
+        )
       };
     }),
     [unifiedChat.messages]
@@ -323,13 +352,28 @@ export function useChatMessages(initialSessionId?: string) {
 
     const outgoingText = promptSegments.join('\n\n').trim() || 'Shared new attachments for analysis.';
 
-    const existingAttachments: ChatAttachment[] = Array.isArray(unifiedChat.context.attachments)
-      ? (unifiedChat.context.attachments as ChatAttachment[])
+    const existingAttachments = Array.isArray(unifiedChat.context.attachments)
+      ? unifiedChat.context.attachments
       : [];
 
     if (uploadResult?.attachments?.length) {
+      // Convert ChatAttachment[] to Attachment[] for core types
+      const convertedAttachments = uploadResult.attachments.map(att => {
+        const attachmentType: 'image' | 'audio' | 'video' | 'document' = 
+          (att.type === 'image' || att.type === 'audio' || att.type === 'video' || att.type === 'document') 
+            ? att.type 
+            : 'document';
+        return {
+          id: att.id,
+          type: attachmentType,
+          url: att.url,
+          mimeType: att.type, // Use type as mimeType for now
+          size: att.size,
+          name: att.name
+        };
+      });
       unifiedChat.updateContext({
-        attachments: [...existingAttachments, ...uploadResult.attachments]
+        attachments: [...existingAttachments, ...convertedAttachments]
       });
     }
 
@@ -395,17 +439,70 @@ export function useChatMessages(initialSessionId?: string) {
     });
   }, [sessionId, unifiedChat.messages]);
 
+  const updatePartialUserTranscript = useCallback((text: string) => {
+    if (!text.trim()) {
+      // Remove partial if empty
+      if (partialUserMessageIdRef.current) {
+        const filtered = unifiedChat.messages.filter(
+          m => m.id !== partialUserMessageIdRef.current
+        );
+        unifiedChat.setMessages(filtered);
+        partialUserMessageIdRef.current = null;
+      }
+      return;
+    }
+
+    const existingId = partialUserMessageIdRef.current;
+    
+    if (!existingId) {
+      // Create new partial message
+      const message = unifiedChat.addMessage({
+        role: 'user',
+        content: text,
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          source: 'voice',
+          modality: 'audio',
+          isPartial: true,
+          isStreaming: true,
+        },
+      });
+      partialUserMessageIdRef.current = message.id;
+    } else {
+      // Update existing partial
+      const nextMessages = unifiedChat.messages.map((message) => {
+        if (message.id !== existingId) return message;
+        return {
+          ...message,
+          content: text,
+          timestamp: new Date(),
+        };
+      });
+      unifiedChat.setMessages(nextMessages);
+    }
+  }, [unifiedChat]);
+
   const appendVoiceUserMessage = useCallback((text: string) => {
     const content = text.trim();
     if (!content) return;
+
+    // Clear partial message if exists
+    if (partialUserMessageIdRef.current) {
+      const filtered = unifiedChat.messages.filter(
+        m => m.id !== partialUserMessageIdRef.current
+      );
+      unifiedChat.setMessages(filtered);
+      partialUserMessageIdRef.current = null;
+    }
 
     voiceAssistantMessageIdRef.current = null;
     unifiedChat.addMessage({
       role: 'user',
       content,
       timestamp: new Date(),
-      type: 'text',
       metadata: {
+        type: 'text',
         source: 'voice',
         modality: 'audio',
         isComplete: true,
@@ -426,8 +523,8 @@ export function useChatMessages(initialSessionId?: string) {
         role: 'assistant',
         content: chunk,
         timestamp: new Date(),
-        type: 'text',
         metadata: {
+          type: 'text',
           source: 'voice',
           modality: 'audio',
           isStreaming: true,
@@ -459,7 +556,7 @@ export function useChatMessages(initialSessionId?: string) {
     const messageId = voiceAssistantMessageIdRef.current;
     if (!messageId) return;
 
-    const nextMessages = unifiedChat.messages.map((message) => {
+    const nextMessages = unifiedChat.messages.map((message): ChatMessage => {
       if (message.id !== messageId) return message;
       return {
         ...message,
@@ -469,7 +566,7 @@ export function useChatMessages(initialSessionId?: string) {
           modality: 'audio',
           isStreaming: false,
           isComplete: true,
-          error: Boolean(opts?.error ?? message.metadata?.error),
+          error: opts?.error ? { code: 'voice_error', message: opts.error } : message.metadata?.error,
         },
         timestamp: new Date(),
       };
@@ -538,6 +635,7 @@ export function useChatMessages(initialSessionId?: string) {
     sessionId,
     updateChatContext,
     appendVoiceUserMessage,
+    updatePartialUserTranscript,
     appendVoiceAssistantChunk,
     finalizeVoiceAssistantMessage,
     exportVoiceTranscript,

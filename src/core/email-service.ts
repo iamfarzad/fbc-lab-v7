@@ -95,7 +95,7 @@ async function safeReadJson(response: Response) {
   try {
     return await response.json()
   } catch (error) {
-    logger.warn('EmailService: failed to parse Resend error payload', error)
+    logger.warn('EmailService: failed to parse Resend error payload', error instanceof Error ? error : undefined)
     return null
   }
 }

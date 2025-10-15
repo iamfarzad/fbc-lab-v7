@@ -76,7 +76,7 @@ interface PopoverContentProps extends React.HTMLAttributes<HTMLDivElement> {
 const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
   ({ className, align = "center", side = "top", sideOffset = 4, ...props }, ref) => {
     const { isOpen, setIsOpen } = usePopover()
-    const contentRef = React.useRef<HTMLDivElement>(null)
+    const contentRef = React.useRef<HTMLDivElement | null>(null)
     const [position, setPosition] = React.useState({ top: 0, left: 0 })
 
     React.useEffect(() => {
@@ -221,8 +221,6 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
           contentRef.current = node
           if (typeof ref === 'function') {
             ref(node)
-          } else if (ref) {
-            ref.current = node
           }
         }}
         role="dialog"

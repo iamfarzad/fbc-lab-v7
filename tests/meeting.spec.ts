@@ -1,6 +1,5 @@
 import { test, expect } from './utils/fixtures'
-import { mockAllAPIs } from './mocks/api'
-import { SELECTORS, TIMEOUTS } from './utils/test-data'
+import { TIMEOUTS } from './utils/test-data'
 
 test.describe('Meeting Overlay', () => {
   test.beforeEach(async ({ page, mockAPIs }) => {

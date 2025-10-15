@@ -16,8 +16,8 @@ export class GoogleGroundingProvider {
   private genAI: GoogleGenAI | null = null
   
   // Cached functions
-  private cachedGrounding: (query: string, urls?: string[]) => Promise<GroundedAnswer>
-  private cachedResearch: (query: string, context: any) => Promise<EnhancedResearchResult>
+  private cachedGrounding!: (query: string, urls?: string[]) => Promise<GroundedAnswer>
+  private cachedResearch!: (query: string, context: any) => Promise<EnhancedResearchResult>
 
   constructor() {
     // Gracefully handle missing API key during build time

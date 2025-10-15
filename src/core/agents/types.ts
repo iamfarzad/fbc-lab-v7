@@ -74,7 +74,5 @@ export interface AgentResult {
   }
 }
 
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
+// Use canonical Message type from @/types/core
+export type { Message as ChatMessage } from '@/types/core'

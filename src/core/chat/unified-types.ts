@@ -1,72 +1,49 @@
 /**
  * Unified Chat Types - AI SDK Compatible
  * Maintains compatibility while using AI SDK backend
+ * 
+ * NOTE: Core types now live in @/types/core.ts
+ * This file re-exports them for backward compatibility
  */
 
-import type { ChatAttachment } from '@/types/attachments'
+// Re-export canonical types from core
+export type { 
+  Message, 
+  UnifiedMessage, 
+  MessageMetadata,
+  Attachment,
+  TokenUsage,
+  ChatContext,
+  LeadContext,
+  MultimodalData,
+  ChatCapabilities
+} from '@/types/core'
 
-export interface UnifiedMessage {
-  id: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  timestamp: Date
-  type?: 'text' | 'tool' | 'multimodal' | 'meta'
-  metadata?: {
-    mode?: string
-    isStreaming?: boolean
-    isComplete?: boolean
-    finalChunk?: boolean
-    error?: boolean
-    errorCode?: string
-    errorMessage?: string
-    toolCalls?: number
-    usage?: any
-    attachments?: ChatAttachment[]
-    [key: string]: any
-  }
-}
+// Keep only unified-chat-specific types here
+export type UnifiedContext = import('@/types/core').ChatContext
 
-export interface UnifiedContext {
-  sessionId?: string
-  leadContext?: {
-    name?: string
-    email?: string
-    company?: string
-    role?: string
-    industry?: string
-  }
-  intelligenceContext?: any
-  conversationIds?: string[]
-  adminId?: string
-  multimodalData?: {
-    audioData?: string | Uint8Array
-    imageData?: string | Uint8Array
-    videoData?: string | Uint8Array
-  }
-  attachments?: ChatAttachment[]
-  [key: string]: any
-}
+import type { Message, ChatContext, ChatCapabilities } from '@/types/core'
 
+// Use canonical types for all interfaces
 export interface UnifiedChatOptions {
   sessionId?: string
-  // mode?: ChatMode // DEPRECATED: Transport determined by connection (HTTP vs WebSocket)
-  context?: UnifiedContext
-  initialMessages?: UnifiedMessage[]
-  onMessage?: (message: UnifiedMessage) => void
+  context?: ChatContext
+  initialMessages?: Message[]
+  onMessage?: (message: Message) => void
   onComplete?: () => void
   onError?: (error: Error) => void
 }
 
 export interface UnifiedChatReturn {
-  messages: UnifiedMessage[]
+  messages: Message[]
   isLoading: boolean
   isStreaming: boolean
   error: Error | null
-  context: UnifiedContext
+  context: ChatContext
   sendMessage: (content: string) => Promise<void>
-  addMessage: (message: Omit<UnifiedMessage, 'id'>) => UnifiedMessage
+  addMessage: (message: Omit<Message, 'id'>) => Message
   clearMessages: () => void
-  updateContext: (context: Partial<UnifiedContext>) => void
+  updateContext: (context: Partial<ChatContext>) => void
   stop: () => Promise<void>
   regenerate: () => Promise<void>
   resumeStream: () => Promise<void>
@@ -75,33 +52,21 @@ export interface UnifiedChatReturn {
     result: unknown,
     metadata?: Record<string, unknown>
   ) => Promise<void>
-  setMessages: (messages: UnifiedMessage[]) => void
+  setMessages: (messages: Message[]) => void
   clearError: () => void
 }
 
 export interface UnifiedChatRequest {
-  messages: UnifiedMessage[]
-  context?: UnifiedContext
-  // mode?: ChatMode // DEPRECATED: Transport determined by connection (HTTP vs WebSocket)
+  messages: Message[]
+  context?: ChatContext
   stream?: boolean
-}
-
-// DEPRECATED: Mode parameter removed - transport determined by connection type
-// HTTP = text/multimodal chat, WebSocket = voice/realtime
-// export type ChatMode = 'standard' | 'realtime' | 'admin' | 'multimodal' | 'automation'
-
-export interface ChatCapabilities {
-  supportsStreaming: boolean
-  supportsMultimodal: boolean
-  supportsRealtime: boolean
-  maxTokens: number
 }
 
 export interface UnifiedChatProvider {
   generate(input: {
-    messages: UnifiedMessage[]
-    context?: UnifiedContext
-  }): AsyncIterable<UnifiedMessage>
+    messages: Message[]
+    context?: ChatContext
+  }): AsyncIterable<Message>
   
   getCapabilities(): ChatCapabilities
 }

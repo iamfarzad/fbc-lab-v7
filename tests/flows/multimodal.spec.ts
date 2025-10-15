@@ -1,6 +1,5 @@
 import { test, expect } from '../utils/fixtures'
 import { setupMockWebSocket } from '../mocks/websocket-server'
-import { mockAllAPIs } from '../mocks/api'
 import { TEST_MESSAGES, TIMEOUTS } from '../utils/test-data'
 
 test.describe('Multimodal Flow', () => {
@@ -122,7 +121,7 @@ test.describe('Multimodal Flow', () => {
     expect(await messages.count()).toBeGreaterThan(0)
   })
 
-  test('should handle modality transitions without errors', async ({ page, chat, voice, camera }) => {
+  test('should handle modality transitions without errors', async ({ page, chat, voice }) => {
     await chat.openChat()
 
     // Rapidly toggle modalities

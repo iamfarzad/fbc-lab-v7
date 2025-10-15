@@ -46,7 +46,7 @@ export async function finalizeLeadSession(ctx: LeadContext) {
 
     return conversation
   } catch (error) {
-    logger.error('finalizeLeadSession failed', error)
+    logger.error('finalizeLeadSession failed', error instanceof Error ? error : undefined)
 
     if (conversation?.id) {
       await updateEmailStatus(conversation.id, 'failed').catch(err => {
@@ -91,7 +91,7 @@ async function generateLeadPdf(ctx: LeadContext, conversationId: string): Promis
 
     return { pdfPath, pdfBytes }
   } catch (error) {
-    logger.error('Lead PDF generation failed', error)
+    logger.error('Lead PDF generation failed', error instanceof Error ? error : undefined)
     throw error
   }
 }
@@ -168,7 +168,7 @@ async function buildAttachments(pdfPath: string | null, pdfBytes?: Uint8Array) {
     
     return undefined
   } catch (error) {
-    logger.warn('Unable to attach PDF to email', error)
+    logger.warn('Unable to attach PDF to email', error instanceof Error ? error : undefined)
     return undefined
   }
 }

@@ -1,6 +1,5 @@
 import { test, expect } from './utils/fixtures'
 import { setupMockWebSocket } from './mocks/websocket-server'
-import { mockAllAPIs } from './mocks/api'
 import { SELECTORS, TIMEOUTS } from './utils/test-data'
 
 test.describe('Voice Features', () => {
@@ -44,7 +43,6 @@ test.describe('Voice Features', () => {
 
     // Should show voice active state or be processing
     const voiceButton = page.locator(SELECTORS.voice.toggleButton).first()
-    const ariaLabel = await voiceButton.getAttribute('aria-label')
     
     // Button should exist and be interactable
     await expect(voiceButton).toBeVisible()

@@ -337,32 +337,32 @@ export class AdvancedIntentClassifier {
 
     // Long, detailed messages suggest complex intent
     if (wordCount > 50) {
-      flowAnalysis.confidence += 0.2;
-      flowAnalysis.reasoning.push('Detailed message suggests complex intent');
-      flowAnalysis.context.complexity = 'complex';
+      flowAnalysis.confidence! += 0.2;
+      flowAnalysis.reasoning!.push('Detailed message suggests complex intent');
+      flowAnalysis.context!.complexity = 'complex';
     }
 
     // Questions suggest information-seeking
     if (hasQuestions) {
-      flowAnalysis.confidence += 0.3;
-      flowAnalysis.reasoning.push('Question format suggests information request');
-      flowAnalysis.context.requiresAction = true;
+      flowAnalysis.confidence! += 0.3;
+      flowAnalysis.reasoning!.push('Question format suggests information request');
+      flowAnalysis.context!.requiresAction = true;
     }
 
     // Exclamations suggest urgency or frustration
     if (hasExclamations) {
-      flowAnalysis.confidence += 0.2;
-      flowAnalysis.reasoning.push('Exclamations suggest urgency or emphasis');
-      flowAnalysis.context.urgency = 'high';
+      flowAnalysis.confidence! += 0.2;
+      flowAnalysis.reasoning!.push('Exclamations suggest urgency or emphasis');
+      flowAnalysis.context!.urgency = 'high';
     }
 
     // Short messages might be casual or urgent
     if (wordCount < 10) {
-      flowAnalysis.reasoning.push('Brief message format');
+      flowAnalysis.reasoning!.push('Brief message format');
       if (hasExclamations) {
-        flowAnalysis.context.urgency = 'high';
+        flowAnalysis.context!.urgency = 'high';
       } else {
-        flowAnalysis.context.urgency = 'low';
+        flowAnalysis.context!.urgency = 'low';
       }
     }
 
@@ -437,14 +437,14 @@ export class AdvancedIntentClassifier {
 
     // Get alternative intents
     const alternativeIntents = allIntents
-      .filter((intent, index) => index !== bestIntentIndex)
+      .filter((_intent, index) => index !== bestIntentIndex)
       .slice(0, 3);
 
     // Combine reasoning
     const allReasoning = analyses.flatMap(analysis => analysis.reasoning || []);
 
     // Combine context information
-    const contexts = analyses.map(analysis => analysis.context).filter(Boolean);
+    const contexts = analyses.map(analysis => analysis.context).filter((ctx): ctx is NonNullable<typeof ctx> => Boolean(ctx));
     const combinedContext = contexts.length > 0 ? this.combineContexts(contexts) : {
       urgency: 'low' as const,
       complexity: 'simple' as const,
@@ -627,7 +627,7 @@ export class AdvancedIntentClassifier {
     return Math.abs(hash).toString(36);
   }
 
-  private getFallbackIntentResult(context: IntentContext, processingTime: number): IntentClassificationResult {
+  private getFallbackIntentResult(_context: IntentContext, processingTime: number): IntentClassificationResult {
     const fallbackIntent = this.intentCategories.find(cat => cat.id === 'information_request')!;
 
     return {
