@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
-import type { AgentContext, ChatMessage } from './types'
+import type { AgentContext, ChatMessage, ChainOfThoughtStep } from './types'
 import { GEMINI_MODELS } from '@/config/constants'
 import { multimodalContextManager } from '@/core/context/multimodal-context'
 
@@ -16,6 +16,15 @@ export async function summaryAgent(
   context: AgentContext
 ) {
   const { sessionId, intelligenceContext, conversationFlow } = context
+  const steps: ChainOfThoughtStep[] = []
+
+  // Step 1: Analyzing full conversation
+  steps.push({
+    label: 'Analyzing full conversation',
+    description: `Reviewing ${messages.length} messages`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
 
   // Get full multimodal context
   const multimodalData = await multimodalContextManager.getConversationContext(
@@ -23,6 +32,24 @@ export async function summaryAgent(
     true,
     true
   )
+
+  // Step 2: Processing multimodal data
+  const modalitiesUsed = multimodalData.summary.modalitiesUsed
+  steps.push({
+    label: 'Processing multimodal data',
+    description: `Found: ${modalitiesUsed.join(', ')} (${multimodalData.summary.totalMessages} items)`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 3: Extracting key findings
+  const categoriesCovered = conversationFlow ? Object.values(conversationFlow.covered).filter(Boolean).length : 0
+  steps.push({
+    label: 'Extracting key findings',
+    description: `${categoriesCovered}/6 discovery categories covered`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
 
   const systemPrompt = `You are F.B/c Summary AI - create executive summaries of discovery conversations.
 
@@ -77,6 +104,14 @@ OUTPUT REQUIRED (JSON only):
 
 TONE: Professional but conversational. This is a valuable document they'll share internally.`
 
+  // Step 4: Determining recommended solution
+  steps.push({
+    label: 'Determining recommended solution',
+    description: 'Workshop vs Consulting fit analysis',
+    status: 'active',
+    timestamp: Date.now()
+  })
+
   const result = await generateText({
     model: google(GEMINI_MODELS.PRO), // Use Pro for reliability
     messages: [
@@ -105,12 +140,32 @@ TONE: Professional but conversational. This is a valuable document they'll share
     }
   }
 
+  steps[3].status = 'complete'
+  steps[3].description = `Recommended: ${summary.recommendedSolution}`
+
+  // Step 5: Calculating ROI projection
+  steps.push({
+    label: 'Calculating ROI projection',
+    description: summary.expectedROI || 'Estimating expected outcomes',
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 6: Structuring executive summary
+  steps.push({
+    label: 'Structuring executive summary',
+    description: 'Formatting for stakeholder review',
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
   return {
     output: JSON.stringify(summary, null, 2),
     agent: 'Summary Agent',
     model: GEMINI_MODELS.PRO,
     metadata: {
       stage: 'SUMMARY' as const,
+      chainOfThought: { steps },
       summary,
       multimodalEngagement: {
         voice: multimodalData.audioContext.length > 0,

@@ -5,6 +5,7 @@ import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
 import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw, Search } from "lucide-react";
 import { DESIGN_TOKENS } from "../tokens/design-tokens";
+import { ShimmerLoader } from "@/components/ai-elements/core/shimmer-loader";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -364,20 +365,19 @@ export function ChatMessages({
                       )}
 
                       {/* Chain of Thought Display */}
-                      {message.metadata?.chainOfThought && (
+                      {message.metadata?.chainOfThought && message.metadata.chainOfThought.steps && (
                         <ChainOfThought defaultOpen={false}>
-                          <ChainOfThoughtHeader>AI Thinking Process</ChainOfThoughtHeader>
+                          <ChainOfThoughtHeader>
+                            {message.metadata?.agent || 'AI'} Thinking Process
+                          </ChainOfThoughtHeader>
                           <ChainOfThoughtContent>
-                            {message.metadata.chainOfThought.steps?.map((step, index) => (
+                            {message.metadata.chainOfThought.steps.map((step, index) => (
                               <ChainOfThoughtStep
                                 key={index}
                                 label={step.label}
                                 description={step.description}
-                                status={step.status as any}
-                                icon={step.icon as any}
-                              >
-                                {step.content}
-                              </ChainOfThoughtStep>
+                                status={step.status}
+                              />
                             ))}
                           </ChainOfThoughtContent>
                         </ChainOfThought>
@@ -613,16 +613,11 @@ export function ChatMessages({
 
           {isLoading && (
             <div className="flex items-start gap-3 max-w-[80%]">
-              <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/80 px-3 py-2 text-xs text-muted-foreground shadow-sm">
-                <div className="flex items-center gap-1">
-                  <div className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse"></div>
-                  <div className="h-1.5 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                  <div className="h-1 w-1 rounded-full bg-[hsl(var(--accent))] animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                </div>
-                <span className="tracking-[0.3em] uppercase">
-                  AI RESPONDING
-                </span>
-              </div>
+              <ShimmerLoader 
+                state="thinking" 
+                variant="block" 
+                text="responding"
+              />
             </div>
           )}
       </ConversationContent>

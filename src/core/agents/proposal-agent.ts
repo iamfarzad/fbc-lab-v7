@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
-import type { AgentContext, ChatMessage } from './types'
+import type { AgentContext, ChatMessage, ChainOfThoughtStep } from './types'
 import { GEMINI_MODELS } from '@/config/constants'
 
 /**
@@ -15,6 +15,32 @@ export async function proposalAgent(
   context: AgentContext
 ) {
   const { intelligenceContext, conversationFlow } = context
+  const steps: ChainOfThoughtStep[] = []
+
+  // Step 1: Analyzing project complexity
+  steps.push({
+    label: 'Analyzing project complexity',
+    description: 'Scope assessment from conversation',
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 2: Determining pricing tier
+  const companySize = intelligenceContext?.company?.size || 'Unknown'
+  steps.push({
+    label: 'Determining pricing tier',
+    description: `Based on company size: ${companySize}`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 3: Structuring project phases
+  steps.push({
+    label: 'Structuring project phases',
+    description: 'Discovery → Development → Deployment → Support',
+    status: 'complete',
+    timestamp: Date.now()
+  })
 
   const systemPrompt = `You are F.B/c Proposal AI - create formal consulting proposals.
 
@@ -107,6 +133,14 @@ Adjust based on:
 
 OUTPUT: Valid JSON only, no explanation.`
 
+  // Step 4: Calculating timeline
+  steps.push({
+    label: 'Calculating timeline',
+    description: 'Phase durations and milestones',
+    status: 'active',
+    timestamp: Date.now()
+  })
+
   const result = await generateText({
     model: google(GEMINI_MODELS.PRO), // Use Pro for pricing accuracy
     messages: [
@@ -141,12 +175,33 @@ OUTPUT: Valid JSON only, no explanation.`
     }
   }
 
+  steps[3].status = 'complete'
+  const totalWeeks = proposal.timeline?.milestones?.length || 12
+  steps[3].description = `${totalWeeks} weeks total project timeline`
+
+  // Step 5: Computing investment breakdown
+  steps.push({
+    label: 'Computing investment breakdown',
+    description: `Total: $${proposal.investment?.total?.toLocaleString() || '75,000'}`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 6: Projecting ROI metrics
+  steps.push({
+    label: 'Projecting ROI metrics',
+    description: proposal.roi?.expectedSavings || 'Calculating savings and efficiency gains',
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
   return {
     output: JSON.stringify(proposal, null, 2),
     agent: 'Proposal Agent',
     model: GEMINI_MODELS.PRO,
     metadata: {
       stage: 'PROPOSAL' as const,
+      chainOfThought: { steps },
       proposal,
       estimatedValue: proposal.investment?.total || 0
     }

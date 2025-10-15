@@ -99,7 +99,12 @@ export function useChatMessages(initialSessionId?: string) {
 
       // Extract AI elements metadata
       const reasoning = typeof msg.metadata?.reasoning === 'string' ? msg.metadata.reasoning : undefined
-      const chainOfThought = msg.metadata?.chainOfThought
+      const chainOfThought = msg.metadata?.chainOfThought && 
+        typeof msg.metadata.chainOfThought === 'object' && 
+        'steps' in msg.metadata.chainOfThought &&
+        Array.isArray(msg.metadata.chainOfThought.steps)
+        ? msg.metadata.chainOfThought as { steps: Array<{ label: string; description?: string; status: 'complete' | 'active' | 'pending'; timestamp?: number }> }
+        : undefined
       const contextUsage = msg.metadata?.contextUsage && typeof msg.metadata.contextUsage === 'object' 
         && 'usedTokens' in msg.metadata.contextUsage 
         ? msg.metadata.contextUsage as { usedTokens: number; maxTokens: number; usage: number; modelId: string }

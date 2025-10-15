@@ -100,22 +100,22 @@ export interface EnhancedChatMessage {
     annotations?: Array<Record<string, any>>;
     // Added missing fields
     chainOfThought?: {
-      steps?: Array<{
+      steps: Array<{
         label: string;
-        description: string;
-        content: string;
-        status: 'completed' | string;
-        icon: string;
+        description?: string;
+        status: 'complete' | 'active' | 'pending';
+        timestamp?: number;
       }>;
     };
     tools?: Array<{
       name: string;
       type: string;
-      state: string;
-      input?: Record<string, any>;
+      state: 'running' | 'complete' | 'error';
+      input?: any;
       output?: any;
       error?: string;
     }>;
+    agent?: string;
     contextUsage?: {
       usedTokens: number;
       maxTokens: number;
