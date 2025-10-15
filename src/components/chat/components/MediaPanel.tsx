@@ -7,6 +7,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DESIGN_TOKENS } from "../design-tokens";
 import { getMonochromeClass } from "@/lib/theme-utils";
+import { VoiceWaveform } from "./VoiceWaveform";
 
 type TabKey = 'voice' | 'camera' | 'screen';
 
@@ -157,6 +158,15 @@ export function MediaPanel(props: MediaPanelProps) {
                     {props.voiceProcessing ? statusDot('bg-amber-500') : props.voiceActive ? statusDot('bg-emerald-500') : statusDot('bg-muted-foreground/40')}
                     <span>{props.voiceProcessing ? 'Processing' : props.voiceActive ? 'Recording' : 'Inactive'}</span>
                   </div>
+                  {/* Live waveform for voice activity */}
+                  <VoiceWaveform
+                    isActive={props.voiceActive}
+                    isProcessing={props.voiceProcessing}
+                    height={56}
+                    barWidth={2}
+                    barGap={1}
+                    className="rounded-md border border-border/40 bg-muted/20"
+                  />
                   {(props.voicePartial || props.voiceTranscript) && (
                     <div className="text-xs text-muted-foreground border border-border/40 p-2 rounded-md">
                       <span className="font-medium text-foreground/90">Preview:</span>{' '}
@@ -219,4 +229,3 @@ export function MediaPanel(props: MediaPanelProps) {
     </AnimatePresence>
   );
 }
-

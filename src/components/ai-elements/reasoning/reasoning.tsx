@@ -11,6 +11,7 @@ import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext, useEffect, useState, type ReactNode } from "react";
 import { Response } from "../core/response";
+import { ShimmerLoader } from "../core/shimmer-loader";
 
 type ReasoningContextValue = {
   isStreaming: boolean;
@@ -115,7 +116,7 @@ export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 
 const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
   if (isStreaming || duration === 0) {
-    return <p>Thinking...</p>;
+    return <ShimmerLoader state="thinking" variant="inline" />;
   }
   if (duration === undefined) {
     return <p>Thought for a few seconds</p>;

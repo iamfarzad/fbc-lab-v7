@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
-import type { AgentContext, ChatMessage } from './types'
+import type { AgentContext, ChatMessage, ChainOfThoughtStep } from './types'
 import { GEMINI_MODELS } from '@/config/constants'
 
 /**
@@ -14,6 +14,57 @@ export async function scoringAgent(
   context: AgentContext
 ) {
   const { intelligenceContext, conversationFlow, multimodalContext } = context
+  const steps: ChainOfThoughtStep[] = []
+
+  // Step 1: Evaluating role seniority
+  const role = intelligenceContext?.role || intelligenceContext?.person?.role || 'Unknown'
+  steps.push({
+    label: 'Evaluating role seniority',
+    description: `Role: ${role} (max 30 points)`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 2: Assessing company size
+  const companySize = intelligenceContext?.company?.size || 'Unknown'
+  steps.push({
+    label: 'Assessing company size',
+    description: `Company: ${intelligenceContext?.company?.name || 'Unknown'}, Size: ${companySize} (max 25 points)`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 3: Analyzing conversation quality
+  const categoriesCovered = conversationFlow ? Object.values(conversationFlow.covered).filter(Boolean).length : 0
+  steps.push({
+    label: 'Analyzing conversation quality',
+    description: `${categoriesCovered}/6 categories covered (max 25 points)`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 4: Calculating budget signals
+  steps.push({
+    label: 'Calculating budget signals',
+    description: `Analyzing timeline and investment indicators (max 20 points)`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 5: Adding multimodal bonuses
+  const multimodalBonuses = []
+  if (multimodalContext?.hasRecentAudio) multimodalBonuses.push('Voice +10')
+  if (multimodalContext?.hasRecentImages) multimodalBonuses.push('Screen +15')
+  if (multimodalContext?.hasRecentUploads) multimodalBonuses.push('Uploads +10')
+  
+  if (multimodalBonuses.length > 0) {
+    steps.push({
+      label: 'Adding multimodal bonuses',
+      description: multimodalBonuses.join(', '),
+      status: 'complete',
+      timestamp: Date.now()
+    })
+  }
 
   const systemPrompt = `You are F.B/c Scoring AI - calculate lead scores.
 
@@ -85,6 +136,14 @@ OUTPUT REQUIRED (JSON only, no explanation):
   "reasoning": "<one sentence explanation>"
 }`
 
+  // Step 6: Computing final scores
+  steps.push({
+    label: 'Computing final scores',
+    description: 'Calculating lead score and fit scores',
+    status: 'active',
+    timestamp: Date.now()
+  })
+
   const result = await generateText({
     model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages: [
@@ -117,12 +176,17 @@ OUTPUT REQUIRED (JSON only, no explanation):
     }
   }
 
+  // Mark computing step as complete with results
+  steps[steps.length - 1].status = 'complete'
+  steps[steps.length - 1].description = `Lead: ${scores.leadScore}/100, Workshop: ${(scores.fitScore.workshop * 100).toFixed(0)}%, Consulting: ${(scores.fitScore.consulting * 100).toFixed(0)}%`
+
   return {
     output: `Lead Score: ${scores.leadScore}/100\nWorkshop Fit: ${(scores.fitScore.workshop * 100).toFixed(0)}%\nConsulting Fit: ${(scores.fitScore.consulting * 100).toFixed(0)}%\n\n${scores.reasoning}`,
     agent: 'Scoring Agent',
     model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
       stage: 'SCORING' as const,
+      chainOfThought: { steps },
       leadScore: scores.leadScore,
       fitScore: scores.fitScore,
       reasoning: scores.reasoning

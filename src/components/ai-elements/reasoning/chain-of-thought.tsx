@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext } from "react";
+import { ShimmerLoader } from "../core/shimmer-loader";
 
 type ChainOfThoughtContextValue = {
   isOpen: boolean;
@@ -141,7 +142,13 @@ export const ChainOfThoughtStep = memo(
           <div className="-mx-px absolute top-6 bottom-0 left-1/2 w-px bg-border/50" />
         </div>
         <div className="flex-1 space-y-1">
-          <div>{label}</div>
+          <div>
+            {status === "active" ? (
+              <ShimmerLoader state="processing" variant="inline" text={label} />
+            ) : (
+              label
+            )}
+          </div>
           {description && (
             <div className="text-muted-foreground text-[11px]">{description}</div>
           )}

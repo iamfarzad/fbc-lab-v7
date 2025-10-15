@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BookIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
+import { ShimmerLoader } from "../core/shimmer-loader";
 
 export type SourcesProps = ComponentProps<"div">;
 
@@ -19,12 +20,14 @@ export const Sources = ({ className, ...props }: SourcesProps) => (
 );
 
 export type SourcesTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {
-  count: number;
+  count: number
+  isLoading?: boolean
 };
 
 export const SourcesTrigger = ({
   className,
   count,
+  isLoading,
   children,
   ...props
 }: SourcesTriggerProps) => (
@@ -34,7 +37,11 @@ export const SourcesTrigger = ({
   >
     {children ?? (
       <>
-        <p className="font-medium">Used {count} sources</p>
+        {isLoading ? (
+          <ShimmerLoader state="researching" variant="inline" text="Gathering sources" />
+        ) : (
+          <p className="font-medium">Used {count} sources</p>
+        )}
         <ChevronDownIcon className="h-3 w-3" />
       </>
     )}

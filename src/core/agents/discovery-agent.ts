@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
-import type { AgentContext, ChatMessage } from './types'
+import type { AgentContext, ChatMessage, ChainOfThoughtStep } from './types'
 import { GEMINI_MODELS } from '@/config/constants'
 import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
@@ -16,6 +16,16 @@ export async function discoveryAgent(
   context: AgentContext
 ) {
   const { intelligenceContext, conversationFlow, multimodalContext, voiceActive } = context
+
+  const steps: ChainOfThoughtStep[] = []
+
+  // Step 1: Analyze conversation flow
+  steps.push({
+    label: 'Analyzing conversation flow',
+    description: conversationFlow ? `Covered: ${formatConversationStatus(conversationFlow)}` : 'Starting discovery',
+    status: 'complete',
+    timestamp: Date.now()
+  })
 
   // Build system prompt with all context
   let systemPrompt = `You are F.B/c Discovery AI - a lead qualification specialist.
@@ -76,6 +86,27 @@ ${conversationFlow?.shouldOfferRecap
   ? 'Deliver a two-sentence recap of what you learned, then ask your next question.' 
   : ''}`
 
+  // Step 2: Identify knowledge gaps
+  const categoriesCovered = conversationFlow 
+    ? Object.values(conversationFlow.covered).filter(Boolean).length 
+    : 0
+  const nextCategory = conversationFlow?.recommendedNext || 'goals'
+  
+  steps.push({
+    label: 'Identifying knowledge gaps',
+    description: `${categoriesCovered}/6 categories covered. Next: ${nextCategory}`,
+    status: 'complete',
+    timestamp: Date.now()
+  })
+
+  // Step 3: Formulate strategic question
+  steps.push({
+    label: 'Formulating strategic question',
+    description: `Targeting ${nextCategory} discovery`,
+    status: 'active',
+    timestamp: Date.now()
+  })
+
   const result = await generateText({
     model: google(GEMINI_MODELS.DEFAULT_CHAT),
     messages,
@@ -83,15 +114,30 @@ ${conversationFlow?.shouldOfferRecap
     temperature: 0.7
   })
 
+  steps[2].status = 'complete'
+
+  // Step 4: Incorporate multimodal context
+  if (multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio || multimodalContext?.hasRecentUploads) {
+    steps.push({
+      label: 'Incorporating multimodal context',
+      description: [
+        multimodalContext.hasRecentImages && 'screen/webcam',
+        multimodalContext.hasRecentAudio && 'voice',
+        multimodalContext.hasRecentUploads && 'uploads'
+      ].filter(Boolean).join(', ') + ' detected',
+      status: 'complete',
+      timestamp: Date.now()
+    })
+  }
+
   return {
     output: result.text,
     agent: 'Discovery Agent',
     model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
       stage: 'DISCOVERY' as const,
-      categoriesCovered: conversationFlow 
-        ? Object.values(conversationFlow.covered).filter(Boolean).length 
-        : 0,
+      chainOfThought: { steps },
+      categoriesCovered,
       recommendedNext: conversationFlow?.recommendedNext || null,
       multimodalUsed: multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio
     }

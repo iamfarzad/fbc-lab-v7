@@ -5,6 +5,7 @@ import { BottomSheet } from "./BottomSheet";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { DESIGN_TOKENS } from "../design-tokens";
+import { VoiceWaveform } from "./VoiceWaveform";
 
 type TabKey = 'voice' | 'camera' | 'screen';
 
@@ -115,6 +116,15 @@ export function MediaDrawer(props: MediaDrawerProps) {
               {props.voiceProcessing ? 'Processing' : props.voiceActive ? 'Recording' : 'Inactive'}
             </span>
           </div>
+          {/* Live waveform for voice activity */}
+          <VoiceWaveform
+            isActive={props.voiceActive}
+            isProcessing={props.voiceProcessing}
+            height={48}
+            barWidth={2}
+            barGap={1}
+            className="rounded-md border border-border/40 bg-muted/20"
+          />
           {(props.voicePartial || props.voiceTranscript) && (
             <div className="text-xs text-muted-foreground border border-border/40 p-2 rounded-md">
               <span className="font-medium text-foreground/90">Preview:</span>{' '}
@@ -189,4 +199,3 @@ export function MediaDrawer(props: MediaDrawerProps) {
     </BottomSheet>
   );
 }
-

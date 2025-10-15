@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { CodeBlock } from "../content/code-block";
+import { ShimmerLoader } from "../core/shimmer-loader";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
@@ -64,24 +65,33 @@ export const ToolHeader = ({
   type,
   state,
   ...props
-}: ToolHeaderProps) => (
-  <CollapsibleTrigger
-    className={cn(
-      "flex w-full items-center justify-between gap-3 p-2",
-      className
-    )}
-    {...props}
-  >
-    <div className="flex items-center gap-1.5">
-      <WrenchIcon className="size-3.5 text-muted-foreground" />
-      <span className="font-medium text-[13px]">
-        {title ?? type.split("-").slice(1).join("-")}
-      </span>
-      {getStatusBadge(state)}
-    </div>
-    <ChevronDownIcon className="size-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-  </CollapsibleTrigger>
-);
+}: ToolHeaderProps) => {
+  const isRunning = state === "input-available" || state === "input-streaming"
+  const displayTitle = title ?? type.split("-").slice(1).join("-")
+
+  return (
+    <CollapsibleTrigger
+      className={cn(
+        "flex w-full items-center justify-between gap-3 p-2",
+        className
+      )}
+      {...props}
+    >
+      <div className="flex items-center gap-1.5">
+        <WrenchIcon className="size-3.5 text-muted-foreground" />
+        <span className="font-medium text-[13px]">
+          {isRunning ? (
+            <ShimmerLoader state="processing" variant="inline" text={displayTitle} />
+          ) : (
+            displayTitle
+          )}
+        </span>
+        {getStatusBadge(state)}
+      </div>
+      <ChevronDownIcon className="size-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+    </CollapsibleTrigger>
+  )
+};
 
 export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 

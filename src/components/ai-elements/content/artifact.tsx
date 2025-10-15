@@ -10,6 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { type LucideIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
+import { ShimmerLoader } from "../core/shimmer-loader";
 
 export type ArtifactProps = HTMLAttributes<HTMLDivElement>;
 
@@ -63,14 +64,26 @@ export const ArtifactClose = ({
   </Button>
 );
 
-export type ArtifactTitleProps = HTMLAttributes<HTMLParagraphElement>;
+export type ArtifactTitleProps = HTMLAttributes<HTMLParagraphElement> & {
+  status?: "streaming" | "loading" | "complete" | "error"
+};
 
-export const ArtifactTitle = ({ className, ...props }: ArtifactTitleProps) => (
-  <p
-    className={cn("font-medium text-foreground text-sm", className)}
-    {...props}
-  />
-);
+export const ArtifactTitle = ({ className, status, children, ...props }: ArtifactTitleProps) => {
+  const isProcessing = status === "streaming" || status === "loading"
+  
+  return (
+    <p
+      className={cn("font-medium text-foreground text-sm", className)}
+      {...props}
+    >
+      {isProcessing && typeof children === "string" ? (
+        <ShimmerLoader state="processing" variant="inline" text={children} />
+      ) : (
+        children
+      )}
+    </p>
+  )
+};
 
 export type ArtifactDescriptionProps = HTMLAttributes<HTMLParagraphElement>;
 
@@ -138,11 +151,25 @@ export const ArtifactAction = ({
   return button;
 };
 
-export type ArtifactContentProps = HTMLAttributes<HTMLDivElement>;
+export type ArtifactContentProps = HTMLAttributes<HTMLDivElement> & {
+  status?: "streaming" | "loading" | "complete" | "error"
+};
 
 export const ArtifactContent = ({
   className,
+  status,
+  children,
   ...props
-}: ArtifactContentProps) => (
-  <div className={cn("flex-1 overflow-auto p-4", className)} {...props} />
-);
+}: ArtifactContentProps) => {
+  const isProcessing = status === "streaming" || status === "loading"
+  
+  return (
+    <div className={cn("flex-1 overflow-auto p-4", className)} {...props}>
+      {isProcessing && !children ? (
+        <ShimmerLoader state="processing" variant="block" />
+      ) : (
+        children
+      )}
+    </div>
+  )
+};

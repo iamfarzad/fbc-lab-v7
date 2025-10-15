@@ -60,12 +60,33 @@ export type FunnelStage =
   | 'ADMIN'
   | 'RETARGETING'
 
+export interface ChainOfThoughtStep {
+  label: string
+  description?: string
+  status: 'complete' | 'active' | 'pending'
+  timestamp?: number
+}
+
+export interface ToolMetadata {
+  name: string
+  type: string
+  state: 'running' | 'complete' | 'error'
+  input?: any
+  output?: any
+  error?: string
+}
+
 export interface AgentResult {
   output: string
   agent: string
   model?: any
   metadata?: {
     stage?: FunnelStage
+    chainOfThought?: {
+      steps: ChainOfThoughtStep[]
+    }
+    reasoning?: string
+    tools?: ToolMetadata[]
     multimodalUsed?: boolean
     handoffReasons?: string[]
     leadScore?: number
