@@ -6,7 +6,7 @@ This directory contains all centralized configuration for the application.
 
 All configuration values must be imported from `constants.ts`. 
 
-**❌ WRONG:**
+**❌ WRONG (examples of what NOT to do):**
 ```typescript
 const ws = new WebSocket('wss://fb-consulting-websocket.fly.dev')
 const model = 'gemini-2.0-flash-exp'

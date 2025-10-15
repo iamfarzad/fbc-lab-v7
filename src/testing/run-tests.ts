@@ -60,7 +60,7 @@ class TestRunner {
     console.log('📡 Testing WebSocket Connectivity...');
     
     const tests = [
-      { name: 'Live Server (port 3001)', url: 'ws://localhost:3001' },
+      { name: 'Live Server (port 3001)', url: WEBSOCKET_CONFIG.DEVELOPMENT_URL },
       { name: 'WebRTC Signaling (port 3002)', url: 'ws://localhost:3002' }
     ];
 

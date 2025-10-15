@@ -36,7 +36,7 @@ const ws = new WebSocket(WEBSOCKET_CONFIG.URL)
 
 ### ❌ WRONG
 ```typescript
-// NO hardcoded URLs
+// NO hardcoded URLs - these are examples of what NOT to do
 const ws = new WebSocket('wss://fb-consulting-websocket.fly.dev') // WRONG
 const ws = new WebSocket('ws://localhost:3001') // WRONG
 ```
