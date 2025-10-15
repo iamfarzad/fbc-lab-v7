@@ -6,6 +6,7 @@ import {
   requestNotRetryable,
   serviceOverloaded 
 } from 'ai-retry/retryables';
+import { GEMINI_MODELS } from '@/config/constants';
 
 /**
  * Create a retryable Gemini model with fallback strategies
@@ -17,8 +18,8 @@ import {
  * - General retryable errors
  * 
  * Fallback strategy:
- * 1. Primary: gemini-2.5-flash (latest, most capable)
- * 2. Fallback 1: gemini-2.0-flash (faster, more available)
+ * 1. Primary: gemini-flash-latest (auto-updates to latest)
+ * 2. Fallback 1: gemini-flash-lite-latest (faster, more available)
  * 3. Fallback 2: gemini-2.5-pro (most reliable)
  */
 export const createRetryableGemini = () => {
@@ -28,25 +29,25 @@ export const createRetryableGemini = () => {
   }
   
   return createRetryable({
-    // Primary model - most capable
-    model: google('gemini-2.5-flash'),
+    // Primary model - auto-updates to latest
+    model: google(GEMINI_MODELS.FLASH_LATEST),
     
     // Retry strategies with fallback models
     retries: [
       // Handle rate limiting with a faster model
-      serviceOverloaded(google('gemini-2.0-flash')),
+      serviceOverloaded(google(GEMINI_MODELS.FLASH_LITE_LATEST)),
       
       // Handle content filtering with a different model
-      contentFilterTriggered(google('gemini-2.5-pro')),
+      contentFilterTriggered(google(GEMINI_MODELS.PRO)),
       
       // Handle timeouts with a more reliable model
-      requestTimeout(google('gemini-2.5-pro')),
+      requestTimeout(google(GEMINI_MODELS.PRO)),
       
       // Handle other retryable errors
-      requestNotRetryable(google('gemini-2.0-flash')),
+      requestNotRetryable(google(GEMINI_MODELS.FLASH_LITE_LATEST)),
       
       // Final fallback to most available model
-      google('gemini-2.0-flash')
+      google(GEMINI_MODELS.FLASH_LITE_LATEST)
     ]
   });
 };
@@ -62,23 +63,23 @@ export const createRetryableGeminiStream = () => {
   }
   
   return createRetryable({
-    model: google('gemini-2.5-flash'), // Start with fastest for streaming
+    model: google(GEMINI_MODELS.FLASH_LATEST), // Latest for streaming
     
     retries: [
-      // Rate limiting - try even faster model
-      serviceOverloaded(google('gemini-2.0-flash')),
+      // Rate limiting - try lite version
+      serviceOverloaded(google(GEMINI_MODELS.FLASH_LITE_LATEST)),
       
       // Content filtering
-      contentFilterTriggered(google('gemini-2.5-flash')),
+      contentFilterTriggered(google(GEMINI_MODELS.FLASH_LATEST)),
       
       // Timeouts
-      requestTimeout(google('gemini-2.5-flash')),
+      requestTimeout(google(GEMINI_MODELS.FLASH_LATEST)),
       
       // Other errors
-      requestNotRetryable(google('gemini-2.0-flash')),
+      requestNotRetryable(google(GEMINI_MODELS.FLASH_LITE_LATEST)),
       
       // Final fallback
-      google('gemini-2.0-flash')
+      google(GEMINI_MODELS.FLASH_LITE_LATEST)
     ]
   });
 };
@@ -94,23 +95,23 @@ export const createRetryableGeminiReliable = () => {
   }
   
   return createRetryable({
-    model: google('gemini-2.5-pro'), // Most reliable
+    model: google(GEMINI_MODELS.PRO), // Most reliable
     
     retries: [
       // Rate limiting - fallback to flash
-      serviceOverloaded(google('gemini-2.5-flash')),
+      serviceOverloaded(google(GEMINI_MODELS.FLASH_LATEST)),
       
       // Content filtering - try different model
-      contentFilterTriggered(google('gemini-2.0-flash')),
+      contentFilterTriggered(google(GEMINI_MODELS.FLASH_LITE_LATEST)),
       
       // Timeouts - try faster model
-      requestTimeout(google('gemini-2.5-flash')),
+      requestTimeout(google(GEMINI_MODELS.FLASH_LATEST)),
       
       // Other errors
-      requestNotRetryable(google('gemini-2.5-flash')),
+      requestNotRetryable(google(GEMINI_MODELS.FLASH_LATEST)),
       
       // Final fallback
-      google('gemini-2.5-flash')
+      google(GEMINI_MODELS.FLASH_LATEST)
     ]
   });
 };

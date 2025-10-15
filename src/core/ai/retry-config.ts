@@ -3,6 +3,8 @@
  * Adjust these settings based on your needs
  */
 
+import { GEMINI_MODELS } from '@/config/constants'
+
 export const RETRY_CONFIG = {
   // Timeout settings (in milliseconds)
   timeouts: {
@@ -14,18 +16,18 @@ export const RETRY_CONFIG = {
   
   // Model preferences
   models: {
-    // Primary models (most capable)
-    primary: 'gemini-2.5-flash',
-    primaryStream: 'gemini-2.5-flash',
-    primaryReliable: 'gemini-2.5-pro',
+    // Primary models (auto-update to latest)
+    primary: GEMINI_MODELS.FLASH_LATEST,
+    primaryStream: GEMINI_MODELS.FLASH_LATEST,
+    primaryReliable: GEMINI_MODELS.PRO,
     
-    // Fallback models (more available)
-    fallback: 'gemini-2.5-flash',
-    fallbackFast: 'gemini-2.0-flash',
-    fallbackReliable: 'gemini-2.5-flash',
+    // Fallback models (faster/more available)
+    fallback: GEMINI_MODELS.FLASH_LATEST,
+    fallbackFast: GEMINI_MODELS.FLASH_LITE_LATEST,
+    fallbackReliable: GEMINI_MODELS.FLASH_LATEST,
     
     // Final fallback (most available)
-    final: 'gemini-2.5-flash',
+    final: GEMINI_MODELS.FLASH_LITE_LATEST,
   },
   
   // Retry behavior
