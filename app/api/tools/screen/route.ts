@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { GoogleGenAI } from '@google/genai'
 import { createOptimizedConfig } from '@/src/core/gemini-config-enhanced'
 import { selectModelForFeature } from '@/src/core/model-selector'
@@ -82,10 +83,10 @@ export async function POST(req: NextRequest) {
       }
 
       logJsonl('screen', 'analysis_complete', { bytes: image?.length || 0, mock: true, chars: response.output.analysis.length })
-      return NextResponse.json(response, { status: 200 })
+      return respond.ok(response)
     }
 
-    if (!image) return NextResponse.json({ ok: false, error: 'No image data provided' }, { status: 400 })
+    if (!image) return respond.badRequest('No image data provided')
 
 
     estimatedTokens = 3000 // Fixed value for image analysis
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
     if (userId && process.env.NODE_ENV !== 'test') {
       const budgetCheck = await enforceBudgetAndLog(userId ?? 'anonymous', sessionId ?? 'anonymous', 'image_analysis', modelName, estimatedTokens, estimatedTokens * 0.5, true)
 
-      if (!budgetCheck.allowed) return NextResponse.json({ ok: false, error: 'Budget limit reached' }, { status: 429 })
+      if (!budgetCheck.allowed) return respond.error('Budget limit reached', 429, 'RATE_LIMITED')
 
     }
 
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       console.error('Screen analysis generation failed:', e)
       logJsonl('screen', 'error', { message: e instanceof Error ? e.message : String(e) })
-      return NextResponse.json({ ok: false, error: 'AI analysis failed' }, { status: 500 })
+      return respond.serverError('AI analysis failed')
 
     }
 
@@ -173,7 +174,7 @@ export async function POST(req: NextRequest) {
     })
 
     logJsonl('screen', 'analysis_complete', { bytes: image?.length || 0, chars: analysisResult.length, model: modelName })
-    return NextResponse.json(response, { status: 200 })
+    return respond.ok(response)
   } catch (error: unknown) {
     // 📊 Performance Monitoring: Complete failed operation
     if (operationId) {

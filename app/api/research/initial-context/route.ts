@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { GoogleGroundingProvider } from '@/core/intelligence/providers/search/google-grounding';
 import { ContextStorage } from '@/core/context/context-storage';
 import { usageLimiter } from '@/src/lib/usage-limits';
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     const { name, email, sessionId } = await req.json();
     
     if (!email || !sessionId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return respond.badRequest('Missing required fields');
     }
     
     // CHECK: Valid business email required (cost protection)
@@ -75,19 +76,13 @@ export async function POST(req: NextRequest) {
         reason: 'Generic email - business email required for full research'
       };
       await contextStorage.store(sessionId, enrichedContext as any);
-      return NextResponse.json({ 
-        success: true,
-        message: 'Business email required for full context research. Conversation will proceed with limited context.'
-      });
+      return respond.ok({ success: true, message: 'Business email required for full context research. Conversation will proceed with limited context.' });
     }
     
     // CHECK: Research limit (cost protection)
     const limitCheck = await usageLimiter.checkLimit(sessionId, 'research');
     if (!limitCheck.allowed) {
-      return NextResponse.json({ 
-        error: limitCheck.reason,
-        limit_reached: true 
-      }, { status: 429 });
+      return respond.error(limitCheck.reason || 'Rate limit reached', 429, 'RATE_LIMITED', { limit_reached: true })
     }
     
     // Check existing context - don't re-research if fresh (within 7 days)
@@ -97,7 +92,7 @@ export async function POST(req: NextRequest) {
       const sevenDays = 7 * 24 * 60 * 60 * 1000;
       if (age < sevenDays) {
         console.log(`✅ Using cached research (age: ${Math.floor(age / 86400000)} days)`);
-        return NextResponse.json({ success: true, cached: true });
+        return respond.ok({ success: true, cached: true });
       }
     }
     
@@ -209,15 +204,7 @@ export async function POST(req: NextRequest) {
     console.log(`   - Company intel: ${companyIntelligence?.citations?.length || 0} sources`);
     console.log(`   - Role context: ${roleContext?.citations?.length || 0} sources`);
     
-    return NextResponse.json({ 
-      success: true,
-      summary: {
-        name,
-        company: emailDomain,
-        country: companyCountry,
-        sources_gathered: successfulResults.reduce((acc, r) => acc + (r.citations?.length || 0), 0)
-      }
-    });
+    return respond.ok({ success: true, summary: { name, company: emailDomain, country: companyCountry, sources_gathered: successfulResults.reduce((acc, r) => acc + (r.citations?.length || 0), 0) } });
   } catch (error) {
     console.error('Background research error:', error);
     // Store minimal context so conversation can proceed
@@ -233,10 +220,6 @@ export async function POST(req: NextRequest) {
     } catch (storageError) {
       console.error('Failed to store error context:', storageError);
     }
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Research failed, conversation will proceed with limited context' 
-    }, { status: 500 });
+    return respond.serverError('Research failed, conversation will proceed with limited context');
   }
 }
-

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { respond } from '@/lib/api/response'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,16 +31,9 @@ export async function POST(request: NextRequest) {
     // For example: Sentry, LogRocket, custom analytics, etc.
     
     // For now, we'll just acknowledge receipt
-    return NextResponse.json({ 
-      success: true, 
-      errorId,
-      message: 'Error logged successfully' 
-    });
+    return respond.ok({ success: true, errorId, message: 'Error logged successfully' })
   } catch (error) {
     console.error('Failed to log error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to log error' },
-      { status: 500 }
-    );
+    return respond.serverError('Failed to log error')
   }
 }

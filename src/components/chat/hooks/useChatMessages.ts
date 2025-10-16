@@ -5,7 +5,6 @@ import type { UnifiedContext } from "@/core/chat/unified-types";
 import type { ConversationCategory } from "./useConversationFlow";
 import { useConversationFlow } from "./useConversationFlow";
 import { ChatMessage } from "../types/chatTypes";
-import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import type { PromptInputFile } from "@/components/ai-elements/interactive/prompt-input";
 import type { AttachmentUploadResponse } from "@/types/attachments";
 import { logConversationMilestone } from "@/lib/analytics/chat-flow";
@@ -34,15 +33,6 @@ type SendMessagePayload = string | {
   attachments?: PromptInputFile[];
 };
 
-type SourceMetadata = {
-  id: string;
-  title: string;
-  url: string;
-  snippet?: string;
-  description?: string;
-  relevanceScore?: number;
-  [key: string]: any;
-};
 
 export function useChatMessages(initialSessionId?: string) {
   const [inputValue, setInputValue] = useState('');
@@ -82,209 +72,7 @@ export function useChatMessages(initialSessionId?: string) {
     [unifiedChat.messages]
   );
 
-  const enhancedMessages = useMemo<EnhancedChatMessage[]>(() =>
-    unifiedChat.messages.map(msg => {
-      const timestamp = msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp);
-
-      const researchMetadata = (msg.metadata?.research ?? null) as Record<string, any> | null;
-      const toolInvocations = Array.isArray(msg.metadata?.toolInvocations)
-        ? (msg.metadata!.toolInvocations as Array<Record<string, any>>)
-        : undefined;
-      const toolCall = msg.metadata && (msg.metadata as any).toolCall && typeof (msg.metadata as any).toolCall === 'object'
-        ? (msg.metadata as any).toolCall as { id?: string; tool: string; arguments?: Record<string, any>; requiresApproval?: boolean; timestamp?: string }
-        : undefined;
-      const annotations = Array.isArray(msg.metadata?.annotations)
-        ? (msg.metadata!.annotations as Array<Record<string, any>>)
-        : undefined;
-
-      // Extract AI elements metadata
-      const reasoning = typeof msg.metadata?.reasoning === 'string' ? msg.metadata.reasoning : undefined
-      const chainOfThought = msg.metadata?.chainOfThought && 
-        typeof msg.metadata.chainOfThought === 'object' && 
-        'steps' in msg.metadata.chainOfThought &&
-        Array.isArray(msg.metadata.chainOfThought.steps)
-        ? msg.metadata.chainOfThought as { steps: Array<{ label: string; description?: string; status: 'complete' | 'active' | 'pending'; timestamp?: number }> }
-        : undefined
-      const contextUsage = msg.metadata?.contextUsage && typeof msg.metadata.contextUsage === 'object' 
-        && 'usedTokens' in msg.metadata.contextUsage 
-        ? msg.metadata.contextUsage as { usedTokens: number; maxTokens: number; usage: number; modelId: string }
-        : undefined
-      const codeBlocks = Array.isArray(msg.metadata?.codeBlocks) ? msg.metadata.codeBlocks as Array<{
-        id: string; code: string; language: string; showLineNumbers?: boolean; title?: string; description?: string
-      }> : undefined
-      const aiSources = Array.isArray(msg.metadata?.sources)
-        ? (msg.metadata!.sources as SourceMetadata[])
-        : undefined
-      const images = Array.isArray(msg.metadata?.images) ? msg.metadata.images as Array<{
-        base64: string; mediaType: string; alt: string
-      }> : undefined
-      const inlineCitations = Array.isArray(msg.metadata?.inlineCitations) ? msg.metadata.inlineCitations as Array<{
-        url: string; title: string; text: string
-      }> : undefined
-      const tasks = Array.isArray(msg.metadata?.tasks) ? msg.metadata.tasks as Array<{
-        title: string; description?: string; status: 'pending' | 'in_progress' | 'completed' | 'failed'; files?: Array<{ name: string }>
-      }> : undefined
-      const webPreview = msg.metadata?.webPreview && typeof msg.metadata.webPreview === 'object'
-        && 'url' in msg.metadata.webPreview && 'title' in msg.metadata.webPreview
-        ? msg.metadata.webPreview as { url: string; title: string; description?: string }
-        : undefined
-      const followUp =
-        typeof msg.metadata?.followUp === 'string' && msg.metadata.followUp.trim().length > 0
-          ? msg.metadata.followUp.trim()
-          : undefined
-      const attachments = Array.isArray(msg.metadata?.attachments)
-        ? msg.metadata.attachments
-        : undefined;
-
-      const metadataPayload: Partial<NonNullable<EnhancedChatMessage['metadata']>> = {};
-
-      const fallbackSources = (!aiSources && researchMetadata)
-        ? (() => {
-            if (Array.isArray(researchMetadata?.citations)) {
-              const mapped = researchMetadata!.citations
-                .map((citation: any, index: number) => {
-                  const url = citation?.url || citation?.uri || '';
-                  if (!url || typeof url !== 'string') return null;
-                  const title = typeof citation?.title === 'string'
-                    ? citation.title
-                    : url.replace(/^https?:\/\//, '');
-                  const snippet = typeof citation?.description === 'string'
-                    ? citation.description
-                    : undefined;
-                  return {
-                    id: citation?.id || `${msg.id}-source-${index}`,
-                    title,
-                    url,
-                    snippet,
-                    description: snippet,
-                  };
-                })
-                .filter(Boolean) as SourceMetadata[];
-              if (mapped.length > 0) return mapped;
-            }
-            if (Array.isArray(researchMetadata?.urlsUsed)) {
-              const mapped = researchMetadata!.urlsUsed
-                .map((url: string, index: number) => {
-                  if (typeof url !== 'string' || url.length === 0) return null;
-                  return {
-                    id: `${msg.id}-source-${index}`,
-                    title: url.replace(/^https?:\/\//, ''),
-                    url,
-                  };
-                })
-                .filter(Boolean) as SourceMetadata[];
-              if (mapped.length > 0) return mapped;
-            }
-            return undefined;
-          })()
-        : undefined;
-
-      const combinedSources = aiSources ?? fallbackSources;
-      if (combinedSources) {
-        metadataPayload.sources = combinedSources;
-      }
-      if (researchMetadata && typeof researchMetadata === 'object') {
-        const researchSummary = {
-          query: typeof researchMetadata.query === 'string' ? researchMetadata.query : undefined,
-          combinedAnswer: typeof researchMetadata.combinedAnswer === 'string' ? researchMetadata.combinedAnswer : undefined,
-          urlsUsed: Array.isArray(researchMetadata.urlsUsed) ? (researchMetadata.urlsUsed as string[]) : undefined,
-          citationCount: typeof researchMetadata.citationCount === 'number' ? researchMetadata.citationCount : undefined,
-          searchGroundingUsed: typeof researchMetadata.searchGroundingUsed === 'number' ? researchMetadata.searchGroundingUsed : undefined,
-          urlContextUsed: typeof researchMetadata.urlContextUsed === 'number' ? researchMetadata.urlContextUsed : undefined,
-          error: typeof researchMetadata.error === 'string' ? researchMetadata.error : undefined,
-        };
-
-        if (
-          researchSummary.combinedAnswer ||
-          researchSummary.urlsUsed?.length ||
-          typeof researchSummary.citationCount === 'number' ||
-          typeof researchSummary.searchGroundingUsed === 'number' ||
-          typeof researchSummary.urlContextUsed === 'number' ||
-          researchSummary.error
-        ) {
-          metadataPayload.researchSummary = researchSummary;
-        }
-      }
-      if (toolInvocations) {
-        metadataPayload.toolInvocations = toolInvocations;
-      }
-      if (toolCall) {
-        metadataPayload.toolCall = toolCall;
-      }
-      if (annotations) {
-        metadataPayload.annotations = annotations;
-      }
-      if (reasoning) {
-        metadataPayload.reasoning = reasoning;
-      }
-      if (chainOfThought) {
-        metadataPayload.chainOfThought = chainOfThought;
-      }
-      if (contextUsage) {
-        metadataPayload.contextUsage = contextUsage;
-      }
-      if (codeBlocks) {
-        metadataPayload.codeBlocks = codeBlocks;
-      }
-      if (images) {
-        metadataPayload.images = images;
-      }
-      if (inlineCitations) {
-        metadataPayload.inlineCitations = inlineCitations;
-      }
-      if (tasks) {
-        metadataPayload.tasks = tasks;
-      }
-      if (webPreview) {
-        metadataPayload.webPreview = webPreview;
-      }
-      if (followUp) {
-        metadataPayload.followUp = followUp;
-      }
-      if (attachments && attachments.length > 0) {
-        // Convert Attachment[] from core to EnhancedChatMessage attachment format
-        metadataPayload.attachments = attachments.map(att => ({
-          id: att.id,
-          name: att.name || 'Unnamed attachment',
-          type: att.type,
-          size: att.size || 0,
-          url: att.url,
-          thumbnail: undefined,
-          analysis: undefined,
-          summary: undefined,
-          pages: undefined,
-          uploadedAt: undefined
-        }));
-      }
-
-      const metadata: EnhancedChatMessage['metadata'] | undefined =
-        Object.keys(metadataPayload).length > 0 ? metadataPayload : undefined;
-
-      const status = msg.metadata?.error
-        ? 'error'
-        : msg.metadata?.isStreaming && !msg.metadata?.isComplete
-          ? 'sending'
-          : msg.metadata?.isComplete
-            ? 'delivered'
-            : 'sent';
-
-      return {
-        id: msg.id,
-        content: msg.content,
-        role: msg.role === 'assistant' ? 'assistant' : 'user',
-        timestamp,
-        type: msg.metadata?.type === 'tool' ? 'code' : 'text',
-        metadata,
-        status,
-        error: msg.metadata?.error ? String(msg.metadata.error.message || 'An error occurred') : undefined,
-        isStreaming: Boolean(
-          msg.metadata?.isStreaming && !msg.metadata?.isComplete ||
-          msg.metadata?.isPartial
-        )
-      };
-    }),
-    [unifiedChat.messages]
-  );
+  // Removed EnhancedChatMessage view-model: components now derive UI from core Message.metadata
 
   const researchSummaries = useMemo<ResearchSummary[]>(() =>
     unifiedChat.messages
@@ -587,6 +375,20 @@ export function useChatMessages(initialSessionId?: string) {
     voiceAssistantMessageIdRef.current = null;
   }, [unifiedChat]);
 
+  // Explicitly append an assistant message (for one-shot analysis results)
+  const appendAssistantMessage = useCallback((content: string, metadata?: Record<string, unknown>) => {
+    if (typeof content !== 'string' || content.trim().length === 0) return;
+    unifiedChat.addMessage({
+      role: 'assistant',
+      content,
+      timestamp: new Date(),
+      metadata: {
+        type: 'text',
+        ...metadata,
+      },
+    });
+  }, [unifiedChat]);
+
   // Handle PDF export
   const handleExportSummary = useCallback(async (request: ExportSummaryRequest | null | undefined) => {
     if (!request?.sessionId) return;
@@ -636,7 +438,7 @@ export function useChatMessages(initialSessionId?: string) {
 
   return {
     messages,
-    enhancedMessages,
+    // enhancedMessages removed – use messages and metadata in components
     researchSummaries,
     isLoading: unifiedChat.isLoading || unifiedChat.isStreaming,
     sseError: unifiedChat.error || null,
@@ -650,6 +452,7 @@ export function useChatMessages(initialSessionId?: string) {
     updatePartialUserTranscript,
     appendVoiceAssistantChunk,
     finalizeVoiceAssistantMessage,
+    appendAssistantMessage,
     exportVoiceTranscript,
   };
 }

@@ -16,6 +16,7 @@ import {
   Session,
 } from '@google/genai';
 import { EventEmitter } from 'eventemitter3';
+import { GEMINI_MODELS } from '../src/config/constants.js'
 import { difference } from 'lodash-es';
 
 /**
@@ -40,7 +41,7 @@ export interface LiveClientEventTypes {
 }
 
 export class GenAILiveClient extends EventEmitter<LiveClientEventTypes> {
-  public readonly model: string = 'gemini-2.5-flash-native-audio-preview-09-2025';
+  public readonly model: string;
 
   protected readonly client: GoogleGenAI;
   protected session?: Session;
@@ -57,7 +58,10 @@ export class GenAILiveClient extends EventEmitter<LiveClientEventTypes> {
    */
   constructor(apiKey: string, model?: string) {
     super();
-    if (model) this.model = model;
+    this.model =
+      model ||
+      process.env.GEMINI_LIVE_MODEL ||
+      GEMINI_MODELS.DEFAULT_VOICE;
 
     this.client = new GoogleGenAI({
       apiKey: apiKey,

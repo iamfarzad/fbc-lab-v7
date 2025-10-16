@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { getSupabase } from '@/core/supabase/server';
 import { generatePdfWithPuppeteer } from '@/core/pdf-generator-puppeteer';
 import { logger } from '@/lib/logger';
@@ -7,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const { sessionId, leadEmail, artifacts = [], research = [] } = await request.json();
     if (!sessionId) {
-      return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
+      return respond.badRequest('Missing sessionId');
     }
 
     const supabase = getSupabase();
@@ -54,6 +55,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     logger.error('Export summary failed', error instanceof Error ? error : undefined);
-    return NextResponse.json({ error: 'Failed to generate summary' }, { status: 500 });
+    return respond.serverError('Failed to generate summary');
   }
 }

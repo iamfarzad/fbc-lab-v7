@@ -124,7 +124,7 @@ const msg = { role: 'user', content: 'Hello' } // Missing id, timestamp
 
 ### Backward Compatibility Maintained
 - `UnifiedMessage` alias still exists in core.ts (line 50)
-- `EnhancedChatMessage` extends Message for UI features
+- UI now derives view state directly from `Message.metadata`. `EnhancedChatMessage` has been removed.
 - Can be removed after full codebase audit
 
 ### No Breaking Changes
@@ -219,4 +219,3 @@ Track these over next 2-3 weeks:
 ---
 
 **The 10-month TypeScript thrashing loop is officially broken.** 🎉
-

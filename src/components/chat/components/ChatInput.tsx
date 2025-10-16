@@ -85,7 +85,7 @@ export type ChatInputHandle = {
   openMedia: (tab?: 'voice' | 'camera' | 'screen') => void;
 }
 
-export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStatusLine?: boolean; disableExpandedControls?: boolean }>(function ChatInput({
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStatusLine?: boolean; showVoicePreview?: boolean; disableExpandedControls?: boolean }>(function ChatInput({
   inputValue,
   isLoading,
   isListening,
@@ -116,6 +116,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   autoOpenPopover = null,
   onAutoOpenPopoverHandled,
   showStatusLine = true,
+  showVoicePreview = false,
   disableExpandedControls = false,
 }, ref) {
   const [activePopover, setActivePopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
@@ -317,7 +318,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
             )}
           </PromptInputAttachments>
 
-          {isListening && (voicePartialTranscript || voiceTranscript) && (
+          {showVoicePreview && isListening && (voicePartialTranscript || voiceTranscript) && (
             <div className="px-1 sm:px-2 text-xs text-muted-foreground/75">
               <span className="font-medium text-muted-foreground/90">Voice preview:</span>{' '}
               {voicePartialTranscript || voiceTranscript?.split('\n').slice(-1)[0]}

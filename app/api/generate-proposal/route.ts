@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { ContextStorage } from '@/core/context/context-storage';
 import { usageLimiter } from '@/src/lib/usage-limits';
 import { generateText } from 'ai';
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     const usage = await usageLimiter.getUsage(sessionId);
     
     if (!context || !usage) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return respond.notFound('Session not found');
     }
     
     console.log('📄 Generating proposal for:', context.name);
@@ -90,10 +91,6 @@ Format as clean, professional markdown. Be concise and specific.`;
     });
   } catch (error) {
     console.error('Proposal generation error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to generate proposal',
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    return respond.serverError('Failed to generate proposal', { details: error instanceof Error ? error.message : String(error) })
   }
 }
-

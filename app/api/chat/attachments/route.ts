@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { randomUUID } from 'node:crypto'
 import { PDFDocument } from 'pdf-lib'
 import { multimodalContextManager } from '@/src/core/context/multimodal-context'
@@ -41,24 +42,21 @@ export async function POST(request: NextRequest) {
     const sessionId = formData.get('sessionId')
 
     if (typeof sessionId !== 'string' || sessionId.trim().length === 0) {
-      return NextResponse.json({ ok: false, error: 'Missing sessionId' }, { status: 400 })
+      return respond.badRequest('Missing sessionId')
     }
 
     const incoming = formData.getAll('files')
     const files = incoming.filter((item): item is File => item instanceof File)
 
     if (files.length === 0) {
-      return NextResponse.json({ ok: false, error: 'No files uploaded' }, { status: 400 })
+      return respond.badRequest('No files uploaded')
     }
 
     const attachmentSummaries: ChatAttachment[] = []
 
     for (const file of files) {
       if (file.size > MAX_FILE_SIZE) {
-        return NextResponse.json({
-          ok: false,
-          error: `File ${file.name} exceeds the ${formatSize(MAX_FILE_SIZE)} limit`
-        }, { status: 413 })
+        return respond.error(`File ${file.name} exceeds the ${formatSize(MAX_FILE_SIZE)} limit`, 413, 'PAYLOAD_TOO_LARGE')
       }
 
       const arrayBuffer = await file.arrayBuffer()
@@ -124,13 +122,9 @@ export async function POST(request: NextRequest) {
 
     const prompt = buildPrompt(attachmentSummaries)
 
-    return NextResponse.json({
-      ok: true,
-      attachments: attachmentSummaries,
-      prompt
-    })
+    return respond.ok({ ok: true, attachments: attachmentSummaries, prompt })
   } catch (error) {
     console.error('Attachment upload failed', error)
-    return NextResponse.json({ ok: false, error: 'Failed to process attachments' }, { status: 500 })
+    return respond.serverError('Failed to process attachments')
   }
 }

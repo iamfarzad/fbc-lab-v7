@@ -3,7 +3,7 @@
 ## Overview
 Eliminate TypeScript type system thrashing by consolidating multiple competing Message types into a single canonical type system with proper migration strategy.
 
-This implementation addresses the root cause of 48 TypeScript fix commits by creating a unified type system that eliminates the cycle of adding features, fixing types, creating conflicts, and generating more fixes. The solution consolidates Message, EnhancedChatMessage, UnifiedMessage, and local Message interfaces into one authoritative source while maintaining backward compatibility during migration.
+This implementation addresses the root cause of 48 TypeScript fix commits by creating a unified type system that eliminates the cycle of adding features, fixing types, creating conflicts, and generating more fixes. The solution consolidates Message and removes EnhancedChatMessage/UnifiedMessage and local Message interfaces into one authoritative source while maintaining backward compatibility during migration.
 
 ## Types
 Single sentence defining the canonical Message type system that will eliminate all type conflicts.
@@ -153,7 +153,7 @@ export interface MessageMetadata {
 }
 
 // Migration types for backward compatibility
-export type EnhancedChatMessage = Message // Alias for migration
+// EnhancedChatMessage alias removed; use Message everywhere
 export type UnifiedMessage = Message // Alias for migration
 
 // Context types (already exist in core.ts)
@@ -198,7 +198,7 @@ Single sentence describing the function updates needed for type consolidation.
 Detailed breakdown of function changes:
 
 ### Modified Functions:
-- All functions using `EnhancedChatMessage` - Update to use `Message` type
+- All functions previously using `EnhancedChatMessage` - Updated to use `Message` type
 - All functions using `UnifiedMessage` - Update to use `Message` type  
 - Functions in `app/api/chat/unified/route.ts` - Remove local type usage
 - Component props interfaces - Update to use canonical `Message` type
@@ -219,7 +219,7 @@ Single sentence describing the class modifications needed for type unification.
 Detailed breakdown of class changes:
 
 ### Modified Classes:
-- Any classes with properties using `EnhancedChatMessage` - Update to `Message`
+- Any classes with properties using `EnhancedChatMessage` - Updated to `Message`
 - Any classes with methods returning `UnifiedMessage` - Update to `Message`
 - Component classes with Message-related props - Update prop types
 

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { adminAuthMiddleware } from '@/app/api-utils/auth'
 import { adminRateLimit } from '@/app/api-utils/rate-limiting'
 import { supabaseService } from '@/src/core/supabase/client'
@@ -41,7 +42,7 @@ function ensureSupabase() {
 export async function GET(request: NextRequest) {
   const hasSupabaseEnv = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   if (!hasSupabaseEnv) {
-    return NextResponse.json({ disabled: true, message: 'Admin features require Supabase configuration' })
+    return respond.ok({ disabled: true, message: 'Admin features require Supabase configuration' })
   }
 
   const rateLimitResult = adminRateLimit(request)
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Admin conversations fetch error:', error)
-      return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
+      return respond.serverError('Failed to fetch conversations')
     }
 
     const conversations: ConversationResponse[] = (data ?? []).map((conv: ConversationRecord) => ({
@@ -98,9 +99,9 @@ export async function GET(request: NextRequest) {
       createdAt: conv.created_at
     }))
 
-    return NextResponse.json(conversations)
+    return respond.ok(conversations)
   } catch (error) {
     console.error('Admin conversations error:', error)
-    return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
+    return respond.serverError('Failed to fetch conversations')
   }
 }

@@ -1,158 +1,8 @@
 // Enhanced TypeScript types for chat functionality with AI elements integration
+// NOTE: Per .cursorrules, canonical types live in '@/types/core'.
+// This file defines UI-only wrappers and re-exports core types to avoid duplication.
 import type { ComponentType } from 'react';
-
-export interface EnhancedChatMessage {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: Date;
-  type?: 'text' | 'voice' | 'image' | 'screen' | 'code' | 'reasoning';
-  metadata?: {
-    fileName?: string;
-    fileType?: string;
-    fileSize?: number;
-    duration?: number; // For voice messages
-    isPartial?: boolean; // For live transcripts
-    isStreaming?: boolean; // For streaming messages
-    sources?: Array<{
-      id: string;
-      title: string;
-      url: string;
-      snippet?: string;
-      description?: string;
-      relevanceScore?: number;
-    }>;
-    reasoning?: string;
-    reasoningDuration?: number;
-    reasoningSteps?: Array<{
-      step: number;
-      content: string;
-      duration?: number;
-    }>;
-    codeBlocks?: Array<{
-      id: string;
-      code: string;
-      language: string;
-      showLineNumbers?: boolean;
-      title?: string;
-      description?: string;
-    }>;
-    actions?: Array<{
-      id: string;
-      label: string;
-      icon?: string | ComponentType<{ className?: string }>;
-      tooltip?: string;
-      variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
-      onClick: () => void;
-      disabled?: boolean;
-    }>;
-    artifacts?: Array<{
-      id: string;
-      type: string;
-      content: string;
-      title?: string;
-      description?: string;
-      metadata?: Record<string, any>;
-    }>;
-    reactions?: Array<{
-      emoji: string;
-      count: number;
-      users: string[];
-    }>;
-    attachments?: Array<{
-      id: string;
-      name: string;
-      type: string;
-      size: number;
-      url: string;
-      thumbnail?: string;
-      analysis?: string;
-      summary?: string;
-      pages?: number;
-      uploadedAt?: string;
-    }>;
-    researchSummary?: {
-      query?: string;
-      combinedAnswer?: string;
-      urlsUsed?: string[];
-      citationCount?: number;
-      searchGroundingUsed?: number;
-      urlContextUsed?: number;
-      error?: string;
-      [key: string]: any;
-    };
-    toolInvocations?: Array<{
-      toolCallId?: string;
-      name?: string;
-      arguments?: Record<string, any>;
-      result?: unknown;
-      state?: string;
-      [key: string]: any;
-    }>;
-    // Server-emitted tool-call event payload (HTTP chat path)
-    toolCall?: {
-      id?: string;
-      tool: string;
-      arguments?: Record<string, any>;
-      requiresApproval?: boolean;
-      timestamp?: string;
-    };
-    annotations?: Array<Record<string, any>>;
-    // Added missing fields
-    chainOfThought?: {
-      steps: Array<{
-        label: string;
-        description?: string;
-        status: 'complete' | 'active' | 'pending';
-        timestamp?: number;
-      }>;
-    };
-    tools?: Array<{
-      name: string;
-      type: string;
-      state: 'running' | 'complete' | 'error';
-      input?: any;
-      output?: any;
-      error?: string;
-    }>;
-    agent?: string;
-    contextUsage?: {
-      usedTokens: number;
-      maxTokens: number;
-      usage: number;
-      modelId: string;
-    };
-    images?: Array<{
-      base64: string;
-      mediaType: string;
-      alt: string;
-    }>;
-    inlineCitations?: Array<{
-      url: string;
-      title: string;
-      text: string;
-    }>;
-    tasks?: Array<{
-      title: string;
-      description?: string;
-      status: 'pending' | 'in_progress' | 'completed' | 'failed';
-      files?: Array<{
-        name: string;
-      }>;
-    }>;
-    webPreview?: {
-      url: string;
-      title: string;
-      description?: string;
-    };
-    followUp?: string;
-  };
-  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'error' | 'failed';
-  error?: string;
-  isStreaming?: boolean;
-  parentId?: string; // For threaded conversations
-  branchId?: string; // For conversation branching
-}
+import type { Message, Source, CodeBlock, Artifact, MessageAction } from '@/types/core';
 
 export interface AIElementConfig {
   showReasoning: boolean;
@@ -173,64 +23,18 @@ export interface AIElementConfig {
   theme?: 'light' | 'dark' | 'auto';
 }
 
-export interface MessageAction {
-  id: string;
-  type: 'copy' | 'edit' | 'delete' | 'regenerate' | 'retry' | 'share' | 'download' | 'custom';
-  label: string;
+// Re-export canonical content-related types from core to prevent duplication
+export type { MessageAction, Source, CodeBlock, ReasoningStep, Artifact } from '@/types/core';
+
+// UI-only MessageAction extension (adds runtime callback typing and icon component support)
+export interface UIMessageAction extends Omit<import('@/types/core').MessageAction, 'icon' | 'onClick'> {
   icon?: string | ComponentType<{ className?: string }>;
-  tooltip?: string;
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
   onClick: () => void | Promise<void>;
-  disabled?: boolean;
-  requiresConfirmation?: boolean;
-  confirmationMessage?: string;
 }
 
-export interface Source {
-  id: string;
-  title: string;
-  url: string;
-  snippet?: string;
-  description?: string;
-  relevanceScore?: number;
-  type?: 'web' | 'document' | 'database' | 'api' | 'local';
-  metadata?: Record<string, any>;
-}
-
-export interface CodeBlock {
-  id: string;
-  code: string;
-  language: string;
-  showLineNumbers?: boolean;
-  title?: string;
-  description?: string;
-  isExecutable?: boolean;
-  canCopy?: boolean;
-  canDownload?: boolean;
-  theme?: string;
-}
-
-export interface ReasoningStep {
-  step: number;
-  content: string;
-  duration?: number;
-  confidence?: number;
-  type?: 'analysis' | 'planning' | 'execution' | 'verification';
-}
-
-export interface Artifact {
-  id: string;
-  type: 'file' | 'chart' | 'table' | 'diagram' | 'custom';
-  content: string | object;
-  title?: string;
-  description?: string;
-  metadata?: Record<string, any>;
-  downloadUrl?: string;
-  previewUrl?: string;
-}
-
-export interface ChatContext {
-  messages: EnhancedChatMessage[];
+// UI-only chat context for component state (distinct from core ChatContext)
+export interface UIChatContext {
+  messages: Message[];
   currentMessage?: string;
   isTyping: boolean;
   hasError: boolean;
@@ -246,13 +50,13 @@ export interface ChatContext {
 }
 
 export interface ChatState {
-  messages: EnhancedChatMessage[];
+  messages: Message[];
   isLoading: boolean;
   error: string | null;
   isStreaming: boolean;
   typingUsers: string[];
   settings: AIElementConfig;
-  context: ChatContext;
+  context: UIChatContext;
 }
 
 export interface AIBaseElement {
@@ -267,14 +71,14 @@ export interface AIBaseElement {
 
 export interface ExtractedElements {
   reasoning?: string;
-  sources?: Source[];
-  codeBlocks?: CodeBlock[];
-  actions?: MessageAction[];
-  artifacts?: Artifact[];
+  sources?: import('@/types/core').Source[];
+  codeBlocks?: import('@/types/core').CodeBlock[];
+  actions?: import('@/types/core').MessageAction[];
+  artifacts?: import('@/types/core').Artifact[];
   citations?: Array<{
     id: string;
     text: string;
-    source: Source;
+    source: import('@/types/core').Source;
   }>;
   tasks?: Array<{
     id: string;
@@ -347,15 +151,6 @@ export interface TypingIndicator {
   timestamp: Date;
 }
 
-// Type guards
-export function isEnhancedChatMessage(obj: any): obj is EnhancedChatMessage {
-  return obj && typeof obj === 'object' && 
-         typeof obj.id === 'string' && 
-         typeof obj.content === 'string' && 
-         (obj.role === 'user' || obj.role === 'assistant') &&
-         obj.timestamp instanceof Date;
-}
-
 export function isSource(obj: any): obj is Source {
   return obj && typeof obj === 'object' && 
          typeof obj.id === 'string' && 
@@ -377,9 +172,6 @@ export function isArtifact(obj: any): obj is Artifact {
 }
 
 // Utility types
-export type MessageStatus = EnhancedChatMessage['status'];
-export type MessageRole = EnhancedChatMessage['role'];
-export type MessageType = EnhancedChatMessage['type'];
 export type ActionVariant = MessageAction['variant'];
 export type SourceType = Source['type'];
 export type ArtifactType = Artifact['type'];

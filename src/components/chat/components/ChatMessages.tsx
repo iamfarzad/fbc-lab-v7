@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "../types/chatTypes";
-import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
 import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw, Search } from "lucide-react";
 import { DESIGN_TOKENS } from "../design-tokens";
@@ -103,9 +102,20 @@ type StreamedArtifact = {
   error?: string;
 };
 
+// Minimal render policy for AI text: strip boilerplate headings and disclaimers
+function sanitizeAIContent(input: string): string {
+  if (typeof input !== 'string' || input.length === 0) return input;
+  let text = input.trimStart();
+  // Remove a leading H1/H2 heading line (e.g., "# Responding to the Inquiry")
+  text = text.replace(/^\s{0,3}#{1,2}\s+.*\n+/i, '');
+  // Remove generic preambles
+  text = text.replace(/^(responding to the inquiry|response|assistant response)\s*:?\s*/i, '');
+  text = text.replace(/^as an ai[\s\S]*?\n+/i, '');
+  return text;
+}
+
 interface ChatMessagesProps {
   messages: ChatMessage[];
-  enhancedMessages: EnhancedChatMessage[];
   researchSummaries: ResearchSummary[];
   isLoading: boolean;
   contextReady: boolean;
@@ -148,7 +158,6 @@ interface ChatMessagesProps {
 
 export function ChatMessages({
   messages,
-  enhancedMessages,
   isLoading,
   contextReady,
   currentContext,
@@ -194,8 +203,8 @@ export function ChatMessages({
   if (isMinimized) {
     return null;
   }
-  const startIndex = Math.max(enhancedMessages.length - visibleCount, 0);
-  const visibleEnhanced = enhancedMessages.slice(startIndex);
+  const startIndex = Math.max(messages.length - visibleCount, 0);
+  const visibleMessages = messages.slice(startIndex);
 
   const canLoadEarlier = startIndex > 0;
 
@@ -249,7 +258,7 @@ export function ChatMessages({
             </div>
           )}
 
-          {visibleEnhanced.map((message) => {
+          {visibleMessages.map((message) => {
             const isUserMessage = message.role === "user";
 
             const rawResearchSummary = message.metadata?.researchSummary as unknown;
@@ -320,10 +329,10 @@ export function ChatMessages({
                   )}>
                     {/* Streaming hint removed: handled by composer status line */}
                     <div className={cn(
-                      message.metadata?.isPartial && "opacity-70 italic text-muted-foreground"
+                      message.metadata?.isPartial ? "opacity-70 italic text-muted-foreground" : ""
                     )}>
-                      <Response>{message.content}</Response>
-                      {message.metadata?.isPartial && (
+                      <Response>{isUserMessage ? message.content : sanitizeAIContent(message.content)}</Response>
+                      {Boolean(message.metadata?.isPartial) && (
                         <span className="ml-1 text-xs text-muted-foreground">(speaking...)</span>
                       )}
                     </div>
@@ -436,8 +445,8 @@ export function ChatMessages({
                             <Tool key={index} defaultOpen={false}>
                               <ToolHeader title={tool.name} type={tool.type as any} state={tool.state as any} />
                               <ToolContent>
-                                {tool.input && <ToolInput input={tool.input} />}
-                                {tool.output && <ToolOutput output={tool.output} errorText={tool.error || ''} />}
+                                {tool.input ? <ToolInput input={String(tool.input)} /> : null}
+                                {tool.output ? <ToolOutput output={String(tool.output)} errorText={tool.error || ''} /> : null}
                               </ToolContent>
                             </Tool>
                           ))}

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { handleIntelligence } from '@/src/api/intelligence/handler'
 import type { ToolRunResult } from '@/src/core/types/intelligence'
 import { validateRequest, leadResearchSchema } from '@/src/core/validation'
@@ -11,13 +12,7 @@ export async function POST(request: NextRequest) {
     const validation = validateRequest(leadResearchSchema, body)
 
     if (!validation.success) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'Invalid request',
-        } satisfies ToolRunResult,
-        { status: 400 }
-      )
+      return respond.badRequest('Invalid request')
     }
 
     const { sessionId, email, name, companyUrl, provider } = validation.data
@@ -29,13 +24,13 @@ export async function POST(request: NextRequest) {
     })
 
     if (!result.success) {
-      return NextResponse.json({ ok: false, error: 'Lead research failed' } satisfies ToolRunResult, { status: 500 })
+      return respond.serverError('Lead research failed')
     }
 
-    return NextResponse.json({ ok: true, output: result.research } satisfies ToolRunResult)
+    return respond.ok({ ok: true, output: result.research } as ToolRunResult)
 
   } catch (error) {
     console.error('❌ Lead research failed', error)
-    return NextResponse.json({ ok: false, error: 'Lead research failed' } satisfies ToolRunResult, { status: 500 })
+    return respond.serverError('Lead research failed')
   }
 }

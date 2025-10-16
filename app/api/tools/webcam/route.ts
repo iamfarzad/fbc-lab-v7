@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { GoogleGenAI } from '@google/genai';
 import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache';
 import { logJsonl } from '@/src/lib/jsonl-logger';
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('webcamCapture') as File;
     if (!file) {
       logJsonl('webcam', 'missing_file')
-      return NextResponse.json({ error: 'No webcam capture provided' }, { status: 400 });
+      return respond.badRequest('No webcam capture provided')
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -72,11 +73,11 @@ export async function POST(req: NextRequest) {
     const result = await cachedAnalyzeImage(imageHash, base64, mimeType);
     logJsonl('webcam', 'analysis_complete', { hash: imageHash, analysisChars: result?.analysis?.length || 0 })
 
-    return NextResponse.json(result);
+    return respond.ok(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Analysis failed';
-    console.error('❌ [Webcam] Analysis error:', message);
+    const message = error instanceof Error ? error.message : 'Analysis failed'
+    console.error('❌ [Webcam] Analysis error:', message)
     logJsonl('webcam', 'error', { message })
-    return NextResponse.json({ error: message }, { status: 500 });
+    return respond.serverError(message)
   }
 }

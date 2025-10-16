@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { SpeechClient } from '@google-cloud/speech';
 import { logJsonl } from '@/src/lib/jsonl-logger';
 
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
 
     if (!audioFile || audioFile.size === 0) {
       logJsonl('transcribe', 'missing_audio')
-      return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
+      return respond.badRequest('No audio file provided')
     }
 
     // Initialize client only when needed to avoid metadata lookup during build
@@ -37,10 +38,11 @@ export async function POST(request: NextRequest) {
       chars: transcription.length,
     })
 
-    return NextResponse.json({ transcription });
+    return respond.ok({ transcription })
   } catch (error: any) {
     console.error('Transcription error:', error);
-    logJsonl('transcribe', 'error', { message: error?.message || 'Internal server error' })
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const message = error?.message || 'Internal server error'
+    logJsonl('transcribe', 'error', { message })
+    return respond.serverError(message)
   }
 }

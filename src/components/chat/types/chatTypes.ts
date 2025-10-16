@@ -1,5 +1,3 @@
-import { EnhancedChatMessage } from "@/types/chat-enhanced";
-
 // Use canonical Message type from @/types/core (DELETE duplicate, import instead)
 export type { Message as ChatMessage } from '@/types/core'
 
@@ -58,7 +56,6 @@ export interface IntelligenceState {
 
 // Enhanced messages state
 export interface EnhancedMessagesState {
-  messages: EnhancedChatMessage[];
+  messages: import('@/types/core').Message[];
   isMeetingOpen: boolean;
 }
-

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { usageLimiter } from '@/src/lib/usage-limits';
 
 export async function GET(
@@ -10,12 +11,12 @@ export async function GET(
     const usage = await usageLimiter.getUsage(sessionId);
     
     if (!usage) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+      return respond.notFound('Session not found')
     }
     
-    return NextResponse.json(usage);
+    return respond.ok(usage);
   } catch (error) {
     console.error('Usage fetch error:', error);
-    return NextResponse.json({ error: 'Failed to fetch usage' }, { status: 500 });
+    return respond.serverError('Failed to fetch usage');
   }
 }

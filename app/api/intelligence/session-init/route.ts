@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { ContextStorage } from '@/src/core/context/context-storage'
 import { LeadResearchService, ResearchResult } from '@/src/core/intelligence/lead-research'
 import { getSupabase } from '@/src/core/supabase/server'
@@ -49,15 +50,7 @@ export async function POST(req: NextRequest) {
     const { sessionId: providedSessionId, email, name, companyUrl }: SessionInitRequest = await req.json()
 
     if (!email) {
-      return NextResponse.json(
-        {
-          error: 'Missing required field: email',
-          message: 'Email address is required to initialize the AI consultation session',
-          required: ['email'],
-          suggestion: 'Please provide a valid email address to continue'
-        },
-        { status: 400 }
-      )
+      return respond.badRequest('Missing required field: email')
     }
 
     // Idempotency: prefer unified header, fallback to legacy; else generate
@@ -124,7 +117,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Action logged
-        return NextResponse.json(response, { headers: { 'X-Session-Id': sessionId, 'Cache-Control': 'no-store' } })
+        return respond.ok(response, { headers: { 'X-Session-Id': sessionId, 'Cache-Control': 'no-store' } })
       }
     }
 
@@ -194,17 +187,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Action logged
-    return NextResponse.json(response, { headers: { 'X-Session-Id': sessionId, 'Cache-Control': 'no-store' } })
+    return respond.ok(response, { headers: { 'X-Session-Id': sessionId, 'Cache-Control': 'no-store' } })
 
   } catch (error) {
     console.error('❌ Session init failed', error)
-    return NextResponse.json(
-      {
-        error: 'Internal server error during session initialization',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        suggestion: 'Please try again or contact support if the issue persists'
-      },
-      { status: 500 }
-    )
+    return respond.serverError('Internal server error during session initialization', { details: error instanceof Error ? error.message : 'Unknown error' })
   }
 }

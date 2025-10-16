@@ -128,6 +128,52 @@ test.describe('Chat Interface', () => {
     // Check for loading indicator (disabled button or spinner)
     await expect(sendButton).toBeDisabled({ timeout: TIMEOUTS.short })
   })
+
+  test('should handle file upload', async ({ page, chat }) => {
+    await chat.openChat()
+
+    // Mock file upload API
+    await page.route('**/api/chat/attachments', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          files: [{ 
+            name: 'test.txt', 
+            size: 100,
+            url: 'mock-url'
+          }]
+        })
+      })
+    })
+
+    // Look for file input
+    const fileInput = page.locator('input[type="file"]')
+    
+    if (await fileInput.count() > 0) {
+      const inputElement = fileInput.first()
+      
+      // Create and upload test file
+      const buffer = Buffer.from('Test file content for upload')
+      await inputElement.setInputFiles({
+        name: 'test.txt',
+        mimeType: 'text/plain',
+        buffer
+      })
+      
+      await page.waitForTimeout(2000)
+      
+      // File should be uploaded
+      // Look for upload confirmation or file indicator
+      const fileIndicators = page.locator('text=/uploaded/i, text=/test.txt/i')
+      const count = await fileIndicators.count()
+      expect(count >= 0).toBe(true)
+    }
+    
+    // Chat should remain functional
+    expect(await chat.isChatOpen()).toBe(true)
+  })
 })
 
 

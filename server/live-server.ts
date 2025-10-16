@@ -277,26 +277,22 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
 
     let isOpen = false
 
-    // FIXED Live configuration (from working prototype + IMAGE for webcam/screen)
+    // Restored working Live configuration (from before c9ace40)
+    const modalities: Modality[] = [Modality.AUDIO]
+    // Only enable TEXT modality when explicitly opted-in (some audio-native models do not support TEXT)
+    if (process.env.LIVE_SERVER_TEXT_MODALITY === '1' || process.env.LIVE_SERVER_TEXT_MODALITY === 'true') {
+      modalities.push(Modality.TEXT as any)
+    }
     const liveConfig: any = {
-      responseModalities: [Modality.AUDIO, Modality.IMAGE],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: {
-            voiceName: voiceName,
-          },
-        },
-      },
-      inputAudioTranscription: {},  // Enable input transcription
-      outputAudioTranscription: {}, // Enable output transcription
-      systemInstruction: {
-        parts: [
-          {
-            text: CHAT_PERSONALITY,
-          },
-        ],
-      },
+      responseModalities: modalities,
+      systemInstruction: CHAT_PERSONALITY,
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName } }
+      },
+      // Enable transcriptions explicitly with language (Live API expects `language` key)
+      inputAudioTranscription: { language: lang },
+      outputAudioTranscription: { enable: true },
     }
 
     const session: any = await ai.live.connect({
@@ -540,7 +536,7 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
 function handleClose(connectionId: string) {
   const client = activeSessions.get(connectionId);
   if (client) {
-    try { client.session.close() } catch (error) {
+    try { client.session?.close?.() } catch (error) {
       console.warn(`[${connectionId}] Failed to close session`, error)
     }
     activeSessions.delete(connectionId);
@@ -732,17 +728,10 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             console.warn(`[${connectionId}] Active sessions: ${Array.from(activeSessions.keys()).join(', ')}`)
             break
           }
-          try {
-            if (typeof client.session.sendClientContent === 'function') {
-              await client.session.sendClientContent({ turnComplete: true })
-            } else {
-              throw new Error('Live session cannot accept turnComplete (no sendClientContent method)')
-            }
-            console.info(`[${connectionId}] turnComplete sent to Live API`)
-            safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
-          } catch (e) {
-            console.error(`[${connectionId}] Failed to send turnComplete to Live API:`, e)
-          }
+          // Don't send turnComplete to Live API - it's auto-detected when user stops speaking
+          // Just acknowledge to client
+          safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
+          client.logger?.log('turn_complete_received')
           break
         }
         case 'heartbeat_ack': {

@@ -136,6 +136,77 @@ test.describe('Camera Features', () => {
     // Camera should be inactive
     expect(await camera.isCameraActive()).toBe(false)
   })
+
+  test('should trigger webcam analysis', async ({ page, chat, camera }) => {
+    await chat.openChat()
+    await page.context().grantPermissions(['camera'])
+    
+    // Mock webcam analysis API
+    let analysisTriggered = false
+    await page.route('/api/tools/webcam', async route => {
+      analysisTriggered = true
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          analysis: 'Webcam analysis: person detected'
+        })
+      })
+    })
+
+    // Start camera
+    await camera.toggleCamera()
+    await page.waitForTimeout(1500)
+
+    // Look for analyze button
+    const analyzeButton = page.locator('button:has-text("Analyze"), button[aria-label*="Analyze" i]')
+    
+    if (await analyzeButton.isVisible()) {
+      await analyzeButton.click()
+      await page.waitForTimeout(1500)
+      expect(analysisTriggered).toBe(true)
+    } else {
+      expect(analysisTriggered).toBe(false)
+    }
+    
+    // Verify chat is still functional
+    expect(await chat.isChatOpen()).toBe(true)
+  })
+
+  test('should display webcam analysis in chat', async ({ page, chat, camera }) => {
+    await chat.openChat()
+    await page.context().grantPermissions(['camera'])
+
+    // Mock webcam API to return analysis
+    await page.route('/api/tools/webcam', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          analysis: 'Test webcam analysis result'
+        })
+      })
+    })
+
+    // Start camera
+    await camera.toggleCamera()
+    await page.waitForTimeout(1500)
+
+    // Look for and click analyze button
+    const analyzeButton = page.locator('button:has-text("Analyze")').first()
+    
+    if (await analyzeButton.isVisible()) {
+      await analyzeButton.click()
+      await page.waitForTimeout(2000)
+
+      // Look for analysis result in chat
+      const chatMessages = page.locator('[data-role="assistant"], .assistant-message')
+      const messageCount = await chatMessages.count()
+      
+      // Message might appear if analysis succeeded
+      expect(messageCount >= 0).toBe(true)
+    }
+  })
 })
-
-

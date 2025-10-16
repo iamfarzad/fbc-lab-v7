@@ -1,14 +1,12 @@
 import { useState, useCallback } from 'react';
 import {
-  EnhancedChatMessage,
   AIElementConfig,
   ExtractedElements,
-  MessageAction,
-  Source,
-  CodeBlock,
+  UIMessageAction as MessageAction,
   AIBaseElement,
   ChatState
 } from '@/types/chat-enhanced';
+import type { Message, Source, CodeBlock, MessageMetadata } from '@/types/core';
 
 const defaultConfig: AIElementConfig = {
   showReasoning: true,
@@ -124,11 +122,11 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
   }, []);
 
   // Create enhanced message
-  const createEnhancedMessage = useCallback((
-    content: string, 
-    role: 'user' | 'assistant', 
-    metadata?: EnhancedChatMessage['metadata']
-  ): EnhancedChatMessage => {
+  const createMessage = useCallback((
+    content: string,
+    role: Message['role'],
+    metadata?: Message['metadata']
+  ): Message => {
     const extracted = role === 'assistant' ? extractElements(content) : undefined;
     
     // Transform artifacts to ensure content is string
@@ -145,29 +143,29 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
       content,
       role,
       timestamp: new Date(),
-      type: 'text',
-      status: 'sending',
       metadata: {
         ...metadata,
-        ...transformedExtracted
-      } as any
+        ...transformedExtracted,
+        uiStatus: 'sending'
+      } as MessageMetadata
     };
   }, [extractElements]);
 
   // Update message status
-  const updateMessageStatus = useCallback((messageId: string, status: EnhancedChatMessage['status'], error?: string) => {
+  const updateMessageStatus = useCallback((messageId: string, status: 'sending' | 'sent' | 'delivered' | 'read' | 'error' | 'failed', error?: string) => {
     setChatState(prev => ({
       ...prev,
-      messages: prev.messages.map(msg => 
-        msg.id === messageId 
-          ? { ...msg, status, error }
-          : msg
-      )
+      messages: prev.messages.map(msg => {
+        if (msg.id !== messageId) return msg;
+        const nextMeta = { ...(msg.metadata || {}), uiStatus: status } as Message['metadata'];
+        if (error) (nextMeta as any).error = { code: 'ui', message: error };
+        return { ...msg, metadata: nextMeta };
+      })
     }));
   }, []);
 
   // Add message to chat
-  const addMessage = useCallback((message: EnhancedChatMessage) => {
+  const addMessage = useCallback((message: Message) => {
     setChatState(prev => ({
       ...prev,
       messages: [...prev.messages, message],
@@ -191,7 +189,7 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
   }, []);
 
   // Update message content
-  const updateMessage = useCallback((messageId: string, updates: Partial<EnhancedChatMessage>) => {
+  const updateMessage = useCallback((messageId: string, updates: Partial<Message>) => {
     setChatState(prev => ({
       ...prev,
       messages: prev.messages.map(msg => 
@@ -302,17 +300,17 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
   }, []);
 
   // Get message by ID
-  const getMessage = useCallback((messageId: string): EnhancedChatMessage | undefined => {
+  const getMessage = useCallback((messageId: string): Message | undefined => {
     return chatState.messages.find(msg => msg.id === messageId);
   }, [chatState.messages]);
 
   // Get messages by role
-  const getMessagesByRole = useCallback((role: EnhancedChatMessage['role']): EnhancedChatMessage[] => {
+  const getMessagesByRole = useCallback((role: Message['role']): Message[] => {
     return chatState.messages.filter(msg => msg.role === role);
   }, [chatState.messages]);
 
   // Get last message
-  const getLastMessage = useCallback((): EnhancedChatMessage | undefined => {
+  const getLastMessage = useCallback((): Message | undefined => {
     return chatState.messages[chatState.messages.length - 1];
   }, [chatState.messages]);
 
@@ -336,7 +334,7 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
     registerElement,
     unregisterElement,
     getElement,
-    createEnhancedMessage,
+    createMessage,
     addMessage,
     removeMessage,
     updateMessage,

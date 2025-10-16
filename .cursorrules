@@ -52,7 +52,8 @@
 ## 8. FILE ORGANIZATION RULES
 - Types: src/types/core.ts (canonical types only)
 - Config: src/config/constants.ts (all constants)
-- Voice: src/hooks/useRealtimeVoice.ts (single voice hook)
+- Voice/Multimodal: src/hooks/useLiveApi.ts (public API for components)
+  - Internal: src/hooks/useRealtimeVoice.ts (WebSocket implementation - not directly imported)
 - Chat API: app/api/chat/unified/route.ts (single route)
 - NO local type definitions - import from @/types/core
 

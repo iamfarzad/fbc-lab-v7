@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
+import { respond } from '@/lib/api/response'
 
 export function GET() {
-  return NextResponse.json({
+  return respond.ok({
     status: 'OK',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,

@@ -504,7 +504,7 @@ this.source.connect(this.recordingWorklet);
 - Lines: 598
 - TypeScript errors: 0
 - Lint warnings: 1 (React hook deps - non-critical)
-- Dependencies: 3 (AudioStreamingQueue, useMediaRecorderVoice, WEBSOCKET_CONFIG)
+- Dependencies: 2 (AudioPlayer, WEBSOCKET_CONFIG)
 - Complexity: High (but necessary for real-time voice)
 
 **useMediaRecorderVoice.ts:**
@@ -647,4 +647,3 @@ Current state (Oct 15):
 - ✅ Production-ready
 
 **No changes needed. The voice system is battle-tested and working.** 🎤
-

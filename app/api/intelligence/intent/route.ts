@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server'
-import type { ToolRunResult } from '@/src/core/types/intelligence'
+import { respond } from '@/lib/api/response'
 import { z } from 'zod'
 import { detectIntent } from '@/src/core/intelligence/intent-detector'
 import { ContextStorage } from '@/src/core/context/context-storage'
@@ -19,11 +18,10 @@ export const POST = withApiGuard({
       const intent = detectIntent(message)
       await contextStorage.update(body.sessionId, { intent_data: intent as any, last_user_message: message })
       // Back-compat: include top-level fields alongside ToolRunResult
-      return NextResponse.json({ ok: true, output: intent, ...intent } satisfies any)
+      return respond.ok({ ok: true, output: intent, ...intent } as any)
     } catch (e: unknown) {
       console.error('Intent detection error:', e)
-      return NextResponse.json({ ok: false, error: 'server_error' } satisfies ToolRunResult, { status: 500 })
+      return respond.serverError('server_error')
     }
   }
 })
-

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { createToken } from '@/src/core/auth'
 
 export async function POST(request: NextRequest) {
@@ -6,12 +7,12 @@ export async function POST(request: NextRequest) {
     const { password } = (await request.json()) as { password?: string }
 
     if (!password) {
-      return NextResponse.json({ error: 'Password is required' }, { status: 400 })
+      return respond.badRequest('Password is required')
     }
 
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'
     if (password !== adminPassword) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      return respond.unauthorized('Invalid credentials')
     }
 
     const ownerEmail = 'farzad@farzadbayat.com'
@@ -21,13 +22,7 @@ export async function POST(request: NextRequest) {
       role: 'admin'
     })
 
-    const response = NextResponse.json({
-      success: true,
-      user: {
-        email: ownerEmail,
-        role: 'admin'
-      }
-    })
+    const response = respond.ok({ success: true, user: { email: ownerEmail, role: 'admin' } })
 
     response.cookies.set('adminToken', token, {
       httpOnly: true,
@@ -40,6 +35,6 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error) {
     console.error('Admin login error:', error)
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 })
+    return respond.serverError('Login failed')
   }
 }

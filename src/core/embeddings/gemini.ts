@@ -1,10 +1,11 @@
 import { GoogleGenAI } from '@google/genai'
+import { EMBEDDING_MODELS } from '@/config/constants'
 
 export async function embedTexts(texts: string[], dims: 768 | 1536 = 1536): Promise<number[][]> {
   if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not set')
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   const res = await ai.models.embedContent({
-    model: 'gemini-embedding-001',
+    model: EMBEDDING_MODELS.DEFAULT,
     contents: texts,
     config: { outputDimensionality: dims },
   })
@@ -14,5 +15,4 @@ export async function embedTexts(texts: string[], dims: 768 | 1536 = 1536): Prom
 
 // Export the functions for compatibility
 export { embedTexts as embedText }
-
 

@@ -7,13 +7,24 @@
  */
 
 // WebSocket Configuration
+const IS_PROD = process.env.NODE_ENV === 'production'
 export const WEBSOCKET_CONFIG = {
-  PRODUCTION_URL: process.env.NEXT_PUBLIC_LIVE_SERVER_URL || 'wss://fb-consulting-websocket.fly.dev',
-  DEVELOPMENT_URL: process.env.NEXT_PUBLIC_LIVE_SERVER_URL || 'ws://localhost:3001',
+  // Distinct envs for prod vs dev to avoid accidental overrides
+  PRODUCTION_URL:
+    process.env.NEXT_PUBLIC_LIVE_SERVER_URL || 'wss://fb-consulting-websocket.fly.dev',
+  DEVELOPMENT_URL:
+    process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_URL || 'ws://localhost:3001',
   get URL() {
-    return process.env.NODE_ENV === 'production' 
-      ? this.PRODUCTION_URL 
-      : this.DEVELOPMENT_URL
+    if (IS_PROD) return this.PRODUCTION_URL
+    // Prefer explicit dev URL when present
+    if (process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_URL) return this.DEVELOPMENT_URL
+    // Derive from current host in the browser for local networks
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname.replace(/:\\d+$/, '')
+      const port = process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_PORT || '3001'
+      return `ws://${host}:${port}`
+    }
+    return this.DEVELOPMENT_URL
   },
   RECONNECT_DELAY: 3000,
   MAX_RECONNECT_ATTEMPTS: 5,
@@ -53,6 +64,12 @@ export const GEMINI_ENDPOINTS = {
   STREAMING_API: 'generativelanguage.googleapis.com/v1beta/models',
 } as const
 
+// Embedding Models
+export const EMBEDDING_MODELS = {
+  DEFAULT: 'gemini-embedding-001',
+  GEMINI_001: 'gemini-embedding-001',
+} as const
+
 // Gemini Live API Configuration
 export const LIVE_API_CONFIG = {
   // Use sendRealtimeInput(), NOT session.send()
@@ -90,3 +107,18 @@ export const AUDIO_CONFIG = {
   NOISE_GATE_THRESHOLD: -50, // dB
 } as const
 
+// Security / CORS
+export const ALLOWED_ORIGINS = (
+  process.env.NEXT_PUBLIC_ALLOWED_ORIGINS ||
+  [
+    'https://fbcai.com',
+    'https://farzadbayat.com',
+    'https://www.farzadbayat.com',
+    'https://fb-c-lab-v2.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+  ].join(',')
+)
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)

@@ -511,7 +511,7 @@ $ pnpm type-check
 
 ### Type System:
 - **New interfaces:** 2 (`ChainOfThoughtStep`, `ToolMetadata`)
-- **Extended interfaces:** 2 (`AgentResult`, `EnhancedChatMessage`)
+- **Extended interfaces:** 1 (`AgentResult`). UI derives state from `Message.metadata`.
 - **Type errors introduced:** 0 ✅
 
 ---
@@ -664,4 +664,3 @@ steps[n].status = 'complete'            // Updated
 **The main gap is testing** - the implementation needs visual verification before it can be considered production-ready.
 
 **Grade:** B+ (A for implementation, C for commit quality, F for testing)
-

@@ -1,25 +1,14 @@
-import { NextResponse } from 'next/server'
+import { respond } from '@/lib/api/response'
 
 export async function POST() {
   try {
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Test endpoint working',
-      timestamp: new Date().toISOString()
-    })
+    return respond.ok({ success: true, message: 'Test endpoint working', timestamp: new Date().toISOString() })
   } catch (error) {
     console.error('Test endpoint error:', error)
-    return NextResponse.json(
-      { error: 'Test endpoint failed' },
-      { status: 500 }
-    )
+    return respond.serverError('Test endpoint failed')
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ 
-    success: true, 
-    message: 'Test endpoint GET working',
-    timestamp: new Date().toISOString()
-  })
+  return respond.ok({ success: true, message: 'Test endpoint GET working', timestamp: new Date().toISOString() })
 }

@@ -104,8 +104,7 @@
 **Props:**
 ```typescript
 {
-  messages: ChatMessage[]
-  enhancedMessages: EnhancedChatMessage[]
+  messages: Message[]
   researchSummaries: ResearchSummary[]
   isLoading: boolean
   contextReady: boolean
@@ -707,7 +706,7 @@
 
 **Dependencies:**
 - `useMediaRecorderVoice` - Audio recording
-- `AudioStreamingQueue` - Audio playback
+- `AudioPlayer` - Audio playback
 - WebSocket server connection
 
 ---
@@ -1174,7 +1173,7 @@ ChatInterface
 │   └── Calls: /api/intelligence/*
 ├── useRealtimeVoice
 │   ├── useMediaRecorderVoice
-│   ├── AudioStreamingQueue
+│   ├── AudioPlayer
 │   └── WebSocket: live server
 ├── useCamera
 │   └── Calls: /api/intelligence/webcam-analysis
@@ -1393,4 +1392,3 @@ CHAT_CONSTANTS = {
 **Document Version:** 1.0  
 **Last Updated:** October 14, 2025  
 **Maintainer:** Development Team
-

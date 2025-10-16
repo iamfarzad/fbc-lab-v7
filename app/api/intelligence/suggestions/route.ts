@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
-import type { ToolRunResult, ContextSnapshot, IntentResult } from '@/src/core/types/intelligence'
+import { respond } from '@/lib/api/response'
+import type { ContextSnapshot, IntentResult } from '@/src/core/types/intelligence'
 import { z } from 'zod'
 import { ContextStorage } from '@/src/core/context/context-storage'
 import { suggestTools } from '@/src/core/intelligence/tool-suggestion-engine'
@@ -14,10 +14,7 @@ export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimi
     const raw = await contextStorage.get(body.sessionId)
     if (!raw) {
       console.warn(`Suggestions API: Context not found for sessionId: ${body.sessionId}`)
-      return NextResponse.json({
-        ok: false,
-        error: `Session context not found for sessionId: ${body.sessionId}. Please ensure you've initialized the session first. Try refreshing the page or reinitializing the chat session.`
-      } satisfies ToolRunResult, { status: 404 })
+      return respond.notFound(`Session context not found for sessionId: ${body.sessionId}. Please ensure you've initialized the session first. Try refreshing the page or reinitializing the chat session.`)
     }
   const snapshot: ContextSnapshot = {
     lead: { email: (raw.email ?? '').toString(), name: (raw.name ?? '').toString() },
@@ -41,19 +38,16 @@ export const POST = withApiGuard({ schema: Body, requireSession: false, rateLimi
     // Ignore heuristic enrichment failures; base suggestions already computed
   }
     // Back-compat: keep top-level suggestions array
-    return NextResponse.json({ ok: true, output: { suggestions }, suggestions } as any)
+    return respond.ok({ ok: true, output: { suggestions }, suggestions } as any)
   } catch (error) {
     console.error('❌ Suggestions API error:', error)
-    return NextResponse.json({
-      ok: false,
-      error: `Internal server error while generating suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`
-    } satisfies ToolRunResult, { status: 500 })
+    return respond.serverError(`Internal server error while generating suggestions: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }})
 
 // Add GET handler for compatibility
 export async function GET() {
-  return NextResponse.json({
+  return respond.ok({
     message: 'Suggestions API - Use POST method',
     methods: ['POST'],
     required: ['sessionId'],

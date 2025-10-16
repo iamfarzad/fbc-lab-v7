@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AudioStreamingQueue } from '@/lib/audio-streaming-queue';
-import { useMediaRecorderVoice, type MediaRecorderVoiceResult } from '@/hooks/useMediaRecorderVoice';
+import { AudioRecorder, AudioPlayer } from '@/lib/audio';
 import { WEBSOCKET_CONFIG } from '@/config/constants';
 
 export type VoiceSession = {
@@ -9,6 +8,140 @@ export type VoiceSession = {
   voiceName?: string;
   mock?: boolean;
 };
+
+// Local recorder result type (inlined to remove dependency on separate hook)
+type MediaRecorderVoiceResult = {
+  base64: string;
+  mimeType: string;
+  durationMs: number;
+};
+
+// Inlined minimal recorder hook using AudioWorklet via AudioRecorder
+function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
+  const targetSampleRate = options.targetSampleRate ?? 16000;
+
+  const [isSupported, setIsSupported] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
+
+  const audioWorkletRecorderRef = useRef<AudioRecorder | null>(null);
+  const usingAudioWorkletRef = useRef(false);
+  const chunkHandlerRef = useRef<((chunk: MediaRecorderVoiceResult) => void) | null>(null);
+
+  const hasAudioWorkletSupport = useCallback(() => {
+    if (typeof window === 'undefined') return false;
+    return typeof (window as any).AudioWorkletNode !== 'undefined';
+  }, []);
+
+  const estimateDurationMs = useCallback((base64: string): number => {
+    const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
+    const bytes = (base64.length * 3) / 4 - padding;
+    const samples = bytes / 2; // 16-bit PCM
+    return samples > 0 ? (samples / targetSampleRate) * 1000 : 0;
+  }, [targetSampleRate]);
+
+  const handleWorkletData = useCallback((base64: string) => {
+    const handler = chunkHandlerRef.current;
+    if (!handler || !base64) return;
+    handler({ base64, mimeType: `audio/pcm;rate=${targetSampleRate}`, durationMs: estimateDurationMs(base64) });
+  }, [estimateDurationMs, targetSampleRate]);
+
+  const handleWorkletError = useCallback((err: Error) => {
+    console.error('🎤 [InlineRecorder] AudioWorklet error:', err);
+    setError(err.message);
+  }, []);
+
+  const startRecording = useCallback(async (opts?: { onChunk?: (chunk: MediaRecorderVoiceResult) => void }) => {
+    if (!isSupported) {
+      const msg = 'Media capture not supported in this browser';
+      console.error('🎤 [InlineRecorder]', msg);
+      throw new Error(msg);
+    }
+    if (!hasAudioWorkletSupport()) {
+      const msg = 'AudioWorklet required but not supported in this browser';
+      console.error('🎤 [InlineRecorder]', msg);
+      setError(msg);
+      throw new Error(msg);
+    }
+    setError(null);
+    chunkHandlerRef.current = opts?.onChunk ?? null;
+
+    if (!audioWorkletRecorderRef.current) {
+      const recorder = new AudioRecorder();
+      recorder.on('data', handleWorkletData);
+      recorder.on('error', handleWorkletError);
+      recorder.on('stop', () => setIsRecording(false));
+      audioWorkletRecorderRef.current = recorder;
+    }
+
+    await audioWorkletRecorderRef.current.start();
+    usingAudioWorkletRef.current = true;
+    setIsRecording(true);
+    try {
+      const stream = (audioWorkletRecorderRef.current as any)?.getStream?.() ?? null;
+      if (stream) setMicStream(stream);
+    } catch {}
+  }, [handleWorkletData, handleWorkletError, hasAudioWorkletSupport, isSupported]);
+
+  const stopRecording = useCallback(async () => {
+    try {
+      setIsProcessing(true);
+      if (usingAudioWorkletRef.current && audioWorkletRecorderRef.current) {
+        await audioWorkletRecorderRef.current.stop();
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to stop recording';
+      setError(msg);
+    } finally {
+      chunkHandlerRef.current = null;
+      usingAudioWorkletRef.current = false;
+      setIsRecording(false);
+      setMicStream(null);
+      setIsProcessing(false);
+    }
+  }, []);
+
+  const resetRecording = useCallback(async () => {
+    try {
+      if (audioWorkletRecorderRef.current) {
+        audioWorkletRecorderRef.current.off('data', handleWorkletData);
+        audioWorkletRecorderRef.current.off('error', handleWorkletError);
+        try { await audioWorkletRecorderRef.current.stop(); } catch {}
+        audioWorkletRecorderRef.current = null;
+      }
+    } finally {
+      chunkHandlerRef.current = null;
+      usingAudioWorkletRef.current = false;
+      setIsRecording(false);
+      setIsProcessing(false);
+      setMicStream(null);
+    }
+  }, [handleWorkletData, handleWorkletError]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const supported = typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
+    setIsSupported(supported);
+    if (!supported) setError('Voice capture is not supported in this browser.');
+  }, []);
+
+  useEffect(() => {
+    return () => { void resetRecording(); };
+  }, [resetRecording]);
+
+  return {
+    startRecording,
+    stopRecording,
+    resetRecording,
+    isSupported,
+    isRecording,
+    isProcessing,
+    error,
+    micStream,
+  } as const;
+}
 
 export type VoiceContextUpdate = {
   sessionId?: string | null;
@@ -77,10 +210,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     isProcessing: recorderProcessing,
     error: recorderError,
     micStream,
-  } = useMediaRecorderVoice({ targetSampleRate: 16000 });
+  } = useInlineRecorder({ targetSampleRate: 16000 });
 
   const wsRef = useRef<WebSocket | null>(null);
-  const audioQueueRef = useRef<AudioStreamingQueue | null>(null);
+  const audioPlayerRef = useRef<AudioPlayer | null>(null);
   const connectionIdRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -95,10 +228,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, [options]);
 
   useEffect(() => {
-    audioQueueRef.current = new AudioStreamingQueue(24000); // 24kHz for Gemini output
+    audioPlayerRef.current = new AudioPlayer(24000); // 24kHz for Gemini output
     return () => {
-      audioQueueRef.current?.destroy();
-      audioQueueRef.current = null;
+      audioPlayerRef.current?.destroy();
+      audioPlayerRef.current = null;
     };
   }, []);
 
@@ -250,6 +383,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isSessionActiveRef.current = true;
         setIsProcessing(false);
         setError(null);
+        // Clear previous transcripts when starting new session
+        setTranscript('');
+        setPartialTranscript('');
 
         callbacks?.onSessionStateChange?.({
           active: true,
@@ -283,7 +419,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isSessionActiveRef.current = false;
         setIsProcessing(false);
         // Clear audio queue on session close
-        audioQueueRef.current?.clear();
+        audioPlayerRef.current?.clear();
         void resetRecording();
         callbacks?.onSessionStateChange?.({
           active: false,
@@ -322,9 +458,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
       case 'audio': {
-        // Use new audio queue for smooth playback
+        // Use unified audio player for smooth playback
         const audioData = event.payload.audioData;
-        audioQueueRef.current?.addChunk(audioData);
+        audioPlayerRef.current?.addBase64PCM16(audioData);
         break;
       }
       case 'heartbeat': {
@@ -334,7 +470,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       case 'interrupted': {
         // User interrupted AI - clear audio queue immediately
         console.log('🔇 User interrupted AI - clearing audio queue')
-        audioQueueRef.current?.clear();
+        audioPlayerRef.current?.clear();
         callbacks?.onInterrupted?.();
         break;
       }
@@ -359,6 +495,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       }
       case 'turn_complete': {
         setIsProcessing(false);
+        // Clear transcripts when turn completes
+        setTranscript('');
+        setPartialTranscript('');
         callbacks?.onSessionStateChange?.({
           active: true,
           connectionId: connectionIdRef.current,
@@ -372,7 +511,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         const message = event.payload?.message ?? 'Voice session error';
         setError(message);
         // Clear audio queue on errors
-        audioQueueRef.current?.clear();
+        audioPlayerRef.current?.clear();
         callbacks?.onError?.(message);
         break;
       }
@@ -421,7 +560,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       };
 
       socket.onerror = (err) => {
-        console.error('🎤 [RealtimeVoice] WebSocket error:', err);
+        console.error('🎤 [RealtimeVoice] WebSocket error:', err?.type || 'Unknown error', err);
         setError('WebSocket connection error');
       };
 
@@ -488,12 +627,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isProcessing: true,
       });
 
-      console.log('🎤 [RealtimeVoice] Starting audio recording');
-      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
-      await startRecording({ onChunk: handleRecorderChunk });
-      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
-      
-      console.log('🎤 [RealtimeVoice] Audio recording started, sending start message');
+      console.log('🎤 [RealtimeVoice] Sending start message');
       sendMessage({
         type: 'start',
         payload: {
@@ -502,8 +636,21 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           sessionId: opts?.sessionId,
         },
       });
-      
-      console.log('🎤 [RealtimeVoice] Start message sent successfully');
+      console.log('🎤 [RealtimeVoice] Start message sent successfully; waiting for session_started');
+
+      // Wait up to 5s for session to become active before starting recorder
+      const deadline = Date.now() + 5000;
+      while (!isSessionActiveRef.current && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+
+      if (!isSessionActiveRef.current) {
+        console.warn('🎤 [RealtimeVoice] Session did not start within 5s; proceeding to start recording but deferring send until active');
+      }
+
+      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
+      await startRecording({ onChunk: handleRecorderChunk });
+      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
       
       // Set timeout to handle case where server never responds
       sessionTimeoutRef.current = setTimeout(() => {
@@ -599,9 +746,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   useEffect(() => {
     return () => {
       void resetRecording();
-      if (audioQueueRef.current) {
-        audioQueueRef.current.destroy();
-        audioQueueRef.current = null;
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.destroy();
+        audioPlayerRef.current = null;
       }
     };
   }, [resetRecording]);

@@ -3,7 +3,8 @@
  * Connects your existing pipeline to AI SDK Tools
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
@@ -113,9 +114,7 @@ const getModel = () => {
   })
 
   if (!resolvedApiKey) {
-    throw new Error(
-      'Missing Google Generative AI API key. Set GEMINI_API_KEY (preferred) or GOOGLE_GEMINI_API_KEY in your environment and restart the dev server.'
-    )
+    throw new Error('Missing Google Generative AI API key.')
   }
 
   if (!process.env.GEMINI_API_KEY) {
@@ -428,7 +427,9 @@ Here is your mock response with enriched metadata.
       'X-Enhanced-Research': researchMetadata ? 'true' : 'false',
       'x-mock-system-prompt': (() => {
         const sanitized = systemPrompt.replace(/[\r\n]+/g, ' ')
-        return sanitized.slice(Math.max(0, sanitized.length - 1024))
+        const asciiSafe = sanitized.replace(/[^\x20-\x7E]/g, '')
+        const trimmed = asciiSafe.slice(Math.max(0, asciiSafe.length - 1024))
+        return trimmed || 'mock-system-prompt-omitted'
       })()
     }
   })
@@ -505,22 +506,19 @@ export async function POST(req: NextRequest) {
     const { messages: rawMessages, context, stream = true } = body
 
     if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
-      return NextResponse.json({ ok: false, error: 'At least one message is required.' }, { status: 400 })
+      return respond.badRequest('At least one message is required.')
     }
 
     const hasEmptyContent = rawMessages.some((msg) => typeof msg?.content !== 'string' || msg.content.trim().length === 0)
     if (hasEmptyContent) {
-      return NextResponse.json({ ok: false, error: 'Messages must include non-empty content.' }, { status: 400 })
+      return respond.badRequest('Messages must include non-empty content.')
     }
 
     // CHECK: Message limit (cost protection)
     const { usageLimiter } = await import('@/src/lib/usage-limits')
     const limitCheck = await usageLimiter.checkLimit(context?.sessionId || '', 'message')
     if (!limitCheck.allowed) {
-      return NextResponse.json({ 
-        error: limitCheck.reason,
-        limit_reached: true 
-      }, { status: 429 })
+      return respond.error(limitCheck.reason || 'Rate limit reached', 429, 'RATE_LIMITED', { limit_reached: true })
     }
     
     // Track message usage
@@ -809,9 +807,7 @@ Citations: ${researchResult.allCitations.length} sources processed
 
     // Ensure we have at least one message
     if (aiMessages.length === 0) {
-      return NextResponse.json({ 
-        error: 'No valid messages provided. Please ensure messages have content.' 
-      }, { status: 400 })
+      return respond.badRequest('No valid messages provided. Please ensure messages have content.')
     }
 
     // ⭐ MULTI-AGENT SYSTEM (if enabled)
@@ -1176,7 +1172,7 @@ Citations: ${researchResult.allCitations.length} sources processed
       // Non-streaming response
       if (isMockUnifiedChat) {
         const mockContent = 'Mock response generated in non-streaming mode.'
-        return NextResponse.json({
+        return respond.ok({
           id: crypto.randomUUID(),
           role: 'assistant',
           content: mockContent,
@@ -1186,13 +1182,6 @@ Citations: ${researchResult.allCitations.length} sources processed
             tokensUsed: 0,
             reqId,
             research: researchMetadata
-          }
-        }, {
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-            'x-fbc-endpoint': 'unified-ai-sdk',
-            'x-request-id': reqId,
-            'X-Enhanced-Research': researchMetadata ? 'true' : 'false'
           }
         })
       }
@@ -1254,7 +1243,7 @@ Citations: ${researchResult.allCitations.length} sources processed
 
       // const followUp = getFollowUp(conversationFlow) // DISABLED
 
-      return NextResponse.json({
+      return respond.ok({
         id: crypto.randomUUID(),
         role: 'assistant',
         content: result.text,
@@ -1266,13 +1255,6 @@ Citations: ${researchResult.allCitations.length} sources processed
           ...mergedMetadata,
           // followUp, // DISABLED
         }
-      }, {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-          'x-fbc-endpoint': 'unified-ai-sdk',
-          'x-request-id': reqId,
-          'X-Enhanced-Research': researchMetadata && !researchHasError ? 'true' : 'false'
-        }
       })
     }
 
@@ -1283,17 +1265,13 @@ Citations: ${researchResult.allCitations.length} sources processed
     const message = isMockUnifiedChat ? rawMessage : (error instanceof Error ? rawMessage : 'Internal server error')
     const status = message.includes('GEMINI_API_KEY') ? 503 : 500
 
-    return NextResponse.json(
-      {
-        error: message,
-        resolution:
-          message.includes('GEMINI_API_KEY')
-            ? 'Create a .env.local file at the project root and set GEMINI_API_KEY before retrying.'
-            : undefined,
-        timestamp: new Date().toISOString()
-      },
-      { status }
-    )
+    return respond.error(message, status, message.includes('GEMINI_API_KEY') ? 'SERVER_CONFIG' : 'SERVER_ERROR', {
+      resolution:
+        message.includes('GEMINI_API_KEY')
+          ? 'Create a .env.local file at the project root and set GEMINI_API_KEY before retrying.'
+          : undefined,
+      timestamp: new Date().toISOString()
+    })
   }
 }
 
@@ -1307,7 +1285,7 @@ export function GET(req: NextRequest) {
 
     switch (action) {
       case 'capabilities':
-        return NextResponse.json({
+        return respond.ok({
           capabilities: {
             supportsStreaming: true,
             supportsMultimodal: true,
@@ -1321,7 +1299,7 @@ export function GET(req: NextRequest) {
         })
 
       case 'status':
-        return NextResponse.json({
+        return respond.ok({
           status: 'operational',
           provider: 'unified-ai-sdk',
           version: '2.0.1',
@@ -1330,7 +1308,7 @@ export function GET(req: NextRequest) {
         })
 
       default:
-        return NextResponse.json({
+        return respond.ok({
           message: 'Unified Chat API - AI SDK Backend',
           endpoints: {
             POST: '/api/chat/unified - Send chat messages (AI SDK)',
@@ -1345,13 +1323,7 @@ export function GET(req: NextRequest) {
 
   } catch (error) {
     console.error('[UNIFIED_AI_SDK] GET error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to process request',
-        timestamp: new Date().toISOString()
-      },
-      { status: 500 }
-    )
+    return respond.serverError('Failed to process request')
   }
 }
 

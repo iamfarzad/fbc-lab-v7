@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { respond } from '@/lib/api/response'
 
 export async function POST(request: Request) {
   // TODO: Add proper authentication when Clerk is configured
@@ -16,16 +16,15 @@ export async function POST(request: Request) {
     // In production, you would save this to a database
     // For now, we'll just validate the input and return success
     if (typeof monthlyBudget !== 'number' || monthlyBudget < 0) {
-      return new NextResponse('Invalid budget amount', { status: 400 })
+      return respond.badRequest('Invalid budget amount')
     }
 
     // Here you would typically save to a database
     // await saveSettings({ monthlyBudget, userId })
 
-    return NextResponse.json({ success: true })
+    return respond.ok({ success: true })
   } catch (error) {
     console.error('Error saving Fly.io settings:', error)
-    return new NextResponse('Internal Error', { status: 500 })
+    return respond.serverError('Internal Error')
   }
 }
-

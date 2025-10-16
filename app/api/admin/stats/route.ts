@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { adminAuthMiddleware } from '@/app/api-utils/auth'
 import { adminRateLimit } from '@/app/api-utils/rate-limiting'
 import { supabaseService } from '@/src/core/supabase/client'
@@ -6,7 +7,7 @@ import { supabaseService } from '@/src/core/supabase/client'
 export async function GET(request: NextRequest) {
   const hasSupabaseEnv = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   if (!hasSupabaseEnv) {
-    return NextResponse.json({ disabled: true, message: 'Admin features require Supabase configuration' })
+    return respond.ok({ disabled: true, message: 'Admin features require Supabase configuration' })
   }
 
   const rateLimitResult = adminRateLimit(request)
@@ -21,19 +22,11 @@ export async function GET(request: NextRequest) {
 
   const supabase = supabaseService
   if (!supabase || typeof (supabase as any)?.from !== 'function') {
-    return NextResponse.json(
-      {
-        disabled: true,
-        message: 'Supabase service client unavailable',
-        totals: {
-          totalLeads: 0,
-          conversionRate: 0,
-          engagementRate: 0,
-          avgLeadScore: 0
-        }
-      },
-      { status: 503 }
-    )
+    return respond.ok({
+      disabled: true,
+      message: 'Supabase service client unavailable',
+      totals: { totalLeads: 0, conversionRate: 0, engagementRate: 0, avgLeadScore: 0 }
+    }, { status: 503 })
   }
 
   try {
@@ -51,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Admin stats Supabase error:', error)
-      return NextResponse.json({ error: 'Failed to retrieve admin statistics' }, { status: 500 })
+      return respond.serverError('Failed to retrieve admin statistics')
     }
 
     type LeadRecord = {
@@ -86,7 +79,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 5)
       .map(([capability]) => capability)
 
-    return NextResponse.json({
+    return respond.ok({
       totalLeads,
       activeConversations: 0,
       conversionRate,
@@ -100,6 +93,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Admin stats handler error:', error)
-    return NextResponse.json({ error: 'Failed to retrieve admin statistics' }, { status: 500 })
+    return respond.serverError('Failed to retrieve admin statistics')
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { getSupabase } from '@/core/supabase/server';
 import { generatePdfWithPuppeteer } from '@/core/pdf-generator-puppeteer';
 import { logger } from '@/lib/logger';
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
   try {
     const { sessionId, toEmail, leadName } = await request.json();
     if (!sessionId || !toEmail) {
-      return NextResponse.json({ error: 'Missing sessionId or toEmail' }, { status: 400 });
+      return respond.badRequest('Missing sessionId or toEmail');
     }
 
     const supabase = getSupabase();
@@ -76,9 +77,9 @@ export async function POST(request: Request) {
       throw new Error(emailError.message || 'Failed to send email');
     }
 
-    return NextResponse.json({ success: true, messageId: data?.id });
+    return respond.ok({ success: true, messageId: data?.id });
   } catch (error) {
     logger.error('Send PDF summary failed', error instanceof Error ? error : undefined);
-    return NextResponse.json({ error: 'Failed to send summary' }, { status: 500 });
+    return respond.serverError('Failed to send summary');
   }
 }

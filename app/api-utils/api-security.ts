@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ALLOWED_ORIGINS } from '@/config/constants'
 import crypto from 'crypto'
 
-const ALLOWED_ORIGINS = [
-  'https://fbcai.com', 
-  'https://farzadbayat.com', 
-  'https://www.farzadbayat.com',
-  'https://fb-c-lab-v2.vercel.app',
-  'http://localhost:3000', 
-  'http://localhost:3001'
-] // Development and production origins
+// Centralized in config/constants.ts via ALLOWED_ORIGINS
 
 export function withAPISecurity(handler: (req: NextRequest) => Promise<Response | NextResponse>) {
   return async (req: NextRequest) => {

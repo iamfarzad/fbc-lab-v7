@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server'
+import { respond } from '@/lib/api/response'
 
 export function POST() {
   try {
-    const response = NextResponse.json({ success: true, message: 'Logged out successfully' })
+    const response = respond.ok({ success: true, message: 'Logged out successfully' })
 
     response.cookies.set('adminToken', '', {
       httpOnly: true,
@@ -15,6 +15,6 @@ export function POST() {
     return response
   } catch (error) {
     console.error('Admin logout error:', error)
-    return NextResponse.json({ error: 'Logout failed' }, { status: 500 })
+    return respond.serverError('Logout failed')
   }
 }

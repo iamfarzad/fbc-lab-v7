@@ -18,7 +18,7 @@ import { SessionLimitWarning } from "./SessionLimitWarning";
 // Hooks - extracted logic
 import { useChatState } from "./hooks/useChatState";
 import { useChatMessages } from "./hooks/useChatMessages";
-import { useRealtimeVoice } from "@/hooks/useRealtimeVoice";
+import { useLiveApi } from "@/hooks/useLiveApi";
 import { useChatIntelligence } from "./hooks/useChatIntelligence";
 import { useCamera } from "@/hooks/useCamera";
 
@@ -81,8 +81,10 @@ export function ChatInterface({ id }: { id?: string | null }) {
     
     return () => clearInterval(interval);
   }, [sessionId]);
-  const audioHookRef = useRef<ReturnType<typeof useRealtimeVoice> | null>(null);
+  const audioHookRef = useRef<ReturnType<typeof useLiveApi> | null>(null);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
+  const [aiSpeechTranscript, setAiSpeechTranscript] = useState('');
+  const analyzeScreenRef = useRef<((prompt: string) => void | Promise<void>) | null>(null);
   const {
     appendVoiceUserMessage,
     updatePartialUserTranscript,
@@ -114,6 +116,15 @@ export function ChatInterface({ id }: { id?: string | null }) {
         .then(() => console.log('✅ Voice transcript stored in context'))
         .catch(err => console.error('❌ Failed to store voice context:', err))
     })
+
+    // Lightweight voice trigger for explicit screen analysis
+    try {
+      const lower = text.toLowerCase();
+      const wantsScreenAnalyze = /(analy[sz]e|look|describe|what\s*(?:'s| is)\s*on).*\b(screen|this|it)\b/.test(lower);
+      if (wantsScreenAnalyze && analyzeScreenRef.current) {
+        analyzeScreenRef.current(text);
+      }
+    } catch {}
   }, [appendVoiceUserMessage, sessionId]);
 
   const handleVoiceAssistantText = useCallback((text: string) => {
@@ -124,15 +135,21 @@ export function ChatInterface({ id }: { id?: string | null }) {
     import('@/core/context/multimodal-context').then(({ multimodalContextManager }) => {
       multimodalContextManager.addVoiceTranscript(sessionId, text, 'assistant', true)
         .then(() => console.log('✅ Assistant voice stored in context'))
-        .catch(err => console.error('❌ Failed to store assistant voice:', err))
-    })
+        .catch((err: unknown) => console.error('❌ Failed to store assistant voice:', err));
+    }).catch((err) => {
+      console.warn('⚠️ Multimodal context not available:', err);
+    });
   }, [appendVoiceAssistantChunk, sessionId]);
 
   const handleVoiceOutputTranscript = useCallback((text: string, isFinal: boolean) => {
     // Closed captions for AI speech
     if (isFinal) {
-      console.log('🔊 AI said (transcript):', text)
-      // Could display as closed captions in UI
+      console.log('🔊 AI said (transcript):', text);
+      setAiSpeechTranscript(text);
+      // Clear after 3 seconds
+      setTimeout(() => setAiSpeechTranscript(''), 3000);
+    } else {
+      setAiSpeechTranscript(text); // Show partial
     }
   }, []);
 
@@ -283,7 +300,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     finalizeVoiceAssistantMessage({ error: message });
   }, [finalizeVoiceAssistantMessage]);
 
-  const audioHook = useRealtimeVoice({
+  const audioHook = useLiveApi({
     onSessionStateChange: handleVoiceSessionState,
     onPartialTranscript: handleVoicePartialTranscript,
     onFinalTranscript: handleVoiceFinalTranscript,
@@ -379,6 +396,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
   }, [camera]);
 
   
+
+  
   const intelligenceHook = useChatIntelligence(sessionId);
   const artifactsState = useArtifacts();
 
@@ -416,7 +435,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   // Enhanced AI elements for advanced features
   const aiConfig = {
-    showReasoning: true,
+    showReasoning: false,
     showSources: true,
     showActions: true,
     showCodeBlocks: true,
@@ -480,6 +499,58 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const handleDeclineTool = useCallback((tool: string) => {
     console.info('Tool declined:', tool);
   }, []);
+
+  // Explicit screen analysis handler (HTTP one-shot)
+  const handleAnalyzeScreen = useCallback(async (prompt: string) => {
+    if (!chatState.isScreenSharing || !chatState.screenShareStream) {
+      toast.error('No screen share active');
+      return;
+    }
+    try {
+      // Capture current frame into canvas
+      const stream = chatState.screenShareStream as MediaStream;
+      const video = document.createElement('video');
+      video.srcObject = stream as any;
+      await video.play();
+      const width = video.videoWidth || 1280;
+      const height = video.videoHeight || 720;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to get 2D context');
+      ctx.drawImage(video, 0, 0, width, height);
+      const blob: Blob = await new Promise((resolve) => canvas.toBlob(b => resolve(b as Blob), 'image/jpeg', 0.85));
+      const base64 = await blobToBase64(blob);
+
+      const { ok, analysis } = await audioHook.sendScreenShareMessage(base64, prompt || 'Analyze current screen', {
+        sessionId,
+        voiceConnectionId,
+        type: 'screen',
+      });
+
+      if (!ok) {
+        toast.error('Screen analysis failed');
+        return;
+      }
+      if (analysis && analysis.trim().length > 0) {
+        messagesHook.appendAssistantMessage(analysis, { source: 'screen', modality: 'image', tool: 'screen_analyze' });
+        setLastScreenSnapshot({ analysis, imageData: canvas.toDataURL('image/jpeg', 0.7), capturedAt: Date.now() });
+        toast.success('Screen analyzed');
+      } else {
+        toast.info('No analysis returned');
+      }
+    } catch (err) {
+      console.error('Analyze screen error:', err);
+      toast.error('Analyze screen error');
+    }
+  }, [audioHook, chatState.isScreenSharing, chatState.screenShareStream, messagesHook.appendAssistantMessage, sessionId, voiceConnectionId]);
+
+  // Expose for voice-triggered analyze
+  useEffect(() => {
+    analyzeScreenRef.current = handleAnalyzeScreen;
+    return () => { analyzeScreenRef.current = null; }
+  }, [handleAnalyzeScreen]);
 
   // Capture screen share frames and send to Gemini for analysis
   useEffect(() => {
@@ -837,7 +908,6 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
             <ChatMessages
               messages={messagesHook.messages}
-              enhancedMessages={messagesHook.enhancedMessages}
               researchSummaries={messagesHook.researchSummaries}
               isLoading={messagesHook.isLoading}
               contextReady={intelligenceHook.contextReady}
@@ -868,6 +938,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
                   isListening={chatState.isListening}
                   voiceTranscript={audioHook.transcript}
                   voicePartialTranscript={audioHook.partialTranscript}
+                  aiSpeechTranscript={aiSpeechTranscript}
                   isMinimized={chatState.isMinimized}
                   voiceError={audioHook.error}
                   isVoiceActive={audioHook.isRecording}
@@ -892,6 +963,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
                   onSwitchCamera={handleSwitchCamera}
                   onToggleScreenShare={chatStateHook.toggleScreenShare}
                   onToggleSettings={chatStateHook.toggleSettings}
+                  onAnalyzeScreen={handleAnalyzeScreen}
                   isExpanded={isExpanded}
                   onOpenMeeting={openMeeting}
                   onExportSummary={handleExportSummary}

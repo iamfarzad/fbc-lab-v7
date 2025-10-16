@@ -413,7 +413,7 @@ function analyzeResearchNeed(content: string, context?: ChatContext) {
 3. Server connects to Gemini Live API
 4. Client starts mic recording → chunks sent via `{ type: 'user_audio' }`
 5. Live API processes + responds with audio + transcript
-6. Client plays audio via `AudioStreamingQueue`
+6. Client plays audio via `AudioPlayer`
 7. Transcript displayed in UI
 
 **Features:**
@@ -599,7 +599,7 @@ LIVE_SERVER_CONTEXT_INJECT_DEBOUNCE_MS=600
 
 ### **Optimization Techniques**
 1. **Connection pooling:** Reuse WebSocket connections
-2. **Audio queue:** Smooth playback via `AudioStreamingQueue`
+2. **Audio playback:** Smooth sequential playback via `AudioPlayer`
 3. **Debouncing:** Context injection throttled (600ms + 8s cooldown)
 4. **Smart research:** Only trigger when needed
 5. **Cost limits:** Per-session throttling
@@ -703,5 +703,4 @@ LIVE_SERVER_CONTEXT_INJECT_DEBOUNCE_MS=600
 
 **Last Updated:** October 15, 2025  
 **Maintained By:** F.B/c AI Development Team
-
 

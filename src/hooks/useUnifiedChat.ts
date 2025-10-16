@@ -376,11 +376,11 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       if (message.role !== 'assistant') return message
 
       const existingInvocations = Array.isArray(message.metadata?.toolInvocations)
-        ? [...(message.metadata!.toolInvocations as unknown[])]
+        ? [...message.metadata.toolInvocations]
         : []
 
       const index = existingInvocations.findIndex((invocation: any) => invocation?.toolCallId === toolCallId)
-      const payload = {
+      const payload: any = {
         toolCallId,
         result,
         state: 'output-available',

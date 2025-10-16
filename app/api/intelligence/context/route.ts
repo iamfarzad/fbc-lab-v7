@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { respond } from '@/lib/api/response'
 import type { ToolRunResult } from '@/src/core/types/intelligence'
 import { ContextStorage } from '@/src/core/context/context-storage'
 import crypto from 'crypto'
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const sessionId = searchParams.get('sessionId') || req.headers.get('x-intelligence-session-id')
 
-    if (!sessionId) return NextResponse.json({ ok: false, error: 'Missing sessionId parameter' } satisfies ToolRunResult, { status: 400 })
+    if (!sessionId) return respond.badRequest('Missing sessionId parameter')
 
     // Rate limiting check
     if (!checkRateLimit(sessionId)) {
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
 
     // Guard against null contextData
     if (!contextData) {
-      return NextResponse.json({ ok: false, error: 'No context' }, { status: 404 });
+      return respond.notFound('No context');
     }
 
     // Return merged context snapshot
@@ -130,7 +131,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Back-compat: include snapshot fields at top-level
-    const response = NextResponse.json({ ok: true, output: snapshot, ...snapshot } as any)
+    const response = respond.ok({ ok: true, output: snapshot, ...snapshot } as any)
     const state200 = getRateState(sessionId)
     response.headers.set('ETag', etag)
     response.headers.set('Cache-Control', 'no-store')
@@ -142,6 +143,6 @@ export async function GET(req: NextRequest) {
 
   } catch (error) {
     console.error('Context GET error:', error)
-    return NextResponse.json({ ok: false, error: 'Internal server error' } satisfies ToolRunResult, { status: 500 })
+    return respond.serverError('Internal server error')
   }
 }

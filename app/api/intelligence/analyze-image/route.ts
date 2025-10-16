@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { respond } from '@/lib/api/response'
 import { contextStorage } from '@/src/core/context/context-storage'
 import { DatabaseConversationContext } from '@/src/core/context/context-types'
 
@@ -36,17 +37,11 @@ export async function POST(request: NextRequest) {
     const sessionId = request.headers.get('x-intelligence-session-id')
 
     if (!imageData) {
-      return NextResponse.json(
-        { ok: false, error: 'Image data missing' },
-        { status: 400 }
-      )
+      return respond.badRequest('Image data missing')
     }
 
     if (!sessionId) {
-      return NextResponse.json(
-        { ok: false, error: 'Session ID required' },
-        { status: 400 }
-      )
+      return respond.badRequest('Session ID required')
     }
 
     // Get current context for personalization
@@ -95,13 +90,10 @@ export async function POST(request: NextRequest) {
       message: 'Image analyzed successfully with AI context awareness'
     }
 
-    return NextResponse.json(response)
+    return respond.ok(response)
 
   } catch (error) {
     console.error('Image analysis error:', error)
-    return NextResponse.json(
-      { ok: false, error: 'Failed to analyze image' },
-      { status: 500 }
-    )
+    return respond.serverError('Failed to analyze image')
   }
 }

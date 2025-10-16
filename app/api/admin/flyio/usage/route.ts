@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { respond } from '@/lib/api/response'
 
 export function GET() {
   // TODO: Add proper authentication when Clerk is configured
@@ -12,7 +12,7 @@ export function GET() {
   try {
     // In production, you would fetch real data from Fly.io API
     // For now, we'll return mock data
-    return NextResponse.json({
+    return respond.ok({
       currentMonthCost: 12.45,
       forecastedMonthCost: 38.20,
       monthlyBudget: 50,
@@ -22,7 +22,6 @@ export function GET() {
     })
   } catch (error) {
     console.error('Error fetching Fly.io usage:', error)
-    return new NextResponse('Internal Error', { status: 500 })
+    return respond.serverError('Internal Error')
   }
 }
-

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { respond } from '@/lib/api/response'
 import { GoogleGroundingProvider } from '@/src/core/intelligence/providers/search/google-grounding';
 
 const groundingProvider = new GoogleGroundingProvider();
@@ -11,10 +12,7 @@ export async function POST(req: NextRequest) {
 
     const query = typeof queryRaw === 'string' ? queryRaw.trim() : '';
     if (!query) {
-      return NextResponse.json(
-        { success: false, error: 'Missing query for web search.' },
-        { status: 400 },
-      );
+      return respond.badRequest('Missing query for web search.')
     }
 
     const urls =
@@ -26,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     const result = await groundingProvider.groundedAnswer(query, urls);
 
-    return NextResponse.json({
+    return respond.ok({
       success: true,
       result: {
         summary: result.text,
@@ -36,12 +34,9 @@ export async function POST(req: NextRequest) {
             .map((citation) => citation.uri)
             .filter((uri): uri is string => Boolean(uri)) ?? [],
       },
-    });
+    })
   } catch (error) {
     console.error('[tools/search] Web search failed:', error);
-    return NextResponse.json(
-      { success: false, error: 'Web search failed. Please try again.' },
-      { status: 500 },
-    );
+    return respond.serverError('Web search failed. Please try again.')
   }
 }

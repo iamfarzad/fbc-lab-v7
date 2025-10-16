@@ -1,4 +1,5 @@
 import * as React from "react"
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from "@/lib/utils"
 
 interface PopoverContextValue {
@@ -79,6 +80,8 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
     const contentRef = React.useRef<HTMLDivElement | null>(null)
     const [position, setPosition] = React.useState({ top: 0, left: 0 })
 
+    const isMobile = useIsMobile(640)
+
     React.useEffect(() => {
       if (!isOpen || !contentRef.current) return
 
@@ -143,7 +146,7 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
         }
 
         // Keep within viewport bounds with responsive margins
-        const margin = window.innerWidth < 640 ? 16 : 8 // More margin on mobile
+        const margin = isMobile ? 16 : 8 // More margin on mobile
         
         if (left < margin) {
           left = margin
@@ -180,7 +183,7 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
         window.removeEventListener('scroll', debouncedUpdate, true)
         window.removeEventListener('orientationchange', updatePosition)
       }
-    }, [isOpen, align, side, sideOffset])
+    }, [isOpen, align, side, sideOffset, isMobile])
 
     // Close on escape
     React.useEffect(() => {
