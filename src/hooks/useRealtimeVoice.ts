@@ -259,16 +259,19 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           isProcessing: recorderProcessing,
         });
         // If we requested start, begin recording only after session ack to avoid sending audio early
-        if (startRequestedRef.current && !isRecording) {
-          try {
-            // Delay a tick to ensure ws state propagates
-            setTimeout(() => {
-              void startRecording({ onChunk: handleRecorderChunk });
-            }, 0);
-          } catch (e) {
-            console.error('🎤 [RealtimeVoice] Failed to start recording after session_started:', e);
-            setError(e instanceof Error ? e.message : 'Failed to start mic');
-          }
+        if (startRequestedRef.current) {
+          console.log('🎤 [RealtimeVoice] Session started, now starting mic recording...');
+          setTimeout(async () => {
+            try {
+              await startRecording({ onChunk: handleRecorderChunk });
+              startRequestedRef.current = false;
+              console.log('🎤 [RealtimeVoice] Mic recording started successfully after session_started');
+            } catch (e) {
+              console.error('🎤 [RealtimeVoice] Failed to start recording after session_started:', e);
+              setError(e instanceof Error ? e.message : 'Failed to start mic');
+              startRequestedRef.current = false;
+            }
+          }, 100); // Slight delay for WS state propagation
         }
         // Flush any audio chunks captured before the session opened
         if (pendingChunksRef.current.length > 0) {

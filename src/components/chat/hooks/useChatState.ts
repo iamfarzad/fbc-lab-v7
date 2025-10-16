@@ -56,8 +56,10 @@ export function useChatState() {
   }, []);
 
   const startScreenShare = useCallback(async () => {
+    console.log('🖥️ [useChatState] startScreenShare called');
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getDisplayMedia) {
       const message = "Screen sharing is not supported in this browser.";
+      console.error('🖥️ [useChatState] Screen sharing not supported');
       setChatState(prev => ({ ...prev, screenShareError: message, isScreenShareInitializing: false }));
       toast.error(message);
       throw new Error(message);
@@ -67,10 +69,12 @@ export function useChatState() {
       // Set initializing state before showing screen picker
       setChatState(prev => ({ ...prev, isScreenShareInitializing: true, screenShareError: null }));
       
+      console.log('🖥️ [useChatState] Requesting getDisplayMedia...');
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: false,
       });
+      console.log('🖥️ [useChatState] getDisplayMedia success, stream tracks:', stream.getTracks().length);
 
       stream.getVideoTracks().forEach(track => {
         track.addEventListener("ended", () => {
@@ -86,6 +90,7 @@ export function useChatState() {
         });
       });
 
+      console.log('🖥️ [useChatState] Screen share started successfully');
       setChatState(prev => ({
         ...prev,
         isScreenSharing: true,
@@ -109,15 +114,18 @@ export function useChatState() {
   }, []);
 
   const toggleScreenShare = useCallback(async () => {
+    console.log('🖥️ [useChatState] toggleScreenShare called', { isScreenSharing: chatState.isScreenSharing });
     if (chatState.isScreenSharing) {
+      console.log('🖥️ [useChatState] Screen share is active, stopping...');
       stopScreenShare();
       return;
     }
 
+    console.log('🖥️ [useChatState] Screen share is inactive, starting...');
     try {
       await startScreenShare();
     } catch (error) {
-      console.error("Failed to start screen sharing", error);
+      console.error("🖥️ [useChatState] Failed to start screen sharing", error);
     }
   }, [chatState.isScreenSharing, startScreenShare, stopScreenShare]);
 

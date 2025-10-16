@@ -152,7 +152,9 @@ export function useCamera(options: UseCameraOptions = {}) {
         audio: false,
       };
 
+      console.log('📷 [useCamera] Requesting getUserMedia with constraints:', constraints);
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('📷 [useCamera] getUserMedia success, stream tracks:', mediaStream.getTracks().length);
       
       // Track device ID
       const videoTrack = mediaStream.getVideoTracks()[0];
@@ -169,6 +171,7 @@ export function useCamera(options: UseCameraOptions = {}) {
       setStream(mediaStream);
       setIsActive(true);
       setIsInitializing(false);
+      console.log('📷 [useCamera] Camera started successfully');
 
       // Enumerate devices after getting permission
       await enumerateDevices();
@@ -212,9 +215,12 @@ export function useCamera(options: UseCameraOptions = {}) {
 
   // Toggle camera on/off
   const toggleCamera = useCallback(async () => {
+    console.log('📷 [useCamera] toggleCamera called', { isActive, currentDeviceId });
     if (isActive) {
+      console.log('📷 [useCamera] Camera is active, stopping...');
       stopCamera();
     } else {
+      console.log('📷 [useCamera] Camera is inactive, starting...');
       await startCamera(currentDeviceId);
     }
   }, [isActive, currentDeviceId, startCamera, stopCamera]);
