@@ -291,8 +291,8 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName } }
       },
-      // Enable transcriptions explicitly with language (Live API expects `language` key)
-      inputAudioTranscription: { language: lang },
+      // Enable transcriptions - languageCode removed (API no longer supports it)
+      inputAudioTranscription: {},
       outputAudioTranscription: { enable: true },
     }
 
