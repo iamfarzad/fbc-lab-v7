@@ -182,7 +182,9 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
   }, [processChunk]);
 
   const startRecording = useCallback(async (options?: StartRecordingOptions) => {
+    console.log('🎤 [useMediaRecorderVoice] startRecording called');
     if (!isSupported) {
+      console.error('🎤 [useMediaRecorderVoice] Media capture not supported');
       throw new Error('Media capture not supported in this browser');
     }
 
@@ -190,6 +192,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
     chunkHandlerRef.current = options?.onChunk ?? null;
 
     if (hasAudioWorkletSupport()) {
+      console.log('🎤 [useMediaRecorderVoice] Trying AudioWorklet...');
       try {
         if (!audioWorkletRecorderRef.current) {
           const recorder = new AudioRecorder();
@@ -202,7 +205,9 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
           audioWorkletRecorderRef.current = recorder;
         }
 
+        console.log('🎤 [useMediaRecorderVoice] Starting AudioWorklet recorder...');
         await audioWorkletRecorderRef.current.start();
+        console.log('🎤 [useMediaRecorderVoice] AudioWorklet started successfully');
         usingAudioWorkletRef.current = true;
         setIsRecording(true);
         try {
@@ -211,7 +216,7 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
         } catch {}
         return;
       } catch (err) {
-        console.warn('[useMediaRecorderVoice] AudioWorklet start failed, falling back to MediaRecorder.', err);
+        console.error('🎤 [useMediaRecorderVoice] AudioWorklet start failed, falling back to MediaRecorder:', err);
         await cleanupAudioWorklet();
         setError(err instanceof Error ? err.message : 'AudioWorklet start failed, using fallback');
       }
@@ -221,10 +226,13 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
       return;
     }
 
+    console.log('🎤 [useMediaRecorderVoice] Trying MediaRecorder fallback...');
     try {
+      console.log('🎤 [useMediaRecorderVoice] Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: STANDARD_AUDIO_CONSTRAINTS,
       });
+      console.log('🎤 [useMediaRecorderVoice] getUserMedia success, stream tracks:', stream.getTracks().length);
 
       const mimeType = pickMimeType();
       const recorder = mimeType
@@ -235,13 +243,16 @@ export function useMediaRecorderVoice(options: UseMediaRecorderVoiceOptions = {}
       recorder.addEventListener('dataavailable', handleDataAvailable as EventListener);
       recorder.addEventListener('error', handleRecorderError as EventListener);
 
+      console.log('🎤 [useMediaRecorderVoice] Starting MediaRecorder...');
       recorder.start(250);
       mediaRecorderRef.current = recorder;
       mediaStreamRef.current = stream;
       setMicStream(stream);
       usingAudioWorkletRef.current = false;
       setIsRecording(true);
+      console.log('🎤 [useMediaRecorderVoice] MediaRecorder started successfully');
     } catch (err) {
+      console.error('🎤 [useMediaRecorderVoice] MediaRecorder failed:', err);
       cleanupStream();
       const message = err instanceof Error ? err.message : 'Failed to start recording';
       setError(message);
