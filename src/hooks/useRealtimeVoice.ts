@@ -85,7 +85,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbacksRef = useRef(options);
-  const startRequestedRef = useRef(false);
   const isSessionActiveRef = useRef(false);
   const pendingChunksRef = useRef<MediaRecorderVoiceResult[]>([]);
   const reconnectAttemptsRef = useRef(0);
@@ -258,21 +257,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           mock: event.payload.mock,
           isProcessing: recorderProcessing,
         });
-        // If we requested start, begin recording only after session ack to avoid sending audio early
-        if (startRequestedRef.current) {
-          console.log('🎤 [RealtimeVoice] Session started, now starting mic recording...');
-          setTimeout(async () => {
-            try {
-              await startRecording({ onChunk: handleRecorderChunk });
-              startRequestedRef.current = false;
-              console.log('🎤 [RealtimeVoice] Mic recording started successfully after session_started');
-            } catch (e) {
-              console.error('🎤 [RealtimeVoice] Failed to start recording after session_started:', e);
-              setError(e instanceof Error ? e.message : 'Failed to start mic');
-              startRequestedRef.current = false;
-            }
-          }, 100); // Slight delay for WS state propagation
-        }
         // Flush any audio chunks captured before the session opened
         if (pendingChunksRef.current.length > 0) {
           pendingChunksRef.current.forEach((chunk) => {
@@ -504,9 +488,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isProcessing: true,
       });
 
-      // Request server to start first; start mic after we get session_started
-      startRequestedRef.current = true;
-      console.log('🎤 [RealtimeVoice] Sending start message (mic will open after ack)');
+      console.log('🎤 [RealtimeVoice] Starting audio recording');
+      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
+      await startRecording({ onChunk: handleRecorderChunk });
+      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
+      
+      console.log('🎤 [RealtimeVoice] Audio recording started, sending start message');
       sendMessage({
         type: 'start',
         payload: {
@@ -515,6 +502,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           sessionId: opts?.sessionId,
         },
       });
+      
       console.log('🎤 [RealtimeVoice] Start message sent successfully');
       
       // Set timeout to handle case where server never responds
@@ -550,7 +538,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       setIsProcessing(false);
       callbacksRef.current?.onError?.(message);
       await resetRecording();
-      startRequestedRef.current = false;
     }
   }, [handleRecorderChunk, isSocketReady, sendMessage, session?.mock, startRecording, resetRecording, serverUrl]);
 
