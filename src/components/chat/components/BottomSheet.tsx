@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { getThemeAwareBackdrop, getMonochromeClass } from "@/lib/theme-utils";
-import { DESIGN_TOKENS } from "../tokens/design-tokens";
+import { DESIGN_TOKENS } from "../design-tokens";
 
 interface BottomSheetProps {
   isOpen: boolean;

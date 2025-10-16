@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { DESIGN_TOKENS } from '../tokens/design-tokens';
+import { DESIGN_TOKENS } from '../design-tokens';
 import { getMonochromeClass } from '@/lib/theme-utils';
 import { useTheme } from 'next-themes';
 
@@ -17,6 +17,9 @@ interface SettingsDialogProps {
   currentTheme?: string;
   onVoiceSettingsChange?: (settings: VoiceSettings) => void;
   voiceSettings?: VoiceSettings;
+  // Chat-specific appearance
+  isMonochrome?: boolean;
+  onMonochromeChange?: (mono: boolean) => void;
 }
 
 interface VoiceSettings {
@@ -35,7 +38,9 @@ export function SettingsDialog({
     language: 'en-US',
     voice: 'Puck',
     sampleRate: 16000
-  }
+  },
+  isMonochrome = false,
+  onMonochromeChange,
 }: SettingsDialogProps) {
   const { theme, setTheme, themes } = useTheme();
   const handleVoiceSettingChange = (key: keyof VoiceSettings, value: any) => {
@@ -71,6 +76,19 @@ export function SettingsDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className={cn(DESIGN_TOKENS.typography.body, "text-foreground")}>Terminal monochrome</Label>
+                <p className={cn(DESIGN_TOKENS.typography.disclaimer, "text-muted-foreground")}>
+                  Use a minimal, high-contrast mono theme inside chat
+                </p>
+              </div>
+              <Switch
+                checked={isMonochrome}
+                onCheckedChange={(checked) => onMonochromeChange?.(checked)}
+              />
             </div>
           </div>
 

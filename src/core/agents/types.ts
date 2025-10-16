@@ -59,6 +59,7 @@ export type FunnelStage =
   | 'PROPOSAL'
   | 'ADMIN'
   | 'RETARGETING'
+  | 'INTELLIGENCE_GATHERING'
 
 export interface ChainOfThoughtStep {
   label: string

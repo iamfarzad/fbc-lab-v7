@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { CHAT_CONSTANTS } from "../constants/chatConstants";
 
 interface ChatContainerProps {
-  chatState: { isOpen: boolean; isExpanded: boolean; isMinimized: boolean };
+  chatState: { isOpen: boolean; isExpanded: boolean; isMinimized: boolean; theme?: 'default' | 'mono' };
   children: React.ReactNode;
 }
 
@@ -39,7 +39,7 @@ export function ChatContainer({ chatState, children }: ChatContainerProps) {
       );
     } else {
       desktopClasses.push(
-        "lg:bottom-4 lg:left-4 lg:right-4 lg:sm:bottom-6 lg:sm:right-6 lg:sm:left-auto",
+        "lg:bottom-4 lg:right-4 lg:sm:bottom-6 lg:sm:right-6",
         CHAT_CONSTANTS.UI.CHAT_WIDTH.NORMAL,
         CHAT_CONSTANTS.UI.CHAT_HEIGHT.NORMAL
       );
@@ -49,8 +49,9 @@ export function ChatContainer({ chatState, children }: ChatContainerProps) {
     return cn(...mobileClasses, ...desktopClasses);
   };
 
+  const theme = chatState.theme || 'default'
   return (
-    <div className={getContainerClasses()}>
+    <div className={cn(getContainerClasses(), theme === 'mono' && 'monochrome')} data-theme={theme === 'mono' ? 'mono' : undefined}>
       {children}
     </div>
   );

@@ -214,14 +214,14 @@ function extractCapabilities(ctx: LeadContext) {
 
 function buildLeadEmailHtml(ctx: LeadContext, pdfUrl: string | null) {
   const palette = {
-    background: '#0b0b0b',
-    surface: '#121212',
-    border: '#1d1d1d',
-    text: '#e6e6e6',
-    muted: '#9f9f9f',
-    accent: '#f2f2f2',
-    accentText: '#111111',
-    highlight: '#161616'
+    background: '#ffffff',
+    surface: '#f8f9fa',
+    border: '#e5e7eb',
+    text: '#111827',
+    muted: '#6b7280',
+    accent: '#ff5b04',      // F.B/c Orange
+    accentText: '#ffffff',
+    highlight: '#fff7ed'
   } as const
 
   const button = pdfUrl
@@ -236,22 +236,28 @@ function buildLeadEmailHtml(ctx: LeadContext, pdfUrl: string | null) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Your AI Strategy Summary - F.B/c</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: ${palette.text}; margin: 0; padding: 0; background: ${palette.background}; }
       .container { max-width: 600px; margin: 0 auto; padding: 24px; }
-      .header { background: linear-gradient(135deg, #111111 0%, #181818 100%); color: ${palette.text}; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; border: 1px solid ${palette.border}; }
-      .content { background: ${palette.surface}; padding: 30px; border: 1px solid ${palette.border}; border-top: none; }
+      .header { background: linear-gradient(135deg, #ff5b04 0%, #ff8040 100%); color: white; padding: 40px; text-align: center; border-radius: 12px 12px 0 0; }
+      .logo { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 8px; }
+      .logo .orange-c { color: #ff5b04; background: white; padding: 2px 6px; border-radius: 4px; }
+      .content { background: white; padding: 30px; border: 1px solid ${palette.border}; border-top: none; }
       .footer { background: ${palette.surface}; padding: 20px; text-align: center; border-radius: 0 0 12px 12px; font-size: 14px; color: ${palette.muted}; border: 1px solid ${palette.border}; border-top: none; }
-      .highlight { background: ${palette.highlight}; padding: 16px; border-left: 4px solid ${palette.border}; margin: 20px 0; }
-      .btn { display: inline-block; background: ${palette.accent}; color: ${palette.accentText}; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: 600; }
+      .highlight { background: ${palette.highlight}; padding: 16px; border-left: 4px solid #ff5b04; margin: 20px 0; }
+      .btn { display: inline-block; background: #ff5b04; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: 600; }
+      .btn:hover { background: #e65200; }
       p, ul, li { color: ${palette.text}; }
-      strong { color: ${palette.accent}; }
+      strong { color: #ff5b04; }
+      h2, h3 { color: #ff5b04; }
     </style>
   </head>
   <body>
     <div class="container">
       <div class="header">
+        <div class="logo">F.B/<span class="orange-c">c</span></div>
         <h1>Your AI Strategy Summary</h1>
-        <p>Insights from your session with F.B/c</p>
+        <p>Insights from your session</p>
       </div>
 
       <div class="content">
@@ -282,8 +288,8 @@ function buildLeadEmailHtml(ctx: LeadContext, pdfUrl: string | null) {
       </div>
 
       <div class="footer">
-        <p>F.B/c - AI Consulting & Strategy</p>
-        <p>www.farzadbayat.com | contact@farzadbayat.com</p>
+        <p style="font-family: 'JetBrains Mono', monospace;">F.B/<span style="color: #ff5b04;">c</span> - AI Consulting & Strategy</p>
+        <p><a href="https://www.farzadbayat.com" style="color: #ff5b04; text-decoration: none;">www.farzadbayat.com</a> | <a href="mailto:contact@farzadbayat.com" style="color: #ff5b04; text-decoration: none;">contact@farzadbayat.com</a></p>
       </div>
     </div>
   </body>

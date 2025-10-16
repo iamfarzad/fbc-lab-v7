@@ -410,9 +410,11 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
           }
         },
         onerror: (error: any) => {
-          console.error(`[${connectionId}] Live API error:`, error)
-          safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live API error' } }))
-          activeSessions.get(connectionId)?.logger?.log('error', { where: 'live_api', message: error instanceof Error ? error.message : String(error) })
+          const message = error?.message || (error instanceof Error ? error.message : 'Live API error');
+          const code = (error && (error.code || error.status)) || undefined;
+          console.error(`[${connectionId}] Live API error:`, { message, code, raw: error });
+          safeSend(ws, JSON.stringify({ type: 'error', payload: { message, code } }))
+          activeSessions.get(connectionId)?.logger?.log('error', { where: 'live_api', message, code })
         },
         onclose: (event: any) => {
           isOpen = false
@@ -472,9 +474,10 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     activeSessions.get(connectionId)?.logger?.log('session_started', { languageCode: lang, voiceName })
 
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to start session';
     console.error(`[${connectionId}] Failed to start Live API session:`, error);
-    safeSend(ws, JSON.stringify({ type: 'error', payload: { message: error instanceof Error ? error.message : 'Failed to start session' } }));
-    activeSessions.get(connectionId)?.logger?.log('error', { where: 'handleStart', message: error instanceof Error ? error.message : String(error) })
+    safeSend(ws, JSON.stringify({ type: 'error', payload: { message } }));
+    activeSessions.get(connectionId)?.logger?.log('error', { where: 'handleStart', message })
   } finally {
     sessionStarting.delete(connectionId)
   }

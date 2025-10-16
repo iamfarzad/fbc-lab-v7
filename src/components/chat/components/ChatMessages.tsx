@@ -1,10 +1,10 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "../types/chatTypes";
 import { EnhancedChatMessage } from "@/types/chat-enhanced";
 import { cn } from "@/lib/utils";
 import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw, Search } from "lucide-react";
-import { DESIGN_TOKENS } from "../tokens/design-tokens";
+import { DESIGN_TOKENS } from "../design-tokens";
 import { ShimmerLoader } from "@/components/ai-elements/core/shimmer-loader";
 import {
   Artifact as ArtifactCard,
@@ -185,10 +185,19 @@ export function ChatMessages({
   //   // return null;
   // }, [enhancedMessages]);
   
+  // Simple virtualization: render last N messages with ability to load earlier chunks
+  const DEFAULT_VISIBLE = 80;
+  const CHUNK = 60;
+  const [visibleCount, setVisibleCount] = useState(DEFAULT_VISIBLE);
+  
   // Don't render messages in minimized state
   if (isMinimized) {
     return null;
   }
+  const startIndex = Math.max(enhancedMessages.length - visibleCount, 0);
+  const visibleEnhanced = enhancedMessages.slice(startIndex);
+
+  const canLoadEarlier = startIndex > 0;
 
   return (
     <Conversation className="h-full">
@@ -229,7 +238,18 @@ export function ChatMessages({
           </div>
         ) : (
           <>
-          {enhancedMessages.map((message) => {
+          {canLoadEarlier && (
+            <div className="flex justify-center">
+              <button
+                className="text-[12px] px-3 py-1.5 rounded border border-border/40 bg-muted/20 hover:bg-muted"
+                onClick={() => setVisibleCount(c => c + CHUNK)}
+              >
+                Load earlier messages
+              </button>
+            </div>
+          )}
+
+          {visibleEnhanced.map((message) => {
             const isUserMessage = message.role === "user";
 
             const rawResearchSummary = message.metadata?.researchSummary as unknown;

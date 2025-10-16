@@ -4,6 +4,7 @@ import { MessageCircle, Menu, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ThemeSwitcher } from "./ThemeSwitcher"
 import { cn } from "@/lib/utils"
+import { COLORS } from "@/components/chat/design-tokens"
 import { ComponentProps } from "react"
 
 export function Navigation({ className, ...props }: ComponentProps<"nav">) {
@@ -40,18 +41,11 @@ export function Navigation({ className, ...props }: ComponentProps<"nav">) {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className={cn(
-            "text-xl tracking-wider",
-            "font-display text-foreground",
-            // Terminal theme enhancements
-            "monochrome:monochrome-orange:font-mono monochrome:monochrome-orange:text-foreground monochrome:monochrome-orange:font-bold",
-            "monochrome:monochrome-orange-dark:font-mono monochrome:monochrome-orange-dark:text-foreground monochrome:monochrome-orange-dark:font-bold"
+            "text-xl tracking-wider font-mono font-bold",
+            "text-foreground"
           )}>
-            <span className="monochrome:monochrome-orange:text-primary monochrome:monochrome-orange-dark:text-primary">F.B/</span>
-            <span className={cn(
-              "text-orange",
-              // Terminal theme enhancements  
-              "monochrome:monochrome-orange:text-primary monochrome:monochrome-orange-dark:text-primary"
-            )}>c</span>
+            <span>F.B/</span>
+            <span className={COLORS.ORANGE.text}>c</span>
           </div>
           
           {/* Desktop Navigation Links */}

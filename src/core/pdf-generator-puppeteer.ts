@@ -118,6 +118,7 @@ async function generatePdfWithPdfLib(
   let page = pdfDoc.addPage([595.28, 841.89])
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  const monoFont = await pdfDoc.embedFont(StandardFonts.Courier)
   const marginX = 40
   const lineHeight = 14
   let cursorY = 800
@@ -129,13 +130,17 @@ async function generatePdfWithPdfLib(
     }
   }
 
-  const writeLine = (text: string, size = 11, bold = false) => {
+  const writeLine = (text: string, size = 11, bold = false, isOrange = false) => {
+    const textColor = isOrange 
+      ? rgb(1.0, 0.356, 0.016)    // F.B/c Orange
+      : rgb(0.067, 0.094, 0.157)  // Dark slate
+    
     page.drawText(text, {
       x: marginX,
       y: cursorY,
       size,
       font: bold ? boldFont : regularFont,
-      color: rgb(0.1, 0.1, 0.1)
+      color: textColor
     })
     cursorY -= lineHeight * 1.2
     ensureRoom()
@@ -155,11 +160,26 @@ async function generatePdfWithPdfLib(
     }
   }
 
-  writeLine('F.B/c AI Consulting', 20, true)
-  writeLine('AI-Powered Lead Summary', 12)
+  // Draw F.B/c logo with orange 'c'
+  page.drawText('F.B/', {
+    x: marginX,
+    y: cursorY,
+    size: 24,
+    font: monoFont,
+    color: rgb(0.067, 0.094, 0.157) // Dark
+  })
+  page.drawText('c', {
+    x: marginX + 52, // Adjust based on character width
+    y: cursorY,
+    size: 24,
+    font: monoFont,
+    color: rgb(1.0, 0.356, 0.016) // F.B/c Orange
+  })
+  cursorY -= 28
+  writeLine('AI Consulting & Strategy', 12)
   cursorY -= 8
 
-  writeLine('Lead Information', 14, true)
+  writeLine('LEAD INFORMATION', 14, true, true)
   writeLine(`Name: ${summaryData.leadInfo.name || 'Unknown'}`)
   writeLine(`Email: ${summaryData.leadInfo.email || 'Unknown'}`)
   if (summaryData.leadInfo.company) writeLine(`Company: ${summaryData.leadInfo.company}`)
@@ -168,20 +188,20 @@ async function generatePdfWithPdfLib(
   cursorY -= 6
 
   if (summaryData.leadResearch?.conversation_summary) {
-    writeLine('Executive Summary', 14, true)
+    writeLine('EXECUTIVE SUMMARY', 14, true, true)
     await writeParagraph(summaryData.leadResearch.conversation_summary)
     cursorY -= 4
   }
 
   if (summaryData.leadResearch?.consultant_brief) {
-    writeLine('Consultant Brief', 14, true)
+    writeLine('CONSULTANT BRIEF', 14, true, true)
     await writeParagraph(summaryData.leadResearch.consultant_brief)
     cursorY -= 4
   }
 
   const conversationPairs = buildConversationPairs(summaryData.conversationHistory)
   if (conversationPairs.length > 0) {
-    writeLine('Conversation Highlights', 14, true)
+    writeLine('CONVERSATION HIGHLIGHTS', 14, true, true)
     for (const pair of conversationPairs.slice(-6)) {
       writeLine('You', 11, true)
       await writeParagraph(shortenText(pair.user.content))
@@ -194,7 +214,7 @@ async function generatePdfWithPdfLib(
   }
 
   if (summaryData.researchHighlights && summaryData.researchHighlights.length > 0) {
-    writeLine('Research Highlights', 14, true)
+    writeLine('RESEARCH HIGHLIGHTS', 14, true, true)
     for (const [index, highlight] of summaryData.researchHighlights.entries()) {
       const label = highlight.query ? `Query: ${highlight.query}` : `Insight ${index + 1}`
       writeLine(label, 11, true)
@@ -228,7 +248,7 @@ async function generatePdfWithPdfLib(
   }
 
   if (summaryData.artifactInsights && summaryData.artifactInsights.length > 0) {
-    writeLine('Generated Artifacts', 14, true)
+    writeLine('GENERATED ARTIFACTS', 14, true, true)
     for (const artifact of summaryData.artifactInsights) {
       const heading = `${artifact.type || 'Artifact'} ${artifact.status ? `(${artifact.status})` : ''}`.trim()
       writeLine(heading, 11, true)
@@ -246,8 +266,23 @@ async function generatePdfWithPdfLib(
   }
 
   cursorY = Math.max(cursorY, 60)
-  page.drawText('Farzad Bayat — AI Consulting Specialist', {
+  // Footer with F.B/c logo
+  page.drawText('F.B/', {
     x: marginX,
+    y: 50,
+    size: 10,
+    font: monoFont,
+    color: rgb(0.42, 0.45, 0.5)
+  })
+  page.drawText('c', {
+    x: marginX + 22,
+    y: 50,
+    size: 10,
+    font: monoFont,
+    color: rgb(1.0, 0.356, 0.016) // F.B/c Orange
+  })
+  page.drawText(' • AI Consulting & Strategy', {
+    x: marginX + 32,
     y: 50,
     size: 10,
     font: regularFont,
@@ -258,7 +293,7 @@ async function generatePdfWithPdfLib(
     y: 36,
     size: 10,
     font: regularFont,
-    color: rgb(0.98, 0.75, 0.14)
+    color: rgb(1.0, 0.356, 0.016) // F.B/c Orange
   })
 
   const pdfBytes = await pdfDoc.save()
@@ -410,15 +445,15 @@ async function generateHtmlContent(summaryData: SummaryData, _mode: Mode, langua
     : ''
 
   const palette = {
-    background: '#0b0b0b',
-    surface: '#121212',
-    border: '#1d1d1d',
-    text: '#e6e6e6',
-    heading: '#f5f5f5',
-    muted: '#a0a0a0',
-    accent: '#f2f2f2',
-    accentText: '#111111',
-    highlight: '#161616'
+    background: '#ffffff',
+    surface: '#f8f9fa',
+    border: '#e5e7eb',
+    text: '#111827',
+    heading: '#0f172a',
+    muted: '#6b7280',
+    accent: '#ff5b04',      // F.B/c Orange
+    accentText: '#ffffff',
+    highlight: '#fff7ed'
   } as const
 
   const conversationSection = conversationPairs.length > 0
@@ -440,26 +475,32 @@ async function generateHtmlContent(summaryData: SummaryData, _mode: Mode, langua
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Strategy Summary</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: ${palette.text}; margin: 0; background: ${palette.background}; }
     .container { max-width: 720px; margin: 0 auto; padding: 32px; }
-    .header { background: linear-gradient(135deg, #111111 0%, #181818 100%); color: ${palette.heading}; padding: 32px; border-radius: 16px; border: 1px solid ${palette.border}; }
-    .section { margin-top: 32px; padding: 24px; border-radius: 12px; background: ${palette.surface}; border: 1px solid ${palette.border}; }
-    h1 { margin: 0 0 12px; font-size: 28px; color: ${palette.heading}; }
-    h2 { margin: 0 0 16px; font-size: 20px; color: ${palette.heading}; }
-    h3 { color: ${palette.heading}; }
+    .header { background: linear-gradient(135deg, #ff5b04 0%, #ff8040 100%); color: white; padding: 40px; border-radius: 16px; text-align: center; box-shadow: 0 4px 6px rgba(255, 91, 4, 0.1); }
+    .logo { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 8px; }
+    .logo .orange-c { color: #ff5b04; background: white; padding: 2px 6px; border-radius: 4px; }
+    .section { margin-top: 24px; padding: 24px; border-radius: 12px; background: white; border: 1px solid ${palette.border}; border-left: 4px solid #ff5b04; }
+    h1 { margin: 0 0 12px; font-size: 28px; color: white; font-weight: 700; }
+    h2 { margin: 0 0 16px; font-size: 20px; color: #ff5b04; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+    h3 { color: #ff5b04; font-weight: 600; }
     p { margin: 0 0 12px; color: ${palette.text}; }
     ul { margin: 0 0 12px 20px; padding: 0; color: ${palette.text}; }
     li { margin-bottom: 6px; }
-    a { color: ${palette.accent}; }
+    a { color: #ff5b04; text-decoration: none; font-weight: 500; }
+    a:hover { text-decoration: underline; }
+    strong { color: #ff5b04; }
     pre { background: ${palette.highlight}; color: ${palette.text}; padding: 16px; border-radius: 8px; border: 1px solid ${palette.border}; font-family: 'JetBrains Mono', monospace; white-space: pre-wrap; }
-    .footer { margin-top: 32px; text-align: center; font-size: 14px; color: ${palette.muted}; }
-    .badge { display: inline-block; padding: 8px 16px; border-radius: 999px; background: ${palette.highlight}; color: ${palette.text}; font-weight: 600; border: 1px solid ${palette.border}; }
+    .footer { margin-top: 32px; text-align: center; padding: 24px; background: ${palette.surface}; border-radius: 12px; font-size: 14px; color: ${palette.muted}; }
+    .badge { display: inline-block; padding: 8px 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); color: white; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
   </style>
 </head>
 <body>
   <div class="container">
     <header class="header">
-      <div class="badge">Personalized AI Strategy</div>
+      <div class="logo">F.B/<span class="orange-c">c</span></div>
+      <div class="badge">AI Consulting & Strategy</div>
       <h1>Summary for ${leadName}</h1>
       <p>Prepared by Farzad Bayat • Session ${summaryData.sessionId}</p>
     </header>
@@ -481,7 +522,8 @@ async function generateHtmlContent(summaryData: SummaryData, _mode: Mode, langua
     ${artifactsSection}
 
     <footer class="footer">
-      <p>F.B/c • AI Consulting & Strategy • www.farzadbayat.com</p>
+      <p style="font-family: 'JetBrains Mono', monospace;">F.B/<span style="color: #ff5b04;">c</span> • AI Consulting & Strategy</p>
+      <p style="margin-top: 8px;"><a href="https://www.farzadbayat.com">www.farzadbayat.com</a></p>
     </footer>
   </div>
 </body>

@@ -2,7 +2,7 @@
 
 import React, { forwardRef } from "react";
 import { cn } from "@/lib/utils";
-import { MonitorUp, Camera } from "lucide-react";
+import { MonitorUp, Camera, ChevronDown, ChevronUp } from "lucide-react";
 import { BarVisualizer, type AgentState } from "@/components/ui/bar-visualizer";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { Popover, PopoverContent } from "@/components/ui/popover";
@@ -21,6 +21,7 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
       isVoiceProcessing,
       voiceError,
       voicePartialTranscript,
+      voiceTranscript,
       cameraState,
       isScreenSharing,
       onToggleCamera,
@@ -29,9 +30,9 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
       ...rest
     } = props as ConversationBarProps & { onToggleCamera: () => void | Promise<void>; onToggleScreenShare: () => void | Promise<void> };
 
-    if (isMinimized) return null;
-
+    // Hooks must be called before any early returns (Rules of Hooks)
     const showVoiceBar = Boolean(isVoiceActive || isVoiceProcessing);
+    const [showInlineTranscript, setShowInlineTranscript] = React.useState(false);
     const [cameraPopoverOpen, setCameraPopoverOpen] = React.useState(false);
     const [screenPopoverOpen, setScreenPopoverOpen] = React.useState(false);
     const camVideoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -57,6 +58,9 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
       }
     }, [props.screenShareStream, isScreenSharing]);
 
+    // Early return after all hooks
+    if (isMinimized) return null;
+
     return (
       <div className={cn("w-full", className)}>
         {/* Unified status + waveform + media chips */}
@@ -81,6 +85,37 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
                 maxHeight={95}
                 className="h-24 sm:h-28 md:h-32 w-full rounded-md border border-border/40 bg-muted/20"
               />
+              {/* Inline transcript toggle */}
+              <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 hover:text-foreground"
+                  onClick={() => setShowInlineTranscript(v => !v)}
+                >
+                  {showInlineTranscript ? (<ChevronUp className="h-3 w-3" />) : (<ChevronDown className="h-3 w-3" />)}
+                  <span>Transcript</span>
+                </button>
+                {(isVoiceProcessing || isVoiceActive) && (
+                  <span>{isVoiceProcessing ? 'Processing…' : 'Listening…'}</span>
+                )}
+              </div>
+
+              {showInlineTranscript && (
+                <div
+                  className="mt-1 max-h-24 overflow-y-auto rounded-md border border-border/40 bg-muted/30 p-2 text-[12px]"
+                  role="log" aria-live="polite" aria-atomic={false}
+                >
+                  {voicePartialTranscript && (
+                    <div className="italic text-muted-foreground">{voicePartialTranscript}</div>
+                  )}
+                  {voiceTranscript && (
+                    <div className="text-foreground whitespace-pre-line">{voiceTranscript}</div>
+                  )}
+                  {!voiceTranscript && !voicePartialTranscript && (
+                    <div className="text-muted-foreground">Start speaking to see your transcript…</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

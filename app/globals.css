@@ -474,6 +474,29 @@
   body {
     @apply bg-background text-foreground font-mono antialiased;
   }
+
+  /* Monochrome chat theme (scoped to elements with data-theme="mono") */
+  [data-theme="mono"] {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 0 0% 90%;
+    --primary-foreground: 0 0% 6%;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 72%;
+    --accent: 17 90% 55%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 17 90% 55%;
+  }
 }
 
 /* Grain overlay inspired by Midday.ai site, tuned for F.B/c monochrome palette */

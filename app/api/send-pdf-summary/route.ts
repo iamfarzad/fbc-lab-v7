@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const { data, error: emailError } = await resend.emails.send({
       from: 'F.B/c AI <ai@fbc.com>',
       to: [toEmail],
-      subject: 'Your AI Consultation Summary',
+      subject: 'Your F.B/c AI Consultation Summary',
       text: 'Please find your consultation summary attached.',
       attachments: [
         {

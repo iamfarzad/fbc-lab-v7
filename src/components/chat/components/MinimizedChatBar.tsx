@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Camera, Monitor, Mic, Expand, MessageCircle } from 'lucide-react';
-import { DESIGN_TOKENS } from '../tokens/design-tokens';
+import { DESIGN_TOKENS } from '../design-tokens';
 import { getMonochromeClass } from '@/lib/theme-utils';
 
 interface MinimizedChatBarProps {

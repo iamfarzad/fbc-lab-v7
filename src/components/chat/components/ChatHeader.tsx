@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChatState } from "../types/chatTypes";
 import { StatusIndicator } from "./StatusIndicator";
+import { BackendPill } from "./BackendPill";
+import { COLORS } from "../design-tokens";
 import { NextStepsMenu } from "../NextStepsMenu";
 import {
   Minimize2,
@@ -25,6 +27,15 @@ interface ChatHeaderProps {
   showTranscript?: boolean;
   onToggleTranscript?: () => void;
   onOpenMedia?: () => void;
+  backend?: {
+    voiceConnected: boolean;
+    voiceActive: boolean;
+    voiceError?: string | null;
+    sseReady: boolean;
+    sseStreaming: boolean;
+    sseError?: string | null;
+  };
+  onRunDiagnostics?: () => void;
 }
 
 export function ChatHeader({
@@ -37,7 +48,9 @@ export function ChatHeader({
   isVoiceActive = false,
   showTranscript = false,
   onToggleTranscript,
-  onOpenMedia
+  onOpenMedia,
+  backend,
+  onRunDiagnostics
 }: ChatHeaderProps) {
   return (
     <>
@@ -64,8 +77,8 @@ export function ChatHeader({
           
           {/* Desktop: Show full branding */}
           <div className="hidden md:block space-y-1">
-            <p className="text-sm font-semibold tracking-[0.28em] uppercase text-foreground/80">
-              F.B/c Assistant
+            <p className="text-sm font-semibold tracking-[0.28em] uppercase font-mono">
+              <span className="text-foreground/80">F.B/</span><span className={COLORS.ORANGE.text}>c</span> <span className="text-foreground/80">Assistant</span>
             </p>
             {!chatState.isMinimized && (
               <p className="text-xs text-muted-foreground/80 max-w-[16rem] leading-relaxed">
@@ -76,8 +89,8 @@ export function ChatHeader({
           
           {/* Mobile: Just show title */}
           <div className="md:hidden">
-            <p className="text-sm font-semibold tracking-wide text-foreground">
-              AI Consultant
+            <p className="text-sm font-semibold tracking-wide font-mono">
+              <span className="text-foreground">F.B/</span><span className={COLORS.ORANGE.text}>c</span>
             </p>
           </div>
         </div>
@@ -98,7 +111,7 @@ export function ChatHeader({
                               variant="ghost"
                               size="sm"
                               onClick={onOpenMedia}
-                              className="h-8 w-8 p-0 touch-manipulation"
+                              className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation"
                               aria-label="Open media panel"
                             >
                               <Monitor className="h-4 w-4" />
@@ -216,7 +229,7 @@ export function ChatHeader({
                 variant="ghost"
                 size="sm"
                 onClick={onToggleExpand}
-                className="h-6 w-6 p-0 touch-manipulation transition-colors"
+                className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation transition-colors"
                 title="Expand chat interface"
                 aria-label="Expand chat"
               >
@@ -229,7 +242,7 @@ export function ChatHeader({
                 variant="ghost"
                 size="sm"
                 onClick={onToggleExpand}
-                className="h-6 w-6 p-0 touch-manipulation transition-colors"
+                className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation transition-colors"
                 title="Exit fullscreen mode"
                 aria-label="Exit fullscreen"
               >
@@ -241,7 +254,7 @@ export function ChatHeader({
               variant="ghost"
               size="sm"
               onClick={onToggleMinimize}
-              className="h-6 w-6 p-0 touch-manipulation transition-colors"
+              className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation transition-colors"
               title="Minimize chat"
               aria-label="Minimize chat"
             >
@@ -252,7 +265,7 @@ export function ChatHeader({
               variant="ghost"
               size="sm"
               onClick={onToggleChat}
-              className="h-6 w-6 p-0 touch-manipulation transition-colors"
+              className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation transition-colors"
               title="Close chat"
               aria-label="Close chat"
             >
@@ -261,7 +274,7 @@ export function ChatHeader({
           </div>
 
           {/* Status indicator - only on desktop for now */}
-          <div className="hidden lg:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-2">
             {/* Media button (desktop opens side panel) */}
             {onOpenMedia && (
               <TooltipProvider>
@@ -280,6 +293,25 @@ export function ChatHeader({
                   <TooltipContent side="bottom">Open media panel</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
+            )}
+            {backend && (
+              <BackendPill
+                voice={{ connected: backend.voiceConnected, active: backend.voiceActive, error: backend.voiceError }}
+                sse={{ ready: backend.sseReady, streaming: backend.sseStreaming, error: backend.sseError }}
+                className="ml-1"
+              />
+            )}
+            {process.env.NODE_ENV !== 'production' && onRunDiagnostics && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-[11px]"
+                onClick={onRunDiagnostics}
+                aria-label="Run voice diagnostics"
+                title="Run voice diagnostics"
+              >
+                Diagnostics
+              </Button>
             )}
             <StatusIndicator />
           </div>
@@ -300,7 +332,7 @@ export function ChatHeader({
             <div className="h-3 w-3 rounded-full bg-green-500" />
           </div>
           <span className="text-xs font-mono text-muted-foreground ml-2">
-            F.B/c AI Terminal - user@fbc:~/consulting
+            F.B/<span className="text-[#ff5b04]">c</span> AI Terminal - user@fbc:~/consulting
           </span>
         </div>
         {/* Controls */}

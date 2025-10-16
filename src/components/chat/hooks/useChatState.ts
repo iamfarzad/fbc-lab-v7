@@ -11,6 +11,7 @@ export function useChatState() {
     isCameraActive: false,
     isListening: false,
     showSettings: false,
+    theme: 'default',
     screenShareStream: null,
     cameraStream: null,
     screenShareError: null,
@@ -124,6 +125,10 @@ export function useChatState() {
     setChatState(prev => ({ ...prev, showSettings: !prev.showSettings }));
   }, []);
 
+  const setTheme = useCallback((theme: 'default' | 'mono') => {
+    setChatState(prev => ({ ...prev, theme }));
+  }, []);
+
   const setListening = useCallback((listening: boolean) => {
     setChatState(prev => {
       if (prev.isListening === listening) {
@@ -143,9 +148,9 @@ export function useChatState() {
     toggleExpand,
     toggleScreenShare,
     toggleSettings,
+    setTheme,
     setListening,
     startScreenShare,
     stopScreenShare,
   };
 }
-

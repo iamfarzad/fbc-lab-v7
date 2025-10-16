@@ -23,7 +23,6 @@ import { useChatIntelligence } from "./hooks/useChatIntelligence";
 import { useCamera } from "@/hooks/useCamera";
 
 // Media display components
-import { DraggableVideoPlayer } from "./components/DraggableVideoPlayer";
 
 // Constants - centralized configuration
 import { CHAT_CONSTANTS } from "./constants/chatConstants";
@@ -382,7 +381,6 @@ export function ChatInterface({ id }: { id?: string | null }) {
   
   const intelligenceHook = useChatIntelligence(sessionId);
   const artifactsState = useArtifacts();
-  const isMobile = typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false;
 
   useEffect(() => {
     if (!intelligenceHook.hasAcceptedTerms) return;
@@ -439,21 +437,6 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const [isMeetingOpen, setIsMeetingOpen] = useState(false);
   const [requestedPopover, setRequestedPopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const lastProcessedMessageRef = useRef<string | null>(null);
-  // Conversation Bar feature flag with runtime fallbacks
-  const useBar = (() => {
-    // SSR safety check
-    if (typeof window === 'undefined') return false;
-    
-    // Build-time env var (highest priority for production)
-    if (process.env.NEXT_PUBLIC_CHAT_BAR === '1') return true;
-    
-    // Runtime overrides for testing (no rebuild needed)
-    if (localStorage.getItem('fbc-bar') === '1') return true;
-    if (new URLSearchParams(window.location.search).get('bar') === '1') return true;
-    
-    // Default: false (safe rollout - old UI by default)
-    return false;
-  })();
 
   // Handle opening meeting booking
   const openMeeting = useCallback(() => {
@@ -833,6 +816,14 @@ export function ChatInterface({ id }: { id?: string | null }) {
               showNextSteps={intelligenceHook.hasAcceptedTerms && usage && (usage.messages_sent >= 5 || (Date.now() - (usage.started_at || 0)) / 60000 >= 5)}
               isVoiceActive={audioHook.isSessionActive}
               onOpenMedia={undefined}
+              backend={{
+                voiceConnected: Boolean(audioHook.isSocketReady),
+                voiceActive: Boolean(audioHook.isRecording || audioHook.isSessionActive),
+                voiceError: audioHook.error || null,
+                sseReady: !messagesHook.sseError,
+                sseStreaming: Boolean(messagesHook.isLoading),
+                sseError: messagesHook.sseError?.message || null,
+              }}
             />
 
             {/* Legacy banners are disabled under the unified Conversation Bar */}
@@ -925,6 +916,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
       <SettingsDialog
         isOpen={chatState.showSettings}
         onClose={chatStateHook.toggleSettings}
+        isMonochrome={chatState.theme === 'mono'}
+        onMonochromeChange={(mono) => chatStateHook.setTheme(mono ? 'mono' : 'default')}
       />
 
       {/* AI SDK Devtools - Development Only */}
@@ -940,25 +933,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
         />
       )}
 
-      {/* Draggable Video Players - Prototype Style */}
-      {/* Hide draggable overlays when Conversation Bar is active to avoid surface duplication */}
-      {(!useBar && !isMobile) && chatState.isCameraActive && camera.stream && (
-        <DraggableVideoPlayer
-          stream={camera.stream}
-          onClose={camera.stopCamera}
-          title="Webcam Feed"
-          type="webcam"
-        />
-      )}
-
-      {(!useBar && !isMobile) && chatState.isScreenSharing && chatState.screenShareStream && (
-        <DraggableVideoPlayer
-          stream={chatState.screenShareStream}
-          onClose={chatStateHook.stopScreenShare}
-          title="Screen Share"
-          type="screen"
-        />
-      )}
+      {/* Draggable overlays removed per consolidation: Conversation Bar owns media */}
     </ErrorBoundary>
   );
 }

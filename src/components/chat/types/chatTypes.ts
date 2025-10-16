@@ -12,6 +12,7 @@ export interface ChatState {
   isCameraActive: boolean;
   isListening: boolean;
   showSettings: boolean;
+  theme?: 'default' | 'mono';
   screenShareStream: MediaStream | null;
   cameraStream: MediaStream | null;
   screenShareError: string | null;
@@ -60,5 +61,4 @@ export interface EnhancedMessagesState {
   messages: EnhancedChatMessage[];
   isMeetingOpen: boolean;
 }
-
 

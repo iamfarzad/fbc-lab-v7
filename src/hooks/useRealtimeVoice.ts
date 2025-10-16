@@ -85,6 +85,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbacksRef = useRef(options);
+  const startRequestedRef = useRef(false);
   const isSessionActiveRef = useRef(false);
   const pendingChunksRef = useRef<MediaRecorderVoiceResult[]>([]);
   const reconnectAttemptsRef = useRef(0);
@@ -169,6 +170,33 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     });
   }, [session?.connectionId, isSessionActive, sendMessage]);
 
+  // --- Dev diagnostics helpers ---
+  const sineToPCM16Base64 = useCallback((frequency = 440, durationMs = 320, sampleRate = 16000) => {
+    const totalSamples = Math.floor((durationMs / 1000) * sampleRate);
+    const pcm = new Int16Array(totalSamples);
+    const twoPiF = 2 * Math.PI * frequency;
+    for (let i = 0; i < totalSamples; i++) {
+      const t = i / sampleRate;
+      const s = Math.sin(twoPiF * t) * 0.2; // -6 dBFS
+      pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    // Convert to base64
+    const buf = pcm.buffer;
+    let binary = '';
+    const bytes = new Uint8Array(buf);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
+    return typeof btoa !== 'undefined' ? btoa(binary) : Buffer.from(binary, 'binary').toString('base64');
+  }, []);
+
+  const sendTestAudioChunk = useCallback((opts?: { frequency?: number; durationMs?: number }) => {
+    const base64 = sineToPCM16Base64(opts?.frequency ?? 440, opts?.durationMs ?? 320, 16000);
+    sendMessage({
+      type: 'user_audio',
+      payload: { audioData: base64, mimeType: 'audio/pcm;rate=16000' },
+    });
+  }, [sendMessage, sineToPCM16Base64]);
+
   const resetState = useCallback((opts?: { soft?: boolean }) => {
     // Clear session timeout
     if (sessionTimeoutRef.current) {
@@ -230,6 +258,18 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           mock: event.payload.mock,
           isProcessing: recorderProcessing,
         });
+        // If we requested start, begin recording only after session ack to avoid sending audio early
+        if (startRequestedRef.current && !isRecording) {
+          try {
+            // Delay a tick to ensure ws state propagates
+            setTimeout(() => {
+              void startRecording({ onChunk: handleRecorderChunk });
+            }, 0);
+          } catch (e) {
+            console.error('🎤 [RealtimeVoice] Failed to start recording after session_started:', e);
+            setError(e instanceof Error ? e.message : 'Failed to start mic');
+          }
+        }
         // Flush any audio chunks captured before the session opened
         if (pendingChunksRef.current.length > 0) {
           pendingChunksRef.current.forEach((chunk) => {
@@ -461,12 +501,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isProcessing: true,
       });
 
-      console.log('🎤 [RealtimeVoice] Starting audio recording');
-      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
-      await startRecording({ onChunk: handleRecorderChunk });
-      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
-      
-      console.log('🎤 [RealtimeVoice] Audio recording started, sending start message');
+      // Request server to start first; start mic after we get session_started
+      startRequestedRef.current = true;
+      console.log('🎤 [RealtimeVoice] Sending start message (mic will open after ack)');
       sendMessage({
         type: 'start',
         payload: {
@@ -475,7 +512,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           sessionId: opts?.sessionId,
         },
       });
-      
       console.log('🎤 [RealtimeVoice] Start message sent successfully');
       
       // Set timeout to handle case where server never responds
@@ -511,6 +547,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       setIsProcessing(false);
       callbacksRef.current?.onError?.(message);
       await resetRecording();
+      startRequestedRef.current = false;
     }
   }, [handleRecorderChunk, isSocketReady, sendMessage, session?.mock, startRecording, resetRecording, serverUrl]);
 
@@ -593,6 +630,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     micStream,
     startSession,
     stopSession,
+    sendTestAudioChunk,
     sendToolResult,
     sendContextUpdate,
     sendRealtimeInput,

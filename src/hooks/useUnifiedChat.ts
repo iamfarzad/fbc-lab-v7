@@ -143,6 +143,7 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
         stream: true
       }
 
+      console.info('[UNIFIED_CHAT] SSE start', { requestId: reqId, hasContext: Boolean(request.context) })
       const response = await fetch('/api/chat/unified', {
         method: 'POST',
         headers: {
@@ -156,14 +157,19 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `HTTP ${response.status}`)
+        const err = new Error(errorData.error || `HTTP ${response.status}`)
+        console.error('[UNIFIED_CHAT] SSE start failed', { requestId: reqId, status: response.status, error: errorData })
+        throw err
       }
 
       setIsLoading(false)
       setIsStreaming(true)
 
       const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response stream')
+      if (!reader) {
+        console.error('[UNIFIED_CHAT] No response stream', { requestId: reqId })
+        throw new Error('No response stream')
+      }
 
       const decoder = new TextDecoder()
       let buffer = ''
@@ -261,6 +267,7 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
       }
 
       const normalisedError = err instanceof Error ? err : new Error(String(err))
+      console.error('[UNIFIED_CHAT] SSE error', { requestId: reqId, message: normalisedError.message })
       setIsLoading(false)
       setIsStreaming(false)
       setError(normalisedError)

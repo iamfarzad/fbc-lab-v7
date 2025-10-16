@@ -639,6 +639,7 @@ export function useChatMessages(initialSessionId?: string) {
     enhancedMessages,
     researchSummaries,
     isLoading: unifiedChat.isLoading || unifiedChat.isStreaming,
+    sseError: unifiedChat.error || null,
     inputValue,
     setInputValue,
     handleSendMessage,

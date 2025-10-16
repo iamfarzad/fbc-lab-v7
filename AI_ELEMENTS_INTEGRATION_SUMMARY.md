@@ -29,10 +29,11 @@ feat: Integrate AI SDK Elements with shimmer effects and multi-agent chain-of-th
 - Integrates with framer-motion for smooth animations
 
 **Key features:**
-- Dynamic spread based on text length
 - Customizable colors via CSS variables
-- Auto-start on viewport entry with `startOnView`
-- Repeatable animation with configurable delay
+- Continuous shimmer loop driven by motion
+- Inline and block variants for text/containers
+
+Note: No `startOnView` prop or configurable delay is implemented, and the shimmer spread is fixed (not text-length dynamic) in the current code.
 
 ---
 
@@ -203,6 +204,8 @@ export interface ToolMetadata {
 
 ---
 
+Note: Both `MediaDrawer.tsx` and `MediaPanel.tsx` were later removed in commit `c60e988` (media UI consolidation), so they do not exist at HEAD.
+
 ## Commit 7218f49 (Oct 15, 17:01)
 **Title:** "feat: Add AI Elements integration with shimmer effects and agent chain-of-thought"
 
@@ -251,6 +254,8 @@ export interface ToolMetadata {
 - Added `agent?: string` field to identify which agent generated the message
 
 **Impact:** Type-safe integration between agents and UI components
+
+Short technical note: `lead-intelligence-agent.ts` sets `metadata.stage` to `"INTELLIGENCE_GATHERING"`, which is not part of the `FunnelStage` union. It’s tolerated at runtime but could be aligned by adding a corresponding union member or mapping to an existing stage.
 
 ---
 
@@ -327,4 +332,3 @@ const chainOfThought = msg.metadata?.chainOfThought &&
 - Proper commit messages explaining the changes
 - This documentation file to track all modifications
 - Clear mapping between commits and features
-
