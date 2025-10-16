@@ -211,6 +211,7 @@ type ActiveSessionRecord = {
 
 // Store active Live API sessions
 const activeSessions = new Map<string, ActiveSessionRecord>();
+const noSessionWarned = new Set<string>(); // Track connections we've already warned about
 // Feature flag + debounce controls for CONTEXT_UPDATE → Live injection
 const INJECT_ON_CONTEXT_UPDATE = process.env.LIVE_SERVER_INJECT_ON_CONTEXT_UPDATE === '0' ? false : true;
 const CONTEXT_INJECT_DEBOUNCE_MS = Math.max(
@@ -425,6 +426,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
           rec?.logger?.log('session_closed', { source: 'live_api' })
           rec?.logger?.close()
           activeSessions.delete(connectionId)
+          noSessionWarned.delete(connectionId)
           // If we're intentionally restarting a session, don't emit session_closed to the client
           if (closingForRestart.has(connectionId)) {
             closingForRestart.delete(connectionId)
@@ -484,8 +486,12 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
 
   if (payload.audioData && payload.mimeType) {
     const client = activeSessions.get(connectionId)
-    if (!client) {
-      console.warn(`[${connectionId}] No active session to send audio to`)
+    if (!client || !client.session) {
+      // Only log once per connection to avoid spam
+      if (!noSessionWarned.has(connectionId)) {
+        console.warn(`[${connectionId}] No active session to send audio to - session may not be initialized yet`)
+        noSessionWarned.add(connectionId)
+      }
       return
     }
 
@@ -540,6 +546,7 @@ function handleClose(connectionId: string) {
       console.warn(`[${connectionId}] Failed to close session`, error)
     }
     activeSessions.delete(connectionId);
+    noSessionWarned.delete(connectionId);
   }
   console.info(`[${connectionId}] Session removed.`);
 }
