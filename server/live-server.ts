@@ -415,15 +415,16 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
         },
         onclose: (event: any) => {
           isOpen = false
-          console.error(`[${connectionId}] ⚠️ Live API session closed`, {
+          const closeDetails = {
             code: event?.code,
             reason: event?.reason,
             wasClean: event?.wasClean,
             timestamp: new Date().toISOString(),
             hadError: Boolean(event?.error)
-          })
+          }
+          console.error(`[${connectionId}] ⚠️ Live API session closed`, closeDetails)
           const rec = activeSessions.get(connectionId)
-          rec?.logger?.log('session_closed', { source: 'live_api' })
+          rec?.logger?.log('session_closed', { source: 'live_api', ...closeDetails })
           rec?.logger?.close()
           activeSessions.delete(connectionId)
           noSessionWarned.delete(connectionId)
