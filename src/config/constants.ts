@@ -8,14 +8,71 @@
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
 
+const normalizeWebsocketUrl = (
+  rawValue: string | undefined,
+  {
+    fallback,
+    enforceSecure = false,
+  }: {
+    fallback: string
+    enforceSecure?: boolean
+  }
+) => {
+  if (!rawValue) {
+    return trimTrailingSlash(fallback)
+  }
+
+  try {
+    const trimmed = rawValue.trim()
+    const hasScheme = /^[a-z]+:\/\//i.test(trimmed)
+    const baseProtocol = enforceSecure ? 'wss://' : 'ws://'
+    const candidate = hasScheme ? trimmed : `${baseProtocol}${trimmed}`
+    const url = new URL(candidate)
+
+    if (url.protocol === 'http:') url.protocol = 'ws:'
+    if (url.protocol === 'https:') url.protocol = 'wss:'
+    if (enforceSecure && url.protocol !== 'wss:') {
+      url.protocol = 'wss:'
+    }
+
+    const hostname = url.hostname.toLowerCase()
+    const isLocalHost =
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '[::1]' ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.localdomain')
+
+    if (!isLocalHost && url.protocol === 'wss:') {
+      if (url.port && url.port !== '443') {
+        console.warn(
+          `[WEBSOCKET_CONFIG] Stripping unsupported secure port "${url.port}" from ${url.hostname}`
+        )
+        url.port = ''
+      }
+    }
+
+    return trimTrailingSlash(url.toString())
+  } catch (error) {
+    console.warn(
+      '[WEBSOCKET_CONFIG] Invalid WebSocket URL provided; falling back to default',
+      error
+    )
+    return trimTrailingSlash(fallback)
+  }
+}
+
 // WebSocket Configuration
 const IS_PROD = process.env.NODE_ENV === 'production'
 export const WEBSOCKET_CONFIG = {
   // Distinct envs for prod vs dev to avoid accidental overrides
-  PRODUCTION_URL:
-    process.env.NEXT_PUBLIC_LIVE_SERVER_URL || 'wss://fb-consulting-websocket.fly.dev',
-  DEVELOPMENT_URL:
-    process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_URL || 'ws://localhost:3001',
+  PRODUCTION_URL: normalizeWebsocketUrl(process.env.NEXT_PUBLIC_LIVE_SERVER_URL, {
+    fallback: 'wss://fb-consulting-websocket.fly.dev',
+    enforceSecure: true,
+  }),
+  DEVELOPMENT_URL: normalizeWebsocketUrl(process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_URL, {
+    fallback: 'ws://localhost:3001',
+  }),
   get URL() {
     if (IS_PROD) return this.PRODUCTION_URL
     // Prefer explicit dev URL when present

@@ -121,6 +121,27 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [isActionsPopoverOpen, setIsActionsPopoverOpen] = useState(false);
   const [isDownloadingSession, setIsDownloadingSession] = useState(false);
+  const [voicePermissionGranted, setVoicePermissionGranted] = useState(false);
+
+  useEffect(() => {
+    if (voicePermissionGranted) return;
+    if (isVoiceActive) {
+      setVoicePermissionGranted(true);
+    }
+  }, [voicePermissionGranted, isVoiceActive]);
+
+  useEffect(() => {
+    if (!voiceError) return;
+    if (/denied|permission/i.test(voiceError)) {
+      setVoicePermissionGranted(false);
+    }
+  }, [voiceError]);
+
+  useEffect(() => {
+    if (pendingPermission === 'voice' && voicePermissionGranted) {
+      setPendingPermission(null);
+    }
+  }, [pendingPermission, voicePermissionGranted]);
 
   // Expose imperative method to open media from header
   useImperativeHandle(ref, () => ({
@@ -139,6 +160,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   // Unified media toggle hooks
   const voiceToggle = useMediaToggle({
     isActive: isVoiceActive,
+    hasPermission: voicePermissionGranted,
     onToggle: onToggleVoice,
     type: 'voice',
     onPermissionNeeded: setPendingPermission

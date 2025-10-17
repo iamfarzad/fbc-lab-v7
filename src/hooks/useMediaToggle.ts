@@ -3,6 +3,7 @@ import { useIsMobile } from './useIsMobile'
 
 export interface MediaToggleOptions {
   isActive: boolean
+  hasPermission?: boolean
   onToggle: () => void | Promise<void>
   type: 'voice' | 'camera' | 'screen'
   onPermissionNeeded?: (type: 'voice' | 'camera' | 'screen') => void
@@ -10,6 +11,7 @@ export interface MediaToggleOptions {
 
 export function useMediaToggle({
   isActive,
+  hasPermission = false,
   onToggle,
   type,
   onPermissionNeeded
@@ -24,19 +26,21 @@ export function useMediaToggle({
     isTogglingRef.current = true
     
     try {
+      const needsPermission = !isActive && !hasPermission
+
       if (isMobile) {
         setIsFullScreenOpen(!isFullScreenOpen)
-        if (!isActive && onPermissionNeeded) {
+        if (needsPermission && onPermissionNeeded) {
           onPermissionNeeded(type)
           return
         }
       } else {
-        if (!isActive && onPermissionNeeded) {
+        if (needsPermission && onPermissionNeeded) {
           onPermissionNeeded(type)
           return
         }
       }
-      
+
       await onToggle()
     } catch (error) {
       console.error(`[${type}] Toggle error:`, error)
@@ -48,7 +52,7 @@ export function useMediaToggle({
         isTogglingRef.current = false
       }, 500)
     }
-  }, [isActive, isFullScreenOpen, onToggle, type, onPermissionNeeded, isMobile])
+  }, [hasPermission, isActive, isFullScreenOpen, onToggle, type, onPermissionNeeded, isMobile])
 
   const closeFullScreen = useCallback(() => {
     setIsFullScreenOpen(false)
@@ -67,4 +71,3 @@ export function useMediaToggle({
     setIsFullScreenOpen
   }
 }
-

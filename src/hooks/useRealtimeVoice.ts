@@ -16,6 +16,17 @@ type MediaRecorderVoiceResult = {
   durationMs: number;
 };
 
+const DEFAULT_SERVER_SAMPLE_RATE = 24000;
+const SAMPLE_RATE_PATTERN = /rate=(\d+)/i;
+
+const extractSampleRate = (mimeType?: string): number | undefined => {
+  if (!mimeType) return undefined;
+  const match = SAMPLE_RATE_PATTERN.exec(mimeType);
+  if (!match) return undefined;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 // Inlined minimal recorder hook using AudioWorklet via AudioRecorder
 function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
   const targetSampleRate = options.targetSampleRate ?? 16000;
@@ -239,7 +250,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, [options]);
 
   useEffect(() => {
-    audioPlayerRef.current = new AudioPlayer(24000); // 24kHz for Gemini output
     return () => {
       audioPlayerRef.current?.destroy();
       audioPlayerRef.current = null;
@@ -357,6 +367,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     setIsProcessing(false);
     setPartialTranscript('');
     setError(null);
+    audioPlayerRef.current?.clear();
     void resetRecording();
     pendingChunksRef.current = [];
 
@@ -471,7 +482,21 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       case 'audio': {
         // Use unified audio player for smooth playback
         const audioData = event.payload.audioData;
-        audioPlayerRef.current?.addBase64PCM16(audioData);
+        if (!audioData) {
+          console.warn('🎤 [RealtimeVoice] Received audio event without data');
+          break;
+        }
+
+        const declaredRate = extractSampleRate(event.payload.mimeType);
+        const playbackRate = declaredRate ?? DEFAULT_SERVER_SAMPLE_RATE;
+
+        if (!audioPlayerRef.current) {
+          audioPlayerRef.current = new AudioPlayer(playbackRate);
+        } else if (declaredRate && audioPlayerRef.current.getSampleRate() !== playbackRate) {
+          audioPlayerRef.current.setSampleRate(playbackRate);
+        }
+
+        audioPlayerRef.current.addBase64PCM16(audioData);
         break;
       }
       case 'heartbeat': {
@@ -649,21 +674,19 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           sessionId: opts?.sessionId,
         },
       });
-      console.log('🎤 [RealtimeVoice] Start message sent successfully; waiting for session_started');
+      console.log('🎤 [RealtimeVoice] Start message sent successfully; preparing microphone');
 
-      // Wait up to 5s for session to become active before starting recorder
-      const deadline = Date.now() + 5000;
-      while (!isSessionActiveRef.current && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 50));
-      }
-
-      if (!isSessionActiveRef.current) {
-        console.warn('🎤 [RealtimeVoice] Session did not start within 5s; proceeding to start recording but deferring send until active');
+      if (sessionTimeoutRef.current) {
+        clearTimeout(sessionTimeoutRef.current);
+        sessionTimeoutRef.current = null;
       }
 
       console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
       await startRecording({ onChunk: handleRecorderChunk });
       console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
+      if (!isSessionActiveRef.current) {
+        console.log('🎤 [RealtimeVoice] Awaiting session activation while buffering audio chunks');
+      }
       
       // Set timeout to handle case where server never responds
       sessionTimeoutRef.current = setTimeout(() => {
