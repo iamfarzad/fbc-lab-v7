@@ -643,8 +643,9 @@ const summary = await getContextSummary(sessionId)
 User: [via voice] "Can you see me?"
   ↓
 1. Voice transcript stored in audioContext
-2. Webcam frames being sent via sendRealtimeInput()
-3. AI response generated with:
+2. Webcam frames streamed via `sendRealtimeInput()` and captured image analyzed through `/api/tools/webcam`
+3. Server persists analysis via `multimodalContextManager.addVisualAnalysis()` (Realtime CONTEXT_UPDATE)
+4. AI response generated with:
    - Recent voice transcript: "Can you see me?"
    - Recent visual context: "Webcam shows person in office..."
   ↓
@@ -673,9 +674,10 @@ AI: "Based on the 10-page report you uploaded..."
 User: [sharing screen with code]
 User: [via voice] "What's wrong with this function?"
   ↓
-1. Screen frames streamed via sendRealtimeInput()
-2. Voice transcript stored: "What's wrong with this function?"
-3. AI response uses:
+1. Screen frames streamed via `sendRealtimeInput()` and analyzed through `/api/tools/screen`
+2. Server logs analysis via `addVisualAnalysis(..., 'screen')`
+3. Voice transcript stored: "What's wrong with this function?"
+4. AI response uses:
    - Recent screen analysis: "Code visible: function calculateTotal()..."
    - Voice transcript: "What's wrong with this function?"
    - Previous chat context
@@ -684,8 +686,8 @@ AI: "Looking at the function on your screen, I see the issue on line 42..."
 
 User: [types in chat] "Can you show me the fixed version?"
   ↓
-4. Text message sent with full multimodal context
-5. AI maintains awareness of:
+5. Text message sent with full multimodal context
+6. AI maintains awareness of:
    - What code was on screen
    - What was discussed via voice
    - Current text request
@@ -1049,4 +1051,3 @@ Your multimodal context system is:
 **Each modality adds to shared context, enabling true multimodal AI interactions.**
 
 **For production:** Consider adding Redis or similar for persistent, distributed context storage.
-

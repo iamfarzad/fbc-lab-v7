@@ -91,6 +91,8 @@ export function useCamera(options: UseCameraOptions = {}) {
     failedCaptures: 0,
     avgCaptureTime: 0,
   });
+  const lastAnalysisAtRef = useRef(0);
+  const ANALYSIS_INTERVAL_MS = 4000;
 
   // Initialize canvas (reused across captures to prevent memory leaks)
   useEffect(() => {
@@ -373,6 +375,10 @@ export function useCamera(options: UseCameraOptions = {}) {
       // Call capture callback if provided
       onCapture?.(blob, imageData);
 
+      let analysisText: string | null = null;
+      const now = Date.now();
+      const shouldAnalyze = Boolean(sessionId) && (now - lastAnalysisAtRef.current >= ANALYSIS_INTERVAL_MS);
+
       // Send frame via sendRealtimeInput for continuous streaming (prototype pattern)
       if (sendRealtimeInput) {
         try {
@@ -383,32 +389,35 @@ export function useCamera(options: UseCameraOptions = {}) {
             data: base64Data,
           }]);
           console.log('📹 Webcam frame streamed to Live API');
-
-          if (sendContextUpdate) {
-            try {
-              sendContextUpdate({
-                sessionId,
-                modality: 'webcam',
-                analysis: `Live webcam frame captured at ${new Date().toISOString()}. Reference the inline image for precise visual details.`,
-                imageData,
-                capturedAt: Date.now(),
-                metadata: {
-                  source: 'webcam_stream',
-                  connectionId: voiceConnectionId,
-                },
-              });
-            } catch (contextErr) {
-              console.warn('⚠️ Failed to push webcam context update:', contextErr);
-            }
-          }
         } catch (err) {
           console.error('❌ Failed to stream webcam frame:', err);
         }
-      } else if (sessionId) {
-        // Fallback: Upload to backend for analysis (legacy mode)
+      }
+
+      if (sessionId && shouldAnalyze) {
         const result = await uploadToBackend(blob, imageData, sessionId, voiceConnectionId);
         if (result?.analysis) {
+          lastAnalysisAtRef.current = now;
+          analysisText = result.analysis;
           onAnalysis?.(result.analysis, imageData, capture.timestamp);
+        }
+      }
+
+      if (analysisText && typeof sendContextUpdate === 'function') {
+        try {
+          sendContextUpdate({
+            sessionId,
+            modality: 'webcam',
+            analysis: analysisText,
+            imageData,
+            capturedAt: capture.timestamp,
+            metadata: {
+              source: sendRealtimeInput ? 'webcam_stream' : 'webcam_capture',
+              connectionId: voiceConnectionId,
+            },
+          });
+        } catch (contextErr) {
+          console.warn('⚠️ Failed to push webcam context update:', contextErr);
         }
       }
 

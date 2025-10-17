@@ -2,11 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Camera, Monitor, Mic, X } from 'lucide-react';
+import { MediaStatusBadge } from '@/components/ui/media-status-badge';
+import { Mic, X } from 'lucide-react';
 import { DESIGN_TOKENS } from '../design-tokens';
 import { getMonochromeClass } from '@/lib/theme-utils';
 import { ChatState, MediaState } from '../constants/chatConstants';
+import { MEDIA_MOTION_VARIANTS } from '@/lib/animations';
 
 interface MediaControlsOverlayProps {
   chatState: ChatState;
@@ -48,10 +49,7 @@ export function MediaControlsOverlay({
         {/* Webcam preview */}
         {mediaState.webcam && webcamStream && (
           <motion.div
-            initial={{ opacity: 0, x: 20, scale: 0.9 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
+            {...MEDIA_MOTION_VARIANTS.slideInRight}
             className={cn(
               "relative w-48 h-36 rounded-lg overflow-hidden border-2 border-primary shadow-lg",
               DESIGN_TOKENS.corners.default,
@@ -82,10 +80,11 @@ export function MediaControlsOverlay({
               <X className="h-3 w-3" />
             </Button>
             <div className="absolute bottom-2 left-2">
-              <Badge variant="secondary" className="text-xs px-2 py-1">
-                <Camera className="h-3 w-3 mr-1" />
-                Webcam
-              </Badge>
+              <MediaStatusBadge
+                type="camera"
+                variant="secondary"
+                className="px-2 py-1"
+              />
             </div>
           </motion.div>
         )}
@@ -93,10 +92,7 @@ export function MediaControlsOverlay({
         {/* Screen share preview */}
         {mediaState.screenShare && screenThumbnail && (
           <motion.div
-            initial={{ opacity: 0, x: 20, scale: 0.9 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
+            {...MEDIA_MOTION_VARIANTS.slideInRight}
             className={cn(
               "relative w-48 h-36 rounded-lg overflow-hidden border-2 border-accent shadow-lg",
               DESIGN_TOKENS.corners.default,
@@ -124,10 +120,11 @@ export function MediaControlsOverlay({
               <X className="h-3 w-3" />
             </Button>
             <div className="absolute bottom-2 left-2">
-              <Badge variant="secondary" className="text-xs px-2 py-1">
-                <Monitor className="h-3 w-3 mr-1" />
-                Screen
-              </Badge>
+              <MediaStatusBadge
+                type="screen"
+                variant="secondary"
+                className="px-2 py-1"
+              />
             </div>
           </motion.div>
         )}
@@ -135,10 +132,7 @@ export function MediaControlsOverlay({
         {/* Voice indicator */}
         {mediaState.voice && (
           <motion.div
-            initial={{ opacity: 0, x: 20, scale: 0.9 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 20, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
+            {...MEDIA_MOTION_VARIANTS.slideInRight}
             className={cn(
               "flex items-center gap-3 bg-primary/90 text-primary-foreground px-4 py-3 rounded-lg shadow-lg",
               "backdrop-blur-sm border border-primary-foreground/20",

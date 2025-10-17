@@ -5,16 +5,11 @@ import {
   Download,
   Paperclip,
   Image as ImageIcon,
-  Mic,
-  MicOff,
-  Camera,
-  CameraOff,
-  Monitor,
-  MonitorOff,
   Settings
 } from "lucide-react";
 import { SettingsDialog } from './SettingsDialog';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { MediaToggle } from '@/components/ui/media-toggle';
 
 interface ActionsMenuProps {
   isOpen: boolean;
@@ -165,42 +160,25 @@ export function ActionsMenu({
 
           {/* Media Controls Section */}
           <div className="space-y-2">
-            <BottomSheetListItem
-              icon={
-                isVoiceActive ? (
-                  <Mic className="h-5 w-5 text-primary" />
-                ) : (
-                  <MicOff className="h-5 w-5 text-muted-foreground" />
-                )
-              }
-              label={isVoiceActive ? "Stop Voice" : "Start Voice"}
-              description={isVoiceActive ? "Currently recording" : "Use voice input"}
+            <MediaToggle
+              type="voice"
+              variant="list"
+              className="px-3 py-3"
+              isActive={Boolean(isVoiceActive)}
               onClick={handleVoiceClick}
             />
-
-            <BottomSheetListItem
-              icon={
-                isCameraActive ? (
-                  <Camera className="h-5 w-5 text-primary" />
-                ) : (
-                  <CameraOff className="h-5 w-5 text-muted-foreground" />
-                )
-              }
-              label={isCameraActive ? "Stop Camera" : "Start Camera"}
-              description={isCameraActive ? "Camera is active" : "Use camera input"}
+            <MediaToggle
+              type="camera"
+              variant="list"
+              className="px-3 py-3"
+              isActive={Boolean(isCameraActive)}
               onClick={handleCameraClick}
             />
-
-            <BottomSheetListItem
-              icon={
-                isScreenSharing ? (
-                  <Monitor className="h-5 w-5 text-primary" />
-                ) : (
-                  <MonitorOff className="h-5 w-5 text-muted-foreground" />
-                )
-              }
-              label={isScreenSharing ? "Stop Screen Share" : "Start Screen Share"}
-              description={isScreenSharing ? "Sharing screen" : "Share your screen"}
+            <MediaToggle
+              type="screen"
+              variant="list"
+              className="px-3 py-3"
+              isActive={Boolean(isScreenSharing)}
               onClick={handleScreenShareClick}
             />
           </div>

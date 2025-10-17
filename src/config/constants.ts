@@ -22,9 +22,13 @@ export const WEBSOCKET_CONFIG = {
     if (process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_URL) return this.DEVELOPMENT_URL
     // Derive from current host in the browser for local networks
     if (typeof window !== 'undefined') {
-      const host = window.location.hostname.replace(/:\\d+$/, '')
-      const port = process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_PORT || '3001'
-      return `ws://${host}:${port}`
+      const host = window.location.hostname
+      const isSecure = window.location.protocol === 'https:'
+      const protocol = isSecure ? 'wss' : 'ws'
+      // WebSocket server runs on 3001, NOT the same port as Next.js (3000)
+      const port = process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_PORT ?? '3001'
+      const portSuffix = port ? `:${port}` : ''
+      return `${protocol}://${host}${portSuffix}`
     }
     return this.DEVELOPMENT_URL
   },

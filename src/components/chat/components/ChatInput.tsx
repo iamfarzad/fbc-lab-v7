@@ -20,14 +20,9 @@ import {
   Download,
   Paperclip,
   Image as ImageIcon,
-  Mic,
-  MicOff,
-  Camera as CameraIcon,
-  CameraOff,
-  MonitorUp,
-  MonitorOff,
 } from "lucide-react";
 import { VoiceButton } from "@/components/ui/voice-button";
+import { Button } from "@/components/ui/button";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
 import { CameraFullScreen } from "./camera/CameraFullScreen";
 import { ScreenFullScreen } from "./screen/ScreenFullScreen";
@@ -37,6 +32,7 @@ import { useMediaToggle } from "@/hooks/useMediaToggle";
 import { useMediaKeyboardShortcuts } from "@/hooks/useMediaKeyboardShortcuts";
 // MediaDrawer and MediaPanel removed
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { MediaToggle } from "@/components/ui/media-toggle";
 
 type SendMessageInput = string | {
   text?: string;
@@ -95,7 +91,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   isVoiceActive,
   isVoiceProcessing,
   cameraState,
+  isCameraInitializing = false,
   isScreenSharing,
+  isScreenShareInitializing = false,
   cameraStream,
   screenShareStream,
   screenThumbnail,
@@ -122,6 +120,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   const [activePopover, setActivePopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [isActionsPopoverOpen, setIsActionsPopoverOpen] = useState(false);
+  const [isDownloadingSession, setIsDownloadingSession] = useState(false);
 
   // Expose imperative method to open media from header
   useImperativeHandle(ref, () => ({
@@ -208,6 +207,43 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
 
   const handleScreenButtonClick = () => {
     screenToggle.handleButtonClick();
+  };
+
+  const handleDownloadSession = async () => {
+    if (!sessionIdForExport) {
+      toast.error('Conversation not ready for download yet.');
+      return;
+    }
+    if (isDownloadingSession) return;
+    setIsDownloadingSession(true);
+    try {
+      const response = await fetch('/api/session/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionIdForExport }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Export failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const fileSuffix = sessionIdForExport.slice(0, 8);
+      link.href = url;
+      link.download = `fbc-session-${fileSuffix}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Session JSON downloaded');
+    } catch (err) {
+      console.error('Failed to export session', err);
+      toast.error('Failed to download session. Please try again.');
+    } finally {
+      setIsDownloadingSession(false);
+    }
   };
 
   // Handle permission dialog acceptance
@@ -387,39 +423,36 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                                 <div className="my-1 h-px bg-border/30" />
 
                                 {/* Core media toggles */}
-                                <button className="flex items-start gap-3 min-h-[44px] rounded px-2 py-2 hover:bg-muted text-left" onClick={() => { setIsActionsPopoverOpen(false); handleVoiceButtonClick(); }}>
-                                  {(isVoiceActive || isVoiceProcessing) ? (
-                                    <Mic className="h-5 w-5 text-[hsl(var(--accent))]" />
-                                  ) : (
-                                    <MicOff className="h-5 w-5 text-muted-foreground" />
-                                  )}
-                                  <span>
-                                    <div className="text-sm font-medium">{isVoiceActive || isVoiceProcessing ? 'Stop Voice' : 'Start Voice'}</div>
-                                    <div className="text-xs text-muted-foreground">{isVoiceActive || isVoiceProcessing ? 'Currently recording' : 'Use voice input'}</div>
-                                  </span>
-                                </button>
-                                <button className="flex items-start gap-3 min-h-[44px] rounded px-2 py-2 hover:bg-muted text-left" onClick={() => { setIsActionsPopoverOpen(false); handleCameraButtonClick(); }}>
-                                  {cameraState ? (
-                                    <CameraIcon className="h-5 w-5 text-[hsl(var(--accent))]" />
-                                  ) : (
-                                    <CameraOff className="h-5 w-5 text-muted-foreground" />
-                                  )}
-                                  <span>
-                                    <div className="text-sm font-medium">{cameraState ? 'Stop Camera' : 'Start Camera'}</div>
-                                    <div className="text-xs text-muted-foreground">{cameraState ? 'Camera is active' : 'Use camera input'}</div>
-                                  </span>
-                                </button>
-                                <button className="flex items-start gap-3 min-h-[44px] rounded px-2 py-2 hover:bg-muted text-left" onClick={() => { setIsActionsPopoverOpen(false); handleScreenButtonClick(); }}>
-                                  {isScreenSharing ? (
-                                    <MonitorUp className="h-5 w-5 text-[hsl(var(--accent))]" />
-                                  ) : (
-                                    <MonitorOff className="h-5 w-5 text-muted-foreground" />
-                                  )}
-                                  <span>
-                                    <div className="text-sm font-medium">{isScreenSharing ? 'Stop Screen Share' : 'Start Screen Share'}</div>
-                                    <div className="text-xs text-muted-foreground">{isScreenSharing ? 'Sharing screen' : 'Share your screen'}</div>
-                                  </span>
-                                </button>
+                                <MediaToggle
+                                  type="voice"
+                                  variant="list"
+                                  isActive={isVoiceActive}
+                                  isProcessing={isVoiceProcessing}
+                                  onClick={() => {
+                                    setIsActionsPopoverOpen(false);
+                                    handleVoiceButtonClick();
+                                  }}
+                                />
+                                <MediaToggle
+                                  type="camera"
+                                  variant="list"
+                                  isActive={cameraState}
+                                  isProcessing={Boolean(isCameraInitializing)}
+                                  onClick={() => {
+                                    setIsActionsPopoverOpen(false);
+                                    handleCameraButtonClick();
+                                  }}
+                                />
+                                <MediaToggle
+                                  type="screen"
+                                  variant="list"
+                                  isActive={isScreenSharing}
+                                  isProcessing={Boolean(isScreenShareInitializing)}
+                                  onClick={() => {
+                                    setIsActionsPopoverOpen(false);
+                                    handleScreenButtonClick();
+                                  }}
+                                />
 
                                 {/* Advanced panels & Settings removed per consolidation */}
                               </div>
@@ -470,6 +503,22 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                           <div ref={screenButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
 
                           {/* Send Button */}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleDownloadSession}
+                            disabled={isDownloadingSession || !sessionIdForExport}
+                            className={cn(
+                              "h-11 w-11 min-h-[44px] min-w-[44px] border border-border/40 bg-muted text-foreground transition-transform duration-150 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2 shadow-sm",
+                              VISUAL.CORNER_RADIUS,
+                              "[.monochrome_&]:rounded-none"
+                            )}
+                            aria-label="Download session JSON"
+                            title="Download session JSON"
+                          >
+                            <Download className={cn("h-4 w-4", isDownloadingSession && "animate-pulse")} />
+                          </Button>
                           <PromptInputSubmit
                             className={cn(
                               "h-11 w-11 min-h-[44px] min-w-[44px] bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[0_24px_60px_-30px_rgba(255,107,53,0.35)] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[hsl(var(--accent))]/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2",

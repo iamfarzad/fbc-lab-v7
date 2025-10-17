@@ -502,7 +502,9 @@ export async function POST(req: NextRequest) {
   try {
     const reqId = req.headers.get('x-request-id') || crypto.randomUUID()
     const startTime = Date.now()
+    const timings: Record<string, number> = {}
     console.log('[UNIFIED_AI_SDK] Request:', reqId)
+    console.log(`⏱️  [PERF] ENABLE_MULTI_AGENT: ${ENABLE_MULTI_AGENT}`)
 
     let body: ChatRequestBody | null = null
     try {
@@ -527,6 +529,7 @@ export async function POST(req: NextRequest) {
     }
 
     // CHECK: Message limit (cost protection)
+    const limitCheckStart = Date.now()
     const { usageLimiter } = await import('@/src/lib/usage-limits')
     const limitCheck = await usageLimiter.checkLimit(context?.sessionId || '', 'message')
     if (!limitCheck.allowed) {
@@ -535,6 +538,8 @@ export async function POST(req: NextRequest) {
     
     // Track message usage
     await usageLimiter.trackUsage(context?.sessionId || '', 'message')
+    timings.limitCheck = Date.now() - limitCheckStart
+    console.log(`⏱️  [PERF] Limit check: ${timings.limitCheck}ms`)
 
     const conversationFlow = context?.conversationFlow ?? null
 
@@ -618,6 +623,7 @@ ARTIFACT CREATION:
 If conversationFlow.recommendedNext is null, you have enough information - offer a crisp recap and propose the next concrete move.`
 
     // Add voice context if available
+    const voiceContextStart = Date.now()
     if (context?.sessionId) {
       try {
         const voiceTranscripts = await multimodalContextManager.getVoiceTranscripts(context.sessionId, 3)
@@ -629,6 +635,8 @@ If conversationFlow.recommendedNext is null, you have enough information - offer
         console.error('Failed to load voice context (non-fatal):', err)
       }
     }
+    timings.voiceContext = Date.now() - voiceContextStart
+    console.log(`⏱️  [PERF] Voice context: ${timings.voiceContext}ms`)
 
     // Note if voice is currently active
     if (context?.voiceActive) {
@@ -636,6 +644,7 @@ If conversationFlow.recommendedNext is null, you have enough information - offer
     }
     
     // Check if admin query via header (mode parameter removed)
+    const intelligenceContextStart = Date.now()
     const isAdminQuery = req.headers.get('x-admin-query') === 'true';
     if (isAdminQuery) {
       systemPrompt = `You are F.B/c AI Admin Assistant, specialized in business intelligence and management.
@@ -675,6 +684,8 @@ Response style: Be concise, actionable, and data-driven.`
     }
 
     systemPrompt += formatConversationGuidance(conversationFlow)
+    timings.intelligenceContext = Date.now() - intelligenceContextStart
+    console.log(`⏱️  [PERF] Intelligence context: ${timings.intelligenceContext}ms`)
 
     // Smart research trigger - analyze if this message needs research
     const researchTrigger = analyzeResearchNeed(
@@ -683,6 +694,7 @@ Response style: Be concise, actionable, and data-driven.`
     )
 
     // Add enhanced research context (combines search grounding + URL context)
+    const researchStart = Date.now()
     let enhancedResearchContext = ''
     let researchMetadata: Record<string, any> | null = null
     
@@ -773,6 +785,8 @@ Citations: ${researchResult.allCitations.length} sources processed
         // Continue without enhanced context
       }
     }
+    timings.research = Date.now() - researchStart
+    console.log(`⏱️  [PERF] Research: ${timings.research}ms`)
 
     const researchHasError = Boolean(
       researchMetadata &&
@@ -785,6 +799,7 @@ Citations: ${researchResult.allCitations.length} sources processed
     }
 
     // Add multimodal context from conversation history
+    const multimodalContextStart = Date.now()
     if (context?.sessionId) {
       try {
         const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(context.sessionId, true, false)
@@ -796,6 +811,8 @@ Citations: ${researchResult.allCitations.length} sources processed
         console.warn('Failed to load multimodal context:', error)
       }
     }
+    timings.multimodalContext = Date.now() - multimodalContextStart
+    console.log(`⏱️  [PERF] Multimodal context: ${timings.multimodalContext}ms`)
 
     // Add multimodal context from direct input
     if (context?.multimodalData) {
@@ -834,6 +851,7 @@ Citations: ${researchResult.allCitations.length} sources processed
 
     // ⭐ MULTI-AGENT SYSTEM (if enabled)
     if (ENABLE_MULTI_AGENT && stream !== false) {
+      const multiAgentStart = Date.now()
       console.log('🤖 [Multi-Agent] Routing to specialized agent...')
       
       try {
@@ -848,13 +866,18 @@ Citations: ${researchResult.allCitations.length} sources processed
 
         // Route to appropriate agent
         // Note: AIDevtools UI component in ChatInterface already tracks this
+        const routingStart = Date.now()
         const agentResult = await routeToAgent({
           messages: aiMessages,
           context: agentContext,
           trigger: context?.voiceActive ? 'voice' : 'chat'
         })
+        timings.agentRouting = Date.now() - routingStart
+        console.log(`⏱️  [PERF] Agent routing: ${timings.agentRouting}ms`)
 
         console.log(`✅ [Multi-Agent] Routed to: ${agentResult.agent} (${agentResult.metadata?.stage})`)
+        timings.multiAgentTotal = Date.now() - multiAgentStart
+        console.log(`⏱️  [PERF] Multi-agent total: ${timings.multiAgentTotal}ms`)
 
         // Stream the agent's response using AI SDK streaming
         // (Agent returns text, we stream it to client using existing SSE format)
@@ -1040,6 +1063,11 @@ Citations: ${researchResult.allCitations.length} sources processed
       };
       
       // Streaming response using AI SDK
+      const streamingStart = Date.now()
+      timings.beforeStreaming = streamingStart - startTime
+      console.log(`⏱️  [PERF] Total prep time before streaming: ${timings.beforeStreaming}ms`)
+      console.log(`⏱️  [PERF] Breakdown: limit=${timings.limitCheck}ms, voice=${timings.voiceContext}ms, intel=${timings.intelligenceContext}ms, research=${timings.research}ms, multimodal=${timings.multimodalContext}ms`)
+      
       const result = streamText({
         model: streamingModel,
         system: systemPrompt,
@@ -1047,12 +1075,15 @@ Citations: ${researchResult.allCitations.length} sources processed
         messages: aiMessages,
         temperature: GEMINI_CONFIG.DEFAULT_TEMPERATURE,
         onFinish: (result) => {
+          const totalDuration = Date.now() - startTime
+          timings.streamingDuration = Date.now() - streamingStart
           console.log('[UNIFIED_AI_SDK] Completed:', {
             reqId,
             tokensUsed: result.usage?.totalTokens || 0,
             finishReason: result.finishReason,
-            duration: Date.now() - startTime
+            duration: totalDuration
           })
+          console.log(`⏱️  [PERF] Final timings:`, timings)
         }
       })
 

@@ -658,7 +658,10 @@ export class MultimodalContextManager {
         ttl: CONTEXT_CONFIG.REDIS_TTL,
         tags: ['session', 'multimodal']
       })
-      console.log(`✅ Context saved to Redis: ${sessionId}`)
+      // Only log if Redis is actually configured (no false positives)
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        console.log(`✅ Context saved to Redis: ${sessionId}`)
+      }
     } catch (err) {
       console.error('Redis save failed (non-fatal):', err)
       // Non-fatal - in-memory still works

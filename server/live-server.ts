@@ -11,6 +11,7 @@ import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { SessionLogger } from './session-logger'
 import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG } from '../src/config/constants.js'
+import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -131,40 +132,12 @@ nodeProcess?.on('unhandledRejection', (reason: unknown) => {
 // --- Live Config: System instruction and tool declarations ---
 // Imported from constants.ts - GEMINI_CONFIG.SYSTEM_PROMPT
 
-const FUNCTION_DECLARATIONS: any[] = [
-  {
-    name: 'search_web',
-    description: 'Search the web for current information and return grounded, cited findings.',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query to submit.' },
-        urls: { type: 'array', items: { type: 'string' }, description: 'Optional URLs to prioritize.' }
-      },
-      required: ['query']
-    }
-  },
-  {
-    name: 'capture_screen_snapshot',
-    description: 'Retrieve the latest analyzed screen-share context for this session.',
-    parameters: {
-      type: 'object',
-      properties: { summaryOnly: { type: 'boolean', description: 'Omit raw image data when true.' } }
-    }
-  },
-  {
-    name: 'capture_webcam_snapshot',
-    description: 'Retrieve the latest analyzed webcam context for this session.',
-    parameters: {
-      type: 'object',
-      properties: { summaryOnly: { type: 'boolean', description: 'Omit raw image data when true.' } }
-    }
-  }
-];
+const FUNCTION_DECLARATIONS = LIVE_FUNCTION_DECLARATIONS;
 
 // Visual trigger + throttle configuration - imported from constants.ts
 const VISUAL_TRIGGER_WORDS = VOICE_CONFIG.VISUAL_TRIGGERS;
 const VISUAL_INJECT_THROTTLE_MS = VOICE_CONFIG.VISUAL_INJECT_THROTTLE_MS;
+const VISUAL_PERSIST_THROTTLE_MS = Math.max(VISUAL_INJECT_THROTTLE_MS, 3000);
 
 // Visual context snapshot & session record types
 type Snapshot = {
@@ -172,6 +145,7 @@ type Snapshot = {
   capturedAt: number;
   imageData?: string;
   lastInjected?: number;
+  lastPersisted?: number;
 };
 
 type ActiveSessionRecord = {
@@ -703,9 +677,31 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
             analysis,
             capturedAt,
             imageData,
-            lastInjected: prev?.lastInjected
+            lastInjected: prev?.lastInjected,
+            lastPersisted: prev?.lastPersisted
           };
           client.logger?.log('context_update', { modality, analysis, capturedAt, hasImage: Boolean(imageData), imageBytes: typeof imageData === 'string' ? Math.floor(imageData.length * 0.75) : 0 })
+
+          if (client.sessionId) {
+            const snapRef = client.latestContext[modalityKey];
+            const now = Date.now();
+            if (!snapRef.lastPersisted || now - snapRef.lastPersisted >= VISUAL_PERSIST_THROTTLE_MS) {
+              snapRef.lastPersisted = now;
+              (async () => {
+                try {
+                  const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+                  const imageBytes = typeof imageData === 'string' ? Math.floor(imageData.length * 0.75) : undefined
+                  await multimodalContextManager.addVisualAnalysis(client.sessionId!, analysis, modalityKey, imageBytes, imageData)
+                  client.logger?.log('context_persisted', { modality, imageBytes, analysisLength: analysis.length })
+                } catch (err) {
+                  console.error(`[${connectionId}] Failed to persist ${modality} context:`, err);
+                  client.logger?.log('error', { where: 'context_persist', modality, message: err instanceof Error ? err.message : String(err) })
+                }
+              })().catch(() => {
+                // handled in logger
+              })
+            }
+          }
 
           if (!INJECT_ON_CONTEXT_UPDATE) {
             console.info(`[${connectionId}] CONTEXT_UPDATE received; injection disabled by flag`);

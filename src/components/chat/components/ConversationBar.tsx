@@ -2,7 +2,8 @@
 
 import React, { forwardRef } from "react";
 import { cn } from "@/lib/utils";
-import { MonitorUp, Camera, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { MediaToggle } from '@/components/ui/media-toggle';
 import { BarVisualizer, type AgentState } from "@/components/ui/bar-visualizer";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { Popover, PopoverContent } from "@/components/ui/popover";
@@ -163,18 +164,14 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
             {/* Camera chip */}
             {cameraState && (
               <Popover open={cameraPopoverOpen} onOpenChange={setCameraPopoverOpen}>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-border/40 bg-muted/40 px-3 py-2.5 text-[11px] min-h-[44px]"
-                  aria-pressed={true}
+                <MediaToggle
+                  type="camera"
+                  variant="chip"
+                  isActive={cameraState}
                   aria-label="Camera active. Click to preview or double-click to toggle"
                   onClick={() => setCameraPopoverOpen(!cameraPopoverOpen)}
                   onDoubleClick={() => onToggleCamera?.()}
-                >
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  <Camera className="h-3 w-3" />
-                  <span>Camera</span>
-                </button>
+                />
                 <PopoverContent className="w-[200px] p-2 space-y-2">
                   <video ref={camVideoRef} muted playsInline className="w-full h-auto rounded-sm" />
                   {Boolean(availableCameras && availableCameras > 1) && (
@@ -189,18 +186,15 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
             {/* Screen share chip */}
             {isScreenSharing && (
               <Popover open={screenPopoverOpen} onOpenChange={setScreenPopoverOpen}>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-border/40 bg-muted/40 px-3 py-2.5 text-[11px] min-h-[44px]"
-                  aria-pressed={true}
+                <MediaToggle
+                  type="screen"
+                  variant="chip"
+                  isActive={isScreenSharing}
+                  labelOverride="Sharing"
                   aria-label="Screen sharing active. Click to preview or double-click to toggle"
                   onClick={() => setScreenPopoverOpen(!screenPopoverOpen)}
                   onDoubleClick={() => onToggleScreenShare?.()}
-                >
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  <MonitorUp className="h-3 w-3" />
-                  <span>Sharing</span>
-                </button>
+                />
                 <PopoverContent className="w-[200px] p-1">
                   <video ref={screenVideoRef} muted playsInline className="w-full h-auto rounded-sm" />
                 </PopoverContent>

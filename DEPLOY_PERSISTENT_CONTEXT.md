@@ -234,12 +234,14 @@ pnpm dev:all:clean
 - Accept terms
 - Type: "What can you do?"
 - Start voice, say: "Can you hear me?"
+- Enable webcam (allow browser access)
+- Start screen share (share any window)
 - Upload any PDF file
 - Click "Download Summary"
 
 # 5. Verify:
 - PDF downloads ✓
-- PDF has "Multimodal Interactions" section ✓
+- PDF has "Multimodal Interactions" section with webcam + screen entries ✓
 - PDF shows voice transcript ✓
 - PDF shows uploaded file ✓
 
@@ -377,4 +379,3 @@ All 10 phases complete:
 > Terms → Discovery (Google Grounding) → All interactions tracked (voice, screen, files) → Conversation end → Archive to Supabase → Generate comprehensive PDF → Store in database → Admin can review for follow-ups → Memory cleaned up
 
 **Time to test and deploy!** 🚀
-

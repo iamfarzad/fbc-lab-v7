@@ -1,7 +1,9 @@
 class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.bufferSize = 4096;
+    // Reduced buffer size from 4096 to 2048 to reduce latency and crackling
+    // At 16kHz: 2048 samples = 128ms (vs 256ms), less audio artifacts
+    this.bufferSize = 2048;
     this.buffer = new Float32Array(this.bufferSize);
     this.bufferIndex = 0;
   }
@@ -20,8 +22,10 @@ class AudioProcessor extends AudioWorkletProcessor {
           const int16Buffer = new Int16Array(this.bufferSize);
       // Simple noise gate + soft DC removal before PCM16 conversion
       let last = 0;
-      const gate = 0.008; // ~-42 dB
-      const hp = 0.995;   // one-pole high-pass coefficient
+      // Reduced noise gate threshold from 0.008 to 0.003 (less aggressive gating)
+      // This prevents cutting off quiet speech which can cause crackling artifacts
+      const gate = 0.003; // ~-50 dB (gentler than previous -42 dB)
+      const hp = 0.998;   // one-pole high-pass coefficient (reduced filtering)
       for (let j = 0; j < this.bufferSize; j++) {
         let s = Math.max(-1, Math.min(1, this.buffer[j]));
         // 1) Noise gate

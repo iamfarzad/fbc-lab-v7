@@ -38,7 +38,20 @@ export class VercelCache {
   private enabled: boolean;
 
   constructor() {
-    this.enabled = process.env.VERCEL_KV_ENABLED !== 'false';
+    // Check if KV is properly configured
+    const hasRequiredEnvVars = 
+      process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN;
+    
+    if (!hasRequiredEnvVars && process.env.NODE_ENV !== 'test') {
+      logger.warn('Vercel KV not configured', {
+        type: 'cache_config',
+        hasUrl: !!process.env.KV_REST_API_URL,
+        hasToken: !!process.env.KV_REST_API_TOKEN,
+        message: 'Add KV_REST_API_URL and KV_REST_API_TOKEN to .env.local'
+      });
+    }
+    
+    this.enabled = Boolean(process.env.VERCEL_KV_ENABLED !== 'false' && hasRequiredEnvVars);
   }
 
   // Generate cache key
@@ -53,7 +66,10 @@ export class VercelCache {
     data: T,
     config: CacheConfig = {}
   ): Promise<void> {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      logger.debug('Cache disabled, skipping set', { namespace, identifier });
+      return;
+    }
 
     try {
       const entry: CacheEntry<T> = {
@@ -80,12 +96,16 @@ export class VercelCache {
         identifier,
         type: 'cache_error'
       });
+      // Don't throw - graceful degradation
     }
   }
 
   // Get cache entry
   async get<T>(namespace: string, identifier: string): Promise<T | null> {
-    if (!this.enabled) return null;
+    if (!this.enabled) {
+      logger.debug('Cache disabled, skipping get', { namespace, identifier });
+      return null;
+    }
 
     try {
       const key = this.generateKey(namespace, identifier);

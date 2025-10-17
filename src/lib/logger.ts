@@ -1,174 +1,146 @@
-import { createLogger as createWinstonLogger, format, transports, Logger } from 'winston';
+type LogMeta = Record<string, unknown> | undefined
 
-const safeToString = (value: unknown, fallback = ''): string => {
-  if (value == null) return fallback;
-  if (typeof value === 'string') return value;
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+interface BaseLogger {
+  debug: (message: string, meta?: LogMeta) => void
+  info: (message: string, meta?: LogMeta) => void
+  warn: (message: string, meta?: LogMeta) => void
+  error: (message: string, meta?: LogMeta) => void
+}
+
+const formatMeta = (meta?: LogMeta) => {
+  if (!meta) return ''
   try {
-    return JSON.stringify(value);
+    const serialized = JSON.stringify(meta)
+    return serialized === '{}' ? '' : ` ${serialized}`
   } catch {
-    return fallback || '[unserializable]';
+    return ' [unserializable meta]'
   }
-};
+}
 
-// Create Winston logger instance
-const winstonLogger: Logger = createWinstonLogger({
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-  format: format.combine(
-    format.timestamp({
-      format: 'YYYY-MM-DD HH:mm:ss'
-    }),
-    format.errors({ stack: true }),
-    format.json(),
-    format.printf(({ timestamp, level, message, service, ...meta }) => {
-      const metaStr = Object.keys(meta).length ? `\n${JSON.stringify(meta, null, 2)}` : '';
-      const timestampStr = safeToString(timestamp, '');
-      const serviceStr = safeToString(service, 'APP');
-      const levelStr = safeToString(level, 'INFO').toUpperCase();
-      const messageStr = safeToString(message, '');
-      return `${timestampStr} [${serviceStr}] ${levelStr}: ${messageStr}${metaStr}`;
-    })
-  ),
-  defaultMeta: {
-    service: 'fbc-lab-v7',
-    environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0'
-  },
-  transports: [
-    // Only use file transports in development, not in serverless environments
-    ...(process.env.NODE_ENV !== 'production' && !process.env.VERCEL ? [
-      // Write all logs with importance level of `error` or less to `error.log`
-      new transports.File({
-        filename: 'logs/error.log',
-        level: 'error',
-        maxsize: 5242880, // 5MB
-        maxFiles: 5,
-      }),
-      // Write all logs with importance level of `info` or less to `combined.log`
-      new transports.File({
-        filename: 'logs/combined.log',
-        maxsize: 5242880, // 5MB
-        maxFiles: 5,
-      }),
-    ] : []),
-  ],
-});
+const emit = (level: LogLevel, message: string, meta?: LogMeta) => {
+  const prefix = `[${new Date().toISOString()}] [${level.toUpperCase()}]`
+  const suffix = formatMeta(meta)
 
-// Always add console transport for serverless environments
-// In development: colored console + files
-// In production/serverless: console only (Vercel captures console logs)
-winstonLogger.add(new transports.Console({
-  format: format.combine(
-    ...(process.env.NODE_ENV !== 'production' ? [format.colorize()] : []),
-    format.simple(),
-    format.printf(({ timestamp, level, message, service }) => {
-      const timestampStr = safeToString(timestamp, '');
-      const serviceStr = safeToString(service, '');
-      const levelStr = safeToString(level, '');
-      const messageStr = safeToString(message, '');
-      return `${timestampStr} [${serviceStr}] ${levelStr}: ${messageStr}`;
-    })
-  )
-}));
+  switch (level) {
+    case 'debug':
+      console.debug(`${prefix} ${message}${suffix}`)
+      break
+    case 'info':
+      console.info(`${prefix} ${message}${suffix}`)
+      break
+    case 'warn':
+      console.warn(`${prefix} ${message}${suffix}`)
+      break
+    case 'error':
+      console.error(`${prefix} ${message}${suffix}`)
+      break
+    default:
+      console.log(`${prefix} ${message}${suffix}`)
+  }
+}
 
-// Enhanced logger interface with performance tracking
+const baseLogger: BaseLogger = {
+  debug: emit.bind(null, 'debug'),
+  info: emit.bind(null, 'info'),
+  warn: emit.bind(null, 'warn'),
+  error: emit.bind(null, 'error'),
+}
+
 export interface LoggerContext {
-  userId?: string;
-  sessionId?: string;
-  requestId?: string;
-  component?: string;
-  operation?: string;
-  duration?: number;
-  [key: string]: any;
+  userId?: string
+  sessionId?: string
+  requestId?: string
+  component?: string
+  operation?: string
+  duration?: number
+  [key: string]: unknown
 }
 
 export class EnhancedLogger {
-  private logger: Logger;
-  private context: LoggerContext;
+  private logger: BaseLogger
+  private context: LoggerContext
 
-  constructor(logger: Logger, context: LoggerContext = {}) {
-    this.logger = logger;
-    this.context = context;
+  constructor(logger: BaseLogger, context: LoggerContext = {}) {
+    this.logger = logger
+    this.context = context
   }
 
-  debug(message: string, meta?: Record<string, any>) {
-    this.logger.debug(message, { ...this.context, ...meta });
+  private withContext(meta?: LogMeta): LogMeta {
+    return { ...this.context, ...meta }
   }
 
-  info(message: string, meta?: Record<string, any>) {
-    this.logger.info(message, { ...this.context, ...meta });
+  debug(message: string, meta?: LogMeta) {
+    this.logger.debug(message, this.withContext(meta))
   }
 
-  warn(message: string, meta?: Record<string, any>) {
-    this.logger.warn(message, { ...this.context, ...meta });
+  info(message: string, meta?: LogMeta) {
+    this.logger.info(message, this.withContext(meta))
   }
 
-  error(message: string, error?: Error, meta?: Record<string, any>) {
-    this.logger.error(message, {
-      ...this.context,
-      ...meta,
-      error: error ? {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      } : undefined
-    });
+  warn(message: string, meta?: LogMeta) {
+    this.logger.warn(message, this.withContext(meta))
   }
 
-  // Performance tracking methods
+  error(message: string, error?: Error, meta?: LogMeta) {
+    const errorMeta = error
+      ? {
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          },
+        }
+      : undefined
+    this.logger.error(message, this.withContext({ ...meta, ...errorMeta }))
+  }
+
   startTimer(operation: string): () => void {
-    const startTime = Date.now();
-    this.debug(`Starting operation: ${operation}`, { operation });
-
+    const start = Date.now()
+    this.debug(`Starting operation: ${operation}`, { operation })
     return () => {
-      const duration = Date.now() - startTime;
+      const duration = Date.now() - start
       this.info(`Completed operation: ${operation}`, {
         operation,
         duration,
-        performance: 'completed'
-      });
-    };
+        performance: 'completed',
+      })
+    }
   }
 
-  // Create child logger with additional context
   child(context: LoggerContext): EnhancedLogger {
-    return new EnhancedLogger(this.logger, { ...this.context, ...context });
+    return new EnhancedLogger(this.logger, { ...this.context, ...context })
   }
 
-  // API request logging
   logApiRequest(method: string, url: string, statusCode?: number, duration?: number) {
     this.info('API Request', {
       method,
       url,
       statusCode,
       duration,
-      type: 'api_request'
-    });
+      type: 'api_request',
+    })
   }
 
-  // Database operation logging
   logDatabaseOperation(operation: string, table: string, duration?: number, error?: Error) {
     if (error) {
       this.error(`Database operation failed: ${operation}`, error, {
         operation,
         table,
         duration,
-        type: 'database'
-      });
+        type: 'database',
+      })
     } else {
       this.debug(`Database operation: ${operation}`, {
         operation,
         table,
         duration,
-        type: 'database'
-      });
+        type: 'database',
+      })
     }
   }
 
-  // AI model interaction logging
   logAiInteraction(model: string, operation: string, tokens?: number, duration?: number, error?: Error) {
     if (error) {
       this.error(`AI interaction failed: ${model} - ${operation}`, error, {
@@ -176,68 +148,22 @@ export class EnhancedLogger {
         operation,
         tokens,
         duration,
-        type: 'ai_interaction'
-      });
+        type: 'ai_interaction',
+      })
     } else {
       this.info(`AI interaction: ${model} - ${operation}`, {
         model,
         operation,
         tokens,
         duration,
-        type: 'ai_interaction'
-      });
+        type: 'ai_interaction',
+      })
     }
   }
 }
 
-// Export singleton instance
-export const logger = new EnhancedLogger(winstonLogger);
+export const logger = new EnhancedLogger(baseLogger)
 
-// Utility function to create contextual loggers
 export const createContextualLogger = (context: LoggerContext): EnhancedLogger => {
-  return new EnhancedLogger(winstonLogger, context);
-};
-
-// Performance monitoring utilities
-export class PerformanceMonitor {
-  private metrics: Map<string, { count: number; totalTime: number; lastAccess: number }> = new Map();
-
-  record(operation: string, duration: number) {
-    const existing = this.metrics.get(operation) || { count: 0, totalTime: 0, lastAccess: 0 };
-    existing.count++;
-    existing.totalTime += duration;
-    existing.lastAccess = Date.now();
-    this.metrics.set(operation, existing);
-
-    // Log slow operations
-    if (duration > 1000) {
-      logger.warn(`Slow operation detected: ${operation}`, {
-        operation,
-        duration,
-        threshold: 1000,
-        type: 'performance'
-      });
-    }
-  }
-
-  getMetrics(): Record<string, { avgTime: number; count: number; lastAccess: number }> {
-    const result: Record<string, { avgTime: number; count: number; lastAccess: number }> = {};
-
-    for (const [operation, data] of this.metrics.entries()) {
-      result[operation] = {
-        avgTime: data.totalTime / data.count,
-        count: data.count,
-        lastAccess: data.lastAccess
-      };
-    }
-
-    return result;
-  }
-
-  reset() {
-    this.metrics.clear();
-  }
+  return new EnhancedLogger(baseLogger, context)
 }
-
-// Export singleton performance monitor
-export const performanceMonitor = new PerformanceMonitor();

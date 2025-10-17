@@ -102,7 +102,7 @@ type StreamedArtifact = {
   error?: string;
 };
 
-// Minimal render policy for AI text: strip boilerplate headings and disclaimers
+// Minimal render policy for AI text: strip boilerplate headings, disclaimers, and Gemini special tags
 function sanitizeAIContent(input: string): string {
   if (typeof input !== 'string' || input.length === 0) return input;
   let text = input.trimStart();
@@ -111,6 +111,10 @@ function sanitizeAIContent(input: string): string {
   // Remove generic preambles
   text = text.replace(/^(responding to the inquiry|response|assistant response)\s*:?\s*/i, '');
   text = text.replace(/^as an ai[\s\S]*?\n+/i, '');
+  // Remove Gemini special tags from voice transcripts: <noise>, <end_of_turn>, etc.
+  text = text.replace(/<noise>/gi, '');
+  text = text.replace(/<end_of_turn>/gi, '');
+  text = text.replace(/<\/?[a-z_]+>/gi, ''); // Remove any other special XML-style tags
   return text;
 }
 
@@ -331,8 +335,8 @@ export function ChatMessages({
                     <div className={cn(
                       message.metadata?.isPartial ? "opacity-70 italic text-muted-foreground" : ""
                     )}>
-                      <Response>{isUserMessage ? message.content : sanitizeAIContent(message.content)}</Response>
-                      {Boolean(message.metadata?.isPartial) && (
+                      <Response>{sanitizeAIContent(message.content)}</Response>
+                      {Boolean(message.metadata?.isPartial) && !message.content.trim() && (
                         <span className="ml-1 text-xs text-muted-foreground">(speaking...)</span>
                       )}
                     </div>

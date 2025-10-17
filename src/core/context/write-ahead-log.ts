@@ -33,10 +33,18 @@ class WriteAheadLog {
     try {
       const walKey = `wal_${sessionId}_${entry.id}`
       await vercelCache.set('wal', walKey, entry, { ttl: 86400 }) // 24h TTL
-      console.log(`✅ WAL entry logged: ${operation} for ${sessionId}`)
+      // Only log success if Redis is actually configured
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        console.log(`✅ WAL entry logged to Redis: ${operation} for ${sessionId}`)
+      }
     } catch (err) {
-      console.error('❌ WAL write failed:', err)
-      throw err // Critical failure - must not lose data
+      console.error('❌ WAL write to Redis failed:', err)
+      // Don't throw if Redis is not configured - allow graceful degradation
+      if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+        throw err // Critical failure only if Redis is supposed to be available
+      } else {
+        console.warn('⚠️ Redis not configured - WAL logging skipped (in-memory only)')
+      }
     }
 
     // 2. Add to pending queue

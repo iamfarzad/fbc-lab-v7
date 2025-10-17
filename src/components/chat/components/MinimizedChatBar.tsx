@@ -2,8 +2,9 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Camera, Monitor, Mic, Expand, MessageCircle } from 'lucide-react';
+import { MediaToggle } from '@/components/ui/media-toggle';
+import { MediaStatusBadge } from '@/components/ui/media-status-badge';
+import { Expand, MessageCircle } from 'lucide-react';
 import { DESIGN_TOKENS } from '../design-tokens';
 import { getMonochromeClass } from '@/lib/theme-utils';
 
@@ -54,35 +55,23 @@ export function MinimizedChatBar({
       {/* Media indicators overlay */}
       <div className="absolute top-3 right-3 flex gap-1.5 z-10">
         {isVoiceActive && (
-          <Badge 
-            variant="default" 
-            className={cn(
-              "h-6 px-2 text-xs font-medium",
-              isProcessing ? "animate-pulse" : "",
-              getMonochromeClass()
-            )}
-          >
-            <Mic className="h-3 w-3 mr-1" />
-            Voice
-          </Badge>
+          <MediaStatusBadge
+            type="voice"
+            isProcessing={isProcessing}
+            className="h-6"
+          />
         )}
         {isWebcamActive && (
-          <Badge 
-            variant="default" 
-            className={cn("h-6 px-2 text-xs font-medium", getMonochromeClass())}
-          >
-            <Camera className="h-3 w-3 mr-1" />
-            Cam
-          </Badge>
+          <MediaStatusBadge
+            type="camera"
+            className="h-6"
+          />
         )}
         {isScreenSharing && (
-          <Badge 
-            variant="default" 
-            className={cn("h-6 px-2 text-xs font-medium", getMonochromeClass())}
-          >
-            <Monitor className="h-3 w-3 mr-1" />
-            Screen
-          </Badge>
+          <MediaStatusBadge
+            type="screen"
+            className="h-6"
+          />
         )}
       </div>
 
@@ -134,53 +123,45 @@ export function MinimizedChatBar({
 
         {/* Quick action buttons */}
         <div className="flex items-center justify-center gap-2 pt-2">
-          <Button
-            variant="ghost"
-            size="sm"
+          <MediaToggle
+            type="voice"
+            variant="compact"
             onClick={onToggleVoice}
             className={cn(
-              "h-8 px-3 rounded-full",
-              isVoiceActive 
-                ? "bg-primary text-primary-foreground hover:bg-primary/90" 
+              isVoiceActive
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
                 : "bg-muted/50 text-muted-foreground hover:bg-muted/70",
-              DESIGN_TOKENS.corners.full,
-              getMonochromeClass()
+              DESIGN_TOKENS.corners.full
             )}
-          >
-            <Mic className="h-3 w-3" />
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
+            isActive={isVoiceActive}
+            isProcessing={isProcessing}
+          />
+
+          <MediaToggle
+            type="camera"
+            variant="compact"
             onClick={onToggleWebcam}
             className={cn(
-              "h-8 px-3 rounded-full",
               isWebcamActive 
                 ? "bg-primary text-primary-foreground hover:bg-primary/90" 
                 : "bg-muted/50 text-muted-foreground hover:bg-muted/70",
-              DESIGN_TOKENS.corners.full,
-              getMonochromeClass()
+              DESIGN_TOKENS.corners.full
             )}
-          >
-            <Camera className="h-3 w-3" />
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
+            isActive={isWebcamActive}
+          />
+
+          <MediaToggle
+            type="screen"
+            variant="compact"
             onClick={onToggleScreenShare}
             className={cn(
-              "h-8 px-3 rounded-full",
               isScreenSharing 
                 ? "bg-primary text-primary-foreground hover:bg-primary/90" 
                 : "bg-muted/50 text-muted-foreground hover:bg-muted/70",
-              DESIGN_TOKENS.corners.full,
-              getMonochromeClass()
+              DESIGN_TOKENS.corners.full
             )}
-          >
-            <Monitor className="h-3 w-3" />
-          </Button>
+            isActive={isScreenSharing}
+          />
         </div>
       </div>
 

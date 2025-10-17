@@ -1,8 +1,8 @@
-import { motion, AnimatePresence } from 'framer-motion'
-import { X, Mic, MicOff } from 'lucide-react'
+import { Mic, MicOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VoiceDisplay } from './VoiceDisplay'
-import { VoiceWaveform } from '../VoiceWaveform'
+import { LiveWaveform } from '@/components/ui/live-waveform'
+import { FullScreenModal } from '@/components/ui/full-screen-modal'
 
 interface VoiceFullScreenProps {
   isOpen: boolean
@@ -25,78 +25,55 @@ export function VoiceFullScreen({
   error,
   onToggle
 }: VoiceFullScreenProps) {
-  if (!isOpen) return null
-
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-background"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold">Voice Mode</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </Button>
+    <FullScreenModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Voice Mode"
+      contentClassName="flex flex-col"
+    >
+      <div className="flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-2xl">
+          <LiveWaveform
+            active={isActive}
+            processing={isProcessing}
+            height={120}
+            barWidth={4}
+            barGap={3}
+            mode="static"
+          />
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="flex flex-col h-[calc(100vh-73px)]">
-          {/* Waveform */}
-          <div className="flex items-center justify-center py-12 px-4">
-            <div className="w-full max-w-2xl">
-              <VoiceWaveform
-                isActive={isActive}
-                isProcessing={isProcessing}
-                height={120}
-                barWidth={4}
-                barGap={3}
-                barCount={60}
-              />
-            </div>
-          </div>
+      <div className="flex-1 px-4">
+        <VoiceDisplay
+          transcript={transcript}
+          partialTranscript={partialTranscript}
+          isProcessing={isProcessing}
+          error={error}
+        />
+      </div>
 
-          {/* Transcript */}
-          <div className="flex-1 px-4">
-            <VoiceDisplay
-              transcript={transcript}
-              partialTranscript={partialTranscript}
-              isProcessing={isProcessing}
-              error={error}
-            />
-          </div>
-
-          {/* Controls */}
-          <div className="p-6 border-t">
-            <Button
-              onClick={onToggle}
-              size="lg"
-              variant={isActive ? 'destructive' : 'default'}
-              className="w-full"
-            >
-              {isActive ? (
-                <>
-                  <MicOff className="mr-2 h-5 w-5" />
-                  Stop Voice
-                </>
-              ) : (
-                <>
-                  <Mic className="mr-2 h-5 w-5" />
-                  Start Voice
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+      <div className="border-t p-6">
+        <Button
+          onClick={onToggle}
+          size="lg"
+          variant={isActive ? 'destructive' : 'default'}
+          className="w-full"
+        >
+          {isActive ? (
+            <>
+              <MicOff className="mr-2 h-5 w-5" />
+              Stop Voice
+            </>
+          ) : (
+            <>
+              <Mic className="mr-2 h-5 w-5" />
+              Start Voice
+            </>
+          )}
+        </Button>
+      </div>
+    </FullScreenModal>
   )
 }
-
