@@ -60,6 +60,8 @@ export type FunnelStage =
   | 'ADMIN'
   | 'RETARGETING'
   | 'INTELLIGENCE_GATHERING'
+  | 'BOOKING_REQUESTED'
+  | 'FORCE_EXIT'
 
 export interface ChainOfThoughtStep {
   label: string

@@ -62,9 +62,44 @@ type ConversationFlowSnapshot = {
   coverageOrder?: Array<{ category: string; firstTurnIndex: number; firstMessageId: string; firstTimestamp: number | null }>
   totalUserTurns?: number
   shouldOfferRecap?: boolean
+  lastResearchTurn?: number
+  exitAttempts?: number
+  shouldForceExit?: boolean
 }
 
 const CONVERSATION_CATEGORIES = ['goals', 'pain', 'data', 'readiness', 'budget', 'success'] as const
+
+// Exit detection patterns
+const BOOKING_PATTERNS = [
+  /let'?s (just )?book/i,
+  /schedule (a|the) (call|meeting|workshop)/i,
+  /set up (a|the) (call|meeting)/i,
+  /book (a|the) (call|meeting|workshop)/i,
+  /calendar/i,
+  /when can we/i
+]
+
+const WRAP_UP_PATTERNS = [
+  /let'?s wrap/i,
+  /move on/i,
+  /that'?s enough/i,
+  /stop asking/i,
+  /wrap it up/i,
+  /move forward/i
+]
+
+const FRUSTRATION_PATTERNS = [
+  /stop asking/i,
+  /i don'?t want to answer/i,
+  /for fuck'?s sake/i,
+  /this is ridiculous/i,
+  /enough already/i
+]
+
+const MINIMAL_RESPONSE_PATTERNS = [
+  /^(nothing|nope|no|not sure|i don'?t know)$/i,
+  /^.{1,4}$/ // 1-4 characters
+]
 
 interface ChatRequestBody {
   messages: UnifiedMessage[]
@@ -550,14 +585,48 @@ export async function POST(req: NextRequest) {
       content: msg.content.trim(),
       timestamp: new Date()
     }))
+    
+    // CRITICAL FIX: Exit detection BEFORE AI generation
+    const lastUserMessage = messages.findLast(m => m.role === 'user');
+    if (lastUserMessage) {
+      const exitIntent = detectExitIntent(lastUserMessage.content);
+      
+      if (exitIntent === 'BOOKING') {
+        console.log('🚀 [EXIT_DETECTION] Booking intent detected, bypassing AI generation');
+        return createBookingResponse(reqId);
+      }
+      
+      if (exitIntent === 'WRAP_UP') {
+        console.log('🔄 [EXIT_DETECTION] Wrap-up intent detected, offering recap');
+        // Update conversation flow to force recap
+        if (conversationFlow) {
+          conversationFlow.shouldOfferRecap = true;
+          conversationFlow.exitAttempts = (conversationFlow.exitAttempts || 0) + 1;
+        }
+      }
+      
+      if (exitIntent === 'FRUSTRATION') {
+        console.log('😤 [EXIT_DETECTION] Frustration detected, forcing exit');
+        if (conversationFlow) {
+          conversationFlow.exitAttempts = (conversationFlow.exitAttempts || 0) + 1;
+          conversationFlow.shouldForceExit = (conversationFlow.exitAttempts || 0) >= 2;
+        }
+      }
+    }
+    
     const model = getModel()
 
     // Build system prompt based on mode and context
+    // CRITICAL FIX: Dynamic response length based on conversation stage
+    const responseLengthLimit = conversationFlow?.shouldOfferRecap ? '5-6 sentences' : 
+                               conversationFlow?.exitAttempts && conversationFlow.exitAttempts > 0 ? '3-4 sentences' : 
+                               '2 sentences max';
+    
     let systemPrompt = `You are F.B/c - Farzad Bayat's AI consulting copilot. Never identify yourself as Gemini, Google's AI, or any other AI assistant. You are F.B/c AI, created specifically for Farzad Bayat Consulting.
 
 VOICE & TONE:
 - Sound like a sharp, friendly consultant (Farzad's "no fluff" style).
-- Use plain English, two sentences max per turn, and end with an open question when you still need context.
+- Use plain English, ${responseLengthLimit} per turn, and end with an open question when you still need context.
 - Mention the voice, screen share, and document upload options the first time you reply after the user accepts terms.
 
 MISSION FOCUS:
@@ -572,13 +641,20 @@ Use the conversation to uncover:
 CONVERSATION STRATEGY:
 - When conversationFlow.totalUserTurns <= 1, open with the warm "Hey {name}..." welcome from the playbook and immediately ask what prompted the chat.
 - If conversationFlow.recommendedNext exists, steer your next question to that topic and skip categories that are already covered.
-- If conversationFlow.shouldOfferRecap is true, deliver a two-sentence recap of what you have learned so far, confirm you're aligned, and then either explore conversationFlow.recommendedNext or propose an actionable next step if none remains.
+- If conversationFlow.shouldOfferRecap is true, deliver a ${responseLengthLimit} recap of what you have learned so far, confirm you're aligned, and then either explore conversationFlow.recommendedNext or propose an actionable next step if none remains.
+- If conversationFlow.shouldForceExit is true, immediately provide a comprehensive recap and offer booking - do NOT ask more questions.
 - Mirror the user's language, build on the latest turn, and ask exactly one focused question at a time.
 - Weave in intelligenceContext, leadContext, and research casually (e.g., "I noticed you're expanding in the Nordics - does that tie in?").
 - Keep answers tight; offer summaries or plans only after you understand the situation.
 - Suggest multimodal actions when they're helpful ("Want to show me your screen?" etc.).
 - Voice transcripts should be handled exactly like text messages - no change in tone or verbosity.
 - If the user asks for legal, medical, HR, or financial advice, politely decline, recommend speaking with the appropriate licensed professional, and offer to continue only with AI strategy topics.
+
+EXIT DETECTION RULES:
+- If user says "let's book" or "schedule a call", immediately offer calendar booking.
+- If user says "let's wrap up" or "that's enough", provide recap and next steps.
+- If user shows frustration (3+ attempts), force exit with comprehensive summary.
+- Track exit attempts: conversationFlow.exitAttempts (force exit at 3+ attempts).
 
 RESPONSE FORMAT:
 - Wrap your internal reasoning in <reasoning>...</reasoning>.
@@ -688,10 +764,13 @@ Response style: Be concise, actionable, and data-driven.`
     console.log(`⏱️  [PERF] Intelligence context: ${timings.intelligenceContext}ms`)
 
     // Smart research trigger - analyze if this message needs research
-    const researchTrigger = analyzeResearchNeed(
-      messages[messages.length - 1]?.content,
-      context
-    )
+    // CRITICAL FIX: Research throttling
+    const currentTurn = conversationFlow?.totalUserTurns || 0;
+    const shouldThrottle = shouldThrottleResearch(conversationFlow, currentTurn);
+    
+    const researchTrigger = shouldThrottle 
+      ? { shouldResearch: false, reason: 'Throttled - too soon after last research' }
+      : analyzeResearchNeed(messages[messages.length - 1]?.content, context)
 
     // Add enhanced research context (combines search grounding + URL context)
     const researchStart = Date.now()
@@ -700,6 +779,10 @@ Response style: Be concise, actionable, and data-driven.`
     
     // Only run research if triggered
     if (researchTrigger.shouldResearch && context?.sessionId) {
+      // Update last research turn for throttling
+      if (conversationFlow) {
+        conversationFlow.lastResearchTurn = currentTurn;
+      }
       try {
         // CHECK: Research limit (cost protection)
         const researchLimitCheck = await usageLimiter.checkLimit(context.sessionId, 'research')
@@ -1419,6 +1502,93 @@ export function GET(req: NextRequest) {
     console.error('[UNIFIED_AI_SDK] GET error:', error)
     return respond.serverError('Failed to process request')
   }
+}
+
+// Exit detection function - CRITICAL FIX
+function detectExitIntent(content: string): 'BOOKING' | 'WRAP_UP' | 'FRUSTRATION' | 'MINIMAL' | 'CONTINUE' {
+  if (!content) return 'CONTINUE';
+  
+  const lowerContent = content.toLowerCase().trim();
+  
+  // Check for booking signals first (highest priority)
+  if (BOOKING_PATTERNS.some(pattern => pattern.test(lowerContent))) {
+    return 'BOOKING';
+  }
+  
+  // Check for wrap-up signals
+  if (WRAP_UP_PATTERNS.some(pattern => pattern.test(lowerContent))) {
+    return 'WRAP_UP';
+  }
+  
+  // Check for frustration signals
+  if (FRUSTRATION_PATTERNS.some(pattern => pattern.test(lowerContent))) {
+    return 'FRUSTRATION';
+  }
+  
+  // Check for minimal responses
+  if (MINIMAL_RESPONSE_PATTERNS.some(pattern => pattern.test(lowerContent))) {
+    return 'MINIMAL';
+  }
+  
+  return 'CONTINUE';
+}
+
+// Create booking response - bypasses AI generation
+function createBookingResponse(reqId: string): Response {
+  const encoder = new TextEncoder();
+  const messageId = crypto.randomUUID();
+  
+  const bookingContent = "Perfect! I'll open our calendar. Pick a time that works for you.";
+  
+  const stream = new ReadableStream({
+    start(controller) {
+      // Send meta event
+      const metaEvent = `event: meta\ndata: ${JSON.stringify({ reqId, type: 'meta', exitIntent: 'BOOKING' })}\n\n`;
+      controller.enqueue(encoder.encode(metaEvent));
+      
+      // Send booking response
+      const messageData = {
+        id: messageId,
+        role: 'assistant',
+        content: bookingContent,
+        timestamp: new Date().toISOString(),
+        type: 'text',
+        metadata: {
+          isComplete: true,
+          finalChunk: true,
+          reqId,
+          exitIntent: 'BOOKING',
+          triggerBooking: true,
+          action: 'show_calendar_widget'
+        }
+      };
+      
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(messageData)}\n\n`));
+      controller.close();
+    }
+  });
+  
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+      'x-fbc-endpoint': 'unified-ai-sdk',
+      'x-request-id': reqId,
+      'X-Chat-Mode': 'multimodal',
+      'X-Session-Id': 'booking-triggered',
+      'X-Exit-Intent': 'BOOKING'
+    }
+  });
+}
+
+// Research throttling - only research every 3 turns
+function shouldThrottleResearch(conversationFlow?: ConversationFlowSnapshot | null, currentTurn?: number): boolean {
+  if (!conversationFlow || !currentTurn) return false;
+  
+  const lastResearch = conversationFlow.lastResearchTurn || 0;
+  return (currentTurn - lastResearch) < 3;
 }
 
 // Helper function to decide if research is needed

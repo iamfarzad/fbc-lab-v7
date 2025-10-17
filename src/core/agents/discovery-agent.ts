@@ -19,6 +19,36 @@ export async function discoveryAgent(
 
   const steps: ChainOfThoughtStep[] = []
 
+  // CRITICAL FIX: Exit detection at start of discovery agent
+  const lastUserMessage = messages.findLast(m => m.role === 'user');
+  if (lastUserMessage) {
+    const exitIntent = detectExitInMessage(lastUserMessage.content);
+    
+    if (exitIntent === 'BOOKING') {
+      return {
+        output: "Absolutely! I'll send you our calendar link. What time zone are you in?",
+        agent: 'Discovery Agent (Booking Mode)',
+        metadata: { 
+          stage: 'BOOKING_REQUESTED', 
+          triggerBooking: true,
+          action: 'show_calendar_widget'
+        }
+      };
+    }
+    
+    if (exitIntent === 'WRAP_UP') {
+      const recap = generateRecap(conversationFlow);
+      return {
+        output: `Got it. Quick recap: ${recap}. Sound right? Let's schedule a call with Farzad to map this out.`,
+        agent: 'Discovery Agent (Wrap-up Mode)',
+        metadata: { 
+          stage: 'WRAP_UP', 
+          triggerBooking: true
+        }
+      };
+    }
+  }
+
   // Step 1: Analyze conversation flow
   steps.push({
     label: 'Analyzing conversation flow',
@@ -86,7 +116,24 @@ ${conversationFlow?.shouldOfferRecap
   ? 'Deliver a two-sentence recap of what you learned, then ask your next question.' 
   : ''}`
 
-  // Step 2: Identify knowledge gaps
+  // Step 2: Check for question fatigue
+  const consecutiveQuestions = countConsecutiveQuestions(messages);
+  const shouldOfferRecap = consecutiveQuestions >= 3 || (conversationFlow?.shouldOfferRecap === true);
+  
+  if (shouldOfferRecap) {
+    const recap = generateRecap(conversationFlow);
+    return {
+      output: `I've asked quite a few questions. Let me recap what I've learned: ${recap}. Does this sound right? And would you like to schedule a deeper dive with Farzad?`,
+      agent: 'Discovery Agent (Recap Mode)',
+      metadata: { 
+        stage: 'DISCOVERY', 
+        triggerBooking: true,
+        recapProvided: true
+      }
+    };
+  }
+
+  // Step 3: Identify knowledge gaps
   const categoriesCovered = conversationFlow 
     ? Object.values(conversationFlow.covered).filter(Boolean).length 
     : 0
@@ -99,7 +146,7 @@ ${conversationFlow?.shouldOfferRecap
     timestamp: Date.now()
   })
 
-  // Step 3: Formulate strategic question
+  // Step 4: Formulate strategic question
   steps.push({
     label: 'Formulating strategic question',
     description: `Targeting ${nextCategory} discovery`,
@@ -114,9 +161,9 @@ ${conversationFlow?.shouldOfferRecap
     temperature: 0.7
   })
 
-  steps[2].status = 'complete'
+  steps[3].status = 'complete'
 
-  // Step 4: Incorporate multimodal context
+  // Step 5: Incorporate multimodal context
   if (multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio || multimodalContext?.hasRecentUploads) {
     steps.push({
       label: 'Incorporating multimodal context',
@@ -142,6 +189,96 @@ ${conversationFlow?.shouldOfferRecap
       multimodalUsed: multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio
     }
   }
+}
+
+// CRITICAL FIX: Exit detection helper
+function detectExitInMessage(content: string): 'BOOKING' | 'WRAP_UP' | 'FRUSTRATION' | 'MINIMAL' | 'CONTINUE' {
+  if (!content) return 'CONTINUE';
+  
+  const lowerContent = content.toLowerCase().trim();
+  
+  // Booking patterns
+  const bookingPatterns = [
+    /let'?s (just )?book/i,
+    /schedule (a|the) (call|meeting|workshop)/i,
+    /set up (a|the) (call|meeting)/i,
+    /book (a|the) (call|meeting|workshop)/i,
+    /calendar/i,
+    /when can we/i
+  ];
+  
+  if (bookingPatterns.some(pattern => pattern.test(lowerContent))) {
+    return 'BOOKING';
+  }
+  
+  // Wrap-up patterns
+  const wrapUpPatterns = [
+    /let'?s wrap/i,
+    /move on/i,
+    /that'?s enough/i,
+    /wrap it up/i,
+    /move forward/i
+  ];
+  
+  if (wrapUpPatterns.some(pattern => pattern.test(lowerContent))) {
+    return 'WRAP_UP';
+  }
+  
+  // Frustration patterns
+  const frustrationPatterns = [
+    /stop asking/i,
+    /i don'?t want to answer/i,
+    /for fuck'?s sake/i,
+    /this is ridiculous/i,
+    /enough already/i
+  ];
+  
+  if (frustrationPatterns.some(pattern => pattern.test(lowerContent))) {
+    return 'FRUSTRATION';
+  }
+  
+  // Minimal response patterns
+  const minimalPatterns = [
+    /^(nothing|nope|no|not sure|i don'?t know)$/i,
+    /^.{1,4}$/ // 1-4 characters
+  ];
+  
+  if (minimalPatterns.some(pattern => pattern.test(lowerContent))) {
+    return 'MINIMAL';
+  }
+  
+  return 'CONTINUE';
+}
+
+// Count consecutive questions from assistant
+function countConsecutiveQuestions(messages: ChatMessage[]): number {
+  let count = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message.role === 'assistant' && message.content.includes('?')) {
+      count++;
+    } else if (message.role === 'user') {
+      break; // Stop counting when we hit a user message
+    }
+  }
+  return count;
+}
+
+// Generate recap from conversation flow
+function generateRecap(conversationFlow: any): string {
+  if (!conversationFlow?.evidence) return 'We discussed your AI needs and challenges.';
+  
+  const categories = ['goals', 'pain', 'data', 'readiness', 'budget', 'success'];
+  const coveredCategories = categories.filter(cat => conversationFlow.covered?.[cat]);
+  
+  if (coveredCategories.length === 0) return 'We just started discussing your AI needs.';
+  
+  const recapParts = coveredCategories.map(cat => {
+    const evidence = conversationFlow.evidence[cat]?.[0] || '';
+    return `${cat}: ${evidence.substring(0, 100)}${evidence.length > 100 ? '...' : ''}`;
+  });
+  
+  return recapParts.join('; ');
 }
 
 function formatConversationStatus(flow: any): string {

@@ -28,6 +28,25 @@ export async function routeToAgent({
   trigger?: 'chat' | 'voice' | 'conversation_end' | 'admin' | 'proposal_request'
 }): Promise<AgentResult> {
   
+  // CRITICAL FIX: Pre-process intent before routing
+  const intentSignal = preProcessIntent(messages);
+  if (intentSignal === 'BOOKING') {
+    return {
+      output: "Absolutely! I'll send you our calendar link. What time zone are you in?",
+      agent: 'Discovery Agent (Booking Mode)',
+      metadata: { 
+        stage: 'BOOKING_REQUESTED', 
+        triggerBooking: true,
+        action: 'show_calendar_widget'
+      }
+    };
+  }
+  
+  if (intentSignal === 'EXIT') {
+    context.stage = 'FORCE_EXIT';
+    return summaryAgent(messages, context);
+  }
+  
   // Handle conversation end (archive before generating summary)
   if (trigger === 'conversation_end' && context.sessionId) {
     try {
@@ -103,7 +122,8 @@ export async function routeToAgent({
   const stage = determineFunnelStage({
     conversationFlow: context.conversationFlow,
     intelligenceContext: context.intelligenceContext,
-    trigger
+    trigger,
+    override: intentSignal === 'BOOKING' ? 'BOOKING_REQUESTED' : undefined
   })
 
   // Build enhanced context for agent
@@ -178,6 +198,22 @@ export async function routeToAgent({
         })
         break
 
+      case 'BOOKING_REQUESTED':
+        result = {
+          output: "Perfect! I'll open our calendar. Pick a time that works for you.",
+          agent: 'Booking Agent',
+          metadata: { 
+            stage: 'BOOKING_REQUESTED', 
+            triggerBooking: true,
+            action: 'show_calendar_widget'
+          }
+        }
+        break
+
+      case 'FORCE_EXIT':
+        result = await summaryAgent(messages, enhancedContext)
+        break
+
       default:
         // Fallback to discovery
         result = await discoveryAgent(messages, enhancedContext)
@@ -211,17 +247,64 @@ export async function routeToAgent({
 }
 
 /**
+ * Pre-process user intent before routing
+ */
+function preProcessIntent(messages: ChatMessage[]): 'BOOKING' | 'EXIT' | 'CONTINUE' {
+  const lastUserMessage = messages.findLast(m => m.role === 'user');
+  if (!lastUserMessage) return 'CONTINUE';
+  
+  const content = lastUserMessage.content.toLowerCase().trim();
+  
+  // Booking patterns
+  const bookingPatterns = [
+    /let'?s (just )?book/i,
+    /schedule (a|the) (call|meeting|workshop)/i,
+    /set up (a|the) (call|meeting)/i,
+    /book (a|the) (call|meeting|workshop)/i,
+    /calendar/i,
+    /when can we/i
+  ];
+  
+  if (bookingPatterns.some(pattern => pattern.test(content))) {
+    return 'BOOKING';
+  }
+  
+  // Exit patterns
+  const exitPatterns = [
+    /let'?s wrap/i,
+    /move on/i,
+    /that'?s enough/i,
+    /stop asking/i,
+    /wrap it up/i,
+    /move forward/i,
+    /for fuck'?s sake/i,
+    /this is ridiculous/i,
+    /enough already/i
+  ];
+  
+  if (exitPatterns.some(pattern => pattern.test(content))) {
+    return 'EXIT';
+  }
+  
+  return 'CONTINUE';
+}
+
+/**
  * Determine which funnel stage the conversation is in
  */
 function determineFunnelStage({
   conversationFlow,
   intelligenceContext,
-  trigger
+  trigger,
+  override
 }: {
   conversationFlow?: any
   intelligenceContext?: any
   trigger?: string
+  override?: FunnelStage
 }): FunnelStage {
+  // Override takes precedence
+  if (override) return override;
   // Admin queries
   if (trigger === 'admin') return 'ADMIN'
 
