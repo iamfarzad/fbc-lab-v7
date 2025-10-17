@@ -1140,6 +1140,13 @@ Citations: ${researchResult.allCitations.length} sources processed
 
             // Parse structured response for AI elements metadata
             const structuredMetadata = parseStructuredResponse(fullContent)
+            console.log('🔍 [UNIFIED_AI_SDK] Parsed structured metadata:', {
+              hasReasoning: !!structuredMetadata.reasoning,
+              hasSources: !!(structuredMetadata.sources && structuredMetadata.sources.length > 0),
+              hasCodeBlocks: !!(structuredMetadata.codeBlocks && structuredMetadata.codeBlocks.length > 0),
+              hasChainOfThought: !!(structuredMetadata.chainOfThought),
+              metadataKeys: Object.keys(structuredMetadata)
+            })
 
             // Clean content by removing parsed sections
             const cleanedContent = cleanParsedContent(fullContent)

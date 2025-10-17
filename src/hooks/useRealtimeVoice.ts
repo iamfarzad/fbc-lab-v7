@@ -80,7 +80,12 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
     }
 
     await audioWorkletRecorderRef.current.start();
-    sampleRateRef.current = audioWorkletRecorderRef.current.getSampleRate?.() ?? targetSampleRate;
+    // Fix: Check if recorder exists before calling getSampleRate
+    if (audioWorkletRecorderRef.current && typeof audioWorkletRecorderRef.current.getSampleRate === 'function') {
+      sampleRateRef.current = audioWorkletRecorderRef.current.getSampleRate() ?? targetSampleRate;
+    } else {
+      sampleRateRef.current = targetSampleRate;
+    }
     usingAudioWorkletRef.current = true;
     setIsRecording(true);
     try {
@@ -94,6 +99,8 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
       setIsProcessing(true);
       if (usingAudioWorkletRef.current && audioWorkletRecorderRef.current) {
         await audioWorkletRecorderRef.current.stop();
+        // Force clear mic stream after stopping
+        setMicStream(null);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to stop recording';
