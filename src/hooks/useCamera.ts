@@ -21,6 +21,14 @@ export interface UseCameraOptions {
   voiceConnectionId?: string; // NEW
   requireVoiceSession?: boolean; // NEW - only capture when voice active
   sendRealtimeInput?: (chunks: Array<{ mimeType: string; data: string }>) => void; // NEW - for prototype pattern
+  sendContextUpdate?: (update: {
+    sessionId?: string | null;
+    modality: 'screen' | 'webcam';
+    analysis: string;
+    imageData?: string;
+    capturedAt?: number;
+    metadata?: Record<string, unknown>;
+  }) => void;
 }
 
 export interface CameraCapture {
@@ -52,6 +60,7 @@ export function useCamera(options: UseCameraOptions = {}) {
     voiceConnectionId,
     requireVoiceSession = false,
     sendRealtimeInput,
+    sendContextUpdate,
   } = options;
 
   // Session store integration
@@ -374,6 +383,24 @@ export function useCamera(options: UseCameraOptions = {}) {
             data: base64Data,
           }]);
           console.log('📹 Webcam frame streamed to Live API');
+
+          if (sendContextUpdate) {
+            try {
+              sendContextUpdate({
+                sessionId,
+                modality: 'webcam',
+                analysis: `Live webcam frame captured at ${new Date().toISOString()}. Reference the inline image for precise visual details.`,
+                imageData,
+                capturedAt: Date.now(),
+                metadata: {
+                  source: 'webcam_stream',
+                  connectionId: voiceConnectionId,
+                },
+              });
+            } catch (contextErr) {
+              console.warn('⚠️ Failed to push webcam context update:', contextErr);
+            }
+          }
         } catch (err) {
           console.error('❌ Failed to stream webcam frame:', err);
         }

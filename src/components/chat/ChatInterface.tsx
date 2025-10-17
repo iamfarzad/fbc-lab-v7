@@ -334,6 +334,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     maxDimension: 640,
     quality: 0.85,
     sendRealtimeInput: audioHook.sendRealtimeInput,
+    sendContextUpdate: audioHook.sendContextUpdate,
     onAnalysis: useCallback((analysis: string, _imageData: string, capturedAt: number) => {
       // Keep for legacy compatibility but not used in prototype pattern
       setLastWebcamSnapshot({ analysis, capturedAt });
@@ -634,6 +635,24 @@ export function ChatInterface({ id }: { id?: string | null }) {
                 data: base64Data,
               }]);
               console.log('📺 Screen frame streamed to Live API');
+
+              if (audioHook.sendContextUpdate) {
+                try {
+                  audioHook.sendContextUpdate({
+                    sessionId,
+                    modality: 'screen',
+                    analysis: `Live screen frame captured at ${new Date().toISOString()}. Describe the visible interface based on the inline image rather than hallucinating.`,
+                    imageData: dataUrl,
+                    capturedAt: Date.now(),
+                    metadata: {
+                      source: 'screen_share_stream',
+                      connectionId: voiceConnectionId,
+                    },
+                  });
+                } catch (contextErr) {
+                  console.warn('⚠️ Failed to push screen context update:', contextErr);
+                }
+              }
 
               // Update local snapshot for UI (but not for analysis)
               const capturedAt = Date.now();

@@ -19,6 +19,7 @@ export class AudioRecorder extends EventEmitter {
   private recordingWorklet: AudioWorkletNode | null = null;
   private stream: MediaStream | null = null;
   private isActive = false;
+  private actualSampleRate = 16000;
 
   constructor() {
     super();
@@ -41,6 +42,7 @@ export class AudioRecorder extends EventEmitter {
       console.log('🎤 [AudioRecorder] Audio context created');
       console.log('🎤 [AudioRecorder] Requested sample rate: 16000');
       console.log('🎤 [AudioRecorder] Actual sample rate:', this.audioContext.sampleRate);
+      this.actualSampleRate = this.audioContext.sampleRate ?? 16000;
       
       if (this.audioContext.sampleRate !== 16000) {
         console.warn('⚠️ [AudioRecorder] Hardware does not support 16kHz! Using:', this.audioContext.sampleRate);
@@ -93,7 +95,7 @@ export class AudioRecorder extends EventEmitter {
           const base64 = arrayBufferToBase64(arrayBuffer);
           if (Math.random() < 0.02) {
             console.log('🎤 [AudioRecorder] Sending audio chunk:', {
-              declaredRate: 16000,
+              declaredRate: this.actualSampleRate,
               actualContextRate: this.audioContext?.sampleRate,
               pcm16BufferSize: arrayBuffer.byteLength,
               base64Length: base64.length
@@ -176,6 +178,10 @@ export class AudioRecorder extends EventEmitter {
 
   get isRecording(): boolean {
     return this.isActive;
+  }
+
+  public getSampleRate(): number {
+    return this.actualSampleRate;
   }
 
   /**

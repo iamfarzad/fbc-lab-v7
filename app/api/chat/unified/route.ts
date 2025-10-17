@@ -9,6 +9,7 @@ import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { GEMINI_MODELS, GEMINI_CONFIG } from '@/config/constants'
+import { logJsonl } from '@/lib/jsonl-logger'
 import { z } from 'zod'
 import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
@@ -574,6 +575,16 @@ CONVERSATION STRATEGY:
 - Voice transcripts should be handled exactly like text messages - no change in tone or verbosity.
 - If the user asks for legal, medical, HR, or financial advice, politely decline, recommend speaking with the appropriate licensed professional, and offer to continue only with AI strategy topics.
 
+RESPONSE FORMAT:
+- Wrap your internal reasoning in <reasoning>...</reasoning>.
+- For multi-step thinking, include <chain_of_thought>Step 1: ...\nStep 2: ...\n</chain_of_thought>.
+- Provide citations inside <sources>\n- https://example.com\n</sources> when referencing research.
+- Emit code samples as <code language="typescript">code here</code>.
+- Inline citations use <citation href="https://..." title="...">Display text</citation>.
+- Summaries or task lists go in <task status="completed">Title\nDetails</task>.
+- Generated images belong in <image>BASE64_IMAGE_DATA</image> and web previews in <web_preview url="https://..." title="...">description</web_preview>.
+- Only include these tags when the corresponding content exists. They will be rendered in the UI, so keep surrounding prose natural.
+
 FORMATTING:
 - No headings, numbered lists, or structured reports unless the user explicitly asks for them.
 - Reference research inline using clean domains, e.g., "industry benchmarks (Gartner)" - never paste redirect URLs.
@@ -910,6 +921,17 @@ Citations: ${researchResult.allCitations.length} sources processed
               }
 
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(completionData)}\n\n`))
+              try {
+                logJsonl('chat', 'assistant_message', {
+                  sessionId: context?.sessionId || 'anonymous',
+                  reqId,
+                  agent: agentResult.agent,
+                  content: agentResult.output,
+                  metadata: completionData.metadata,
+                })
+              } catch (logErr) {
+                console.warn('[Multi-Agent] Failed to log assistant message:', logErr)
+              }
               controller.close()
 
             } catch (error) {
@@ -1156,6 +1178,16 @@ Citations: ${researchResult.allCitations.length} sources processed
             
             const completionEvent = `data: ${JSON.stringify(completionData)}\n\n`
             controller.enqueue(encoder.encode(completionEvent))
+            try {
+              logJsonl('chat', 'assistant_message', {
+                sessionId: context?.sessionId || 'anonymous',
+                reqId,
+                content: cleanedContent,
+                metadata: completionData.metadata,
+              })
+            } catch (logErr) {
+              console.warn('[UNIFIED_AI_SDK] Failed to log assistant message:', logErr)
+            }
             
             controller.close()
           } catch (error) {
@@ -1254,7 +1286,7 @@ Citations: ${researchResult.allCitations.length} sources processed
 
       // const followUp = getFollowUp(conversationFlow) // DISABLED
 
-      return respond.ok({
+      const responsePayload = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: result.text,
@@ -1266,7 +1298,20 @@ Citations: ${researchResult.allCitations.length} sources processed
           ...mergedMetadata,
           // followUp, // DISABLED
         }
-      })
+      }
+
+      try {
+        logJsonl('chat', 'assistant_message', {
+          sessionId: context?.sessionId || 'anonymous',
+          reqId,
+          content: result.text,
+          metadata: responsePayload.metadata,
+        })
+      } catch (logErr) {
+        console.warn('[UNIFIED_AI_SDK] Failed to log assistant message (non-stream):', logErr)
+      }
+
+      return respond.ok(responsePayload)
     }
 
   } catch (error) {

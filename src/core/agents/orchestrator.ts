@@ -28,6 +28,38 @@ export async function routeToAgent({
   trigger?: 'chat' | 'voice' | 'conversation_end' | 'admin' | 'proposal_request'
 }): Promise<AgentResult> {
   
+  // Handle conversation end (archive before generating summary)
+  if (trigger === 'conversation_end' && context.sessionId) {
+    try {
+      console.log(`🏁 Conversation end triggered for ${context.sessionId}`)
+      
+      // 1. Archive multimodal context to Supabase (critical for PDF)
+      await multimodalContextManager.archiveConversation(context.sessionId)
+      console.log('✅ Context archived before summary generation')
+      
+      // 2. Generate summary with full context (will load from Supabase)
+      const multimodalData = await multimodalContextManager.prepareChatContext(
+        context.sessionId,
+        true, // include visual
+        true  // include audio
+      )
+      
+      const enhancedContext: AgentContext = {
+        ...context,
+        multimodalContext: multimodalData.multimodalContext,
+        stage: 'SUMMARY'
+      }
+      
+      const result = await summaryAgent(messages, enhancedContext)
+      
+      console.log('✅ Summary generated - client will generate PDF')
+      return result
+    } catch (error) {
+      console.error('Conversation end handling failed:', error)
+      throw error
+    }
+  }
+  
   // Check usage limits first (except for summary/admin)
   if (trigger === 'chat' || trigger === 'voice') {
     if (context.sessionId) {

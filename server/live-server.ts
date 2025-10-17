@@ -10,7 +10,7 @@ import * as path from 'path'
 import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { SessionLogger } from './session-logger'
-import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG } from '../src/config/constants.js'
+import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG } from '../src/config/constants.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -177,6 +177,7 @@ type Snapshot = {
 type ActiveSessionRecord = {
   ws: WebSocket;
   session: any;
+  sessionId?: string; // Client session ID for context management
   latestContext: {
     screen?: Snapshot;
     webcam?: Snapshot;
@@ -244,6 +245,37 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     const lang = requestedLang || 'en-US'
     const requestedVoice = typeof payload?.voiceName === 'string' ? payload.voiceName : undefined
     const voiceName = requestedVoice || VOICE_CONFIG.BY_LANG[lang as keyof typeof VOICE_CONFIG.BY_LANG] || VOICE_CONFIG.DEFAULT_VOICE
+    const sessionId = typeof payload?.sessionId === 'string' ? payload.sessionId.trim() : ''
+
+    let priorChatContext = ''
+    if (sessionId) {
+      try {
+        const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+        const recentConversation = await multimodalContextManager.getConversationHistory(sessionId, 6)
+
+        if (recentConversation.length > 0) {
+          const formatted = recentConversation
+            .map((entry) => {
+              const rawSpeaker = typeof entry.metadata?.speaker === 'string' ? entry.metadata.speaker : undefined
+              const speaker = rawSpeaker === 'assistant' || rawSpeaker === 'model'
+                ? 'assistant'
+                : rawSpeaker === 'user'
+                  ? 'user'
+                  : entry.modality === 'text'
+                    ? 'user'
+                    : 'assistant'
+              const trimmed = entry.content.trim().replace(/\s+/g, ' ')
+              const truncated = trimmed.length > 220 ? `${trimmed.slice(0, 217).trimEnd()}...` : trimmed
+              return `${speaker}: ${truncated}`
+            })
+            .join('\n')
+
+          priorChatContext = `\n\nRECENT TEXT CHAT (latest first shown last):\n${formatted}`
+        }
+      } catch (err) {
+        console.warn(`[${connectionId}] Failed to load conversation history for voice session:`, err)
+      }
+    }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -270,6 +302,9 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       // Enable transcriptions - languageCode removed (API no longer supports it)
       inputAudioTranscription: {},
       outputAudioTranscription: {},
+    }
+    if (priorChatContext) {
+      liveConfig.systemInstruction = `${GEMINI_CONFIG.SYSTEM_PROMPT}${priorChatContext}`
     }
 
     const session: any = await ai.live.connect({
@@ -440,9 +475,9 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
 
     {
       const prev = activeSessions.get(connectionId)
-      activeSessions.set(connectionId, { ws, session, latestContext: prev?.latestContext || {}, injectionTimers: prev?.injectionTimers, logger: prev?.logger });
+      activeSessions.set(connectionId, { ws, session, sessionId, latestContext: prev?.latestContext || {}, injectionTimers: prev?.injectionTimers, logger: prev?.logger });
     }
-    console.info(`[${connectionId}] Live API session established.`)
+    console.info(`[${connectionId}] Live API session established for sessionId: ${sessionId || 'anonymous'}`)
 
     // Send session started message to client
     safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: lang, voiceName } }));
@@ -516,9 +551,28 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
   // Handle text messages if needed in the future
 }
 
-function handleClose(connectionId: string) {
+async function handleClose(connectionId: string) {
   const client = activeSessions.get(connectionId);
   if (client) {
+    // Archive conversation if it has meaningful content
+    if (client.sessionId && CONTEXT_CONFIG.ARCHIVE_ON_DISCONNECT) {
+      try {
+        const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+        const context = await multimodalContextManager.getContext(client.sessionId)
+        
+        if (context && context.conversationHistory.length >= CONTEXT_CONFIG.MIN_MESSAGES_FOR_ARCHIVE) {
+          console.log(`[${connectionId}] 💾 Archiving conversation for ${client.sessionId}...`)
+          await multimodalContextManager.archiveConversation(client.sessionId)
+          console.log(`[${connectionId}] ✅ Conversation archived on disconnect`)
+        } else {
+          console.log(`[${connectionId}] ⏭️ Skipping archive: no meaningful content`)
+        }
+      } catch (err) {
+        console.error(`[${connectionId}] ❌ Failed to archive on disconnect:`, err)
+        // Non-fatal - continue with cleanup
+      }
+    }
+
     try { client.session?.close?.() } catch (error) {
       console.warn(`[${connectionId}] Failed to close session`, error)
     }

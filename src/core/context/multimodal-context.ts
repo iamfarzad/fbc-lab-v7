@@ -1,8 +1,11 @@
 import { ContextStorage } from './context-storage'
 import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry, AudioEntry } from './context-types'
 import { vercelCache } from '@/lib/vercel-cache'
-import { CONTEXT_CONFIG } from '@/config/constants'
+import { CONTEXT_CONFIG, SECURITY_CONFIG } from '@/config/constants'
 import { walLog } from './write-ahead-log'
+import { summarizeConversationWindow, shouldSummarize, extractSummaries } from './context-summarizer'
+import { detectPII, shouldRedact, redactPII } from '@/core/security/pii-detector'
+import { auditLog } from '@/core/security/audit-logger'
 
 // Define a local alias for the allowed modalities so we don't widen to string[]
 type Modality = 'text' | 'video' | 'image' | 'audio';
@@ -160,11 +163,37 @@ export class MultimodalContextManager {
   async addTextMessage(sessionId: string, content: string, metadata?: ConversationEntry['metadata']): Promise<void> {
     const context = await this.getOrCreateContext(sessionId)
 
+    // Check for PII (security & compliance)
+    let processedContent = content
+    if (SECURITY_CONFIG.ENABLE_PII_DETECTION) {
+      const detection = detectPII(content)
+      
+      if (detection.hasPII) {
+        console.warn(`⚠️ PII detected in message: ${detection.types.join(', ')}`)
+        
+        // Log to audit trail
+        if (SECURITY_CONFIG.ENABLE_AUDIT_LOGGING) {
+          await auditLog.logPIIDetection(
+            sessionId,
+            detection.types,
+            detection.matches.length,
+            SECURITY_CONFIG.ENABLE_PII_REDACTION
+          )
+        }
+        
+        // Redact if enabled (production only)
+        if (SECURITY_CONFIG.ENABLE_PII_REDACTION && shouldRedact(content)) {
+          processedContent = redactPII(content)
+          console.log(`🔒 PII redacted from message`)
+        }
+      }
+    }
+
     const entry: ConversationEntry = {
       id: `text_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
       modality: 'text',
-      content,
+      content: processedContent,
       metadata: metadata ?? {}
     }
 
@@ -176,7 +205,7 @@ export class MultimodalContextManager {
     context.metadata.modalitiesUsed = coerceModalities([...context.metadata.modalitiesUsed, 'text'])
 
     // Estimate tokens (rough approximation)
-    context.metadata.totalTokens += Math.ceil(content.length / 4)
+    context.metadata.totalTokens += Math.ceil(processedContent.length / 4)
 
     await this.saveContext(sessionId, context)
   }
@@ -554,6 +583,12 @@ export class MultimodalContextManager {
     // Build system prompt with multimodal context
     let systemPrompt = "You are F.B/c AI, a helpful business assistant with multimodal capabilities."
 
+    // Extract conversation summaries (for long conversations)
+    const summaries = extractSummaries(context.conversationHistory)
+    if (summaries.length > 0) {
+      systemPrompt += "\n\n PREVIOUS CONVERSATION SUMMARY:\n" + summaries.join('\n\n')
+    }
+
     if (context.summary.recentVisualAnalyses > 0 || context.summary.recentAudioEntries > 0 || context.summary.recentUploads > 0) {
       systemPrompt += "\n\nYou have access to recent multimodal context from this conversation:"
     }
@@ -594,7 +629,30 @@ export class MultimodalContextManager {
     // 1. Update in-memory (fastest)
     this.activeContexts.set(sessionId, context)
     
-    // 2. Persist to Redis (active session cache)
+    // 2. Check if conversation needs summarization (long conversations)
+    if (shouldSummarize(context.conversationHistory.length)) {
+      try {
+        const summary = await summarizeConversationWindow(context.conversationHistory)
+        
+        if (summary) {
+          // Store summary as special entry
+          context.conversationHistory.push({
+            id: crypto.randomUUID(),
+            timestamp: new Date().toISOString(),
+            modality: 'text',
+            content: `[CONTEXT SUMMARY] ${summary}`,
+            metadata: { speaker: 'assistant', type: 'summary' }
+          })
+          
+          console.log(`✅ Summarized conversation at ${context.conversationHistory.length} messages for ${sessionId}`)
+        }
+      } catch (err) {
+        console.error('Context summarization failed (non-fatal):', err)
+        // Continue - summarization is optimization, not critical
+      }
+    }
+    
+    // 3. Persist to Redis (active session cache)
     try {
       await vercelCache.set('multimodal', sessionId, context, {
         ttl: CONTEXT_CONFIG.REDIS_TTL,
@@ -660,6 +718,15 @@ export class MultimodalContextManager {
       })
 
       console.log(`✅ Archived conversation ${sessionId} to Supabase (${context.conversationHistory.length} messages, ${context.metadata.modalitiesUsed.join(', ')})`)
+      
+      // Audit log the archival
+      if (SECURITY_CONFIG.ENABLE_AUDIT_LOGGING) {
+        await auditLog.logContextArchived(
+          sessionId,
+          context.conversationHistory.length,
+          context.metadata.modalitiesUsed
+        )
+      }
     } catch (err) {
       console.error('❌ Failed to archive conversation:', err)
       throw err // This is critical - we want to know if archival fails

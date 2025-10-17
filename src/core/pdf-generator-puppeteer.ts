@@ -48,6 +48,35 @@ interface SummaryData {
   sessionId: string
   researchHighlights?: ResearchHighlight[]
   artifactInsights?: ArtifactInsight[]
+  multimodalContext?: {
+    visualAnalyses: Array<{
+      id: string
+      timestamp: string
+      type: 'webcam' | 'screen' | 'upload'
+      analysis: string
+    }>
+    voiceTranscripts: Array<{
+      id: string
+      timestamp: string
+      type: 'voice_input' | 'voice_output' | 'voice_transcript'
+      data: { transcript?: string; isFinal?: boolean }
+    }>
+    uploadedFiles: Array<{
+      id: string
+      filename: string
+      mimeType: string
+      size: number
+      analysis: string
+      pages?: number
+    }>
+    summary: {
+      totalMessages: number
+      modalitiesUsed: string[]
+      recentVisualAnalyses: number
+      recentAudioEntries: number
+      recentUploads: number
+    }
+  }
 }
 
 type Mode = 'client' | 'internal'
@@ -197,6 +226,72 @@ async function generatePdfWithPdfLib(
     writeLine('CONSULTANT BRIEF', 14, true, true)
     await writeParagraph(summaryData.leadResearch.consultant_brief)
     cursorY -= 4
+  }
+
+  // NEW: Multimodal Context Section
+  if (summaryData.multimodalContext) {
+    const mc = summaryData.multimodalContext
+    
+    if (mc.summary.modalitiesUsed.length > 0) {
+      writeLine('MULTIMODAL INTERACTIONS', 14, true, true)
+      writeLine(`Modalities Used: ${mc.summary.modalitiesUsed.join(', ')}`)
+      writeLine(`Total Messages: ${mc.summary.totalMessages}`)
+      cursorY -= 4
+    }
+
+    // Voice Transcripts Summary
+    if (mc.voiceTranscripts.length > 0) {
+      writeLine('Voice Conversation Excerpts', 12, true)
+      const userTranscripts = mc.voiceTranscripts
+        .filter(t => t.type === 'voice_input' && t.data.transcript && t.data.isFinal)
+        .slice(-5) // Last 5 user voice inputs
+      
+      for (const transcript of userTranscripts) {
+        if (transcript.data.transcript) {
+          writeLine(`[Voice] ${new Date(transcript.timestamp).toLocaleTimeString()}`, 10)
+          await writeParagraph(shortenText(transcript.data.transcript, 200))
+          cursorY -= 2
+        }
+      }
+      cursorY -= 4
+    }
+
+    // Visual Analyses Summary
+    if (mc.visualAnalyses.length > 0) {
+      writeLine('Visual Context Analyzed', 12, true)
+      const grouped = mc.visualAnalyses.reduce((acc, v) => {
+        acc[v.type] = (acc[v.type] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+      
+      Object.entries(grouped).forEach(([type, count]) => {
+        writeLine(`${type.charAt(0).toUpperCase() + type.slice(1)}: ${count} captures`)
+      })
+      
+      // Show sample analyses
+      const recent = mc.visualAnalyses.slice(-3)
+      for (const analysis of recent) {
+        writeLine(`[${analysis.type}] ${new Date(analysis.timestamp).toLocaleTimeString()}`, 10)
+        await writeParagraph(shortenText(analysis.analysis, 150))
+        cursorY -= 2
+      }
+      cursorY -= 4
+    }
+
+    // Uploaded Files
+    if (mc.uploadedFiles.length > 0) {
+      writeLine('Documents Shared', 12, true)
+      for (const file of mc.uploadedFiles) {
+        const sizeKB = Math.round(file.size / 1024)
+        const pageInfo = file.pages ? ` (${file.pages} pages)` : ''
+        writeLine(`${file.filename} - ${sizeKB}KB${pageInfo}`, 10)
+        if (file.analysis) {
+          await writeParagraph(shortenText(file.analysis, 100))
+        }
+        cursorY -= 2
+      }
+      cursorY -= 4
+    }
   }
 
   const conversationPairs = buildConversationPairs(summaryData.conversationHistory)

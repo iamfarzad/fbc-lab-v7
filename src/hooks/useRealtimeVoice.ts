@@ -29,6 +29,7 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
   const audioWorkletRecorderRef = useRef<AudioRecorder | null>(null);
   const usingAudioWorkletRef = useRef(false);
   const chunkHandlerRef = useRef<((chunk: MediaRecorderVoiceResult) => void) | null>(null);
+  const sampleRateRef = useRef(targetSampleRate);
 
   const hasAudioWorkletSupport = useCallback(() => {
     if (typeof window === 'undefined') return false;
@@ -39,13 +40,15 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
     const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
     const bytes = (base64.length * 3) / 4 - padding;
     const samples = bytes / 2; // 16-bit PCM
-    return samples > 0 ? (samples / targetSampleRate) * 1000 : 0;
+    const rate = sampleRateRef.current || targetSampleRate;
+    return samples > 0 ? (samples / rate) * 1000 : 0;
   }, [targetSampleRate]);
 
   const handleWorkletData = useCallback((base64: string) => {
     const handler = chunkHandlerRef.current;
     if (!handler || !base64) return;
-    handler({ base64, mimeType: `audio/pcm;rate=${targetSampleRate}`, durationMs: estimateDurationMs(base64) });
+    const declaredRate = sampleRateRef.current || targetSampleRate;
+    handler({ base64, mimeType: `audio/pcm;rate=${declaredRate}`, durationMs: estimateDurationMs(base64) });
   }, [estimateDurationMs, targetSampleRate]);
 
   const handleWorkletError = useCallback((err: Error) => {
@@ -77,6 +80,7 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
     }
 
     await audioWorkletRecorderRef.current.start();
+    sampleRateRef.current = audioWorkletRecorderRef.current.getSampleRate?.() ?? targetSampleRate;
     usingAudioWorkletRef.current = true;
     setIsRecording(true);
     try {
@@ -720,6 +724,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
       setSessionActive(false);
       isSessionActiveRef.current = false;
+
+      // Note: Context cleanup handled by server on disconnect (handleClose in live-server.ts)
+      // and by client in ChatInterface component unmount
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to stop voice session';
       console.error('🎤 [RealtimeVoice] Failed to stop session:', err);

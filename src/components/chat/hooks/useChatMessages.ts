@@ -389,15 +389,40 @@ export function useChatMessages(initialSessionId?: string) {
     });
   }, [unifiedChat]);
 
-  // Handle PDF export
+  // Handle PDF export (with conversation end archival)
   const handleExportSummary = useCallback(async (request: ExportSummaryRequest | null | undefined) => {
     if (!request?.sessionId) return;
     try {
+      console.log('🏁 Initiating conversation end and PDF export...')
+      
+      // 1. Trigger conversation_end to archive context
+      const endResponse = await fetch('/api/chat/unified', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages,
+          context: {
+            sessionId: request.sessionId,
+            trigger: 'conversation_end'
+          }
+        })
+      })
+
+      if (!endResponse.ok) {
+        console.error('Failed to archive conversation')
+        // Continue anyway - PDF might still work
+      } else {
+        console.log('✅ Conversation archived')
+      }
+
+      // 2. Generate PDF with multimodal context
+      toast.info('Generating PDF summary...')
       const response = await fetch('/api/export-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request)
       });
+      
       if (response.ok) {
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
@@ -407,6 +432,7 @@ export function useChatMessages(initialSessionId?: string) {
         a.click();
         URL.revokeObjectURL(url);
         toast.success('Summary exported successfully!');
+        console.log('✅ PDF downloaded and stored in Supabase')
       } else {
         toast.error('Export failed. Please try again.');
       }
@@ -414,7 +440,7 @@ export function useChatMessages(initialSessionId?: string) {
       toast.error('Export error. Check console.');
       console.error('PDF export error:', error);
     }
-  }, []);
+  }, [messages]);
 
   // Export voice transcript for summaries
   const exportVoiceTranscript = useCallback(() => {
