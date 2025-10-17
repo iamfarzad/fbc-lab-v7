@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     logger.debug('chat-flow-analytics', body)
     return respond.ok({ ok: true })
   } catch (error) {
-    logger.warn('chat-flow-analytics failed', error instanceof Error ? error : undefined)
+    logger.error('chat-flow-analytics failed', error instanceof Error ? error : undefined)
     return respond.badRequest('Invalid payload')
   }
 }

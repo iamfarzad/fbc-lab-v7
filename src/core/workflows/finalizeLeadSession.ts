@@ -168,7 +168,7 @@ async function buildAttachments(pdfPath: string | null, pdfBytes?: Uint8Array) {
     
     return undefined
   } catch (error) {
-    logger.warn('Unable to attach PDF to email', error instanceof Error ? error : undefined)
+    logger.error('Unable to attach PDF to email', error instanceof Error ? error : undefined)
     return undefined
   }
 }

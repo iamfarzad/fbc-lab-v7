@@ -117,12 +117,12 @@ export function Footer({ className, ...props }: ComponentProps<"footer">) {
               // Terminal theme enhancements
               "monochrome:monochrome-orange:space-x-6 monochrome:monochrome-orange-dark:space-x-6"
             )}>
-              <FooterLink href="#">
+              <FooterLink href="/docs/privacy-policy">
                 <span className="monochrome:monochrome-orange:hidden monochrome:monochrome-orange-dark:inline">[</span>
                 PRIVACY POLICY
                 <span className="monochrome:monochrome-orange:hidden monochrome:monochrome-orange-dark:inline">]</span>
               </FooterLink>
-              <FooterLink href="#">
+              <FooterLink href="/docs/terms-and-conditions">
                 <span className="monochrome:monochrome-orange:hidden monochrome:monochrome-orange-dark:inline">[</span>
                 TERMS OF SERVICE
                 <span className="monochrome:monochrome-orange-dark:inline">]</span>

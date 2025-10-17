@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { logger, performanceMonitor } from './logger';
+import { logger } from './logger';
 import { v4 as uuidv4 } from 'uuid';
 
 // Request ID generator
@@ -123,8 +123,8 @@ export async function withRequestLogging(
     const duration = Date.now() - startTime;
     requestLogger.logApiRequest(request.method, url.pathname, response.status, duration);
 
-    // Record performance metrics
-    performanceMonitor.record(`api_${request.method}_${url.pathname}`, duration);
+    // Performance metrics recorded in logger
+    logger.debug('API performance', { method: request.method, path: url.pathname, duration });
 
     // Log response body if enabled
     if (logResponseBody && response.status < 400) {
@@ -168,8 +168,8 @@ export async function withRequestLogging(
       });
     }
 
-    // Record error metrics
-    performanceMonitor.record(`api_error_${request.method}_${url.pathname}`, duration);
+    // Error metrics recorded in logger
+    logger.debug('API error performance', { method: request.method, path: url.pathname, duration });
 
     return createErrorResponse(error instanceof ApiError ? error : new ApiError(500, 'Internal server error'), requestId);
   }
