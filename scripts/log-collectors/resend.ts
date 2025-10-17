@@ -1,8 +1,11 @@
 #!/usr/bin/env tsx
 
+import { EXTERNAL_ENDPOINTS } from '../../src/config/constants'
+
 const LOG_INGEST_URL = process.env.LOG_INGEST_URL || 'http://localhost:3000/api/logs/ingest'
 const LOG_SECRET = process.env.LOGS_INGESTION_SECRET || ''
 const RESEND_API_KEY = process.env.RESEND_API_KEY
+const RESEND_API_URL = EXTERNAL_ENDPOINTS.RESEND_EMAIL
 
 if (!RESEND_API_KEY) {
   console.log('ℹ️  RESEND_API_KEY not set, skipping Resend log collection')
@@ -28,7 +31,7 @@ let lastChecked = Date.now() - 60000 // Start from 1 minute ago
 
 async function fetchResendEvents() {
   try {
-    const response = await fetch('https://api.resend.com/emails', {
+    const response = await fetch(RESEND_API_URL, {
       headers: {
         Authorization: `Bearer ${RESEND_API_KEY}`
       }
@@ -87,4 +90,3 @@ process.on('SIGINT', () => {
   console.log('\n📧 Resend collector stopped')
   process.exit(0)
 })
-

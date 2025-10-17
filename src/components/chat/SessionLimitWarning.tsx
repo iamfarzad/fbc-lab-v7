@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Download, Calendar } from 'lucide-react';
+import { CONTACT_CONFIG } from '@/config/constants';
 
 interface SessionLimitWarningProps {
   sessionId: string;
@@ -77,7 +78,7 @@ export function SessionLimitWarning({ sessionId, usage }: SessionLimitWarningPro
               <Download className="w-4 h-4 mr-2" />
               {generating ? 'Generating PDF...' : 'Download Your Proposal'}
             </Button>
-            <Button variant="outline" onClick={() => window.open('https://calendly.com/farzad-fbc', '_blank')}>
+            <Button variant="outline" onClick={() => window.open(CONTACT_CONFIG.SCHEDULING.BOOKING_URL, '_blank')}>
               <Calendar className="w-4 h-4 mr-2" />
               Book Strategy Call
             </Button>
@@ -102,4 +103,3 @@ export function SessionLimitWarning({ sessionId, usage }: SessionLimitWarningPro
   
   return null;
 }
-

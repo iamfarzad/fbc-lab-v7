@@ -10,7 +10,7 @@ import * as path from 'path'
 import * as dotenv from 'dotenv'
 import { fileURLToPath } from 'url'
 import { SessionLogger } from './session-logger'
-import { GEMINI_MODELS } from '../src/config/constants.js'
+import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG } from '../src/config/constants.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,14 +24,7 @@ const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
 console.log(`🔧 Environment check: PORT=${process.env.PORT}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT}, Using: ${PORT}`);
 
 // Voice & Language Utilities
-const VOICE_BY_LANG: Record<string, string> = {
-  'en-US': 'Puck',
-  'en-GB': 'Puck',
-  'nb-NO': 'Puck',
-  'sv-SE': 'Puck',
-  'de-DE': 'Puck',
-  'es-ES': 'Puck',
-};
+// Imported from constants.ts - VOICE_CONFIG.BY_LANG
 
 function isBcp47(s?: string) {
   return typeof s === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z]{2}|-[A-Za-z]{4})?(-[A-Za-z]{2}|-[0-9]{3})?$/.test(s)
@@ -123,7 +116,7 @@ const pingInterval = setInterval(() => {
       }
     }
   })
-}, 25_000) // 25 seconds - well within the 600s idle timeout
+}, WEBSOCKET_CONFIG.HEARTBEAT_INTERVAL)
 server.on('close', () => clearInterval(pingInterval))
 
 // Error handlers
@@ -136,15 +129,7 @@ nodeProcess?.on('unhandledRejection', (reason: unknown) => {
 })
 
 // --- Live Config: System instruction and tool declarations ---
-const CHAT_PERSONALITY = `
-You are F.B/c, Farzad Bayat's sharp, friendly consulting assistant.
-- Speak concisely (2 sentences max by default).
-- Ask one focused question when you need more context.
-- Keep a natural voice tone; avoid lists unless asked.
-- You have VISUAL CAPABILITIES: You can see webcam and screen share video frames in real-time.
-- When you receive video input, acknowledge what you see and provide relevant insights.
-Pronunciation: "Farzad Bayat" ~ "Fahr–zahd Bye–yaht" (soft 'a' in Farzad).
-`;
+// Imported from constants.ts - GEMINI_CONFIG.SYSTEM_PROMPT
 
 const FUNCTION_DECLARATIONS: any[] = [
   {
@@ -177,15 +162,9 @@ const FUNCTION_DECLARATIONS: any[] = [
   }
 ];
 
-// Visual trigger + throttle configuration (parameterized via env)
-const VISUAL_TRIGGER_WORDS: string[] = (process.env.LIVE_SERVER_VISUAL_TRIGGERS || 'screen,showing,look at,see this,dashboard,workflow')
-  .split(',')
-  .map(s => s.trim().toLowerCase())
-  .filter(Boolean);
-const VISUAL_INJECT_THROTTLE_MS = Math.max(
-  0,
-  Number.parseInt(process.env.LIVE_SERVER_VISUAL_INJECT_THROTTLE_MS || '8000', 10) || 8000
-);
+// Visual trigger + throttle configuration - imported from constants.ts
+const VISUAL_TRIGGER_WORDS = VOICE_CONFIG.VISUAL_TRIGGERS;
+const VISUAL_INJECT_THROTTLE_MS = VOICE_CONFIG.VISUAL_INJECT_THROTTLE_MS;
 
 // Visual context snapshot & session record types
 type Snapshot = {
@@ -212,12 +191,9 @@ type ActiveSessionRecord = {
 // Store active Live API sessions
 const activeSessions = new Map<string, ActiveSessionRecord>();
 const noSessionWarned = new Set<string>(); // Track connections we've already warned about
-// Feature flag + debounce controls for CONTEXT_UPDATE → Live injection
-const INJECT_ON_CONTEXT_UPDATE = process.env.LIVE_SERVER_INJECT_ON_CONTEXT_UPDATE === '0' ? false : true;
-const CONTEXT_INJECT_DEBOUNCE_MS = Math.max(
-  0,
-  Number.parseInt(process.env.LIVE_SERVER_CONTEXT_INJECT_DEBOUNCE_MS || '600', 10) || 600
-);
+// Feature flag + debounce controls for CONTEXT_UPDATE → Live injection - imported from constants.ts
+const INJECT_ON_CONTEXT_UPDATE = VOICE_CONFIG.INJECT_ON_CONTEXT_UPDATE;
+const CONTEXT_INJECT_DEBOUNCE_MS = VOICE_CONFIG.CONTEXT_INJECT_DEBOUNCE_MS;
 const sessionStarting = new Set<string>()
 // Avoid emitting spurious session_closed when restarting a Live session for the same WS
 const closingForRestart = new Set<string>()
@@ -267,7 +243,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     const requestedLang = isBcp47(payload?.languageCode) ? payload.languageCode : undefined
     const lang = requestedLang || 'en-US'
     const requestedVoice = typeof payload?.voiceName === 'string' ? payload.voiceName : undefined
-    const voiceName = requestedVoice || VOICE_BY_LANG[lang] || 'Puck'
+    const voiceName = requestedVoice || VOICE_CONFIG.BY_LANG[lang as keyof typeof VOICE_CONFIG.BY_LANG] || VOICE_CONFIG.DEFAULT_VOICE
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -286,14 +262,14 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     }
     const liveConfig: any = {
       responseModalities: modalities,
-      systemInstruction: CHAT_PERSONALITY,
+      systemInstruction: GEMINI_CONFIG.SYSTEM_PROMPT,
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName } }
       },
       // Enable transcriptions - languageCode removed (API no longer supports it)
       inputAudioTranscription: {},
-      outputAudioTranscription: { enable: true },
+      outputAudioTranscription: {},
     }
 
     const session: any = await ai.live.connect({

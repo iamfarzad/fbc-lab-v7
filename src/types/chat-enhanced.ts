@@ -24,7 +24,7 @@ export interface AIElementConfig {
 }
 
 // Re-export canonical content-related types from core to prevent duplication
-export type { MessageAction, Source, CodeBlock, ReasoningStep, Artifact } from '@/types/core';
+export type { MessageAction, Source, CodeBlock, ReasoningStep, Artifact, MessageReaction } from '@/types/core';
 
 // UI-only MessageAction extension (adds runtime callback typing and icon component support)
 export interface UIMessageAction extends Omit<import('@/types/core').MessageAction, 'icon' | 'onClick'> {
@@ -128,13 +128,6 @@ export interface Suggestion {
   category?: string;
   priority?: number;
   context?: string;
-}
-
-export interface MessageReaction {
-  emoji: string;
-  count: number;
-  users: string[];
-  userReacted?: boolean; // For current user
 }
 
 export interface ReadReceipt {

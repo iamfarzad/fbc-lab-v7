@@ -4,6 +4,7 @@ import { ContextStorage } from '@/core/context/context-storage';
 import { usageLimiter } from '@/src/lib/usage-limits';
 import { generateText } from 'ai';
 import { google } from '@ai-sdk/google';
+import { CONTACT_CONFIG, GEMINI_MODELS } from '@/config/constants';
 
 const contextStorage = new ContextStorage();
 
@@ -61,9 +62,9 @@ Include timeline and expected outcomes.
 ${typeof (context as any).company_overview?.summary === 'string' ? (context as any).company_overview.summary : 'Brief overview based on available information'}
 
 ## Next Steps
-1. Book a 30-minute strategy call: [calendly.com/farzad-fbc](https://calendly.com/farzad-fbc)
-2. Email: farzad@fbc.ai
-3. Website: fbc.ai
+1. Book a 30-minute strategy call: [${CONTACT_CONFIG.SCHEDULING.BOOKING_URL}](${CONTACT_CONFIG.SCHEDULING.BOOKING_URL})
+2. Email: ${CONTACT_CONFIG.SUPPORT_EMAIL}
+3. Website: ${CONTACT_CONFIG.WEBSITE_URL.replace(/^https?:\/\//, '')}
 
 ---
 
@@ -71,7 +72,7 @@ ${typeof (context as any).company_overview?.summary === 'string' ? (context as a
 
 Format as clean, professional markdown. Be concise and specific.`;
 
-    const model = google('gemini-2.0-flash-exp');
+    const model = google(GEMINI_MODELS.FLASH_EXP);
     const result = await generateText({
       model,
       prompt: proposalPrompt,

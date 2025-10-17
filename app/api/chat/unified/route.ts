@@ -8,6 +8,7 @@ import { respond } from '@/lib/api/response'
 import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
+import { GEMINI_MODELS, GEMINI_CONFIG } from '@/config/constants'
 import { z } from 'zod'
 import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
@@ -256,8 +257,8 @@ function parseStructuredResponse(content: string) {
   // Add context usage tracking
   metadata.contextUsage = {
     usedTokens: Math.floor(content.length / 4), // Rough token estimate
-    maxTokens: 8192,
-    usage: Math.floor(content.length / 4) / 8192,
+    maxTokens: GEMINI_CONFIG.MAX_TOKENS,
+    usage: Math.floor(content.length / 4) / GEMINI_CONFIG.MAX_TOKENS,
     modelId: 'gemini-flash-latest'
   }
   
@@ -502,7 +503,17 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
     console.log('[UNIFIED_AI_SDK] Request:', reqId)
 
-    const body = await req.json() as ChatRequestBody
+    let body: ChatRequestBody | null = null
+    try {
+      body = await req.json() as ChatRequestBody
+    } catch (error) {
+      console.error('[UNIFIED_AI_SDK] Failed to parse JSON body', error)
+      return respond.badRequest('Request body must be valid JSON with a messages array.')
+    }
+
+    if (!body) {
+      return respond.badRequest('Missing request body.')
+    }
     const { messages: rawMessages, context, stream = true } = body
 
     if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
@@ -958,7 +969,7 @@ Citations: ${researchResult.allCitations.length} sources processed
         process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
       }
       
-      const streamingModel = google('gemini-flash-lite-latest')
+      const streamingModel = google(GEMINI_MODELS.FLASH_LITE_LATEST)
       
       // Define AI tools for multimodal and artifact creation
       const tools = {
@@ -1012,7 +1023,7 @@ Citations: ${researchResult.allCitations.length} sources processed
         system: systemPrompt,
         tools,
         messages: aiMessages,
-        temperature: 0.7,
+        temperature: GEMINI_CONFIG.DEFAULT_TEMPERATURE,
         onFinish: (result) => {
           console.log('[UNIFIED_AI_SDK] Completed:', {
             reqId,
@@ -1190,7 +1201,7 @@ Citations: ${researchResult.allCitations.length} sources processed
         model,
         system: systemPrompt,
         messages: aiMessages,
-        temperature: 0.7
+        temperature: GEMINI_CONFIG.DEFAULT_TEMPERATURE
       })
 
       // Parse structured response for AI elements metadata
@@ -1290,7 +1301,7 @@ export function GET(req: NextRequest) {
             supportsStreaming: true,
             supportsMultimodal: true,
             supportsRealtime: true,
-            maxTokens: 8192,
+            maxTokens: GEMINI_CONFIG.MAX_TOKENS,
             supportedModes: ['standard', 'realtime', 'admin', 'multimodal']
           },
           provider: 'ai-sdk',

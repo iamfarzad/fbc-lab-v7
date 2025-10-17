@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarIcon, ExternalLink } from 'lucide-react';
+import { CONTACT_CONFIG } from '@/config/constants';
 
 interface CalendarWidgetProps {
   title: string;
@@ -13,7 +14,7 @@ interface CalendarWidgetProps {
 export function CalendarWidget({ 
   title, 
   description, 
-  url = 'https://calendly.com/farzad-fbc'
+  url = CONTACT_CONFIG.SCHEDULING.BOOKING_URL
 }: CalendarWidgetProps) {
   return (
     <Card className="border-blue-200 bg-blue-50">
@@ -38,10 +39,9 @@ export function CalendarWidget({
           <ExternalLink className="h-4 w-4" />
         </Button>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          Opens in Calendly
+          Opens scheduling portal
         </p>
       </CardContent>
     </Card>
   );
 }
-

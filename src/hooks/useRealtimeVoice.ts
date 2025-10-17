@@ -537,9 +537,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
   const connectWebSocket = useCallback(() => {
     if (!serverUrl || wsRef.current) {
+      console.log('🎤 [RealtimeVoice] Cannot connect:', { serverUrl, hasSocket: !!wsRef.current });
       return;
     }
 
+    console.log('🎤 [RealtimeVoice] Connecting to:', serverUrl);
     try {
       const socket = new WebSocket(serverUrl);
       wsRef.current = socket;
@@ -741,7 +743,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [connectWebSocket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only connect once on mount - connectWebSocket handles reconnections internally
 
   useEffect(() => {
     return () => {

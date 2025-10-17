@@ -1,5 +1,8 @@
 import { ContextStorage } from './context-storage'
 import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry, AudioEntry } from './context-types'
+import { vercelCache } from '@/lib/vercel-cache'
+import { CONTEXT_CONFIG } from '@/config/constants'
+import { walLog } from './write-ahead-log'
 
 // Define a local alias for the allowed modalities so we don't widen to string[]
 type Modality = 'text' | 'video' | 'image' | 'audio';
@@ -165,6 +168,9 @@ export class MultimodalContextManager {
       metadata: metadata ?? {}
     }
 
+    // Log to WAL first (critical path for data reliability)
+    await walLog.logOperation(sessionId, 'add_text', entry)
+
     context.conversationHistory.push(entry)
     context.metadata.lastUpdated = entry.timestamp
     context.metadata.modalitiesUsed = coerceModalities([...context.metadata.modalitiesUsed, 'text'])
@@ -173,7 +179,6 @@ export class MultimodalContextManager {
     context.metadata.totalTokens += Math.ceil(content.length / 4)
 
     await this.saveContext(sessionId, context)
-    // Action logged
   }
 
   async addVoiceMessage(sessionId: string, transcription: string, duration: number, metadata?: { sampleRate?: number; format?: string; confidence?: number }): Promise<void> {
@@ -252,6 +257,9 @@ export class MultimodalContextManager {
       }
     }
 
+    // Log to WAL (critical for visual analyses)
+    await walLog.logOperation(sessionId, 'add_visual', visualEntry)
+
     context.visualContext.push(visualEntry)
     context.metadata.lastUpdated = convEntry.timestamp
     context.metadata.modalitiesUsed = coerceModalities([...context.metadata.modalitiesUsed, 'image']) // not 'vision'
@@ -260,7 +268,6 @@ export class MultimodalContextManager {
     context.metadata.totalTokens += Math.ceil(analysis.length / 4)
 
     await this.saveContext(sessionId, context)
-    // Action logged
   }
 
   async addUploadEntry(sessionId: string, payload: {
@@ -287,6 +294,9 @@ export class MultimodalContextManager {
       dataUrl: payload.dataUrl,
       pages: payload.pages
     }
+
+    // Log to WAL (critical for file uploads)
+    await walLog.logOperation(sessionId, 'add_upload', uploadEntry)
 
     context.uploadContext = context.uploadContext || []
     context.uploadContext.push(uploadEntry)
@@ -326,6 +336,11 @@ export class MultimodalContextManager {
           size: metadata?.size,
           storedRaw: metadata?.storedRaw ?? false,
         }
+      }
+
+      // Log to WAL first (critical for voice transcripts)
+      if (isFinal) {
+        await walLog.logOperation(sessionId, 'add_voice', audioEntry)
       }
 
       context.audioContext = context.audioContext || []
@@ -387,16 +402,30 @@ export class MultimodalContextManager {
   }
 
   async getContext(sessionId: string): Promise<MultimodalContext | null> {
-    // Check memory first
+    // 1. Check memory first (fastest)
     if (this.activeContexts.has(sessionId)) {
       return this.activeContexts.get(sessionId)!
     }
 
-    // Check database
+    // 2. Check Redis (active sessions)
+    try {
+      const cached = await vercelCache.get<MultimodalContext>('multimodal', sessionId)
+      if (cached) {
+        this.activeContexts.set(sessionId, cached)
+        console.log(`✅ Context loaded from Redis: ${sessionId}`)
+        return cached
+      }
+    } catch (err) {
+      console.error('Redis get failed:', err)
+      // Continue to database fallback
+    }
+
+    // 3. Check Supabase (archived sessions)
     const stored = await this.contextStorage.get(sessionId)
     if (stored?.multimodal_context) {
       const context = ensureContext(stored.multimodal_context)
       this.activeContexts.set(sessionId, context)
+      console.log(`✅ Context loaded from Supabase: ${sessionId}`)
       return context
     }
 
@@ -562,9 +591,20 @@ export class MultimodalContextManager {
   }
 
   private async saveContext(sessionId: string, context: MultimodalContext): Promise<void> {
-    // Update memory only (like FB-c_labV2 approach)
+    // 1. Update in-memory (fastest)
     this.activeContexts.set(sessionId, context)
-    // Action logged`)
+    
+    // 2. Persist to Redis (active session cache)
+    try {
+      await vercelCache.set('multimodal', sessionId, context, {
+        ttl: CONTEXT_CONFIG.REDIS_TTL,
+        tags: ['session', 'multimodal']
+      })
+      console.log(`✅ Context saved to Redis: ${sessionId}`)
+    } catch (err) {
+      console.error('Redis save failed (non-fatal):', err)
+      // Non-fatal - in-memory still works
+    }
   }
 
   private extractTopics(messages: ConversationEntry[]): string[] {
@@ -591,10 +631,53 @@ export class MultimodalContextManager {
     return Array.from(topics)
   }
 
+  /**
+   * Archive conversation to Supabase for long-term storage
+   * Called at conversation end before cleanup
+   */
+  async archiveConversation(sessionId: string): Promise<void> {
+    const context = await this.getContext(sessionId)
+    if (!context) {
+      console.warn(`⚠️ No context to archive for session: ${sessionId}`)
+      return
+    }
+
+    // Don't archive trivial conversations
+    if (context.conversationHistory.length < CONTEXT_CONFIG.MIN_MESSAGES_FOR_ARCHIVE) {
+      console.log(`⏭️ Skipping archive: only ${context.conversationHistory.length} messages`)
+      return
+    }
+
+    try {
+      // Store full context in Supabase conversation_contexts
+      await this.contextStorage.store(sessionId, {
+        session_id: sessionId,
+        email: context.leadContext.email,
+        name: context.leadContext.name,
+        company_context: context.leadContext.company,
+        multimodal_context: JSON.parse(JSON.stringify(context)) as any, // Serialize to JSON-compatible format
+        updated_at: new Date().toISOString()
+      })
+
+      console.log(`✅ Archived conversation ${sessionId} to Supabase (${context.conversationHistory.length} messages, ${context.metadata.modalitiesUsed.join(', ')})`)
+    } catch (err) {
+      console.error('❌ Failed to archive conversation:', err)
+      throw err // This is critical - we want to know if archival fails
+    }
+  }
+
   async clearSession(sessionId: string): Promise<void> {
-    // Clear from memory only (like FB-c_labV2 approach)
+    // Clear from memory
     this.activeContexts.delete(sessionId)
-    // Action logged`)
+    
+    // Clear from Redis cache
+    try {
+      await vercelCache.delete('multimodal', sessionId)
+      console.log(`✅ Cleared context from Redis: ${sessionId}`)
+    } catch (err) {
+      console.error('Failed to clear Redis cache:', err)
+      // Non-fatal
+    }
   }
 
   // Get all active sessions (for monitoring)

@@ -1,3 +1,5 @@
+import { respond } from '@/lib/api/response'
+
 export function GET() {
   // Return simple analytics data as JSON
   const analyticsData = {
@@ -14,5 +16,5 @@ export function GET() {
     ]
   };
 
-  return Response.json(analyticsData);
+  return respond.ok(analyticsData);
 }

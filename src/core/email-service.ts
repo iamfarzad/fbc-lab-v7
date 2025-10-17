@@ -1,4 +1,5 @@
 import { logger } from '../lib/logger'
+import { CONTACT_CONFIG, EXTERNAL_ENDPOINTS } from '@/config/constants'
 
 export interface EmailAttachment {
   filename: string
@@ -15,12 +16,12 @@ export interface EmailTemplate {
   tags?: Record<string, string>
 }
 
-const RESEND_ENDPOINT = 'https://api.resend.com/emails'
+const RESEND_ENDPOINT = EXTERNAL_ENDPOINTS.RESEND_EMAIL
 
 export class EmailService {
   static async sendEmail(template: EmailTemplate) {
     const apiKey = process.env.RESEND_API_KEY
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'F.B/c <contact@farzadbayat.com>'
+    const fromAddress = CONTACT_CONFIG.DEFAULT_FROM_EMAIL
 
     if (!apiKey) {
       logger.warn('EmailService: RESEND_API_KEY missing, skipping email send', {
@@ -99,4 +100,3 @@ async function safeReadJson(response: Response) {
     return null
   }
 }
-

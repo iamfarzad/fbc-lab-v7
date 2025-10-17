@@ -3,6 +3,7 @@
 import * as React from "react"
 import { createPortal } from "react-dom"
 import { X } from "lucide-react"
+import { CONTACT_CONFIG } from "@/config/constants"
 
 interface MeetingOverlayProps {
   open: boolean
@@ -13,18 +14,18 @@ interface MeetingOverlayProps {
   description?: string
 }
 
-const CAL_SCRIPT_SRC = "https://app.cal.com/embed/embed.js"
-
 export function MeetingOverlay({
   open,
   onClose,
-  username = "farzad-bayat",
-  event = "30min",
+  username = CONTACT_CONFIG.SCHEDULING.USERNAME,
+  event = CONTACT_CONFIG.SCHEDULING.EVENT,
   title = "Schedule a Strategy Call",
   description = "Pick a time that works for you. You'll receive a calendar invite with the meeting details.",
 }: MeetingOverlayProps) {
   const [mounted, setMounted] = React.useState(false)
-  const calUrl = `https://cal.com/${username}/${event}`
+  const schedulingPath = `${username}/${event}`
+  const calUrl = `${CONTACT_CONFIG.SCHEDULING.BASE_URL}/${schedulingPath}`
+  const embedUrl = `${CONTACT_CONFIG.SCHEDULING.EMBED_BASE_URL}/${schedulingPath}?embed=true`
 
   React.useEffect(() => {
     setMounted(true)
@@ -34,13 +35,13 @@ export function MeetingOverlay({
     if (!open) return
 
     const alreadyLoaded = Array.from(document.scripts).some(
-      (script) => script.src === CAL_SCRIPT_SRC,
+      (script) => script.src === CONTACT_CONFIG.SCHEDULING.EMBED_SCRIPT_SRC,
     )
 
     if (alreadyLoaded) return
 
     const script = document.createElement("script")
-    script.src = CAL_SCRIPT_SRC
+    script.src = CONTACT_CONFIG.SCHEDULING.EMBED_SCRIPT_SRC
     script.async = true
     script.defer = true
     document.body.appendChild(script)
@@ -98,7 +99,7 @@ export function MeetingOverlay({
 
           <iframe
             title="Book a meeting"
-            src={`https://app.cal.com/${username}/${event}?embed=true`}
+            src={embedUrl}
             style={{
               position: "absolute",
               inset: 8,
@@ -123,4 +124,3 @@ export function MeetingOverlay({
 }
 
 export default MeetingOverlay
-

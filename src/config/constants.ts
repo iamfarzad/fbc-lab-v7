@@ -6,6 +6,8 @@
  * must be imported from this file.
  */
 
+const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '')
+
 // WebSocket Configuration
 const IS_PROD = process.env.NODE_ENV === 'production'
 export const WEBSOCKET_CONFIG = {
@@ -91,6 +93,24 @@ export const RATE_LIMITS = {
   RETRY_DELAY: 1000,
 } as const
 
+// Context Configuration
+export const CONTEXT_CONFIG = {
+  REDIS_TTL: 3600, // 1 hour for active sessions
+  ARCHIVE_ON_DISCONNECT: true,
+  AUTO_GENERATE_PDF: true,
+  MIN_MESSAGES_FOR_ARCHIVE: 3, // Don't archive test conversations
+  SUMMARIZE_THRESHOLD: 50, // Summarize every 50 messages
+} as const
+
+// Security Configuration
+export const SECURITY_CONFIG = {
+  ENABLE_PII_DETECTION: process.env.NODE_ENV === 'production',
+  ENABLE_PII_REDACTION: process.env.NODE_ENV === 'production',
+  ENABLE_AUDIT_LOGGING: true,
+  DATA_RETENTION_DAYS: 90, // GDPR compliance
+  ENABLE_ENCRYPTION_AT_REST: true, // For Supabase
+} as const
+
 // Session Configuration
 export const SESSION_CONFIG = {
   TIMEOUT: 30 * 60 * 1000, // 30 minutes
@@ -122,3 +142,76 @@ export const ALLOWED_ORIGINS = (
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
+
+// Third-party API endpoints
+export const EXTERNAL_ENDPOINTS = {
+  RESEND_EMAIL: process.env.NEXT_PUBLIC_RESEND_API_ENDPOINT || 'https://api.resend.com/emails',
+  PERPLEXITY_CHAT_COMPLETIONS:
+    process.env.NEXT_PUBLIC_PERPLEXITY_API_ENDPOINT || 'https://api.perplexity.ai/chat/completions',
+} as const
+
+// Contact details & scheduling configuration
+const schedulingUsername = process.env.NEXT_PUBLIC_SCHEDULING_USERNAME || 'farzad-bayat'
+const schedulingEvent = process.env.NEXT_PUBLIC_SCHEDULING_EVENT || '30min'
+const schedulingBaseUrl = trimTrailingSlash(
+  process.env.NEXT_PUBLIC_SCHEDULING_BASE_URL || 'https://cal.com',
+)
+const schedulingEmbedBaseUrl = trimTrailingSlash(
+  process.env.NEXT_PUBLIC_SCHEDULING_EMBED_BASE_URL || 'https://app.cal.com',
+)
+const schedulingEmbedScript =
+  process.env.NEXT_PUBLIC_SCHEDULING_EMBED_SCRIPT || 'https://app.cal.com/embed/embed.js'
+
+export const CONTACT_CONFIG = {
+  SUPPORT_EMAIL: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'farzad@fbc.ai',
+  WEBSITE_URL: process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://fbc.ai',
+  DEFAULT_FROM_EMAIL: process.env.RESEND_FROM_EMAIL || 'F.B/c <contact@farzadbayat.com>',
+  SCHEDULING: {
+    USERNAME: schedulingUsername,
+    EVENT: schedulingEvent,
+    BOOKING_URL: `${schedulingBaseUrl}/${schedulingUsername}/${schedulingEvent}`,
+    EMBED_URL: `${schedulingEmbedBaseUrl}/${schedulingUsername}/${schedulingEvent}?embed=true`,
+    EMBED_SCRIPT_SRC: schedulingEmbedScript,
+    BASE_URL: schedulingBaseUrl,
+    EMBED_BASE_URL: schedulingEmbedBaseUrl,
+  },
+} as const
+
+// Voice System Configuration
+export const VOICE_CONFIG = {
+  BY_LANG: {
+    'en-US': 'Puck',
+    'en-GB': 'Puck',
+    'nb-NO': 'Puck',
+    'sv-SE': 'Puck',
+    'de-DE': 'Puck',
+    'es-ES': 'Puck',
+  } as const,
+  DEFAULT_VOICE: 'Puck',
+  VISUAL_TRIGGERS: (process.env.LIVE_SERVER_VISUAL_TRIGGERS || 'screen,showing,look at,see this,dashboard,workflow')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean),
+  VISUAL_INJECT_THROTTLE_MS: Math.max(
+    0,
+    Number.parseInt(process.env.LIVE_SERVER_VISUAL_INJECT_THROTTLE_MS || '8000', 10) || 8000
+  ),
+  CONTEXT_INJECT_DEBOUNCE_MS: Math.max(
+    0,
+    Number.parseInt(process.env.LIVE_SERVER_CONTEXT_INJECT_DEBOUNCE_MS || '600', 10) || 600
+  ),
+  INJECT_ON_CONTEXT_UPDATE: process.env.LIVE_SERVER_INJECT_ON_CONTEXT_UPDATE === '0' ? false : true,
+} as const
+
+// Gemini Configuration
+export const GEMINI_CONFIG = {
+  DEFAULT_TEMPERATURE: 0.7,
+  MAX_TOKENS: 8192,
+  SYSTEM_PROMPT: `You are F.B/c, Farzad Bayat's sharp, friendly consulting assistant.
+- Speak concisely (2 sentences max by default).
+- Ask one focused question when you need more context.
+- Keep a natural voice tone; avoid lists unless asked.
+- You have VISUAL CAPABILITIES: You can see webcam and screen share video frames in real-time.
+- When you receive video input, acknowledge what you see and provide relevant insights.
+Pronunciation: "Farzad Bayat" ~ "Fahr–zahd Bye–yaht" (soft 'a' in Farzad).`,
+} as const

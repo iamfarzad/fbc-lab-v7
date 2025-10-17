@@ -3,6 +3,8 @@
   NOTE: This uses Server-side fetch from Next.js route handlers. Do not import in client components.
 */
 
+import { EXTERNAL_ENDPOINTS } from '@/config/constants'
+
 export type PerplexityMessage = {
   role: 'system' | 'user' | 'assistant'
   content: string
@@ -27,7 +29,7 @@ type StreamEvent = {
   done?: boolean
 }
 
-const PERPLEXITY_URL = 'https://api.perplexity.ai/chat/completions'
+const PERPLEXITY_URL = EXTERNAL_ENDPOINTS.PERPLEXITY_CHAT_COMPLETIONS
 
 export async function *streamPerplexity(params: {
   apiKey: string
@@ -95,5 +97,4 @@ export async function *streamPerplexity(params: {
   const safeCitations: string[] = Array.isArray(citations) ? citations : [];
   return void (yield { done: true, citations: safeCitations });
 }
-
 

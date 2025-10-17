@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Calendar, FileText } from 'lucide-react';
+import { CONTACT_CONFIG } from '@/config/constants';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +65,7 @@ export function NextStepsMenu({ sessionId, show }: NextStepsMenuProps) {
           <span>{generating ? 'Generating...' : 'Download Summary'}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => window.open('https://calendly.com/farzad-fbc', '_blank')}>
+        <DropdownMenuItem onClick={() => window.open(CONTACT_CONFIG.SCHEDULING.BOOKING_URL, '_blank')}>
           <Calendar className="mr-2 h-4 w-4" />
           <span>Book Free 30-Min Call</span>
         </DropdownMenuItem>
@@ -72,4 +73,3 @@ export function NextStepsMenu({ sessionId, show }: NextStepsMenuProps) {
     </DropdownMenu>
   );
 }
-
