@@ -183,7 +183,7 @@ export interface MessageAction {
 
 export interface Artifact {
   id: string
-  type: 'file' | 'chart' | 'table' | 'diagram' | 'custom'
+  type: 'file' | 'chart' | 'table' | 'diagram' | 'custom' | 'summary'
   content: string | Record<string, unknown>
   title?: string
   description?: string

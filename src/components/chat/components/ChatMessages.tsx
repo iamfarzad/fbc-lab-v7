@@ -88,7 +88,7 @@ import { CHAT_CONSTANTS } from "../constants/chatConstants";
 import { ChatSuggestions } from "./ChatSuggestions";
 import { ChatTermsAcceptance } from "./ChatTermsAcceptance";
 import { ToolApprovalPrompt } from "../ToolApprovalPrompt";
-import { CalendarWidget, ChartWidget } from "../artifacts";
+import { CalendarWidget, ChartWidget, SummaryArtifact } from "../artifacts";
 
 type StreamedArtifact = {
   id: string;
@@ -600,6 +600,26 @@ export function ChatMessages({
                             data={toolCall.arguments?.data}
                           />
                         )}
+                      </div>
+                    )}
+
+                    {/* Summary Artifact (conversation end) */}
+                    {message.metadata?.artifacts && Array.isArray(message.metadata.artifacts) && (
+                      <div className="mt-4">
+                        {message.metadata.artifacts.map((artifact: any) => {
+                          if (artifact.type === 'summary') {
+                            return (
+                              <SummaryArtifact
+                                key={artifact.id}
+                                content={artifact.content}
+                                sessionId={artifact.metadata?.sessionId}
+                                leadEmail={artifact.metadata?.leadEmail}
+                                gdprNotice={artifact.metadata?.gdprNotice}
+                              />
+                            );
+                          }
+                          return null;
+                        })}
                       </div>
                     )}
                   </MessageContent>

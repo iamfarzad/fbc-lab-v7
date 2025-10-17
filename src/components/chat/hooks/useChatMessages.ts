@@ -389,11 +389,11 @@ export function useChatMessages(initialSessionId?: string) {
     });
   }, [unifiedChat]);
 
-  // Handle PDF export (with conversation end archival)
+  // Handle PDF export (with conversation end archival and inline summary)
   const handleExportSummary = useCallback(async (request: ExportSummaryRequest | null | undefined) => {
     if (!request?.sessionId) return;
     try {
-      console.log('🏁 Initiating conversation end and PDF export...')
+      console.log('🏁 Initiating conversation end and summary generation...')
       
       // 1. Trigger conversation_end to archive context
       const endResponse = await fetch('/api/chat/unified', {
@@ -410,37 +410,57 @@ export function useChatMessages(initialSessionId?: string) {
 
       if (!endResponse.ok) {
         console.error('Failed to archive conversation')
-        // Continue anyway - PDF might still work
+        // Continue anyway - summary might still work
       } else {
         console.log('✅ Conversation archived')
       }
 
-      // 2. Generate PDF with multimodal context
-      toast.info('Generating PDF summary...')
-      const response = await fetch('/api/export-summary', {
+      // 2. Generate summary text for inline display
+      toast.info('Generating conversation summary...')
+      const summaryResponse = await fetch('/api/generate-summary-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request)
-      });
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'fbc-ai-consultation-summary.pdf';
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success('Summary exported successfully!');
-        console.log('✅ PDF downloaded and stored in Supabase')
-      } else {
-        toast.error('Export failed. Please try again.');
+        body: JSON.stringify({ sessionId: request.sessionId })
+      })
+
+      if (!summaryResponse.ok) {
+        throw new Error('Summary generation failed')
       }
+
+      const { summary, metadata: summaryMetadata } = await summaryResponse.json()
+      
+      // 3. Display summary as inline artifact with GDPR notice
+      unifiedChat.addMessage({
+        role: 'assistant',
+        content: 'Here\'s a comprehensive summary of our conversation. You can download it as a PDF or have it emailed to you.',
+        timestamp: new Date(),
+        metadata: {
+          type: 'multimodal',
+          artifacts: [{
+            id: crypto.randomUUID(),
+            type: 'summary',
+            title: 'Conversation Summary',
+            content: summary,
+            metadata: {
+              sessionId: request.sessionId,
+              leadEmail: summaryMetadata.leadEmail,
+              gdprNotice: {
+                message: 'After downloading, raw conversation data (voice transcripts, screen captures, uploaded files) will be permanently deleted from our servers within 7 days. Only this PDF summary will be retained for 90 days for follow-up purposes.',
+                dataRetained: ['PDF summary', 'Your contact information (name, email, company)', 'Audit trail of our interaction'],
+                dataDeleted: ['Voice transcripts and audio data', 'Screen share captures', 'Webcam images', 'Original uploaded files', 'Raw chat messages']
+              }
+            }
+          }]
+        }
+      })
+
+      toast.success('Summary ready! Scroll down to view, download, or email.')
+      console.log('✅ Summary artifact displayed inline')
     } catch (error) {
       toast.error('Export error. Check console.');
-      console.error('PDF export error:', error);
+      console.error('Summary generation error:', error);
     }
-  }, [messages]);
+  }, [messages, unifiedChat]);
 
   // Export voice transcript for summaries
   const exportVoiceTranscript = useCallback(() => {
