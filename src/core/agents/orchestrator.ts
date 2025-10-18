@@ -31,19 +31,20 @@ export async function routeToAgent({
   // CRITICAL FIX: Pre-process intent before routing
   const intentSignal = preProcessIntent(messages);
   if (intentSignal === 'BOOKING') {
-    return {
+    const result: AgentResult = {
       output: "Absolutely! I'll send you our calendar link. What time zone are you in?",
       agent: 'Discovery Agent (Booking Mode)',
       metadata: { 
-        stage: 'BOOKING_REQUESTED', 
+        stage: 'BOOKING_REQUESTED' as FunnelStage, 
         triggerBooking: true,
         action: 'show_calendar_widget'
       }
     };
+    return result;
   }
   
   if (intentSignal === 'EXIT') {
-    context.stage = 'FORCE_EXIT';
+    context.stage = 'FORCE_EXIT' as FunnelStage;
     return summaryAgent(messages, context);
   }
   
@@ -119,11 +120,18 @@ export async function routeToAgent({
   }
 
   // Determine funnel stage
+  let overrideStage: FunnelStage | undefined = undefined;
+  if (intentSignal === 'BOOKING') {
+    overrideStage = 'BOOKING_REQUESTED';
+  } else if (intentSignal === 'EXIT') {
+    overrideStage = 'FORCE_EXIT';
+  }
+  
   const stage = determineFunnelStage({
     conversationFlow: context.conversationFlow,
     intelligenceContext: context.intelligenceContext,
     trigger,
-    override: intentSignal === 'BOOKING' ? 'BOOKING_REQUESTED' : undefined
+    override: overrideStage
   })
 
   // Build enhanced context for agent
@@ -203,11 +211,11 @@ export async function routeToAgent({
           output: "Perfect! I'll open our calendar. Pick a time that works for you.",
           agent: 'Booking Agent',
           metadata: { 
-            stage: 'BOOKING_REQUESTED', 
+            stage: 'BOOKING_REQUESTED' as FunnelStage, 
             triggerBooking: true,
             action: 'show_calendar_widget'
           }
-        }
+        } as AgentResult
         break
 
       case 'FORCE_EXIT':
@@ -250,7 +258,7 @@ export async function routeToAgent({
  * Pre-process user intent before routing
  */
 function preProcessIntent(messages: ChatMessage[]): 'BOOKING' | 'EXIT' | 'CONTINUE' {
-  const lastUserMessage = messages.findLast(m => m.role === 'user');
+  const lastUserMessage = messages.filter(m => m.role === 'user').pop();
   if (!lastUserMessage) return 'CONTINUE';
   
   const content = lastUserMessage.content.toLowerCase().trim();

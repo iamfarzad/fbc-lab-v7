@@ -84,14 +84,6 @@ export function ChatInterface({ id }: { id?: string | null }) {
     return () => clearInterval(interval);
   }, [sessionId]);
 
-  // CRITICAL FIX: Auto-trigger booking widget on exit intent
-  useEffect(() => {
-    if (detectedExitIntent && !bookingWidgetShown) {
-      setBookingWidgetShown(true);
-      // Trigger calendar widget
-      openMeeting();
-    }
-  }, [detectedExitIntent, bookingWidgetShown, openMeeting]);
   const audioHookRef = useRef<ReturnType<typeof useLiveApi> | null>(null);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const [aiSpeechTranscript, setAiSpeechTranscript] = useState('');
@@ -473,6 +465,15 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const openMeeting = useCallback(() => {
     setIsMeetingOpen(true);
   }, []);
+
+  // CRITICAL FIX: Auto-trigger booking widget on exit intent
+  useEffect(() => {
+    if (detectedExitIntent && !bookingWidgetShown) {
+      setBookingWidgetShown(true);
+      // Trigger calendar widget
+      openMeeting();
+    }
+  }, [detectedExitIntent, bookingWidgetShown, openMeeting]);
 
   const { chatState } = chatStateHook;
   const isExpanded = chatState.isExpanded;

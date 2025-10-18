@@ -20,7 +20,7 @@ export async function discoveryAgent(
   const steps: ChainOfThoughtStep[] = []
 
   // CRITICAL FIX: Exit detection at start of discovery agent
-  const lastUserMessage = messages.findLast(m => m.role === 'user');
+  const lastUserMessage = messages.filter(m => m.role === 'user').pop();
   if (lastUserMessage) {
     const exitIntent = detectExitInMessage(lastUserMessage.content);
     

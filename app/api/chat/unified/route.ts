@@ -587,7 +587,7 @@ export async function POST(req: NextRequest) {
     }))
     
     // CRITICAL FIX: Exit detection BEFORE AI generation
-    const lastUserMessage = messages.findLast(m => m.role === 'user');
+    const lastUserMessage = messages.filter(m => m.role === 'user').pop();
     if (lastUserMessage) {
       const exitIntent = detectExitIntent(lastUserMessage.content);
       
@@ -1272,7 +1272,6 @@ Citations: ${researchResult.allCitations.length} sources processed
               research: researchMetadata
             }
 
-            // const followUp = getFollowUp(conversationFlow) // DISABLED
 
             // Send completion event with same ID
             const completionData = {
@@ -1286,7 +1285,6 @@ Citations: ${researchResult.allCitations.length} sources processed
                 finalChunk: true,
                 reqId,
                 ...mergedMetadata,
-                // followUp, // DISABLED
               }
             }
             
@@ -1398,7 +1396,6 @@ Citations: ${researchResult.allCitations.length} sources processed
         research: researchMetadata
       }
 
-      // const followUp = getFollowUp(conversationFlow) // DISABLED
 
       const responsePayload = {
         id: crypto.randomUUID(),
@@ -1410,7 +1407,6 @@ Citations: ${researchResult.allCitations.length} sources processed
           tokensUsed: result.usage?.totalTokens || 0,
           reqId,
           ...mergedMetadata,
-          // followUp, // DISABLED
         }
       }
 
