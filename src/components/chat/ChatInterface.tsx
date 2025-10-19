@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Button } from "@/components/ui/button";
-import { X, MessageCircle } from "lucide-react";
+import { X, MessageCircle, Calendar, SkipForward, RotateCcw } from "lucide-react";
 import { cn, blobToBase64 } from "@/lib/utils";
 
 // Core chat components - clean imports
@@ -56,6 +56,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const [usage, setUsage] = useState<any>(null);
   const [screenThumbnail, setScreenThumbnail] = useState<string | null>(null);
   const [hasNotifiedCapture, setHasNotifiedCapture] = useState(false);
+  const [detectedExitIntent, setDetectedExitIntent] = useState(false);
+  const [bookingWidgetShown, setBookingWidgetShown] = useState(false);
 
   // Keep only the existing chatStateHook - no conflicting state
 
@@ -81,6 +83,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     
     return () => clearInterval(interval);
   }, [sessionId]);
+
   const audioHookRef = useRef<ReturnType<typeof useLiveApi> | null>(null);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const [aiSpeechTranscript, setAiSpeechTranscript] = useState('');
@@ -463,6 +466,15 @@ export function ChatInterface({ id }: { id?: string | null }) {
     setIsMeetingOpen(true);
   }, []);
 
+  // CRITICAL FIX: Auto-trigger booking widget on exit intent
+  useEffect(() => {
+    if (detectedExitIntent && !bookingWidgetShown) {
+      setBookingWidgetShown(true);
+      // Trigger calendar widget
+      openMeeting();
+    }
+  }, [detectedExitIntent, bookingWidgetShown, openMeeting]);
+
   const { chatState } = chatStateHook;
   const isExpanded = chatState.isExpanded;
 
@@ -777,6 +789,24 @@ export function ChatInterface({ id }: { id?: string | null }) {
     });
   };
 
+  // CRITICAL FIX: Quick booking handler
+  const handleQuickBook = useCallback(() => {
+    setDetectedExitIntent(true);
+    openMeeting();
+  }, [openMeeting]);
+
+  // CRITICAL FIX: Skip to recap handler
+  const handleSkipToRecap = useCallback(() => {
+    const skipMessage = "Let's wrap this up and move to next steps.";
+    messagesHook.handleSendMessage(skipMessage);
+  }, [messagesHook]);
+
+  // CRITICAL FIX: Skip current question handler
+  const handleSkipQuestion = useCallback(() => {
+    const skipMessage = "Let's move on to something else.";
+    messagesHook.handleSendMessage(skipMessage);
+  }, [messagesHook]);
+
   // Camera, screen, and voice banners removed - now handled by ConversationBar
 
   useEffect(() => {
@@ -828,6 +858,25 @@ export function ChatInterface({ id }: { id?: string | null }) {
           )}
         </Button>
       </motion.div>
+
+      {/* CRITICAL FIX: Floating Action Button for Quick Booking */}
+      {chatStateHook.chatState.isOpen && (
+        <motion.div
+          className="fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-40"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Button
+            onClick={handleQuickBook}
+            className="h-10 px-4 bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] hover:bg-[hsl(var(--accent))]/90 shadow-lg"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Book a Call
+          </Button>
+        </motion.div>
+      )}
 
       {/* Main Chat Interface */}
       <ChatContainer chatState={chatStateHook.chatState}>
@@ -907,6 +956,55 @@ export function ChatInterface({ id }: { id?: string | null }) {
               {intelligenceHook.hasAcceptedTerms && usage && (
                 <div className={cn(isExpanded ? "mx-auto w-full max-w-3xl px-4 sm:px-6" : "px-0")}>
                   <SessionLimitWarning sessionId={sessionId} usage={usage} />
+                </div>
+              )}
+
+              {/* CRITICAL FIX: Conversation Progress Indicator */}
+              {intelligenceHook.hasAcceptedTerms && (
+                <div className={cn("mb-4", isExpanded ? "mx-auto w-full max-w-3xl px-4 sm:px-6" : "px-0")}>
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium">Discovery Progress</h3>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSkipToRecap}
+                          className="h-8 px-3 text-xs"
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Recap
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSkipQuestion}
+                          className="h-8 px-3 text-xs"
+                        >
+                          <SkipForward className="h-3 w-3 mr-1" />
+                          Skip
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      {['goals', 'pain', 'data', 'readiness', 'budget', 'success'].map((category) => (
+                        <div
+                          key={category}
+                          className={cn(
+                            "px-2 py-1 rounded text-center",
+                            messagesHook.messages.some(m => 
+                              m.role === 'assistant' && 
+                              m.content.toLowerCase().includes(category)
+                            ) 
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                              : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                          )}
+                        >
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 

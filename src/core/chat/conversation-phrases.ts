@@ -1,4 +1,4 @@
-type ConversationCategory = 'goals' | 'pain' | 'data' | 'readiness' | 'budget' | 'success'
+type ConversationCategory = 'goals' | 'pain' | 'data' | 'readiness' | 'budget' | 'success' | 'transition' | 'booking' | 'acknowledgment' | 'recap' | 'pivot'
 
 type PhraseBank = Record<ConversationCategory, string[]>
 
@@ -33,6 +33,36 @@ export const PHRASE_BANK: PhraseBank = {
     "How will you know this AI move actually helped, not just felt cool?",
     "If we nail this, what’s the first win you’ll brag about?",
   ],
+  transition: [
+    "Based on what you've shared, let me lay out a quick path forward.",
+    "I've got a clearer picture now. Here's what I'd suggest next:",
+    "Let me connect the dots on what you've told me.",
+    "I'm seeing a pattern here. Let me propose next steps.",
+  ],
+  booking: [
+    "Perfect! Let's get you on Farzad's calendar. What time zone are you in?",
+    "Great—I'll pull up our scheduling link. Any time constraints this week?",
+    "Excellent. I'll open our calendar widget right here. Pick what works for you.",
+    "Let's lock in a time. I'll show you Farzad's availability.",
+  ],
+  acknowledgment: [
+    "Totally fair—let me stop drilling and just give you options.",
+    "I hear you. Let's skip to what matters: next steps.",
+    "No problem. Let me pivot to actionable next steps.",
+    "Got it. Let me wrap this up and get you moving forward.",
+  ],
+  recap: [
+    "Quick recap: [SUMMARY]. Sound right?",
+    "Let me make sure I've got this: [SUMMARY]. Did I miss anything?",
+    "Here's what I've gathered: [SUMMARY]. Does this align with your thinking?",
+    "Before we move forward, let me confirm: [SUMMARY]. Accurate?",
+  ],
+  pivot: [
+    "No worries—let's come back to that. What about [DIFFERENT_TOPIC]?",
+    "Fair enough. Let's switch gears to [DIFFERENT_TOPIC].",
+    "Got it. Let's explore [DIFFERENT_TOPIC] instead.",
+    "No problem. What about [DIFFERENT_TOPIC]—is that more relevant?",
+  ],
 }
 
 export function pickFollowUp(category: ConversationCategory, seed = 0): string {
@@ -40,4 +70,17 @@ export function pickFollowUp(category: ConversationCategory, seed = 0): string {
   if (!options || options.length === 0) return 'Tell me more.'
   const index = Math.abs(Math.floor(seed)) % options.length
   return options[index]
+}
+
+// CRITICAL FIX: Helper function to detect minimal responses
+export function isMinimalResponse(content: string): boolean {
+  if (!content) return false;
+  
+  const trimmed = content.trim();
+  const minimalPatterns = [
+    /^(nothing|nope|no|not sure|i don'?t know)$/i,
+    /^.{1,4}$/ // 1-4 characters
+  ];
+  
+  return minimalPatterns.some(pattern => pattern.test(trimmed));
 }
