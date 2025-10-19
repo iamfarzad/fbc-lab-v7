@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { WEBSOCKET_CONFIG } from '@/config/constants';
 
 export default function VoiceTest() {
   const [isListening, setIsListening] = useState(false);
@@ -9,7 +10,7 @@ export default function VoiceTest() {
 
   const testWebSocket = () => {
     try {
-      const ws = new WebSocket('ws://localhost:3001');
+      const ws = new WebSocket(WEBSOCKET_CONFIG.URL);
       
       ws.onopen = () => {
         setWsStatus('connected');

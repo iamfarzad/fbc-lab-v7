@@ -82,10 +82,16 @@ export const WEBSOCKET_CONFIG = {
       const host = window.location.hostname
       const isSecure = window.location.protocol === 'https:'
       const protocol = isSecure ? 'wss' : 'ws'
-      // WebSocket server runs on 3001, NOT the same port as Next.js (3000)
-      const port = process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_PORT ?? '3001'
-      const portSuffix = port ? `:${port}` : ''
-      return `${protocol}://${host}${portSuffix}`
+      // Only add port for localhost/development - production URLs should not have ports
+      const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
+      if (isLocalHost) {
+        const port = process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_PORT ?? '3001'
+        const portSuffix = port ? `:${port}` : ''
+        return `${protocol}://${host}${portSuffix}`
+      } else {
+        // For non-localhost hosts, don't add port (production)
+        return `${protocol}://${host}`
+      }
     }
     return this.DEVELOPMENT_URL
   },
