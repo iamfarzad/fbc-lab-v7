@@ -66,6 +66,8 @@ logs/
 
 # Documentation (internal notes, not for repo)
 docs/
+!app/docs/
+!public/docs/
 
 # Development artifacts
 .clinerules/
