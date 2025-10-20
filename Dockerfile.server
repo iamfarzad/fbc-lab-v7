@@ -1,0 +1,14 @@
+# ---------------------------------------------------------------------------
+# DEPRECATED DOCKERFILE
+# ---------------------------------------------------------------------------
+# This file is left in place so existing scripts do not reference a missing
+# path, but the real build definition now lives at the repository root in
+# Dockerfile.websocket. Use that file when deploying the voice server:
+#
+#   fly deploy --config server/fly.toml --dockerfile Dockerfile.websocket
+#
+# Intentionally fail fast if someone tries to build with this file.
+# ---------------------------------------------------------------------------
+
+FROM scratch
+CMD ["sh", "-c", "echo 'Dockerfile.server is deprecated. Use Dockerfile.websocket at repo root.' && exit 1"]

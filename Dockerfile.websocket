@@ -1,6 +1,6 @@
 # WebSocket Voice Server Dockerfile for Fly.io
-# NOTE: This file mirrors the root-level Dockerfile.websocket. Prefer using that
-# path directly when deploying (fly deploy --config server/fly.toml --dockerfile Dockerfile.websocket).
+# IMPORTANT: Run from project root so the build context includes server/ and src/
+# Deploy with: fly deploy --config server/fly.toml --dockerfile Dockerfile.websocket
 
 FROM node:20-alpine
 
@@ -17,7 +17,7 @@ RUN pnpm install --prod
 COPY server/live-server.ts ./
 COPY server/session-logger.ts ./
 
-# Copy shared config used by the server (to /src, matching live-server imports)
+# Copy shared config used by the server (to /src, not /app/src, since live-server imports ../src/config)
 COPY src/config /src/config
 
 # Install tsx for TypeScript execution
