@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { createContext, memo, useContext, useEffect, useState, type ReactNode } from "react";
+import { Response } from "../core/response";
 import { ShimmerLoader } from "../core/shimmer-loader";
 
 type ReasoningContextValue = {
@@ -172,9 +173,7 @@ export const ReasoningContent = memo(
         {...props}
       >
         {isStringContent ? (
-          <div className="grid gap-2 whitespace-pre-wrap text-sm text-foreground">
-            {children}
-          </div>
+          <Response className="grid gap-2">{children as string}</Response>
         ) : (
           <div className="grid gap-2">{children}</div>
         )}

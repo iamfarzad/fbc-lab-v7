@@ -381,7 +381,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
             </div>
           )}
 
-          <PromptInputToolbar className="items-center px-1 sm:px-0 pb-0 pt-1 overflow-visible">
+          <PromptInputToolbar className="items-center px-1 sm:px-0 pb-0 pt-1">
             <PromptInputTools className="gap-2">
               <ChatActions
                 className={VISUAL.CORNER_RADIUS}
