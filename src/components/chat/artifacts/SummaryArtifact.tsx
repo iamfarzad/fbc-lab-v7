@@ -39,7 +39,8 @@ export function SummaryArtifact({
       });
 
       if (!response.ok) {
-        throw new Error('PDF generation failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const blob = await response.blob();
@@ -54,8 +55,9 @@ export function SummaryArtifact({
       toast.success('PDF downloaded successfully!');
       console.log('✅ PDF downloaded and stored in database');
     } catch (error) {
-      console.error('Download failed:', error);
-      toast.error('Failed to download PDF. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[PDF Export]', error);
+      toast.error(`Failed to generate PDF: ${errorMessage}`);
     } finally {
       setIsDownloading(false);
     }
@@ -79,14 +81,16 @@ export function SummaryArtifact({
       });
 
       if (!response.ok) {
-        throw new Error('Email sending failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       toast.success(`PDF sent to ${leadEmail}`);
       console.log('✅ PDF emailed successfully');
     } catch (error) {
-      console.error('Email failed:', error);
-      toast.error('Failed to send email. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Email Export]', error);
+      toast.error(`Failed to send email: ${errorMessage}`);
     } finally {
       setIsEmailing(false);
     }
