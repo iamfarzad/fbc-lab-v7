@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 export type LiveWaveformProps = HTMLAttributes<HTMLDivElement> & {
   active?: boolean
   processing?: boolean
+  deviceId?: string
   barWidth?: number
   barGap?: number
   barRadius?: number
@@ -26,6 +27,7 @@ export type LiveWaveformProps = HTMLAttributes<HTMLDivElement> & {
 export const LiveWaveform = ({
   active = false,
   processing = false,
+  deviceId,
   barWidth = 3,
   barGap = 1,
   barRadius = 1.5,
@@ -248,11 +250,18 @@ export const LiveWaveform = ({
     const setupMicrophone = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
+          audio: deviceId
+            ? {
+                deviceId: { exact: deviceId },
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              }
+            : {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
         })
         streamRef.current = stream
         onStreamReady?.(stream)
@@ -301,6 +310,7 @@ export const LiveWaveform = ({
     }
   }, [
     active,
+    deviceId,
     fftSize,
     smoothingTimeConstant,
     onError,
@@ -407,10 +417,7 @@ export const LiveWaveform = ({
           const style = getComputedStyle(canvas)
           // Try to get the computed color value directly
           const color = style.color
-          // Fallback to CSS variable instead of hardcoded color
-          return color || getComputedStyle(document.documentElement).getPropertyValue('--foreground') 
-            ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue('--foreground')})`
-            : "currentColor"
+          return color || "#000"
         })()
 
       const step = barWidth + barGap

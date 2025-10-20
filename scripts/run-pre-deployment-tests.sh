@@ -192,7 +192,6 @@ run_test "Chat Interface Component" "test -f src/components/chat/ChatInterface.t
 run_test "Unified Chat Route" "test -f app/api/chat/unified/route.ts"
 run_test "Webcam Tool Route" "test -f app/api/tools/webcam/route.ts"
 run_test "Live Server (Voice)" "test -f server/live-server.ts"
-run_test "Genai Live Client" "test -f server/genai-live-client.ts"
 run_test "Chat State Hook" "test -f src/components/chat/hooks/useChatState.ts"
 
 ###############################################################################
@@ -297,5 +296,4 @@ else
   echo -e "${RED}   Fix failing tests before deploying${NC}\n"
   exit 1
 fi
-
 

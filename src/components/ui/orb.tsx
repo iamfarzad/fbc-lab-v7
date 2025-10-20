@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react"
 import { useTexture } from "@react-three/drei"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-// @ts-expect-error - three types not available
 import * as THREE from "three"
 
 export type AgentState = null | "thinking" | "listening" | "talking"

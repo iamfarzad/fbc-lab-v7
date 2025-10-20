@@ -1,5 +1,11 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const PLAYWRIGHT_PORT = process.env.PLAYWRIGHT_PORT ?? '3000'
+const PLAYWRIGHT_HOST = process.env.PLAYWRIGHT_HOST ?? '127.0.0.1'
+const PLAYWRIGHT_BASE_URL = `http://${PLAYWRIGHT_HOST}:${PLAYWRIGHT_PORT}`
+
+process.env.PLAYWRIGHT_BASE_URL = PLAYWRIGHT_BASE_URL
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -12,7 +18,7 @@ export default defineConfig({
     ['junit', { outputFile: 'test-results/junit.xml' }],
   ],
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: PLAYWRIGHT_BASE_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -52,16 +58,14 @@ export default defineConfig({
       name: 'webkit',
       use: { 
         ...devices['Desktop Safari'],
-        permissions: ['microphone', 'camera'],
+        permissions: ['camera'], // WebKit doesn't support 'microphone' permission in Playwright
       },
     },
   ],
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
+    command: `pnpm dev --port ${PLAYWRIGHT_PORT} --hostname ${PLAYWRIGHT_HOST}`,
+    url: PLAYWRIGHT_BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
   },
 })
-
-

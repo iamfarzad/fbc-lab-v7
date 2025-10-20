@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test'
 
-const BASE_URL = 'http://localhost:3000'
+const BASE_ORIGIN = new URL(process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:3100').origin
 
 test.describe('API Routes Health Checks', () => {
   test('POST /api/chat - should handle text chat', async ({ request }) => {
-    const response = await request.post(`${BASE_URL}/api/chat`, {
+    const response = await request.post('/api/chat', {
       data: {
         messages: [
           { role: 'user', content: 'Hello' }
@@ -25,7 +25,7 @@ test.describe('API Routes Health Checks', () => {
   test('POST /api/tools/screen - should accept screen analysis requests', async ({ request }) => {
     const testImageBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
-    const response = await request.post(`${BASE_URL}/api/tools/screen`, {
+    const response = await request.post('/api/tools/screen', {
       data: {
         image: testImageBase64,
         prompt: 'What do you see?'
@@ -50,7 +50,7 @@ test.describe('API Routes Health Checks', () => {
   test('POST /api/tools/webcam - should accept webcam analysis requests', async ({ request }) => {
     const testImageBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
-    const response = await request.post(`${BASE_URL}/api/tools/webcam`, {
+    const response = await request.post('/api/tools/webcam', {
       data: {
         image: testImageBase64
       },
@@ -75,7 +75,7 @@ test.describe('API Routes Health Checks', () => {
     // Create a test file
     const fileBuffer = Buffer.from('Test file content')
     
-    const response = await request.post(`${BASE_URL}/api/chat/attachments`, {
+    const response = await request.post('/api/chat/attachments', {
       multipart: {
         file: {
           name: 'test.txt',
@@ -90,7 +90,7 @@ test.describe('API Routes Health Checks', () => {
   })
 
   test('GET /api/health - should return server health status', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/api/health`)
+    const response = await request.get('/api/health')
 
     // Health endpoint should exist and respond
     expect([200, 404]).toContain(response.status())
@@ -104,7 +104,7 @@ test.describe('API Routes Health Checks', () => {
   test('API endpoints should respond within acceptable time', async ({ request }) => {
     const startTime = Date.now()
     
-    await request.get(`${BASE_URL}/api/health`)
+    await request.get('/api/health')
     
     const responseTime = Date.now() - startTime
     
@@ -113,9 +113,9 @@ test.describe('API Routes Health Checks', () => {
   })
 
   test('API endpoints should handle CORS correctly', async ({ request }) => {
-    const response = await request.get(`${BASE_URL}/api/chat`, {
+    const response = await request.get('/api/chat', {
       headers: {
-        'Origin': 'http://localhost:3000',
+        'Origin': BASE_ORIGIN,
         'Access-Control-Request-Method': 'POST',
         'Access-Control-Request-Headers': 'Content-Type'
       }
@@ -127,7 +127,7 @@ test.describe('API Routes Health Checks', () => {
 
   test('API endpoints should validate request bodies', async ({ request }) => {
     // Send invalid request (empty body)
-    const response = await request.post(`${BASE_URL}/api/chat`, {
+    const response = await request.post('/api/chat', {
       data: {},
       headers: {
         'Content-Type': 'application/json'
@@ -141,7 +141,7 @@ test.describe('API Routes Health Checks', () => {
   test('API endpoints should handle rate limiting', async ({ request }) => {
     // Send multiple requests in rapid succession
     const requests = Array(10).fill(null).map(() => 
-      request.post(`${BASE_URL}/api/chat`, {
+      request.post('/api/chat', {
         data: {
           messages: [{ role: 'user', content: 'Test' }]
         },
@@ -161,7 +161,7 @@ test.describe('API Routes Health Checks', () => {
 
   test('API error responses should include proper error messages', async ({ request }) => {
     // Intentionally send bad request
-    const response = await request.post(`${BASE_URL}/api/tools/screen`, {
+    const response = await request.post('/api/tools/screen', {
       data: {
         // Missing required fields
       },
@@ -182,4 +182,3 @@ test.describe('API Routes Health Checks', () => {
     }
   })
 })
-
