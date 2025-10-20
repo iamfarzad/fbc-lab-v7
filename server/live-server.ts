@@ -281,10 +281,16 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
       liveConfig.systemInstruction = `${GEMINI_CONFIG.SYSTEM_PROMPT}${priorChatContext}`
     }
 
-    const session: any = await ai.live.connect({
-      model,
-      config: liveConfig,  // ← Pass config as separate parameter
-      callbacks: {
+    // Add connection timeout to prevent infinite hangs
+    const connectTimeout = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Live API connection timeout after 30s')), 30000)
+    )
+
+    const session: any = await Promise.race([
+      ai.live.connect({
+        model,
+        config: liveConfig,  // ← Pass config as separate parameter
+        callbacks: {
         onopen: () => {
           isOpen = true
           console.info(`[${connectionId}] Live API session opened`)
@@ -421,7 +427,9 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
           }
         }
       }
-    })
+    }),
+    connectTimeout
+  ])
 
     // Apply compatibility shim for session.start() method
     // Gemini Live API session is already active on connect(), but some code expects a start() method
@@ -558,24 +566,10 @@ async function handleClose(connectionId: string) {
 
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const connectionId = uuidv4();
-  try { (req.socket as any)?.setNoDelay?.(true) } catch (error) {
-    console.warn(`[${connectionId}] Unable to disable socket delay`, error)
-  }
   console.info(`[${connectionId}] Client connected.`);
 
-  // Acknowledge connection
-  safeSend(ws, JSON.stringify({ type: 'connected', payload: { connectionId } }))
-
-  // Initialize session logger early for this connection
-  try {
-    const logger = new SessionLogger(connectionId)
-    logger.log('connected')
-    // Seed an active session record so we can keep the logger before start
-    activeSessions.set(connectionId, { ws, session: undefined as any, latestContext: {}, logger })
-  } catch (e) {
-    console.warn(`[${connectionId}] Failed to initialize session logger:`, e)
-  }
-
+  // Register message handler IMMEDIATELY (before any other operations)
+  // This ensures we capture ALL messages regardless of timing
   ws.on('message', async (message: RawData) => {
     try {
       const rawString = decodeRawMessage(message)
@@ -780,6 +774,33 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
       console.error(`[${connectionId}] Error processing message:`, error);
     }
   });
+
+  // Now do the rest of connection setup AFTER handler is registered
+  try { 
+    (req.socket as any)?.setNoDelay?.(true) 
+  } catch (error) {
+    console.warn(`[${connectionId}] Unable to disable socket delay`, error)
+  }
+
+  // Acknowledge connection
+  safeSend(ws, JSON.stringify({ type: 'connected', payload: { connectionId } }))
+
+  // Initialize session logger asynchronously to not block message handling
+  Promise.resolve().then(() => {
+    try {
+      const logger = new SessionLogger(connectionId)
+      logger.log('connected')
+      // Update or seed the active session record with logger
+      const existing = activeSessions.get(connectionId)
+      if (existing) {
+        existing.logger = logger
+      } else {
+        activeSessions.set(connectionId, { ws, session: undefined as any, latestContext: {}, logger })
+      }
+    } catch (e) {
+      console.warn(`[${connectionId}] Failed to initialize session logger:`, e)
+    }
+  })
 
   ws.on('close', (code: number, reason: Buffer) => {
     console.info(`[${connectionId}] WebSocket closed. Code: ${code}, Reason: ${reason?.toString?.() || 'N/A'}`)
