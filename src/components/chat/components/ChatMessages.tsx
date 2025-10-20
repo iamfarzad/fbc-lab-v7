@@ -451,9 +451,15 @@ export function ChatMessages({
                   <div className="space-y-2">
                       {/* Reasoning Display */}
                       {canRenderReasoning && message.metadata?.reasoning && (
-                        <Reasoning isStreaming={isLoading} defaultOpen={false}>
+                        <Reasoning isStreaming={!message.metadata?.reasoningComplete} defaultOpen={false}>
                           <ReasoningTrigger />
-                          <ReasoningContent>{message.metadata.reasoning}</ReasoningContent>
+                          <ReasoningContent>
+                            {message.metadata.reasoningComplete === false ? (
+                              <ShimmerLoader state="processing" text={message.metadata.reasoning} />
+                            ) : (
+                              message.metadata.reasoning
+                            )}
+                          </ReasoningContent>
                         </Reasoning>
                       )}
 

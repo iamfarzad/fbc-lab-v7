@@ -939,7 +939,8 @@ Citations: ${researchResult.allCitations.length} sources processed
                   stage: agentResult.metadata?.stage,
                   leadScore: agentResult.metadata?.leadScore,
                   fitScore: agentResult.metadata?.fitScore,
-                  ...structuredMetadata
+                  ...structuredMetadata,
+                  reasoningComplete: true  // Mark reasoning as complete for multi-agent responses
                 }
               }
 
@@ -1097,9 +1098,12 @@ Citations: ${researchResult.allCitations.length} sources processed
             controller.enqueue(encoder.encode(metaEvent))
 
             let fullContent = ''
+            let reasoningContent = ''
+            let reasoningComplete = false
             const messageId = crypto.randomUUID() // Stable ID across chunks
+            const parts: any[] = []
             
-            // Stream AI SDK response including tool calls
+            // Stream AI SDK response including tool calls and parts
             for await (const chunk of result.fullStream) {
               // Handle tool calls
               if (chunk.type === 'tool-call') {
@@ -1114,6 +1118,38 @@ Citations: ${researchResult.allCitations.length} sources processed
                 
                 const toolEventData = `data: ${JSON.stringify(toolCallData)}\n\n`;
                 controller.enqueue(encoder.encode(toolEventData));
+                
+                parts.push({ type: 'tool-call', toolName: chunk.toolName, args: chunk.input })
+              }
+              
+              // Handle reasoning parts (experimental - AI SDK v5)
+              if (chunk.type === 'reasoning-start' || chunk.type === 'reasoning-delta' || chunk.type === 'reasoning-end') {
+                if (chunk.type === 'reasoning-delta' && 'text' in chunk) {
+                  reasoningContent += chunk.text;
+                  reasoningComplete = false;
+                  
+                  // Send reasoning part immediately with shimmer indicator
+                  const messageData = {
+                    id: messageId,
+                    role: 'assistant',
+                    content: fullContent,
+                    timestamp: new Date().toISOString(),
+                    type: 'text',
+                    metadata: {
+                      isStreaming: true,
+                      reqId,
+                      reasoning: reasoningContent,
+                      reasoningComplete: false
+                    }
+                  };
+                  
+                  const eventData = `data: ${JSON.stringify(messageData)}\n\n`;
+                  controller.enqueue(encoder.encode(eventData));
+                  
+                  parts.push({ type: 'reasoning', text: reasoningContent, isComplete: false })
+                } else if (chunk.type === 'reasoning-end') {
+                  reasoningComplete = true;
+                }
               }
               
               // Handle text delta
@@ -1129,12 +1165,25 @@ Citations: ${researchResult.allCitations.length} sources processed
                   type: 'text',
                   metadata: {
                     isStreaming: true,
-                    reqId
+                    reqId,
+                    ...(reasoningContent ? { 
+                      reasoning: reasoningContent,
+                      reasoningComplete
+                    } : {})
                   }
                 };
                 
                 const eventData = `data: ${JSON.stringify(messageData)}\n\n`;
                 controller.enqueue(encoder.encode(eventData));
+                
+                parts.push({ type: 'text', text: chunk.text })
+              }
+              
+              // Mark reasoning as complete if we get finish event
+              if (chunk.type === 'finish') {
+                if (reasoningContent) {
+                  reasoningComplete = true
+                }
               }
             }
 
@@ -1193,7 +1242,10 @@ Citations: ${researchResult.allCitations.length} sources processed
               researchSummary: !researchHasError
                 ? researchMetadata?.combinedAnswer || structuredMetadata.researchSummary
                 : structuredMetadata.researchSummary,
-              research: researchMetadata
+              research: researchMetadata,
+              // Include reasoning from parts if available (for backwards compatibility with tag parsing)
+              reasoning: reasoningContent || structuredMetadata.reasoning,
+              reasoningComplete: true
             }
 
             // const followUp = getFollowUp(conversationFlow) // DISABLED
