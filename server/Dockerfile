@@ -27,7 +27,6 @@ RUN chown -R nodejs:nodejs /app
 USER nodejs
 
 # Use PORT from environment (Fly.io provides this)
-ENV PORT=8080
 EXPOSE 8080
 
 # Health check endpoint
