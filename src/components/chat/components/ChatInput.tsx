@@ -6,7 +6,6 @@ import {
   PromptInputTextarea,
   PromptInputToolbar,
   PromptInputTools,
-  PromptInputButton,
   PromptInputSubmit,
   PromptInputAttachment,
   PromptInputAttachments,
@@ -14,13 +13,7 @@ import {
 } from "@/components/ai-elements/interactive/prompt-input";
 import { toast } from "sonner";
 import { VISUAL } from "../design-tokens";
-import {
-  Plus,
-  Calendar,
-  Download,
-  Paperclip,
-  Image as ImageIcon,
-} from "lucide-react";
+import { Download } from "lucide-react";
 import { VoiceButton } from "@/components/ui/voice-button";
 import { Button } from "@/components/ui/button";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
@@ -31,8 +24,7 @@ import { usePromptInputAttachments } from "@/components/ai-elements/interactive/
 import { useMediaToggle } from "@/hooks/useMediaToggle";
 import { useMediaKeyboardShortcuts } from "@/hooks/useMediaKeyboardShortcuts";
 // MediaDrawer and MediaPanel removed
-import { Popover, PopoverContent } from "@/components/ui/popover";
-import { MediaToggle } from "@/components/ui/media-toggle";
+import { ChatActions } from "./ChatActions";
 
 type SendMessageInput = string | {
   text?: string;
@@ -90,6 +82,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   voiceError,
   isVoiceActive,
   isVoiceProcessing,
+  isVoiceInitializing = false,
   cameraState,
   isCameraInitializing = false,
   isScreenSharing,
@@ -119,7 +112,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
 }, ref) {
   const [activePopover, setActivePopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
-  const [isActionsPopoverOpen, setIsActionsPopoverOpen] = useState(false);
   const [isDownloadingSession, setIsDownloadingSession] = useState(false);
   const [voicePermissionGranted, setVoicePermissionGranted] = useState(false);
 
@@ -389,98 +381,34 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
             </div>
           )}
 
-                      <PromptInputToolbar className="items-center px-1 sm:px-0 pb-0 pt-1">
-                        <PromptInputTools className="gap-2">
-                          {/* Inline Actions Popover (replaces drawer) */}
-                          <Popover open={isActionsPopoverOpen} onOpenChange={setIsActionsPopoverOpen}>
-                          <PromptInputButton
-                            variant="ghost"
-                            className={cn(
-                              "flex items-center justify-center border border-border/40 bg-muted transition-all duration-150 hover:scale-105 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40",
-                              VISUAL.CORNER_RADIUS,
-                              "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono",
-                              "h-11 w-11 min-h-[44px] min-w-[44px] shadow-sm"
-                            )}
-                            aria-label="Actions"
-                            title="Actions, Tools & Media"
-                            onClick={() => setIsActionsPopoverOpen(!isActionsPopoverOpen)}
-                          >
-                            <Plus className="h-4 w-4 text-foreground/70" aria-hidden="true" />
-                          </PromptInputButton>
-                            <PopoverContent className="w-72 p-1">
-                              <div className="flex flex-col">
-                                {/* Utilities (top) */}
-                                <button className="flex items-start gap-3 min-h-[44px] rounded px-2 py-2 hover:bg-muted text-left" onClick={() => { setIsActionsPopoverOpen(false); onOpenMeeting?.(); }}>
-                                  <Calendar className="h-5 w-5 text-[hsl(var(--accent))]" />
-                                  <span>
-                                    <div className="text-sm font-medium">Schedule a call</div>
-                                    <div className="text-xs text-muted-foreground">Book a consultation session</div>
-                                  </span>
-                                </button>
-                                <button className="flex items-start gap-3 min-h-[44px] rounded px-2 py-2 hover:bg-muted text-left disabled:opacity-50" disabled={!sessionIdForExport} onClick={() => { setIsActionsPopoverOpen(false); onExportSummary?.(); }}>
-                                  <Download className="h-5 w-5 text-[hsl(var(--accent))]" />
-                                  <span>
-                                    <div className="text-sm font-medium">Export summary</div>
-                                    <div className="text-xs text-muted-foreground">Download conversation summary</div>
-                                  </span>
-                                </button>
-
-                                <div className="my-1 h-px bg-border/30" />
-
-                                <button className="flex items-start gap-3 min-h-[44px] rounded px-2 py-2 hover:bg-muted text-left" onClick={() => { setIsActionsPopoverOpen(false); hiddenFilesInputRef.current?.click(); }}>
-                                  <Paperclip className="h-5 w-5 text-muted-foreground" />
-                                  <span>
-                                    <div className="text-sm font-medium">Upload files</div>
-                                    <div className="text-xs text-muted-foreground">Attach documents or PDFs</div>
-                                  </span>
-                                </button>
-                                <button className="flex items-start gap-3 min-h-[44px] rounded px-2 py-2 hover:bg-muted text-left" onClick={() => { setIsActionsPopoverOpen(false); hiddenImagesInputRef.current?.click(); }}>
-                                  <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                  <span>
-                                    <div className="text-sm font-medium">Upload images</div>
-                                    <div className="text-xs text-muted-foreground">Share photos or screenshots</div>
-                                  </span>
-                                </button>
-
-                                <div className="my-1 h-px bg-border/30" />
-
-                                {/* Core media toggles */}
-                                <MediaToggle
-                                  type="voice"
-                                  variant="list"
-                                  isActive={isVoiceActive}
-                                  isProcessing={isVoiceProcessing}
-                                  onClick={() => {
-                                    setIsActionsPopoverOpen(false);
-                                    handleVoiceButtonClick();
-                                  }}
-                                />
-                                <MediaToggle
-                                  type="camera"
-                                  variant="list"
-                                  isActive={cameraState}
-                                  isProcessing={Boolean(isCameraInitializing)}
-                                  onClick={() => {
-                                    setIsActionsPopoverOpen(false);
-                                    handleCameraButtonClick();
-                                  }}
-                                />
-                                <MediaToggle
-                                  type="screen"
-                                  variant="list"
-                                  isActive={isScreenSharing}
-                                  isProcessing={Boolean(isScreenShareInitializing)}
-                                  onClick={() => {
-                                    setIsActionsPopoverOpen(false);
-                                    handleScreenButtonClick();
-                                  }}
-                                />
-
-                                {/* Advanced panels & Settings removed per consolidation */}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </PromptInputTools>
+          <PromptInputToolbar className="items-center px-1 sm:px-0 pb-0 pt-1">
+            <PromptInputTools className="gap-2">
+              <ChatActions
+                className={VISUAL.CORNER_RADIUS}
+                analyticsId="chat-actions-trigger"
+                onScheduleCall={onOpenMeeting}
+                onExportSummary={onExportSummary}
+                canExportSummary={Boolean(sessionIdForExport)}
+                onUploadFiles={() => hiddenFilesInputRef.current?.click()}
+                onUploadImages={() => hiddenImagesInputRef.current?.click()}
+                voice={{
+                  isActive: isVoiceActive,
+                  isProcessing: isVoiceProcessing,
+                  onToggle: handleVoiceButtonClick,
+                  disabled: isVoiceProcessing || isVoiceInitializing,
+                }}
+                camera={{
+                  isActive: cameraState,
+                  isProcessing: Boolean(isCameraInitializing),
+                  onToggle: handleCameraButtonClick,
+                }}
+                screen={{
+                  isActive: isScreenSharing,
+                  isProcessing: Boolean(isScreenShareInitializing),
+                  onToggle: handleScreenButtonClick,
+                }}
+              />
+            </PromptInputTools>
 
                         {/* Right side: Voice + Send */}
                         <div className="flex items-center gap-2">

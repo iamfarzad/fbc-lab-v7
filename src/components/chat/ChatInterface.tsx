@@ -8,7 +8,7 @@ import { X, MessageCircle } from "lucide-react";
 import { cn, blobToBase64 } from "@/lib/utils";
 
 // Core chat components - clean imports
-import { ChatContainer } from "./components/ChatContainer";
+import { ChatShell } from "./ChatShell";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
 import { type ChatInputHandle } from "./components/ChatInput";
@@ -18,9 +18,11 @@ import { SessionLimitWarning } from "./SessionLimitWarning";
 // Hooks - extracted logic
 import { useChatState } from "./hooks/useChatState";
 import { useChatMessages } from "./hooks/useChatMessages";
-import { useLiveApi } from "@/hooks/useLiveApi";
 import { useChatIntelligence } from "./hooks/useChatIntelligence";
 import { useCamera } from "@/hooks/useCamera";
+import { useChatUsagePolling } from "./hooks/useChatUsagePolling";
+import { useVoicePipeline } from "./hooks/useVoicePipeline";
+import { useScreenShareSnapshots } from "./hooks/useScreenShareSnapshots";
 
 // Media display components
 
@@ -53,7 +55,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
   const { setListening } = chatStateHook;
 
   const [sessionId] = useState(() => id ?? crypto.randomUUID());
-  const [usage, setUsage] = useState<any>(null);
+  const usage = useChatUsagePolling(sessionId);
   const [screenThumbnail, setScreenThumbnail] = useState<string | null>(null);
   const [hasNotifiedCapture, setHasNotifiedCapture] = useState(false);
 
@@ -65,26 +67,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   // Use existing chatStateHook handlers directly
 
-  // Poll usage every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/usage/${sessionId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setUsage(data);
-        }
-      } catch (error) {
-        // Silently fail - usage tracking is not critical
-      }
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [sessionId]);
-  const audioHookRef = useRef<ReturnType<typeof useLiveApi> | null>(null);
   const chatInputRef = useRef<ChatInputHandle | null>(null);
-  const [aiSpeechTranscript, setAiSpeechTranscript] = useState('');
-  const analyzeScreenRef = useRef<((prompt: string) => void | Promise<void>) | null>(null);
   const {
     appendVoiceUserMessage,
     updatePartialUserTranscript,
@@ -93,236 +76,23 @@ export function ChatInterface({ id }: { id?: string | null }) {
     updateChatContext,
   } = messagesHook;
 
-  const handleVoiceSessionState = useCallback((state: { active: boolean; isProcessing?: boolean; connectionId?: string | null; mock?: boolean }) => {
-    setListening(state.active || Boolean(state.isProcessing));
-    if (!state.active && !state.isProcessing) {
-      finalizeVoiceAssistantMessage();
-    }
-  }, [finalizeVoiceAssistantMessage, setListening]);
-
-  const handleVoicePartialTranscript = useCallback((text: string) => {
-    // Update partial message in chat directly
-    updatePartialUserTranscript(text);
-    console.log('🎤 Partial transcript:', text);
-  }, [updatePartialUserTranscript]);
-
-  const handleVoiceFinalTranscript = useCallback((text: string) => {
-    console.log('🎤 [ChatInterface] Final transcript received:', text);
-    appendVoiceUserMessage(text);
-    
-    // Store in multimodal context (non-blocking)
-    import('@/core/context/multimodal-context').then(({ multimodalContextManager }) => {
-      multimodalContextManager.addVoiceTranscript(sessionId, text, 'user', true)
-        .then(() => console.log('✅ Voice transcript stored in context'))
-        .catch(err => console.error('❌ Failed to store voice context:', err))
-    })
-
-    // Lightweight voice trigger for explicit screen analysis
-    try {
-      const lower = text.toLowerCase();
-      const wantsScreenAnalyze = /(analy[sz]e|look|describe|what\s*(?:'s| is)\s*on).*\b(screen|this|it)\b/.test(lower);
-      if (wantsScreenAnalyze && analyzeScreenRef.current) {
-        analyzeScreenRef.current(text);
-      }
-    } catch {}
-  }, [appendVoiceUserMessage, sessionId]);
-
-  const handleVoiceAssistantText = useCallback((text: string) => {
-    console.log('🤖 [ChatInterface] Assistant text chunk:', text);
-    appendVoiceAssistantChunk(text);
-    
-    // Store assistant voice output (non-blocking)
-    import('@/core/context/multimodal-context').then(({ multimodalContextManager }) => {
-      multimodalContextManager.addVoiceTranscript(sessionId, text, 'assistant', true)
-        .then(() => console.log('✅ Assistant voice stored in context'))
-        .catch((err: unknown) => console.error('❌ Failed to store assistant voice:', err));
-    }).catch((err) => {
-      console.warn('⚠️ Multimodal context not available:', err);
-    });
-  }, [appendVoiceAssistantChunk, sessionId]);
-
-  const handleVoiceOutputTranscript = useCallback((text: string, isFinal: boolean) => {
-    // Closed captions for AI speech
-    if (isFinal) {
-      console.log('🔊 AI said (transcript):', text);
-      setAiSpeechTranscript(text);
-      // Clear after 3 seconds
-      setTimeout(() => setAiSpeechTranscript(''), 3000);
-    } else {
-      setAiSpeechTranscript(text); // Show partial
-    }
-  }, []);
-
-  const handleVoiceTurnComplete = useCallback(() => {
-    finalizeVoiceAssistantMessage();
-  }, [finalizeVoiceAssistantMessage]);
-
-  const handleVoiceInterrupted = useCallback(() => {
-    // User interrupted AI - stop current assistant message
-    console.log('🔇 Voice interrupted')
-    finalizeVoiceAssistantMessage();
-  }, [finalizeVoiceAssistantMessage]);
-
-  const handleVoiceSetupComplete = useCallback(() => {
-    // Silent - tracked via state
-  }, []);
-
-  const handleVoiceToolCall = useCallback(async (toolCall: any) => {
-    if (toolCall?.handledByServer || toolCall?.handledBy === 'server') {
-      console.info('🛠️ Voice tool call handled server-side; skipping client execution.');
-      return;
-    }
-    const functionCalls: any[] = Array.isArray(toolCall?.functionCalls) ? toolCall.functionCalls : [];
-    if (functionCalls.length === 0) return;
-
-    const names = functionCalls.map((fc) => fc?.name ?? 'tool').join(', ');
-    toast.info(`Running ${names}…`, { id: 'voice-tool-call' });
-
-    const parseArgs = (raw: unknown): Record<string, unknown> => {
-      if (!raw) return {};
-      if (typeof raw === 'string') {
-        try {
-          return JSON.parse(raw) as Record<string, unknown>;
-        } catch {
-          return {};
-        }
-      }
-      if (typeof raw === 'object') return raw as Record<string, unknown>;
-      return {};
-    };
-
-    const responses: Array<{ id: string; name: string; response: { json: any } }> = [];
-
-    for (const call of functionCalls) {
-      const name: string = typeof call?.name === 'string' ? call.name : 'unknown_tool';
-      const id: string = typeof call?.id === 'string' ? call.id : crypto.randomUUID();
-      const args = parseArgs(call?.args);
-
-      try {
-        let resultPayload: Record<string, unknown> = {};
-
-        if (name === 'search_web') {
-          const query = typeof args?.query === 'string' ? args.query.trim() : '';
-          const urls = Array.isArray(args?.urls) ? args.urls.filter((u): u is string => typeof u === 'string') : undefined;
-          if (!query) {
-            throw new Error('Missing query for web search.');
-          }
-
-          const response = await fetch('/api/tools/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, urls }),
-          });
-
-          if (!response.ok) {
-            const text = await response.text().catch(() => 'Web search failed.');
-            throw new Error(text || `Web search failed with status ${response.status}`);
-          }
-
-          const data = await response.json();
-          resultPayload = {
-            summary: data?.result?.summary ?? data?.result?.text ?? '',
-            citations: data?.result?.citations ?? [],
-            urlsUsed: data?.result?.urlsUsed ?? [],
-          };
-        } else if (name === 'capture_screen_snapshot') {
-          if (!lastScreenSnapshot) {
-            throw new Error('No recent screen share captured yet.');
-          }
-          const summaryOnly = Boolean(args?.summaryOnly);
-          resultPayload = {
-            analysis: lastScreenSnapshot.analysis,
-            capturedAt: lastScreenSnapshot.capturedAt,
-            imageAvailable: Boolean(!summaryOnly && lastScreenSnapshot.imageData),
-            imageData: summaryOnly ? undefined : lastScreenSnapshot.imageData,
-          };
-        } else if (name === 'capture_webcam_snapshot') {
-          if (!lastWebcamSnapshot) {
-            throw new Error('No recent webcam capture available yet.');
-          }
-          const summaryOnly = Boolean(args?.summaryOnly);
-          resultPayload = {
-            analysis: lastWebcamSnapshot.analysis,
-            capturedAt: lastWebcamSnapshot.capturedAt,
-            imageAvailable: false,
-            imageData: summaryOnly ? undefined : undefined,
-          };
-        } else {
-          throw new Error(`Unsupported tool: ${name}`);
-        }
-
-        responses.push({
-          id,
-          name,
-          response: { json: { success: true, result: resultPayload } },
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Tool execution failed.';
-        responses.push({
-          id,
-          name,
-          response: { json: { success: false, error: message } },
-        });
-      }
-    }
-
-    const hook = audioHookRef.current;
-    if (!hook) return;
-    hook.sendToolResult(responses);
-  }, [lastScreenSnapshot, lastWebcamSnapshot]);
-
-  const handleVoiceToolResult = useCallback((result: any) => {
-    console.log('🛠️ Voice tool result:', result);
-    const payload = result?.payload ?? result;
-    const errorMessage: string | undefined =
-      typeof payload?.error === 'string' ? payload.error : undefined;
-
-    if (errorMessage) {
-      toast.error(errorMessage, { id: 'voice-tool-call' });
-      return;
-    }
-
-    const responses = Array.isArray(payload?.responses) ? payload.responses : [];
-    const failedResponse = responses.find((item: any) => item?.response?.json?.success === false);
-    if (failedResponse) {
-      const failureMessage =
-        typeof failedResponse.response?.json?.error === 'string'
-          ? failedResponse.response.json.error
-          : 'Tool execution failed.';
-      toast.error(failureMessage, { id: 'voice-tool-call' });
-      return;
-    }
-
-    toast.success('Tool result ready.', { id: 'voice-tool-call' });
-  }, []);
-
-  const handleVoiceError = useCallback((message: string) => {
-    finalizeVoiceAssistantMessage({ error: message });
-  }, [finalizeVoiceAssistantMessage]);
-
-  const audioHook = useLiveApi({
-    onSessionStateChange: handleVoiceSessionState,
-    onPartialTranscript: handleVoicePartialTranscript,
-    onFinalTranscript: handleVoiceFinalTranscript,
-    onAssistantText: handleVoiceAssistantText,
-    onOutputTranscript: handleVoiceOutputTranscript,
-    onTurnComplete: handleVoiceTurnComplete,
-    onInterrupted: handleVoiceInterrupted,
-    onSetupComplete: handleVoiceSetupComplete,
-    onToolCall: handleVoiceToolCall,
-    onToolResult: handleVoiceToolResult,
-    onError: handleVoiceError,
+  const {
+    audio: audioHook,
+    toggleVoiceSession,
+    aiSpeechTranscript,
+    voiceConnectionId,
+    visualizerState,
+    registerScreenAnalyzer,
+  } = useVoicePipeline({
+    sessionId,
+    setListening,
+    appendVoiceUserMessage,
+    updatePartialUserTranscript,
+    appendVoiceAssistantChunk,
+    finalizeVoiceAssistantMessage,
+    lastScreenSnapshot,
+    lastWebcamSnapshot,
   });
-  audioHookRef.current = audioHook;
-  const voiceConnectionId = audioHook.session?.connectionId ?? undefined;
-  // Map voice hook state to visualizer state
-  const visualizerState = useMemo(() => {
-    if (!audioHook.isSocketReady) return 'connecting' as const;
-    if (audioHook.isProcessing && !audioHook.isRecording) return 'initializing' as const;
-    if (audioHook.isRecording) return 'listening' as const;
-    // If we recently received model replies, treat as speaking; otherwise thinking
-    return (audioHook.modelReplies?.length ?? 0) > 0 ? ('speaking' as const) : ('thinking' as const);
-  }, [audioHook.isSocketReady, audioHook.isProcessing, audioHook.isRecording, audioHook.modelReplies]);
 
   // Camera integration with continuous frame streaming (prototype pattern)
   const camera = useCamera({
@@ -364,28 +134,6 @@ export function ChatInterface({ id }: { id?: string | null }) {
       }));
     }
   }, [camera.isActive, camera.stream, camera.error, camera.isInitializing, camera.availableCameraCount]);
-
-  // Toggle voice session (start/stop, not just mute)
-  const toggleVoiceSession = useCallback(async () => {
-    const hook = audioHookRef.current;
-    if (!hook) {
-      console.error('🎤 [ChatInterface] Audio hook ref not available');
-      return;
-    }
-    
-    console.log('🎤 [ChatInterface] toggleVoiceSession called', {
-      isSessionActive: hook.isSessionActive,
-      isRecording: hook.isRecording
-    });
-    
-    if (hook.isSessionActive) {
-      console.log('🎤 [ChatInterface] Stopping session...');
-      await hook.stopSession();
-    } else {
-      console.log('🎤 [ChatInterface] Starting session...');
-      await hook.startSession({ sessionId });
-    }
-  }, [sessionId]);
 
   // Camera control handlers
   const handleToggleCamera = useCallback(async () => {
@@ -547,222 +295,24 @@ export function ChatInterface({ id }: { id?: string | null }) {
     }
   }, [audioHook, chatState.isScreenSharing, chatState.screenShareStream, messagesHook.appendAssistantMessage, sessionId, voiceConnectionId]);
 
-  // Expose for voice-triggered analyze
   useEffect(() => {
-    analyzeScreenRef.current = handleAnalyzeScreen;
-    return () => { analyzeScreenRef.current = null; }
-  }, [handleAnalyzeScreen]);
+    registerScreenAnalyzer(handleAnalyzeScreen);
+    return () => registerScreenAnalyzer(null);
+  }, [handleAnalyzeScreen, registerScreenAnalyzer]);
 
-  // Capture screen share frames and send to Gemini for analysis
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const stream = chatState.screenShareStream;
-    if (!chatState.isScreenSharing || !stream || !sessionId) {
-      return;
-    }
-
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    video.muted = true;
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      toast.error('Failed to initialize screen capture');
-      return;
-    }
-
-    let ready = false;
-    let cancelled = false;
-    let isUploading = false;
-
-    const configureCanvas = () => {
-      const width = video.videoWidth || 1280;
-      const height = video.videoHeight || 720;
-      const maxWidth = 1280;
-      const scale = width > maxWidth ? maxWidth / width : 1;
-      canvas.width = Math.floor(width * scale) || 1280;
-      canvas.height = Math.floor(height * scale) || 720;
-      ready = true;
-      video.play().catch(() => undefined);
-    };
-
-    const handleLoadedMetadata = () => {
-      configureCanvas();
-    };
-
-    video.addEventListener('loadedmetadata', handleLoadedMetadata);
-    if (video.readyState >= 1) {
-      configureCanvas();
-    }
-
-    const CAPTURE_INTERVAL_MS = 500; // 2 FPS for continuous streaming (prototype pattern)
-    const THUMBNAIL_INTERVAL_MS = 2000;
-    const ANALYSIS_INTERVAL_MS = 4000;
-    let captureIntervalId: number | null = null;
-    let thumbnailIntervalId: number | null = null;
-    let lastAnalysisAt = 0;
-
-    const runScreenAnalysis = async (imageDataUrl: string, capturedAt: number, source: 'stream' | 'legacy') => {
-      try {
-        const response = await fetch('/api/tools/screen', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-intelligence-session-id': sessionId,
-            ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
-          },
-          body: JSON.stringify({
-            image: imageDataUrl,
-            type: 'screen',
-            context: {
-              trigger: audioHook.isSessionActive ? 'voice' : 'manual',
-              prompt: audioHook.isSessionActive
-                ? 'Provide a concise summary aligned with the current voice conversation.'
-                : 'Analyze this screen and provide key insights.',
-            },
-          }),
-        });
-
-        if (!response.ok) {
-          console.error('Screen analysis request failed with status', response.status);
-          return;
-        }
-
-        const data = await response.json().catch(() => null);
-        const analysis = data?.output?.analysis || data?.analysis;
-        if (!analysis) return;
-
-        setLastScreenSnapshot({ analysis, imageData: imageDataUrl, capturedAt });
-        console.log('📸 Screen captured and analyzed', {
-          trigger: audioHook.isSessionActive ? 'voice' : 'manual',
-          analysisLength: analysis.length,
-          timestamp: new Date(capturedAt).toLocaleTimeString()
-        });
-
-        if (!hasNotifiedCapture) {
-          toast.success(source === 'stream'
-            ? 'Screen sharing active - streaming frames continuously'
-            : 'Screen sharing active - capturing regularly');
-          setHasNotifiedCapture(true);
-        }
-
-        if (typeof audioHook.sendContextUpdate === 'function') {
-          audioHook.sendContextUpdate({
-            sessionId,
-            modality: 'screen',
-            analysis,
-            imageData: imageDataUrl,
-            capturedAt,
-            metadata: {
-              source: source === 'stream' ? 'screen_share_stream' : 'screen_capture',
-              connectionId: voiceConnectionId,
-            },
-          });
-        }
-      } catch (err) {
-        console.error('❌ Failed to analyze screen frame:', err);
-      }
-    };
-
-    const captureFrame = async () => {
-      if (cancelled || !ready || isUploading) {
-        return;
-      }
-      
-      // ✅ Check video is ready (prototype MediaStreamContext.tsx:162)
-      if (video.readyState < 2) {
-        return; // Skip this frame
-      }
-      
-      isUploading = true;
-      try {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, 'image/jpeg', 0.7)
-        );
-        if (!blob) {
-          isUploading = false;
-          return;
-        }
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        const capturedAt = Date.now();
-        const shouldAnalyze = capturedAt - lastAnalysisAt >= ANALYSIS_INTERVAL_MS;
-        const hasRealtimeInput = typeof audioHook.sendRealtimeInput === 'function';
-
-        if (hasRealtimeInput) {
-          try {
-            const base64Data = await blobToBase64(blob);
-            audioHook.sendRealtimeInput([{
-              mimeType: 'image/jpeg',
-              data: base64Data,
-            }]);
-            console.log('📺 Screen frame streamed to Live API');
-          } catch (err) {
-            console.error('❌ Failed to stream screen frame:', err);
-          }
-        }
-
-        if (hasRealtimeInput && !hasNotifiedCapture) {
-          setLastScreenSnapshot({
-            analysis: 'Screen frame captured - awaiting analysis...',
-            imageData: dataUrl,
-            capturedAt,
-          });
-        }
-
-        if (!hasRealtimeInput || shouldAnalyze) {
-          lastAnalysisAt = capturedAt;
-          await runScreenAnalysis(dataUrl, capturedAt, hasRealtimeInput ? 'stream' : 'legacy');
-        }
-      } catch (err) {
-        console.error('Screen share capture failed:', err);
-      } finally {
-        isUploading = false;
-      }
-    };
-
-    const updateThumbnail = () => {
-      if (cancelled || !ready) return;
-      
-      // ✅ Check video is ready
-      if (video.readyState < 2) return;
-      
-      try {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.5);
-        setScreenThumbnail(thumbnailUrl);
-      } catch (err) {
-        console.debug('Thumbnail update skipped:', err);
-      }
-    };
-
-    // ✅ Delay 1 second for video to be ready (prototype pattern)
-    const startDelay = setTimeout(() => {
-      captureIntervalId = window.setInterval(captureFrame, CAPTURE_INTERVAL_MS);
-      thumbnailIntervalId = window.setInterval(updateThumbnail, THUMBNAIL_INTERVAL_MS);
-      captureFrame();
-      updateThumbnail();
-    }, 1000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(startDelay);
-      if (captureIntervalId) {
-        window.clearInterval(captureIntervalId);
-      }
-      if (thumbnailIntervalId) {
-        window.clearInterval(thumbnailIntervalId);
-      }
-      video.pause();
-      video.srcObject = null;
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      setScreenThumbnail(null);
-      setHasNotifiedCapture(false);
-    };
-  }, [chatState.isScreenSharing, chatState.screenShareStream, audioHook.isSessionActive, audioHook.sendContextUpdate, voiceConnectionId, sessionId, hasNotifiedCapture]);
+  useScreenShareSnapshots({
+    isScreenSharing: chatState.isScreenSharing,
+    stream: chatState.screenShareStream ?? null,
+    sessionId,
+    isVoiceSessionActive: audioHook.isSessionActive,
+    sendRealtimeInput: audioHook.sendRealtimeInput,
+    sendContextUpdate: audioHook.sendContextUpdate,
+    voiceConnectionId,
+    setLastScreenSnapshot,
+    setScreenThumbnail,
+    hasNotifiedCapture,
+    setHasNotifiedCapture,
+  });
 
   const handleExportSummary = () => {
     if (!sessionIdForExport) {
@@ -802,9 +352,172 @@ export function ChatInterface({ id }: { id?: string | null }) {
   }, [messagesHook.messages.length]); // Only depend on array length, not the array itself
 
   // Main render - clean and organized
+  const minimizedContent = (
+    <motion.div
+      key="chat-minimized"
+      className="h-full flex items-center justify-between px-4 cursor-pointer"
+      onClick={chatStateHook.toggleMinimize}
+    >
+      <div className="flex items-center gap-2">
+        {/* Voice indicator with wavebar animation */}
+        {chatState.isListening ? (
+          <div className="flex items-center gap-1" title="Voice active">
+            <div className="flex items-center gap-0.5">
+              <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
+              <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
+              <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
+              <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
+              <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-2 w-2 animate-pulse rounded-full bg-primary"></div>
+        )}
+
+        <span className="text-sm truncate font-mono">
+          F.B/c AI
+        </span>
+
+        {/* Status indicators */}
+        <div className="flex items-center gap-1">
+          {chatState.isCameraActive && (
+            <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Camera active"></div>
+          )}
+          {chatState.isScreenSharing && (
+            <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" title="Screen sharing active"></div>
+          )}
+        </div>
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          chatStateHook.toggleChat();
+        }}
+        className="h-6 w-6 p-0 transition-colors"
+      >
+        <X className="h-3 w-3" />
+      </Button>
+    </motion.div>
+  );
+
+  const sessionWarningNode = intelligenceHook.hasAcceptedTerms && usage ? (
+    <div className={cn(isExpanded ? "mx-auto w-full max-w-3xl px-4 sm:px-6" : "px-0")}>
+      <SessionLimitWarning sessionId={sessionId} usage={usage} />
+    </div>
+  ) : null;
+
+  const expandedContent = (
+    <div key="chat-expanded" className={cn("flex h-full w-full flex-col", isExpanded ? "" : "overflow-hidden")}>
+      <ChatHeader
+        chatState={chatState}
+        onToggleMinimize={chatStateHook.toggleMinimize}
+        onToggleExpand={chatStateHook.toggleExpand}
+        onToggleChat={chatStateHook.toggleChat}
+        sessionId={sessionId}
+        showNextSteps={intelligenceHook.hasAcceptedTerms && usage && (usage.messages_sent >= 5 || (Date.now() - (usage.started_at || 0)) / 60000 >= 5)}
+        isVoiceActive={audioHook.isSessionActive}
+        onOpenMedia={undefined}
+        backend={{
+          voiceConnected: Boolean(audioHook.isSocketReady),
+          voiceActive: Boolean(audioHook.isRecording || audioHook.isSessionActive),
+          voiceError: audioHook.error || null,
+          sseReady: !messagesHook.sseError,
+          sseStreaming: Boolean(messagesHook.isLoading),
+          sseError: messagesHook.sseError?.message || null,
+        }}
+      />
+
+      <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>
+        {sessionWarningNode}
+
+        <ChatMessages
+          messages={messagesHook.messages}
+          researchSummaries={messagesHook.researchSummaries}
+          isLoading={messagesHook.isLoading}
+          contextReady={intelligenceHook.contextReady}
+          currentContext={intelligenceHook.currentContext}
+          hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
+          onSendMessage={messagesHook.handleSendMessage}
+          aiElements={aiConfig}
+          isExpanded={isExpanded}
+          artifacts={artifactCards}
+          name={intelligenceHook.name}
+          email={intelligenceHook.email}
+          agreed={intelligenceHook.agreed}
+          onNameChange={intelligenceHook.setName}
+          onEmailChange={intelligenceHook.setEmail}
+          onAgreedChange={intelligenceHook.setAgreed}
+          onAcceptTerms={intelligenceHook.handleTermsAcceptance}
+          onApproveTool={handleApproveTool}
+          onDeclineTool={handleDeclineTool}
+        />
+      </div>
+
+      <div className={cn("flex-shrink-0 border-t border-border/20 safe-area-inset-bottom", isExpanded ? "px-0 sm:px-0 py-0 pb-0" : "px-0 py-0 pb-0")}>
+        <ConversationBar
+          ref={chatInputRef}
+          inputValue={messagesHook.inputValue}
+          isLoading={messagesHook.isLoading}
+          isListening={chatState.isListening}
+          voiceTranscript={audioHook.transcript}
+          voicePartialTranscript={audioHook.partialTranscript}
+          aiSpeechTranscript={aiSpeechTranscript}
+          isMinimized={chatState.isMinimized}
+          voiceError={audioHook.error}
+          isVoiceActive={audioHook.isRecording}
+          isVoiceProcessing={audioHook.isProcessing}
+          isVoiceSupported={audioHook.isVoiceSupported}
+          isVoiceInitializing={!audioHook.isSocketReady && !audioHook.isRecording}
+          micStream={audioHook.micStream}
+          cameraState={chatState.isCameraActive}
+          isCameraInitializing={chatState.isCameraInitializing}
+          cameraStream={chatState.cameraStream}
+          cameraError={chatState.cameraError ?? undefined}
+          availableCameras={chatStateHook.availableCameras}
+          isScreenSharing={chatState.isScreenSharing}
+          isScreenShareInitializing={chatState.isScreenShareInitializing}
+          screenShareStream={chatState.screenShareStream}
+          screenThumbnail={screenThumbnail}
+          screenShareError={chatState.screenShareError ?? undefined}
+          onInputChange={messagesHook.setInputValue}
+          onSendMessage={messagesHook.handleSendMessage}
+          onToggleVoice={toggleVoiceSession}
+          onToggleCamera={handleToggleCamera}
+          onSwitchCamera={handleSwitchCamera}
+          onToggleScreenShare={chatStateHook.toggleScreenShare}
+          onToggleSettings={chatStateHook.toggleSettings}
+          onAnalyzeScreen={handleAnalyzeScreen}
+          isExpanded={isExpanded}
+          onOpenMeeting={openMeeting}
+          onExportSummary={handleExportSummary}
+          sessionIdForExport={sessionIdForExport}
+          autoOpenPopover={requestedPopover}
+          onAutoOpenPopoverHandled={() => setRequestedPopover(null)}
+          visualizerState={visualizerState}
+        />
+      </div>
+    </div>
+  );
+
+  const overlays = (
+    <>
+      <MeetingOverlay
+        open={isMeetingOpen}
+        onClose={() => setIsMeetingOpen(false)}
+      />
+      <SettingsDialog
+        isOpen={chatState.showSettings}
+        onClose={chatStateHook.toggleSettings}
+        isMonochrome={chatState.theme === 'mono'}
+        onMonochromeChange={(mono) => chatStateHook.setTheme(mono ? 'mono' : 'default')}
+      />
+    </>
+  );
+
   return (
     <ErrorBoundary>
-      {/* Chat Toggle Button */}
       <motion.div
         className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50"
         whileHover={{ scale: 1.05 }}
@@ -829,174 +542,13 @@ export function ChatInterface({ id }: { id?: string | null }) {
         </Button>
       </motion.div>
 
-      {/* Main Chat Interface */}
-      <ChatContainer chatState={chatStateHook.chatState}>
-        {chatStateHook.chatState.isMinimized ? (
-          /* Minimized State */
-          <motion.div
-            key="chat-minimized"
-            className="h-full flex items-center justify-between px-4 cursor-pointer"
-            onClick={chatStateHook.toggleMinimize}
-          >
-            <div className="flex items-center gap-2">
-              {/* Voice indicator with wavebar animation */}
-              {chatState.isListening ? (
-                <div className="flex items-center gap-1" title="Voice active">
-                  <div className="flex items-center gap-0.5">
-                    <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1.5 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                    <div className="h-1 w-0.5 bg-[hsl(var(--accent))] voice-wavebar"></div>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-2 w-2 animate-pulse rounded-full bg-primary"></div>
-              )}
-              
-              <span className="text-sm truncate font-mono">
-                F.B/c AI
-              </span>
-              
-              {/* Status indicators */}
-              <div className="flex items-center gap-1">
-                {chatState.isCameraActive && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" title="Camera active"></div>
-                )}
-                {chatState.isScreenSharing && (
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" title="Screen sharing active"></div>
-                )}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                chatStateHook.toggleChat();
-              }}
-              className="h-6 w-6 p-0 transition-colors"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </motion.div>
-        ) : (
-          <div key="chat-expanded" className={cn("flex h-full w-full flex-col", isExpanded ? "" : "overflow-hidden")}>
-            <ChatHeader
-              chatState={chatState}
-              onToggleMinimize={chatStateHook.toggleMinimize}
-              onToggleExpand={chatStateHook.toggleExpand}
-              onToggleChat={chatStateHook.toggleChat}
-              sessionId={sessionId}
-              showNextSteps={intelligenceHook.hasAcceptedTerms && usage && (usage.messages_sent >= 5 || (Date.now() - (usage.started_at || 0)) / 60000 >= 5)}
-              isVoiceActive={audioHook.isSessionActive}
-              onOpenMedia={undefined}
-              backend={{
-                voiceConnected: Boolean(audioHook.isSocketReady),
-                voiceActive: Boolean(audioHook.isRecording || audioHook.isSessionActive),
-                voiceError: audioHook.error || null,
-                sseReady: !messagesHook.sseError,
-                sseStreaming: Boolean(messagesHook.isLoading),
-                sseError: messagesHook.sseError?.message || null,
-              }}
-            />
-
-            {/* Legacy banners are disabled under the unified Conversation Bar */}
-
-            <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>
-              {intelligenceHook.hasAcceptedTerms && usage && (
-                <div className={cn(isExpanded ? "mx-auto w-full max-w-3xl px-4 sm:px-6" : "px-0")}>
-                  <SessionLimitWarning sessionId={sessionId} usage={usage} />
-                </div>
-              )}
-
-            <ChatMessages
-              messages={messagesHook.messages}
-              researchSummaries={messagesHook.researchSummaries}
-              isLoading={messagesHook.isLoading}
-              contextReady={intelligenceHook.contextReady}
-              currentContext={intelligenceHook.currentContext}
-              hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
-              onSendMessage={messagesHook.handleSendMessage}
-              aiElements={aiConfig}
-              isExpanded={isExpanded}
-              artifacts={artifactCards}
-              name={intelligenceHook.name}
-              email={intelligenceHook.email}
-              agreed={intelligenceHook.agreed}
-              onNameChange={intelligenceHook.setName}
-              onEmailChange={intelligenceHook.setEmail}
-              onAgreedChange={intelligenceHook.setAgreed}
-              onAcceptTerms={intelligenceHook.handleTermsAcceptance}
-              onApproveTool={handleApproveTool}
-              onDeclineTool={handleDeclineTool}
-            />
-            </div>
-
-            <div className={cn("flex-shrink-0 border-t border-border/20 safe-area-inset-bottom", isExpanded ? "px-0 sm:px-0 py-0 pb-0" : "px-0 py-0 pb-0") }>
-              {
-                <ConversationBar
-                  ref={chatInputRef}
-                  inputValue={messagesHook.inputValue}
-                  isLoading={messagesHook.isLoading}
-                  isListening={chatState.isListening}
-                  voiceTranscript={audioHook.transcript}
-                  voicePartialTranscript={audioHook.partialTranscript}
-                  aiSpeechTranscript={aiSpeechTranscript}
-                  isMinimized={chatState.isMinimized}
-                  voiceError={audioHook.error}
-                  isVoiceActive={audioHook.isRecording}
-                  isVoiceProcessing={audioHook.isProcessing}
-                  isVoiceSupported={audioHook.isVoiceSupported}
-                  isVoiceInitializing={!audioHook.isSocketReady && !audioHook.isRecording}
-                  micStream={audioHook.micStream}
-                  cameraState={chatState.isCameraActive}
-                  isCameraInitializing={chatState.isCameraInitializing}
-                  cameraStream={chatState.cameraStream}
-                  cameraError={chatState.cameraError ?? undefined}
-                  availableCameras={chatStateHook.availableCameras}
-                  isScreenSharing={chatState.isScreenSharing}
-                  isScreenShareInitializing={chatState.isScreenShareInitializing}
-                  screenShareStream={chatState.screenShareStream}
-                  screenThumbnail={screenThumbnail}
-                  screenShareError={chatState.screenShareError ?? undefined}
-                  onInputChange={messagesHook.setInputValue}
-                  onSendMessage={messagesHook.handleSendMessage}
-                  onToggleVoice={toggleVoiceSession}
-                  onToggleCamera={handleToggleCamera}
-                  onSwitchCamera={handleSwitchCamera}
-                  onToggleScreenShare={chatStateHook.toggleScreenShare}
-                  onToggleSettings={chatStateHook.toggleSettings}
-                  onAnalyzeScreen={handleAnalyzeScreen}
-                  isExpanded={isExpanded}
-                  onOpenMeeting={openMeeting}
-                  onExportSummary={handleExportSummary}
-                  sessionIdForExport={sessionIdForExport}
-                  autoOpenPopover={requestedPopover}
-                  onAutoOpenPopoverHandled={() => setRequestedPopover(null)}
-                  visualizerState={visualizerState}
-                />
-              }
-            </div>
-          </div>
-        )}
-      </ChatContainer>
-
-      {/* Meeting Overlay */}
-      <MeetingOverlay
-        open={isMeetingOpen}
-        onClose={() => setIsMeetingOpen(false)}
+      <ChatShell
+        chatState={chatStateHook.chatState}
+        minimized={minimizedContent}
+        expanded={expandedContent}
+        overlays={overlays}
       />
 
-      {/* Settings Dialog */}
-      <SettingsDialog
-        isOpen={chatState.showSettings}
-        onClose={chatStateHook.toggleSettings}
-        isMonochrome={chatState.theme === 'mono'}
-        onMonochromeChange={(mono) => chatStateHook.setTheme(mono ? 'mono' : 'default')}
-      />
-
-      {/* AI SDK Devtools - Development Only */}
       {process.env.NODE_ENV === 'development' && (
         <AIDevtools
           config={{
@@ -1008,8 +560,6 @@ export function ChatInterface({ id }: { id?: string | null }) {
           }}
         />
       )}
-
-      {/* Draggable overlays removed per consolidation: Conversation Bar owns media */}
     </ErrorBoundary>
   );
 }

@@ -64,6 +64,12 @@ class WriteAheadLog {
 
     try {
       const supabase = getSupabaseService()
+      
+      // Check if Supabase is properly configured
+      if (!supabase || supabase === null as any) {
+        console.warn('⚠️ WAL sync skipped - Supabase not configured')
+        return
+      }
 
       for (const entry of pending) {
         if (entry.synced) continue
@@ -108,6 +114,12 @@ class WriteAheadLog {
   async recoverFromWAL(sessionId: string): Promise<MultimodalContext | null> {
     try {
       const supabase = getSupabaseService()
+      
+      // Check if Supabase is properly configured
+      if (!supabase || supabase === null as any) {
+        console.warn('⚠️ WAL recovery skipped - Supabase not configured')
+        return null
+      }
 
       const { data: walEntries, error } = await supabase
         .from('wal_log')
@@ -193,4 +205,3 @@ class WriteAheadLog {
 }
 
 export const walLog = new WriteAheadLog()
-

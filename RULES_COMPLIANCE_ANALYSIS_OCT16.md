@@ -188,7 +188,6 @@ This is a **TEXTBOOK EXAMPLE** of proper consolidation:
 #### 6. Server Updates (✅ CONFIGURATION COMPLIANCE)
 
 **Files:**
-- `server/genai-live-client.ts` (+8 lines)
 - `server/live-server.ts` (+40 lines)
 
 **Compliance:**

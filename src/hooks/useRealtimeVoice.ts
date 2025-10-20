@@ -490,9 +490,31 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         const declaredRate = extractSampleRate(event.payload.mimeType);
         const playbackRate = declaredRate ?? DEFAULT_SERVER_SAMPLE_RATE;
 
+        // Log audio event reception
+        const padding = audioData.endsWith('==') ? 2 : audioData.endsWith('=') ? 1 : 0;
+        const approxBytes = Math.max(0, Math.floor((audioData.length * 3) / 4) - padding);
+        console.log('🎧 [RealtimeVoice] Audio event received', {
+          base64Length: audioData.length,
+          approxBytes,
+          mimeType: event.payload.mimeType ?? 'not-specified',
+          declaredRate: declaredRate ?? 'not-found',
+          playbackRate,
+          playerExists: !!audioPlayerRef.current,
+          playerState: audioPlayerRef.current ? {
+            playing: audioPlayerRef.current.playing,
+            rate: audioPlayerRef.current.getSampleRate(),
+            contextState: audioPlayerRef.current.contextState
+          } : null
+        });
+
         if (!audioPlayerRef.current) {
+          console.log('🎵 [RealtimeVoice] Creating new AudioPlayer', { sampleRate: playbackRate });
           audioPlayerRef.current = new AudioPlayer(playbackRate);
         } else if (declaredRate && audioPlayerRef.current.getSampleRate() !== playbackRate) {
+          console.warn('⚠️ [RealtimeVoice] Sample rate mismatch, updating player', {
+            from: audioPlayerRef.current.getSampleRate(),
+            to: playbackRate
+          });
           audioPlayerRef.current.setSampleRate(playbackRate);
         }
 

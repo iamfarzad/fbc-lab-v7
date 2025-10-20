@@ -3,7 +3,7 @@
 - Track what is already implemented, what remains, and how we will validate completion.
 
 **Status**
-- In progress. Initial wiring for HTTP tool-calls → UI approvals is complete, mobile gating for draggable overlays is in place, and tokens have been consolidated to a single source of truth (compat layer provided).
+- In progress. HTTP tool-call approvals and mobile gating are in place, design tokens are centralized, the responsive `ChatActions` surface ships on both desktop (popover) and mobile (bottom sheet), and the AudioWorklet voice pipeline is production-stable (see VOICE_PIPELINE_HISTORY_ANALYSIS.md).
 
 **Rules Alignment (Enforced + Planned)**
 - Critical Never Rules
@@ -36,10 +36,16 @@
 - Token consolidation (single source of truth) with compat export.
   - Central tokens: `src/components/chat/design-tokens.ts:193`.
   - Compat + utilities: `src/components/chat/tokens/design-tokens.ts:8` (`combineTokens`), with de-facto re-exporting and migration path.
+- Responsive Actions surface.
+  - `ChatActions` now routes all secondary actions/media toggles through a single entry point: popover on desktop, bottom sheet on handheld.
+  - Design tokens applied for consistent rounding/shadows; minimum 44 px touch targets verified.
+  - Key refs: `src/components/chat/components/ChatActions.tsx`, `src/hooks/useIsMobile.ts`, `src/components/chat/components/BottomSheet.tsx`.
+- Voice pipeline stabilization.
+  - AudioWorklet capture retained, adaptive schedule-ahead buffering added in `AudioPlayer`.
+  - History + decision documented in `VOICE_PIPELINE_HISTORY_ANALYSIS.md`; no MediaRecorder port planned.
 
 **What’s Not Done Yet**
-- Unify media controls into one mobile-first Media Drawer (bottom sheet on handheld; popover on desktop).
-- Consolidate actions behind a single “Actions” control (+) in the Composer and minimize duplication in Header.
+- Audit header and legacy components for lingering action duplicates; gate or remove once verified.
 - Calm streaming state: replace banners/toasts with subtle inline indicators near the Composer.
 - Accessibility polish: focus traps, ESC to close, TAB ordering, visible focus, minimum touch size.
 - Theme hygiene: move ad-hoc monochrome/utility mixes to semantic tokens and data-theme CSS variables.
@@ -151,4 +157,3 @@
 - Hooks audit: confirm only `useRealtimeVoice` used for voice; remove any imports of deprecated hooks if present (with approval).
 - API route audit: ensure one unified chat route per feature and consistent error schemas.
 - Voice UX: clearer error messages and retry instruction when WebSocket server isn’t running; point to `pnpm dev:all` per environment-setup.
-

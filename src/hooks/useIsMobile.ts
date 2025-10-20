@@ -1,18 +1,33 @@
 import { useState, useEffect } from 'react'
 
 export function useIsMobile(breakpoint = 768): boolean {
-  const [isMobile, setIsMobile] = useState(false)
-  
-  useEffect(() => {
-    const query = window.matchMedia(`(max-width: ${breakpoint}px)`)
-    setIsMobile(query.matches)
-    
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    query.addEventListener('change', handler)
-    
-    return () => query.removeEventListener('change', handler)
-  }, [breakpoint])
-  
-  return isMobile
-}
+  const getViewportWidth = () => {
+    if (typeof window === 'undefined') return breakpoint;
+    if (window.visualViewport) {
+      return window.visualViewport.width;
+    }
+    return window.innerWidth;
+  };
 
+  const [isMobile, setIsMobile] = useState<boolean>(() => getViewportWidth() <= breakpoint);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      setIsMobile(getViewportWidth() <= breakpoint);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    const visualViewport = window.visualViewport;
+    visualViewport?.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      visualViewport?.removeEventListener('resize', handleResize);
+    };
+  }, [breakpoint]);
+
+  return isMobile;
+}

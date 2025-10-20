@@ -136,7 +136,27 @@ export function pcm16ToFloat32(pcm16Data: ArrayBuffer | Int16Array): Float32Arra
  */
 export function base64PCM16ToFloat32(base64: string): Float32Array {
   const arrayBuffer = base64ToArrayBuffer(base64);
-  return pcm16ToFloat32(arrayBuffer);
+  const float32 = pcm16ToFloat32(arrayBuffer);
+  
+  // Validate decoded data
+  const hasNaN = float32.some(v => !Number.isFinite(v));
+  const allZeros = float32.every(v => v === 0);
+  
+  if (hasNaN) {
+    console.error('❌ [audio-utils] Decoded Float32 contains NaN values!', {
+      base64Length: base64.length,
+      sampleCount: float32.length
+    });
+  }
+  
+  if (allZeros && float32.length > 0) {
+    console.warn('⚠️ [audio-utils] Decoded audio is all zeros (silence)', {
+      base64Length: base64.length,
+      sampleCount: float32.length
+    });
+  }
+  
+  return float32;
 }
 
 // ============================================================================

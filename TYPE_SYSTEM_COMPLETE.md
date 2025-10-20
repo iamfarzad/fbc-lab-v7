@@ -167,10 +167,10 @@ Track these over next 2-3 weeks:
 **Hooks (4):**
 - src/hooks/{useUnifiedChat,useRealtimeVoice,useCamera}.ts
 
-**Core/Intelligence (10):**
+**Core/Intelligence (8):**
 - src/core/admin/admin-chat-service.ts
 - src/core/agents/{admin,lead-intelligence,retargeting,scoring,summary}-agent.ts
-- src/core/intelligence/{advanced-intent-classifier,conversational-intelligence,enhanced-role-detector,enhanced-tool-suggestion-engine}.ts
+- src/core/intelligence/{advanced-intent-classifier,conversational-intelligence}.ts
 - src/core/intelligence/providers/search/google-grounding.ts
 - src/core/{db/conversations,email-service,pdf-generator-puppeteer,token-usage-logger,workflows/finalizeLeadSession}.ts
 

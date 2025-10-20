@@ -116,6 +116,8 @@ else
   TEST_RESULTS+=("❌ TypeScript Type Check")
 fi
 
+run_test_with_output "Unit Tests: Chat Analytics" "pnpm test -- useChatAnalytics"
+
 ###############################################################################
 # Test 4: Build Process
 ###############################################################################
@@ -296,4 +298,3 @@ else
   echo -e "${RED}   Fix failing tests before deploying${NC}\n"
   exit 1
 fi
-

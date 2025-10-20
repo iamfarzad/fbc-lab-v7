@@ -2,13 +2,10 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { useUnifiedChat } from "@/hooks/useUnifiedChat";
 import type { UnifiedContext } from "@/core/chat/unified-types";
-import type { ConversationCategory } from "./useConversationFlow";
-import { useConversationFlow } from "./useConversationFlow";
 import { ChatMessage } from "../types/chatTypes";
 import type { PromptInputFile } from "@/components/ai-elements/interactive/prompt-input";
 import type { AttachmentUploadResponse } from "@/types/attachments";
-import { logConversationMilestone } from "@/lib/analytics/chat-flow";
-import { detectSafetyCategory, logSafetyEvent } from "@/lib/analytics/safety";
+import { useChatAnalytics } from "./useChatAnalytics";
 
 export interface ResearchSummary {
   messageId: string;
@@ -58,6 +55,12 @@ export function useChatMessages(initialSessionId?: string) {
       console.error('Chat error:', error);
       toast.error('Failed to send message. Please try again.');
     }
+  });
+
+  const { conversationFlow } = useChatAnalytics({
+    sessionId,
+    messages: unifiedChat.messages,
+    updateContext: unifiedChat.updateContext,
   });
 
   // Convert unified messages to chat messages
@@ -184,59 +187,6 @@ export function useChatMessages(initialSessionId?: string) {
   const updateChatContext = useCallback((context: Partial<UnifiedContext>) => {
     unifiedChat.updateContext(context);
   }, [unifiedChat.updateContext]);
-
-  const conversationFlow = useConversationFlow(unifiedChat.messages);
-  const loggedCategoriesRef = useRef<Set<ConversationCategory>>(new Set());
-  const safetyLoggedRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    updateChatContext({
-      sessionId,
-      conversationFlow,
-    });
-  }, [conversationFlow, sessionId, updateChatContext]);
-
-  useEffect(() => {
-    if (!conversationFlow.coverageOrder.length) return;
-
-    for (const insight of conversationFlow.coverageOrder) {
-      if (loggedCategoriesRef.current.has(insight.category)) continue;
-      loggedCategoriesRef.current.add(insight.category);
-
-      const elapsedMs = insight.firstTimestamp && conversationFlow.firstUserTimestamp
-        ? insight.firstTimestamp - conversationFlow.firstUserTimestamp
-        : null;
-
-      logConversationMilestone({
-        sessionId,
-        category: insight.category,
-        firstTurnIndex: insight.firstTurnIndex,
-        firstMessageId: insight.firstMessageId,
-        firstTimestamp: insight.firstTimestamp,
-        elapsedMs,
-      });
-    }
-  }, [conversationFlow.coverageOrder, conversationFlow.firstUserTimestamp, sessionId]);
-
-  useEffect(() => {
-    const userMessages = unifiedChat.messages.filter((message) => message.role === 'user');
-    if (userMessages.length === 0) return;
-
-    const latest = userMessages[userMessages.length - 1];
-    if (safetyLoggedRef.current.has(latest.id)) return;
-
-    const category = detectSafetyCategory(latest.content.toLowerCase());
-    if (!category) return;
-
-    safetyLoggedRef.current.add(latest.id);
-    logSafetyEvent({
-      sessionId,
-      category,
-      messageId: latest.id,
-      messageSnippet: latest.content.slice(0, 200),
-      timestamp: Date.now(),
-    });
-  }, [sessionId, unifiedChat.messages]);
 
   const updatePartialUserTranscript = useCallback((text: string) => {
     if (!text.trim()) {
@@ -500,5 +450,6 @@ export function useChatMessages(initialSessionId?: string) {
     finalizeVoiceAssistantMessage,
     appendAssistantMessage,
     exportVoiceTranscript,
+    conversationFlow,
   };
 }

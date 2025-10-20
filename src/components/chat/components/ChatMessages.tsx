@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "../types/chatTypes";
 import { cn } from "@/lib/utils";
 import { MessageCircle, ExternalLink, Sparkles, Code2, ListTree, AlertTriangle, Copy, RotateCw, Search } from "lucide-react";
 import { DESIGN_TOKENS } from "../design-tokens";
 import { ShimmerLoader } from "@/components/ai-elements/core/shimmer-loader";
+import { Button } from "@/components/ui/button";
 import {
   Artifact as ArtifactCard,
   ArtifactHeader,
@@ -89,6 +90,14 @@ import { ChatSuggestions } from "./ChatSuggestions";
 import { ChatTermsAcceptance } from "./ChatTermsAcceptance";
 import { ToolApprovalPrompt } from "../ToolApprovalPrompt";
 import { CalendarWidget, ChartWidget, SummaryArtifact } from "../artifacts";
+import {
+  AI_ELEMENTS_ADVANCED,
+  AI_ELEMENTS_DEFAULT,
+  AI_ELEMENT_LABELS,
+  MAX_DEFAULT_AI_ELEMENTS,
+  type AdvancedAIElement,
+  type DefaultAIElement,
+} from "../constants/ai-elements";
 
 type StreamedArtifact = {
   id: string;
@@ -202,6 +211,8 @@ export function ChatMessages({
   const DEFAULT_VISIBLE = 80;
   const CHUNK = 60;
   const [visibleCount, setVisibleCount] = useState(DEFAULT_VISIBLE);
+  const [insightsOpen, setInsightsOpen] = useState<Record<string, boolean>>({});
+  const budgetWarningsRef = useRef<Set<string>>(new Set());
   
   // Don't render messages in minimized state
   if (isMinimized) {
@@ -297,6 +308,96 @@ export function ChatMessages({
 
             // Tool-call extraction from metadata (HTTP path) or legacy top-level
             const toolCall = (message.metadata as any)?.toolCall || ((message as any).type === 'tool_call' ? (message as any) : undefined);
+            const isInsightsOpen = insightsOpen[message.id] ?? false;
+
+            const hasReasoningContent = Boolean(
+              aiElements?.showReasoning &&
+              (
+                message.metadata?.reasoning ||
+                showResearchSummary ||
+                researchError
+              )
+            );
+
+            const defaultElementFlags: Record<DefaultAIElement, boolean> = {
+              reasoning: hasReasoningContent,
+              sources: Boolean(
+                aiElements?.showSources &&
+                Array.isArray(message.metadata?.sources) &&
+                message.metadata.sources.length > 0
+              ),
+              inlineCitations: Boolean(
+                aiElements?.showInlineCitations &&
+                Array.isArray(message.metadata?.inlineCitations) &&
+                message.metadata.inlineCitations.length > 0
+              ),
+            };
+
+            const availableDefaultElements = AI_ELEMENTS_DEFAULT.filter((key) => defaultElementFlags[key]);
+            const allowedDefaultElements = availableDefaultElements.slice(0, MAX_DEFAULT_AI_ELEMENTS);
+            const trimmedDefaultElements = availableDefaultElements.slice(MAX_DEFAULT_AI_ELEMENTS);
+
+            if (
+              trimmedDefaultElements.length > 0 &&
+              process.env.NODE_ENV !== 'production'
+            ) {
+              const warningKey = `${message.id}:${trimmedDefaultElements.join(',')}`;
+              if (!budgetWarningsRef.current.has(warningKey)) {
+                budgetWarningsRef.current.add(warningKey);
+                console.warn(
+                  '[ChatMessages] AI element budget exceeded; trimming elements',
+                  {
+                    messageId: message.id,
+                    trimmed: trimmedDefaultElements.map((key) => AI_ELEMENT_LABELS[key]),
+                    allowedBudget: MAX_DEFAULT_AI_ELEMENTS,
+                  }
+                );
+              }
+            }
+
+            const shouldRenderDefault = (key: DefaultAIElement) => allowedDefaultElements.includes(key);
+
+            const advancedElementFlags: Record<AdvancedAIElement, boolean> = {
+              tools: Boolean(
+                aiElements?.showActions &&
+                Array.isArray(message.metadata?.tools) &&
+                message.metadata.tools.length > 0
+              ),
+              code: Boolean(
+                aiElements?.showCodeBlocks &&
+                Array.isArray(message.metadata?.codeBlocks) &&
+                message.metadata.codeBlocks.length > 0
+              ),
+              context: Boolean(message.metadata?.contextUsage),
+              images: Boolean(
+                aiElements?.showImages &&
+                Array.isArray(message.metadata?.images) &&
+                message.metadata.images.length > 0
+              ),
+              tasks: Boolean(
+                aiElements?.showTasks &&
+                Array.isArray(message.metadata?.tasks) &&
+                message.metadata.tasks.length > 0
+              ),
+              webPreview: Boolean(aiElements?.showWebPreview && message.metadata?.webPreview),
+              actions: Boolean(aiElements?.showActions && !isUserMessage),
+              chainOfThought: Boolean(
+                aiElements?.showReasoning &&
+                Array.isArray(message.metadata?.chainOfThought?.steps) &&
+                message.metadata.chainOfThought.steps.length > 0
+              ),
+              artifacts: Boolean(
+                aiElements?.showArtifacts &&
+                Array.isArray(message.metadata?.artifacts) &&
+                message.metadata.artifacts.length > 0
+              ),
+            };
+
+            const hasAdvancedContent = AI_ELEMENTS_ADVANCED.some((key) => advancedElementFlags[key]);
+            const canRenderAdvanced = (key: AdvancedAIElement) => isInsightsOpen && advancedElementFlags[key];
+            const canRenderReasoning = shouldRenderDefault('reasoning');
+            const canRenderSources = shouldRenderDefault('sources');
+            const canRenderInlineCitations = shouldRenderDefault('inlineCitations');
 
             return (
               <Message
@@ -349,14 +450,14 @@ export function ChatMessages({
 
                   <div className="space-y-2">
                       {/* Reasoning Display */}
-                      {aiElements?.showReasoning && message.metadata?.reasoning && (
+                      {canRenderReasoning && message.metadata?.reasoning && (
                         <Reasoning isStreaming={isLoading} defaultOpen={false}>
                           <ReasoningTrigger />
                           <ReasoningContent>{message.metadata.reasoning}</ReasoningContent>
                         </Reasoning>
                       )}
 
-                      {aiElements?.showReasoning && showResearchSummary && (
+                      {canRenderReasoning && showResearchSummary && (
                         <Reasoning isStreaming={false} defaultOpen={false}>
                           <ReasoningTrigger>
                             <Search className="h-3.5 w-3.5" />
@@ -383,7 +484,7 @@ export function ChatMessages({
                         </Reasoning>
                       )}
 
-                      {aiElements?.showReasoning && researchError && (
+                      {canRenderReasoning && researchError && (
                         <Reasoning isStreaming={false} defaultOpen={false}>
                           <ReasoningTrigger>
                             <Search className="h-3.5 w-3.5" />
@@ -398,7 +499,7 @@ export function ChatMessages({
                       )}
 
                       {/* Chain of Thought Display */}
-                      {message.metadata?.chainOfThought && message.metadata.chainOfThought.steps && (
+                      {canRenderAdvanced('chainOfThought') && message.metadata?.chainOfThought?.steps && (
                         <ChainOfThought defaultOpen={false}>
                           <ChainOfThoughtHeader>
                             {message.metadata?.agent || 'AI'} Thinking Process
@@ -417,7 +518,7 @@ export function ChatMessages({
                       )}
 
                       {/* Sources Display */}
-                      {aiElements?.showSources && message.metadata?.sources && message.metadata.sources.length > 0 && (
+                      {canRenderSources && message.metadata?.sources && message.metadata.sources.length > 0 && (
                         <Sources>
                           <SourcesTrigger count={message.metadata.sources.length} />
                           <SourcesContent>
@@ -443,7 +544,7 @@ export function ChatMessages({
                       )}
 
                       {/* Tool Usage Display */}
-                      {aiElements?.showActions && message.metadata?.tools && message.metadata.tools.length > 0 && (
+                      {canRenderAdvanced('tools') && message.metadata?.tools && message.metadata.tools.length > 0 && (
                         <div className="space-y-2">
                           {message.metadata.tools.map((tool, index) => (
                             <Tool key={index} defaultOpen={false}>
@@ -458,7 +559,7 @@ export function ChatMessages({
                       )}
 
                       {/* Code Blocks */}
-                      {aiElements?.showCodeBlocks && message.metadata?.codeBlocks && message.metadata.codeBlocks.length > 0 && (
+                      {canRenderAdvanced('code') && message.metadata?.codeBlocks && message.metadata.codeBlocks.length > 0 && (
                         <div className="space-y-2">
                           {message.metadata.codeBlocks.map((codeBlock, index) => (
                             <CodeBlock
@@ -474,7 +575,7 @@ export function ChatMessages({
                       )}
 
                       {/* Context Usage Display */}
-                      {message.metadata?.contextUsage && (
+                      {canRenderAdvanced('context') && message.metadata?.contextUsage && (
                         <Context
                           usedTokens={message.metadata.contextUsage.usedTokens}
                           maxTokens={message.metadata.contextUsage.maxTokens}
@@ -497,7 +598,7 @@ export function ChatMessages({
                       )}
 
                       {/* Images Display */}
-                      {aiElements?.showImages && message.metadata?.images && message.metadata.images.length > 0 && (
+                      {canRenderAdvanced('images') && message.metadata?.images && message.metadata.images.length > 0 && (
                         <div className="space-y-2">
                           {message.metadata.images.map((image, index) => (
                             <Image
@@ -510,7 +611,7 @@ export function ChatMessages({
                       )}
 
                       {/* Inline Citations */}
-                      {aiElements?.showInlineCitations && message.metadata?.inlineCitations && message.metadata.inlineCitations.length > 0 && (
+                      {canRenderInlineCitations && Array.isArray(message.metadata?.inlineCitations) && message.metadata.inlineCitations.length > 0 && (
                         <div className="space-y-1">
                           {message.metadata.inlineCitations.map((citation, index) => (
                             <InlineCitation key={index} {...(citation as any)}>
@@ -520,8 +621,26 @@ export function ChatMessages({
                         </div>
                       )}
 
+                      {hasAdvancedContent && (
+                        <div className="pt-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                            onClick={() =>
+                              setInsightsOpen(prev => ({
+                                ...prev,
+                                [message.id]: !isInsightsOpen,
+                              }))
+                            }
+                          >
+                            {isInsightsOpen ? 'Hide Insights' : 'Show Insights'}
+                          </Button>
+                        </div>
+                      )}
+
                       {/* Tasks Display */}
-                      {aiElements?.showTasks && message.metadata?.tasks && message.metadata.tasks.length > 0 && (
+                      {canRenderAdvanced('tasks') && message.metadata?.tasks && message.metadata.tasks.length > 0 && (
                         <Task defaultOpen={false}>
                           <div className="space-y-2">
                             {message.metadata.tasks.map((task, index) => (
@@ -546,7 +665,7 @@ export function ChatMessages({
                       )}
 
                       {/* Web Preview */}
-                      {aiElements?.showWebPreview && message.metadata?.webPreview && (
+                      {canRenderAdvanced('webPreview') && message.metadata?.webPreview && (
                         <WebPreview>
                           <WebPreviewUrl value={message.metadata.webPreview.url} readOnly />
                           <WebPreviewBody
@@ -557,7 +676,7 @@ export function ChatMessages({
                       )}
 
                       {/* Message Actions */}
-                      {aiElements?.showActions && (
+                      {canRenderAdvanced('actions') && (
                         <Actions>
                           <Action tooltip="Copy message">
                             <Copy className="h-3 w-3" />
@@ -608,7 +727,7 @@ export function ChatMessages({
                     )}
 
                     {/* Summary Artifact (conversation end) */}
-                    {message.metadata?.artifacts && Array.isArray(message.metadata.artifacts) && (
+                    {canRenderAdvanced('artifacts') && message.metadata?.artifacts && Array.isArray(message.metadata.artifacts) && (
                       <div className="mt-4">
                         {message.metadata.artifacts.map((artifact: any) => {
                           if (artifact.type === 'summary') {
