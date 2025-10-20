@@ -112,14 +112,17 @@ export async function generatePdfWithPuppeteer(
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--disable-gpu'
-        ]
+          '--disable-gpu',
+          '--single-process',
+          '--disable-extensions'
+        ],
+        timeout: 15000
       })
 
       try {
         const page = await browser.newPage()
         const htmlContent = await generateHtmlContent(summaryData, mode, language)
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0', timeout: 30000 })
+        await page.setContent(htmlContent, { waitUntil: 'domcontentloaded', timeout: 15000 })
         await page.pdf({
           path: outputPath,
           format: 'A4',
