@@ -66,8 +66,37 @@ export async function POST(request: Request) {
     console.log(`📊 PDF data assembled: ${activities.length} messages, ${multimodalContext.summary.modalitiesUsed.join(', ')}`)
 
     // Generate PDF with temporary path
+    console.log('[export-summary] Starting PDF generation', {
+      sessionId,
+      timestamp: new Date().toISOString(),
+      env: {
+        nodeEnv: process.env.NODE_ENV,
+        pdfUsePdfLib: process.env.PDF_USE_PDFLIB
+      }
+    });
+
     const tempPath = `/tmp/summary-${Date.now()}.pdf`;
-    const pdfBuffer = await generatePdfWithPuppeteer(summaryData, tempPath);
+    const startTime = Date.now();
+    console.log('[export-summary] Calling Puppeteer...');
+
+    let pdfBuffer: Uint8Array;
+    try {
+      pdfBuffer = await Promise.race([
+        generatePdfWithPuppeteer(summaryData, tempPath),
+        new Promise<Uint8Array>((_, reject) => 
+          setTimeout(() => reject(new Error('PDF generation timeout after 50s')), 50000)
+        )
+      ]) as Uint8Array;
+      
+      console.log(`[export-summary] PDF generated in ${Date.now() - startTime}ms`);
+    } catch (error) {
+      console.error('[export-summary] PDF generation failed:', {
+        error: error instanceof Error ? error.message : String(error),
+        duration: Date.now() - startTime
+      });
+      
+      return respond.serverError('PDF generation failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
 
     // Store PDF in Supabase Storage
     const pdfFileName = `${sessionId}/${Date.now()}.pdf`
