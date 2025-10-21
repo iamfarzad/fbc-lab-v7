@@ -49,6 +49,11 @@ export function ChatActions({
   const [sheetOpen, setSheetOpen] = useState(false);
   const isMobile = useIsMobile(768);
 
+  // Add debugging
+  useEffect(() => {
+    console.log('[ChatActions] isMobile:', isMobile, 'popoverOpen:', popoverOpen);
+  }, [isMobile, popoverOpen]);
+
   const closeAll = useCallback(() => {
     setPopoverOpen(false);
     setSheetOpen(false);
@@ -198,7 +203,11 @@ export function ChatActions({
             <Plus className="h-4 w-4 text-foreground/70" aria-hidden="true" />
           </PromptInputButton>
         </PopoverTrigger>
-        <PopoverContent className={cn("w-72 p-1 space-y-1", VISUAL.CORNER_RADIUS)}>
+        <PopoverContent 
+          side="top"
+          align="start"
+          className={cn("w-72 p-1 space-y-1 z-[9999]", VISUAL.CORNER_RADIUS)}
+        >
           {actionButtons}
         </PopoverContent>
       </Popover>
