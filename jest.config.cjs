@@ -6,7 +6,11 @@ const customJestConfig = {
     '^@/app/(.*)$': '<rootDir>/app/$1',
     '^@/core/(.*)$': '<rootDir>/src/core/$1',
     '^@/src/(.*)$': '<rootDir>/src/$1',
-    '^@/(.*)$': '<rootDir>/src/$1'
+    '^@/(.*)$': '<rootDir>/src/$1',
+    // Stub ESM-only KV client in tests to avoid transform issues
+    '^@vercel/kv$': '<rootDir>/tests/mocks/vercel-kv.ts',
+    // Mock AI SDK to avoid network calls in unit tests
+    '^ai$': '<rootDir>/tests/mocks/ai.ts'
   },
   testEnvironment: 'jest-environment-jsdom',
   collectCoverageFrom: [
