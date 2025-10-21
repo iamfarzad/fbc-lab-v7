@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import {
   PromptInput,
@@ -71,6 +71,15 @@ interface ChatInputProps {
 
 export type ChatInputHandle = {
   openMedia: (tab?: 'voice' | 'camera' | 'screen') => void;
+}
+
+// Small bridge to lift attachments.add API from PromptInput's context
+function AttachmentsBridge({ onReady }: { onReady: (addFn: (files: File[] | FileList) => void) => void }) {
+  const ctx = usePromptInputAttachments();
+  useEffect(() => {
+    onReady(ctx.add);
+  }, [ctx.add, onReady]);
+  return null;
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStatusLine?: boolean; showVoicePreview?: boolean; disableExpandedControls?: boolean }>(function ChatInput({
@@ -188,15 +197,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
     onScreenToggle: screenToggle.handleButtonClick,
     onClosePopover: () => setActivePopover(null)
   });
-
-  // Small bridge to lift attachments.add API from PromptInput's context
-  function AttachmentsBridge({ onReady }: { onReady: (addFn: (files: File[] | FileList) => void) => void }) {
-    const ctx = usePromptInputAttachments();
-    useEffect(() => {
-      onReady(ctx.add);
-    }, [ctx.add, onReady]);
-    return null;
-  }
 
   // Auto-open popover when media becomes active
   // Auto-open drawers removed
@@ -324,12 +324,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
         isExpanded ? "max-w-3xl px-4" : "px-4"
       )}>
         {showStatusLine && (isLoading || isVoiceProcessing || isVoiceActive) && (
-          <div className="mb-1 text-[11px] text-muted-foreground flex items-center gap-2" role="status" aria-live="polite" aria-atomic="true">
+          <output className="mb-1 text-[11px] text-muted-foreground flex items-center gap-2" aria-live="polite" aria-atomic="true">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))] animate-pulse" />
             <span>
               {isVoiceProcessing ? 'Processing voice…' : isVoiceActive ? 'Recording…' : 'AI is responding…'}
             </span>
-          </div>
+          </output>
         )}
         <PromptInput
           className={cn(
@@ -517,7 +517,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
         multiple
         onChange={(e) => {
           const files = e.target.files;
-          if (files && files.length) {
+          if (files?.length) {
             attachmentsBridgeRef.current?.add(files);
           }
           e.currentTarget.value = '';
@@ -531,7 +531,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
         multiple
         onChange={(e) => {
           const files = e.target.files;
-          if (files && files.length) {
+          if (files?.length) {
             attachmentsBridgeRef.current?.add(files);
           }
           e.currentTarget.value = '';
@@ -560,6 +560,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
         partialTranscript={voicePartialTranscript}
         error={voiceError}
         onToggle={onToggleVoice}
+        onOpenCamera={onToggleCamera}
+        onOpenScreen={onToggleScreenShare}
       />
 
       <CameraFullScreen
@@ -571,6 +573,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
         onToggle={onToggleCamera}
         onSwitchCamera={onSwitchCamera}
         hasMultipleCameras={availableCameras > 1}
+        onOpenVoice={onToggleVoice}
+        onOpenScreen={onToggleScreenShare}
+        transcript={voiceTranscript}
+        partialTranscript={voicePartialTranscript}
       />
 
       <ScreenFullScreen
@@ -581,6 +587,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
         thumbnail={screenThumbnail}
         error={screenShareError}
         onToggle={onToggleScreenShare}
+        onOpenCamera={onToggleCamera}
+        onOpenVoice={onToggleVoice}
+        transcript={voiceTranscript}
+        partialTranscript={voicePartialTranscript}
       />
     </div>
   );
