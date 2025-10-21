@@ -50,6 +50,24 @@ export interface ConversationEntry {
   };
 }
 
+/** Conversation turn for Google-style export format */
+export interface ConversationTurn {
+  role: 'user' | 'agent' | 'assistant';
+  text: string;
+  isFinal: boolean;
+  timestamp: string;
+  modality?: 'text' | 'voice' | 'image';
+  toolCall?: {
+    name: string;
+    args: Record<string, any>;
+    id?: string;
+  };
+  fileUpload?: {
+    name: string;
+    analysis?: string;
+  };
+}
+
 /** Visual analysis entries produced by image/video tools. */
 export interface VisualEntry {
   id: string;
@@ -101,6 +119,7 @@ export interface AudioEntry {
 export interface MultimodalContext {
   sessionId: string;
   conversationHistory: ConversationEntry[];
+  conversationTurns: ConversationTurn[]; // Google-style conversation export
   visualContext: VisualEntry[];
   audioContext: AudioEntry[]; // Voice transcripts and audio
   uploadContext: UploadEntry[];

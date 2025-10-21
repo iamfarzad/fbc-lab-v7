@@ -28,13 +28,15 @@ export async function POST(request: Request) {
       return respond.notFound('Session not found');
     }
 
-    const conversation = context.conversationHistory.map((entry) => ({
-      id: entry.id,
-      role: entry.metadata?.speaker ?? 'assistant',
-      modality: entry.modality,
-      text: entry.content,
-      timestamp: entry.timestamp,
-      metadata: entry.metadata,
+    // Use new conversationTurns array (Google prototype format)
+    const conversation = (context.conversationTurns || []).map((turn) => ({
+      role: turn.role,
+      text: turn.text,
+      isFinal: turn.isFinal,
+      timestamp: turn.timestamp,
+      ...(turn.modality ? { modality: turn.modality } : {}),
+      ...(turn.toolCall ? { toolCall: turn.toolCall } : {}),
+      ...(turn.fileUpload ? { fileUpload: turn.fileUpload } : {})
     }));
 
     const payload = {

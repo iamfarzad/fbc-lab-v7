@@ -1,0 +1,11 @@
+{
+  "sessionId": "7cca2496-49f6-42d1-8408-4c6e61f55d22",
+  "connectionId": "7dccf4c7-5321-4940-80e6-2032c7d28710",
+  "started": "2025-10-21T12:55:40",
+  "rawLogFiles": {
+    "chat": "logs/chat/chat-20251021.jsonl",
+    "voice": "logs/live/7dccf4c7-5321-4940-80e6-2032c7d28710.jsonl"
+  },
+  "note": "Full raw transcript below - extracting from logs..."
+}
+

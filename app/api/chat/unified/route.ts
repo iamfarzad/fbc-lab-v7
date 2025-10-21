@@ -9,6 +9,7 @@ import { createRetryableGemini } from '@/core/ai/retry-model'
 import { streamText, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { GEMINI_MODELS, GEMINI_CONFIG } from '@/config/constants'
+import { getResolvedGeminiApiKey } from '@/config/env'
 import { logJsonl } from '@/lib/jsonl-logger'
 import { z } from 'zod'
 import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
@@ -137,31 +138,14 @@ const contextStorage = new ContextStorage()
 const groundingProvider = new GoogleGroundingProvider()
 
 const getModel = () => {
-  const resolvedApiKey =
-    process.env.GEMINI_API_KEY ??
-    process.env.GOOGLE_GEMINI_API_KEY ??
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY
-  const googleApiKey = process.env.GOOGLE_API_KEY
-
+  // Resolve and normalize API key once for model creation
+  getResolvedGeminiApiKey()
   console.log('[DEBUG] Environment variables:', {
     GEMINI_API_KEY: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 10)}...` : 'NOT SET',
     GOOGLE_GEMINI_API_KEY: process.env.GOOGLE_GEMINI_API_KEY ? `${process.env.GOOGLE_GEMINI_API_KEY.substring(0, 10)}...` : 'NOT SET',
     GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY ? `${process.env.GOOGLE_GENERATIVE_AI_API_KEY.substring(0, 10)}...` : 'NOT SET',
-    GOOGLE_API_KEY: googleApiKey ? `${googleApiKey.substring(0, 10)}...` : 'NOT SET'
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY ? `${process.env.GOOGLE_API_KEY.substring(0, 10)}...` : 'NOT SET'
   })
-
-  if (!resolvedApiKey) {
-    throw new Error('Missing Google Generative AI API key.')
-  }
-
-  if (!process.env.GEMINI_API_KEY) {
-    process.env.GEMINI_API_KEY = resolvedApiKey
-  }
-  
-  // Also set GOOGLE_GENERATIVE_AI_API_KEY for @ai-sdk/google
-  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = resolvedApiKey
-  }
 
   if (!cachedModel) {
     cachedModel = createRetryableGemini()
@@ -295,7 +279,7 @@ function parseStructuredResponse(content: string) {
     usedTokens: Math.floor(content.length / 4), // Rough token estimate
     maxTokens: GEMINI_CONFIG.MAX_TOKENS,
     usage: Math.floor(content.length / 4) / GEMINI_CONFIG.MAX_TOKENS,
-    modelId: 'gemini-flash-latest'
+    modelId: GEMINI_MODELS.FLASH_LATEST
   }
   
   return metadata
@@ -968,7 +952,7 @@ Citations: ${researchResult.allCitations.length} sources processed
         const messageId = crypto.randomUUID()
 
         const stream = new ReadableStream({
-          start(controller) {
+          async start(controller) {
             try {
               // Send meta event
               const metaEvent = `event: meta\ndata: ${JSON.stringify({ 
@@ -1038,6 +1022,30 @@ Citations: ${researchResult.allCitations.length} sources processed
               } catch (logErr) {
                 console.warn('[Multi-Agent] Failed to log assistant message:', logErr)
               }
+
+              // Track conversation turns for export
+              if (context?.sessionId) {
+                try {
+                  const lastUserMessage = messages[messages.length - 1]
+                  if (lastUserMessage?.role === 'user') {
+                    await multimodalContextManager.addConversationTurn(context.sessionId, {
+                      role: 'user',
+                      text: lastUserMessage.content,
+                      isFinal: true,
+                      modality: 'text'
+                    })
+                  }
+                  await multimodalContextManager.addConversationTurn(context.sessionId, {
+                    role: 'agent',
+                    text: agentResult.output,
+                    isFinal: true,
+                    modality: 'text'
+                  })
+                } catch (turnErr) {
+                  console.warn('[Multi-Agent] Failed to track conversation turns:', turnErr)
+                }
+              }
+
               controller.close()
 
             } catch (error) {
@@ -1078,24 +1086,15 @@ Citations: ${researchResult.allCitations.length} sources processed
         })
       }
       // For streaming, use direct Google model (ai-retry doesn't support streaming)
-      const apiKey = process.env.GEMINI_API_KEY
-      const googleApiKey = process.env.GOOGLE_API_KEY
-      const googleGenApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-      
+      // Resolve and normalize keys via centralized helper
+      getResolvedGeminiApiKey()
+
       console.log('[DEBUG] Streaming environment variables:', {
-        GEMINI_API_KEY: apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT SET',
-        GOOGLE_API_KEY: googleApiKey ? `${googleApiKey.substring(0, 10)}...` : 'NOT SET',
-        GOOGLE_GENERATIVE_AI_API_KEY: googleGenApiKey ? `${googleGenApiKey.substring(0, 10)}...` : 'NOT SET'
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 10)}...` : 'NOT SET',
+        GOOGLE_API_KEY: process.env.GOOGLE_API_KEY ? `${process.env.GOOGLE_API_KEY.substring(0, 10)}...` : 'NOT SET',
+        GOOGLE_GENERATIVE_AI_API_KEY: process.env.GOOGLE_GENERATIVE_AI_API_KEY ? `${process.env.GOOGLE_GENERATIVE_AI_API_KEY.substring(0, 10)}...` : 'NOT SET',
+        GOOGLE_GEMINI_API_KEY: process.env.GOOGLE_GEMINI_API_KEY ? `${process.env.GOOGLE_GEMINI_API_KEY.substring(0, 10)}...` : 'NOT SET'
       })
-      
-      if (!apiKey) {
-        throw new Error('Missing GEMINI_API_KEY environment variable')
-      }
-      
-      // Set GOOGLE_GENERATIVE_AI_API_KEY for @ai-sdk/google
-      if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-        process.env.GOOGLE_GENERATIVE_AI_API_KEY = apiKey
-      }
       
       const streamingModel = google(GEMINI_MODELS.FLASH_LITE_LATEST)
       
@@ -1309,6 +1308,29 @@ Citations: ${researchResult.allCitations.length} sources processed
             } catch (logErr) {
               console.warn('[UNIFIED_AI_SDK] Failed to log assistant message:', logErr)
             }
+
+            // Track conversation turns for export
+            if (context?.sessionId) {
+              try {
+                const lastUserMessage = messages[messages.length - 1]
+                if (lastUserMessage?.role === 'user') {
+                  await multimodalContextManager.addConversationTurn(context.sessionId, {
+                    role: 'user',
+                    text: lastUserMessage.content,
+                    isFinal: true,
+                    modality: 'text'
+                  })
+                }
+                await multimodalContextManager.addConversationTurn(context.sessionId, {
+                  role: 'agent',
+                  text: cleanedContent,
+                  isFinal: true,
+                  modality: 'text'
+                })
+              } catch (turnErr) {
+                console.warn('[UNIFIED_AI_SDK] Failed to track conversation turns:', turnErr)
+              }
+            }
             
             controller.close()
           } catch (error) {
@@ -1432,6 +1454,29 @@ Citations: ${researchResult.allCitations.length} sources processed
         console.warn('[UNIFIED_AI_SDK] Failed to log assistant message (non-stream):', logErr)
       }
 
+      // Track conversation turns for export
+      if (context?.sessionId) {
+        try {
+          const lastUserMessage = messages[messages.length - 1]
+          if (lastUserMessage?.role === 'user') {
+            await multimodalContextManager.addConversationTurn(context.sessionId, {
+              role: 'user',
+              text: lastUserMessage.content,
+              isFinal: true,
+              modality: 'text'
+            })
+          }
+          await multimodalContextManager.addConversationTurn(context.sessionId, {
+            role: 'agent',
+            text: result.text,
+            isFinal: true,
+            modality: 'text'
+          })
+        } catch (turnErr) {
+          console.warn('[UNIFIED_AI_SDK] Failed to track conversation turns (non-stream):', turnErr)
+        }
+      }
+
       return respond.ok(responsePayload)
     }
 
@@ -1471,7 +1516,7 @@ export function GET(req: NextRequest) {
             supportedModes: ['standard', 'realtime', 'admin', 'multimodal']
           },
           provider: 'ai-sdk',
-          model: 'gemini-2.5-pro',
+          model: GEMINI_MODELS.PRO,
           timestamp: new Date().toISOString()
         })
 

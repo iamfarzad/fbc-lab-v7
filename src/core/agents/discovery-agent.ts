@@ -161,7 +161,11 @@ ${conversationFlow?.shouldOfferRecap
     temperature: 0.7
   })
 
-  steps[3].status = 'complete'
+  // Mark the currently active step as complete (guard against missing index)
+  const activeIdx = steps.findIndex(s => s.status === 'active')
+  if (activeIdx >= 0) {
+    steps[activeIdx].status = 'complete'
+  }
 
   // Step 5: Incorporate multimodal context
   if (multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio || multimodalContext?.hasRecentUploads) {

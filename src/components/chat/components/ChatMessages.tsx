@@ -449,51 +449,63 @@ export function ChatMessages({
                   </div>
 
                   <div className="space-y-2">
-                      {/* Reasoning Display */}
-                      {canRenderReasoning && message.metadata?.reasoning && (
+                      {/* Consolidated Reasoning Display - Single Component */}
+                      {canRenderReasoning && (
                         <Reasoning isStreaming={isLoading} defaultOpen={false}>
                           <ReasoningTrigger />
-                          <ReasoningContent>{message.metadata.reasoning}</ReasoningContent>
-                        </Reasoning>
-                      )}
-
-                      {canRenderReasoning && showResearchSummary && (
-                        <Reasoning isStreaming={false} defaultOpen={false}>
-                          <ReasoningTrigger>
-                            <Search className="h-3.5 w-3.5" />
-                            <span>Research findings</span>
-                          </ReasoningTrigger>
                           <ReasoningContent>
-                            <div className={cn("space-y-2 text-muted-foreground", DESIGN_TOKENS.typography.body)}>
-                              {typeof researchSummary?.combinedAnswer === 'string' && researchSummary.combinedAnswer.trim().length > 0 && (
-                                <p className="leading-relaxed whitespace-pre-wrap">
-                                  {researchSummary.combinedAnswer}
-                                </p>
+                            <div className="space-y-4">
+                              {/* AI Reasoning */}
+                              {message.metadata?.reasoning && (
+                                <div>
+                                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80 mb-2">
+                                    AI Reasoning
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {message.metadata.reasoning}
+                                  </div>
+                                </div>
                               )}
-                              {researchBadges.length > 0 && (
-                                <div className={cn("flex flex-wrap gap-2 uppercase tracking-wide", DESIGN_TOKENS.typography.disclaimer)}>
-                                  {researchBadges.map((label) => (
-                                    <Badge key={label} variant="outline" className={cn("border-border/40 bg-background/60", DESIGN_TOKENS.borders.default)}>
-                                      {label}
-                                    </Badge>
-                                  ))}
+
+                              {/* Research Findings */}
+                              {showResearchSummary && (
+                                <div>
+                                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80 mb-2 flex items-center gap-1.5">
+                                    <Search className="h-3 w-3" />
+                                    Research findings
+                                  </div>
+                                  <div className={cn("space-y-2 text-muted-foreground", DESIGN_TOKENS.typography.body)}>
+                                    {typeof researchSummary?.combinedAnswer === 'string' && researchSummary.combinedAnswer.trim().length > 0 && (
+                                      <p className="leading-relaxed whitespace-pre-wrap">
+                                        {researchSummary.combinedAnswer}
+                                      </p>
+                                    )}
+                                    {researchBadges.length > 0 && (
+                                      <div className={cn("flex flex-wrap gap-2 uppercase tracking-wide", DESIGN_TOKENS.typography.disclaimer)}>
+                                        {researchBadges.map((label) => (
+                                          <Badge key={label} variant="outline" className={cn("border-border/40 bg-background/60", DESIGN_TOKENS.borders.default)}>
+                                            {label}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Research Error */}
+                              {researchError && (
+                                <div>
+                                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground/80 mb-2 flex items-center gap-1.5">
+                                    <Search className="h-3 w-3" />
+                                    Research unavailable
+                                  </div>
+                                  <p className={cn(DESIGN_TOKENS.typography.body, "text-muted-foreground")}>
+                                    {researchError}
+                                  </p>
                                 </div>
                               )}
                             </div>
-                          </ReasoningContent>
-                        </Reasoning>
-                      )}
-
-                      {canRenderReasoning && researchError && (
-                        <Reasoning isStreaming={false} defaultOpen={false}>
-                          <ReasoningTrigger>
-                            <Search className="h-3.5 w-3.5" />
-                            <span>Research unavailable</span>
-                          </ReasoningTrigger>
-                          <ReasoningContent>
-                            <p className={cn(DESIGN_TOKENS.typography.body, "text-muted-foreground")}>
-                              {researchError}
-                            </p>
                           </ReasoningContent>
                         </Reasoning>
                       )}

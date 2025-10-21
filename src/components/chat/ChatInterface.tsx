@@ -84,6 +84,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     voiceConnectionId,
     visualizerState,
     registerScreenAnalyzer,
+    liveClient,
   } = useVoicePipeline({
     sessionId,
     setListening,
@@ -481,6 +482,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
           sseStreaming: Boolean(messagesHook.isLoading),
           sseError: messagesHook.sseError?.message || null,
         }}
+        liveClient={liveClient}
       />
 
       <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>

@@ -147,8 +147,8 @@ export function useScreenShareSnapshots({
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.7)
         const capturedAt = Date.now()
-        const shouldAnalyze = capturedAt - lastAnalysisAt >= ANALYSIS_INTERVAL_MS
-        const hasRealtimeInput = typeof sendRealtimeInput === 'function'
+    const shouldAnalyze = capturedAt - lastAnalysisAt >= ANALYSIS_INTERVAL_MS
+    const hasRealtimeInput = typeof sendRealtimeInput === 'function' && isVoiceSessionActive
 
         if (hasRealtimeInput) {
           try {

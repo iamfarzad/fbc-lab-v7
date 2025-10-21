@@ -1,10 +1,23 @@
-import { respond } from '@/lib/api/response'
+import { NextResponse } from 'next/server'
+import { getResolvedGeminiApiKey } from '@/config/env'
+import { WEBSOCKET_CONFIG, GEMINI_MODELS } from '@/config/constants'
 
-export function GET() {
-  return respond.ok({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    version: process.env.npm_package_version || '1.0.0'
-  })
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
+  try {
+    const key = getResolvedGeminiApiKey()
+    return NextResponse.json({
+      ok: true,
+      provider: 'google-genai',
+      keyPresent: Boolean(key),
+      ws: WEBSOCKET_CONFIG.URL,
+      defaultVoiceModel: GEMINI_MODELS.DEFAULT_VOICE,
+      ts: new Date().toISOString(),
+    }, { status: 200 })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message || 'missing api key' }, { status: 500 })
+  }
 }
+

@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { respond } from '@/lib/api/response'
 import { GoogleGenAI } from '@google/genai';
 import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache';
+import { GEMINI_MODELS } from '@/config/constants'
+import { getResolvedGeminiApiKey } from '@/config/env'
 import { logJsonl } from '@/src/lib/jsonl-logger';
 import { createHash } from 'crypto';
 
@@ -16,9 +18,11 @@ const cachedAnalyzeImage = createCachedFunction(
     }
 
     try {
-      const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Normalize API key for @google/genai
+      const apiKey = getResolvedGeminiApiKey()
+      const genAI = new GoogleGenAI({ apiKey });
       // Prefer explicit v1beta model names with required "models/" prefix
-      const model = process.env.WEB_VISION_MODEL || 'models/gemini-2.0-flash';
+      const model = process.env.WEB_VISION_MODEL || `models/${GEMINI_MODELS.DEFAULT_MULTIMODAL}`;
       const result = await genAI.models.generateContent({
         model,
         contents: [{

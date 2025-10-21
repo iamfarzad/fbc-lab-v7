@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioRecorder, AudioPlayer } from '@/lib/audio';
 import { WEBSOCKET_CONFIG } from '@/config/constants';
+import type { LiveServerEvent } from '@/core/live/types'
+import { LiveClientWS } from '@/core/live/client'
 
 export type VoiceSession = {
   connectionId: string;
@@ -174,23 +176,7 @@ export type VoiceContextUpdate = {
   metadata?: Record<string, unknown>;
 };
 
-type LiveServerEvent =
-  | { type: 'connected'; payload: { connectionId: string } }
-  | { type: 'session_started'; payload: { connectionId: string; languageCode?: string; voiceName?: string; mock?: boolean } }
-  | { type: 'session_closed'; payload?: { reason?: string } }
-  | { type: 'input_transcript'; payload: { text: string; isFinal?: boolean } }
-  | { type: 'output_transcript'; payload: { text: string; isFinal?: boolean } }
-  | { type: 'model_text'; payload: { text: string } }
-  | { type: 'text'; payload: { content: string } }
-  | { type: 'audio'; payload: { audioData: string; mimeType?: string } }
-  | { type: 'heartbeat'; payload?: { timestamp: number } }
-  | { type: 'turn_complete'; payload?: { turnComplete?: boolean } }
-  | { type: 'setup_complete'; payload: { setupComplete: boolean } }
-  | { type: 'interrupted'; payload: { interrupted: boolean } }
-  | { type: 'tool_call'; payload: any }
-  | { type: 'tool_result'; payload: any }
-  | { type: 'tool_call_cancellation'; payload: any }
-  | { type: 'error'; payload: { message: string; detail?: unknown } };
+// LiveServerEvent is centralized in '@/core/live/types' to prevent drift
 
 type SessionStateEvent = {
   active: boolean;
@@ -234,7 +220,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     micStream,
   } = useInlineRecorder({ targetSampleRate: 16000 });
 
-  const wsRef = useRef<WebSocket | null>(null);
+  const liveRef = useRef<LiveClientWS | null>(null);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
   const connectionIdRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -250,6 +236,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, [options]);
 
   useEffect(() => {
+    // Create AudioPlayer on mount to ensure it persists across voice turns
+    audioPlayerRef.current = new AudioPlayer(DEFAULT_SERVER_SAMPLE_RATE);
+    console.log('🎵 [RealtimeVoice] AudioPlayer created on mount', { 
+      sampleRate: DEFAULT_SERVER_SAMPLE_RATE 
+    });
+
     return () => {
       audioPlayerRef.current?.destroy();
       audioPlayerRef.current = null;
@@ -268,60 +260,34 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     return WEBSOCKET_CONFIG.URL;
   }, []);
 
-  const sendMessage = useCallback((message: Record<string, unknown>) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.error('🎤 [RealtimeVoice] Cannot send message - socket not ready:', {
-        hasSocket: !!wsRef.current,
-        readyState: wsRef.current?.readyState,
-        message
-      });
-      return;
-    }
-    try {
-      const messageStr = JSON.stringify(message);
-      console.log('🎤 [RealtimeVoice] Sending message:', message.type, messageStr.substring(0, 100));
-      wsRef.current.send(messageStr);
-      console.log('🎤 [RealtimeVoice] Message sent successfully:', message.type);
-    } catch (err) {
-      console.error('🎤 [RealtimeVoice] Failed to send message:', err, message);
-    }
+  const sendMessage = useCallback((_message: Record<string, unknown>) => {
+    console.warn('sendMessage called directly; prefer LiveClientWS methods');
   }, []);
 
   const sendToolResult = useCallback((responses: Array<Record<string, unknown>>) => {
     if (!responses || responses.length === 0) return;
-    sendMessage({
-      type: 'TOOL_RESULT',
-      payload: { responses },
-    });
-  }, [sendMessage]);
+    liveRef.current?.sendToolResponse(responses);
+  }, []);
 
   const sendContextUpdate = useCallback((update: VoiceContextUpdate) => {
     if (!update || typeof update !== 'object') return;
-    sendMessage({
-      type: 'CONTEXT_UPDATE',
-      payload: {
-        ...update,
-        modality: update.modality,
-        sessionId: update.sessionId ?? undefined,
-        capturedAt: typeof update.capturedAt === 'number' ? update.capturedAt : Date.now(),
-      },
+    if (!update.analysis) return; // require analysis text for server injection
+    liveRef.current?.sendContextUpdate({
+      modality: update.modality,
+      analysis: update.analysis,
+      imageData: update.imageData,
+      sessionId: update.sessionId ?? undefined,
+      capturedAt: typeof update.capturedAt === 'number' ? update.capturedAt : Date.now(),
     });
-  }, [sendMessage]);
+  }, []);
 
   const sendRealtimeInput = useCallback((chunks: Array<{ mimeType: string; data: string }>) => {
     if (!session?.connectionId || !isSessionActive) {
       console.warn('Cannot send realtime input - no active session');
       return;
     }
-
-    sendMessage({
-      type: 'REALTIME_INPUT',
-      payload: {
-        chunks,
-        connectionId: session.connectionId,
-      },
-    });
-  }, [session?.connectionId, isSessionActive, sendMessage]);
+    liveRef.current?.sendRealtimeInput(chunks);
+  }, [session?.connectionId, isSessionActive]);
 
   // --- Dev diagnostics helpers ---
   const sineToPCM16Base64 = useCallback((frequency = 440, durationMs = 320, sampleRate = 16000) => {
@@ -418,13 +384,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         // Flush any audio chunks captured before the session opened
         if (pendingChunksRef.current.length > 0) {
           pendingChunksRef.current.forEach((chunk) => {
-            sendMessage({
-              type: 'user_audio',
-              payload: {
-                audioData: chunk.base64,
-                mimeType: chunk.mimeType,
-              },
-            });
+            liveRef.current?.sendAudioBase64PCM16(chunk.base64, chunk.mimeType)
           });
           pendingChunksRef.current = [];
         }
@@ -508,8 +468,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         });
 
         if (!audioPlayerRef.current) {
-          console.log('🎵 [RealtimeVoice] Creating new AudioPlayer', { sampleRate: playbackRate });
-          audioPlayerRef.current = new AudioPlayer(playbackRate);
+          console.error('🚫 [RealtimeVoice] AudioPlayer should exist but is missing!', { 
+            sampleRate: playbackRate,
+            playerExists: !!audioPlayerRef.current 
+          });
+          break;
         } else if (declaredRate && audioPlayerRef.current.getSampleRate() !== playbackRate) {
           console.warn('⚠️ [RealtimeVoice] Sample rate mismatch, updating player', {
             from: audioPlayerRef.current.getSampleRate(),
@@ -522,7 +485,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
       case 'heartbeat': {
-        sendMessage({ type: 'heartbeat_ack', timestamp: Date.now() });
+        liveRef.current?.ackHeartbeat();
         break;
       }
       case 'interrupted': {
@@ -584,93 +547,63 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       return;
     }
 
-    sendMessage({
-      type: 'user_audio',
-      payload: {
-        audioData: chunk.base64,
-        mimeType: chunk.mimeType,
-      },
-    });
-  }, [sendMessage]);
+    liveRef.current?.sendAudioBase64PCM16(chunk.base64, chunk.mimeType);
+  }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (!serverUrl || wsRef.current) {
-      console.log('🎤 [RealtimeVoice] Cannot connect:', { serverUrl, hasSocket: !!wsRef.current });
-      return;
-    }
-
-    console.log('🎤 [RealtimeVoice] Connecting to:', serverUrl);
-    try {
-      const socket = new WebSocket(serverUrl);
-      wsRef.current = socket;
-
-      socket.onopen = () => {
-        setSocketReady(true);
-        setError(null);
-        reconnectAttemptsRef.current = 0; // Reset on successful connection
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as LiveServerEvent;
-          handleServerEvent(data);
-        } catch (err) {
-          console.error('🎤 [RealtimeVoice] Failed to parse server event:', err);
-        }
-      };
-
-      socket.onerror = (err) => {
-        console.error('🎤 [RealtimeVoice] WebSocket error:', err?.type || 'Unknown error', err);
-        setError('WebSocket connection error');
-      };
-
-      socket.onclose = (event) => {
-        console.log('🎤 [RealtimeVoice] WebSocket closed:', event.code, event.reason);
-        wsRef.current = null;
-        setSocketReady(false);
-        resetState({ soft: true });
-
-        // Check if we should attempt reconnection
+    if (!serverUrl) return
+    if (!liveRef.current) {
+      liveRef.current = new LiveClientWS()
+      liveRef.current.on('open', () => {
+        setSocketReady(true)
+        setError(null)
+        reconnectAttemptsRef.current = 0
+      })
+      liveRef.current.on('close', () => {
+        setSocketReady(false)
+        resetState({ soft: true })
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-          const msg = 'Failed to connect to voice server after multiple attempts. Please check if the server is running.';
-          console.error('🎤 [RealtimeVoice] Max reconnection attempts reached');
-          setError(msg);
-          callbacksRef.current?.onError?.(msg);
-          return;
+          const msg = 'Failed to connect to voice server after multiple attempts. Please check if the server is running.'
+          setError(msg)
+          callbacksRef.current?.onError?.(msg)
+          return
         }
-
         if (!reconnectTimerRef.current) {
-          reconnectAttemptsRef.current++;
-          // Exponential backoff: 1s, 2s, 4s, 8s, 16s
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 16000);
-          console.log(`🎤 [RealtimeVoice] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
-          
+          reconnectAttemptsRef.current++
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 16000)
           reconnectTimerRef.current = setTimeout(() => {
-            reconnectTimerRef.current = null;
-            connectWebSocket();
-          }, delay);
+            reconnectTimerRef.current = null
+            liveRef.current?.connect()
+          }, delay)
         }
-      };
-    } catch (err) {
-      console.error('🎤 [RealtimeVoice] Failed to connect:', err);
-      setError('Failed to connect to voice server');
+      })
+      liveRef.current.on('error', (m) => {
+        setError(typeof m === 'string' ? m : 'WebSocket connection error')
+      })
+      // Route all server events through existing handler
+      liveRef.current.on('connected', (id) => handleServerEvent({ type: 'connected', payload: { connectionId: id } }))
+      liveRef.current.on('session_started', (p) => handleServerEvent({ type: 'session_started', payload: { ...p } } as any))
+      liveRef.current.on('session_closed', (reason) => handleServerEvent({ type: 'session_closed', payload: { reason } } as any))
+      liveRef.current.on('input_transcript', (t, f) => handleServerEvent({ type: 'input_transcript', payload: { text: t, isFinal: f } }))
+      liveRef.current.on('output_transcript', (t, f) => handleServerEvent({ type: 'output_transcript', payload: { text: t, isFinal: f } }))
+      liveRef.current.on('text', (content) => handleServerEvent({ type: 'text', payload: { content } }))
+      liveRef.current.on('audio', (base64, mime) => handleServerEvent({ type: 'audio', payload: { audioData: base64, mimeType: mime } }))
+      liveRef.current.on('turn_complete', () => handleServerEvent({ type: 'turn_complete' } as any))
+      liveRef.current.on('setup_complete', () => handleServerEvent({ type: 'setup_complete', payload: { setupComplete: true } }))
+      liveRef.current.on('interrupted', () => handleServerEvent({ type: 'interrupted', payload: { interrupted: true } }))
+      liveRef.current.on('tool_call', (p) => handleServerEvent({ type: 'tool_call', payload: p } as any))
+      liveRef.current.on('tool_result', (p) => handleServerEvent({ type: 'tool_result', payload: p } as any))
     }
-  }, [handleServerEvent, resetState, serverUrl]);
+    liveRef.current.connect()
+  }, [callbacksRef, handleServerEvent, resetState, serverUrl])
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
-    console.log('🎤 [RealtimeVoice] startSession called', { 
-      isSocketReady, 
-      wsState: wsRef.current?.readyState, 
-      connectionId: connectionIdRef.current,
-      opts 
-    });
+    console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
     
-    if (!isSocketReady || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (!isSocketReady || !liveRef.current) {
       const message = 'Voice server not ready';
       console.error('🎤 [RealtimeVoice] Cannot start session - server not ready:', { 
-        isSocketReady, 
-        wsState: wsRef.current?.readyState,
-        serverUrl 
+        isSocketReady, serverUrl 
       });
       setError(message);
       callbacksRef.current?.onError?.(message);
@@ -688,13 +621,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       });
 
       console.log('🎤 [RealtimeVoice] Sending start message');
-      sendMessage({
-        type: 'start',
-        payload: {
-          languageCode: opts?.languageCode,
-          voiceName: opts?.voiceName,
-          sessionId: opts?.sessionId,
-        },
+      liveRef.current.start({
+        languageCode: opts?.languageCode,
+        voiceName: opts?.voiceName,
+        sessionId: opts?.sessionId,
       });
       console.log('🎤 [RealtimeVoice] Start message sent successfully; preparing microphone');
 
@@ -744,7 +674,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       callbacksRef.current?.onError?.(message);
       await resetRecording();
     }
-  }, [handleRecorderChunk, isSocketReady, sendMessage, session?.mock, startRecording, resetRecording, serverUrl]);
+  }, [handleRecorderChunk, isSocketReady, sendMessage, session, startRecording, resetRecording, serverUrl]);
 
   const stopSession = useCallback(async () => {
     console.log('🎤 [RealtimeVoice] stopSession called', {
@@ -770,9 +700,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       await stopRecording();
       pendingChunksRef.current = [];
 
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        sendMessage({ type: 'TURN_COMPLETE' });
-      }
+      // Notify server to mark turn complete and stop the Live session cleanly
+      liveRef.current?.stop();
 
       setSessionActive(false);
       isSessionActiveRef.current = false;
@@ -786,7 +715,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       setIsProcessing(false);
       callbacksRef.current?.onError?.(message);
     }
-  }, [isSessionActive, isRecording, isProcessing, sendMessage, session?.mock, stopRecording]);
+  }, [isSessionActive, isRecording, isProcessing, sendMessage, session, stopRecording]);
 
   useEffect(() => {
     connectWebSocket();
@@ -799,8 +728,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         clearTimeout(sessionTimeoutRef.current);
         sessionTimeoutRef.current = null;
       }
-      wsRef.current?.close();
-      wsRef.current = null;
+      liveRef.current?.disconnect();
+      liveRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only connect once on mount - connectWebSocket handles reconnections internally

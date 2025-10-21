@@ -16,6 +16,8 @@ import {
   Monitor
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { LiveStatusBadge } from './LiveStatusBadge'
+import type { LiveClientWS } from '@/core/live/client'
 interface ChatHeaderProps {
   chatState: ChatState;
   onToggleMinimize: () => void;
@@ -35,6 +37,7 @@ interface ChatHeaderProps {
     sseStreaming: boolean;
     sseError?: string | null;
   };
+  liveClient?: LiveClientWS;
   onRunDiagnostics?: () => void;
 }
 
@@ -50,7 +53,8 @@ export function ChatHeader({
   onToggleTranscript,
   onOpenMedia,
   backend,
-  onRunDiagnostics
+  onRunDiagnostics,
+  liveClient
 }: ChatHeaderProps) {
   return (
     <>
@@ -300,6 +304,9 @@ export function ChatHeader({
                 sse={{ ready: backend.sseReady, streaming: backend.sseStreaming, error: backend.sseError }}
                 className="ml-1"
               />
+            )}
+            {liveClient && (
+              <LiveStatusBadge client={liveClient} className="ml-2" />
             )}
             {process.env.NODE_ENV !== 'production' && onRunDiagnostics && (
               <Button

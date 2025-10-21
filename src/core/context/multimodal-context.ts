@@ -1,5 +1,5 @@
 import { ContextStorage } from './context-storage'
-import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry, AudioEntry } from './context-types'
+import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry, AudioEntry, ConversationTurn } from './context-types'
 import { vercelCache } from '@/lib/vercel-cache'
 import { CONTEXT_CONFIG, SECURITY_CONFIG } from '@/config/constants'
 import { walLog } from './write-ahead-log'
@@ -43,6 +43,7 @@ export function createInitialContext(sessionId: string, leadContext?: Partial<Le
   return {
     sessionId,
     conversationHistory: [],
+    conversationTurns: [], // Google-style export format
     visualContext: [],
     audioContext: [],
     uploadContext: [],
@@ -76,6 +77,7 @@ function ensureContext(ctx: unknown): MultimodalContext {
     return {
       sessionId: 'unknown',
       conversationHistory: [],
+      conversationTurns: [],
       visualContext: [],
       audioContext: [],
       uploadContext: [],
@@ -92,6 +94,7 @@ function ensureContext(ctx: unknown): MultimodalContext {
   return {
     sessionId: obj.sessionId || 'unknown',
     conversationHistory: obj.conversationHistory || [],
+    conversationTurns: obj.conversationTurns || [],
     visualContext: obj.visualContext || [],
     audioContext: asAudioEntries(obj.audioContext || []),
     uploadContext: obj.uploadContext || [],
@@ -139,6 +142,7 @@ export class MultimodalContextManager {
     const context: MultimodalContext = {
       sessionId,
       conversationHistory: [],
+      conversationTurns: [],
       visualContext: [],
       audioContext: [],
       uploadContext: [],
@@ -333,6 +337,98 @@ export class MultimodalContextManager {
     context.metadata.modalitiesUsed = coerceModalities([...context.metadata.modalitiesUsed, 'text'])
     context.metadata.totalTokens += Math.ceil(payload.analysis.length / 4)
 
+    await this.saveContext(sessionId, context)
+  }
+
+  /**
+   * Add conversation turn for Google-style export format
+   * Tracks every user/AI message for clean transcript export
+   */
+  async addConversationTurn(sessionId: string, turn: Omit<ConversationTurn, 'timestamp'> & { timestamp?: string }): Promise<void> {
+    const context = await this.getOrCreateContext(sessionId)
+    
+    const conversationTurn: ConversationTurn = {
+      ...turn,
+      timestamp: turn.timestamp || new Date().toISOString()
+    }
+
+    if (!context.conversationTurns) {
+      context.conversationTurns = []
+    }
+    
+    context.conversationTurns.push(conversationTurn)
+    context.metadata.lastUpdated = conversationTurn.timestamp
+
+    // Track modality usage
+    if (turn.modality) {
+      const modalityMap: Record<string, 'text' | 'image' | 'audio' | 'video'> = {
+        'text': 'text',
+        'voice': 'audio',
+        'image': 'image'
+      }
+      const modality = modalityMap[turn.modality]
+      if (modality) {
+        context.metadata.modalitiesUsed = coerceModalities([...context.metadata.modalitiesUsed, modality])
+      }
+    }
+
+    // Estimate tokens
+    context.metadata.totalTokens += Math.ceil(turn.text.length / 4)
+
+    await this.saveContext(sessionId, context)
+  }
+
+  /**
+   * Add tool call to the last conversation turn
+   */
+  async addToolCallToLastTurn(sessionId: string, toolCall: { name: string; args: Record<string, any>; id?: string }): Promise<void> {
+    const context = await this.getOrCreateContext(sessionId)
+    
+    if (!context.conversationTurns) {
+      context.conversationTurns = []
+    }
+
+    // Add as a separate turn or attach to last AI turn
+    const lastTurn = context.conversationTurns[context.conversationTurns.length - 1]
+    
+    if (lastTurn && lastTurn.role === 'agent' && !lastTurn.isFinal) {
+      // Attach tool call to in-progress AI turn
+      lastTurn.toolCall = toolCall
+    } else {
+      // Create new turn for tool call
+      context.conversationTurns.push({
+        role: 'agent',
+        text: `[Tool: ${toolCall.name}]`,
+        isFinal: true,
+        timestamp: new Date().toISOString(),
+        toolCall
+      })
+    }
+
+    context.metadata.lastUpdated = new Date().toISOString()
+    await this.saveContext(sessionId, context)
+  }
+
+  /**
+   * Add file upload info to conversation turn
+   */
+  async addFileUploadTurn(sessionId: string, fileInfo: { name: string; analysis?: string }): Promise<void> {
+    const context = await this.getOrCreateContext(sessionId)
+    
+    if (!context.conversationTurns) {
+      context.conversationTurns = []
+    }
+
+    context.conversationTurns.push({
+      role: 'user',
+      text: `[File Uploaded: ${fileInfo.name}] Please analyze this file.`,
+      isFinal: true,
+      timestamp: new Date().toISOString(),
+      modality: 'text',
+      fileUpload: fileInfo
+    })
+
+    context.metadata.lastUpdated = new Date().toISOString()
     await this.saveContext(sessionId, context)
   }
 

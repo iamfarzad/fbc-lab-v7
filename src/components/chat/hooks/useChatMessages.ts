@@ -36,6 +36,11 @@ export function useChatMessages(initialSessionId?: string) {
   const [sessionId, setSessionId] = useState(() => initialSessionId ?? crypto.randomUUID());
   const voiceAssistantMessageIdRef = useRef<string | null>(null);
   const partialUserMessageIdRef = useRef<string | null>(null);
+  
+  // Debouncing for voice transcript updates
+  const voiceChunkBufferRef = useRef<string>('');
+  const voiceChunkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const VOICE_CHUNK_DEBOUNCE_MS = 150; // 150ms buffer for smooth updates
 
   useEffect(() => {
     if (initialSessionId && initialSessionId !== sessionId) {
@@ -266,11 +271,20 @@ export function useChatMessages(initialSessionId?: string) {
   const appendVoiceAssistantChunk = useCallback((chunk: string) => {
     if (!chunk) return;
 
+    // Clear existing timeout
+    if (voiceChunkTimeoutRef.current) {
+      clearTimeout(voiceChunkTimeoutRef.current);
+    }
+
+    // Add chunk to buffer
+    voiceChunkBufferRef.current += chunk;
+
     const existingId = voiceAssistantMessageIdRef.current;
     if (!existingId) {
+      // Create new message immediately for first chunk
       const message = unifiedChat.addMessage({
         role: 'assistant',
-        content: chunk,
+        content: voiceChunkBufferRef.current,
         timestamp: new Date(),
         metadata: {
           type: 'text',
@@ -280,25 +294,33 @@ export function useChatMessages(initialSessionId?: string) {
         },
       });
       voiceAssistantMessageIdRef.current = message.id;
-      return;
     }
 
-    const nextMessages = unifiedChat.messages.map((message) => {
-      if (message.id !== existingId) return message;
-      return {
-        ...message,
-        content: `${message.content}${chunk}`,
-        metadata: {
-          ...message.metadata,
-          source: 'voice',
-          modality: 'audio',
-          isStreaming: true,
-        },
-        timestamp: new Date(),
-      };
-    });
+    // Debounce the update to reduce visual jitter
+    voiceChunkTimeoutRef.current = setTimeout(() => {
+      const currentId = voiceAssistantMessageIdRef.current;
+      if (!currentId) return;
 
-    unifiedChat.setMessages(nextMessages);
+      const bufferedContent = voiceChunkBufferRef.current;
+      voiceChunkBufferRef.current = ''; // Clear buffer after using
+
+      const nextMessages = unifiedChat.messages.map((message) => {
+        if (message.id !== currentId) return message;
+        return {
+          ...message,
+          content: bufferedContent,
+          metadata: {
+            ...message.metadata,
+            source: 'voice',
+            modality: 'audio',
+            isStreaming: true,
+          },
+          timestamp: new Date(),
+        };
+      });
+
+      unifiedChat.setMessages(nextMessages);
+    }, VOICE_CHUNK_DEBOUNCE_MS);
   }, [unifiedChat]);
 
   const finalizeVoiceAssistantMessage = useCallback((opts?: { error?: string }) => {

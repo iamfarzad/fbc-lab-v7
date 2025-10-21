@@ -107,6 +107,16 @@ export async function POST(request: NextRequest) {
         pages
       })
 
+      // Track file upload in conversation for export
+      try {
+        await multimodalContextManager.addFileUploadTurn(sessionId, {
+          name: file.name,
+          analysis
+        })
+      } catch (err) {
+        console.warn('[Attachments] Failed to track file upload turn:', err)
+      }
+
       attachmentSummaries.push({
         id,
         name: file.name,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useLiveApi } from '@/hooks/useLiveApi'
+import { LiveClientWS } from '@/core/live/client'
 
 type Snapshot = {
   analysis: string
@@ -86,12 +87,13 @@ export function useVoicePipeline({
   }, [appendVoiceAssistantChunk, sessionId])
 
   const handleVoiceOutputTranscript = useCallback((text: string, isFinal: boolean) => {
-    if (resetTimerRef.current) {
-      clearTimeout(resetTimerRef.current)
-    }
+    // Remove the 3-second timeout to persist transcripts after voice ends
+    // The transcript should remain visible in the chat area as a permanent message
     setAiSpeechTranscript(text)
+    
+    // Optional: Log when transcript is finalized for debugging
     if (isFinal) {
-      resetTimerRef.current = setTimeout(() => setAiSpeechTranscript(''), 3000)
+      console.log('🎤 Final AI transcript completed:', text.substring(0, 50) + '...')
     }
   }, [])
 
@@ -237,7 +239,14 @@ export function useVoicePipeline({
     finalizeVoiceAssistantMessage({ error: message })
   }, [finalizeVoiceAssistantMessage])
 
+  const liveClient = useMemo(() => new LiveClientWS(), [])
+  useEffect(() => {
+    liveClient.connect()
+    return () => liveClient.disconnect()
+  }, [liveClient])
+
   const audioHook = useLiveApi({
+    liveClient,
     onSessionStateChange: handleVoiceSessionState,
     onPartialTranscript: handleVoicePartialTranscript,
     onFinalTranscript: handleVoiceFinalTranscript,
@@ -285,5 +294,6 @@ export function useVoicePipeline({
     voiceConnectionId,
     visualizerState,
     registerScreenAnalyzer,
+    liveClient,
   }
 }

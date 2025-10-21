@@ -110,6 +110,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   showVoicePreview = false,
   disableExpandedControls = false,
 }, ref) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [manualInputOverride, setManualInputOverride] = useState(false);
   const [activePopover, setActivePopover] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [isDownloadingSession, setIsDownloadingSession] = useState(false);
@@ -121,6 +123,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
       setVoicePermissionGranted(true);
     }
   }, [voicePermissionGranted, isVoiceActive]);
+
+  // Reset manual override when voice fully stops
+  useEffect(() => {
+    if (!isVoiceActive && !isVoiceProcessing) {
+      setManualInputOverride(false);
+    }
+  }, [isVoiceActive, isVoiceProcessing]);
 
   useEffect(() => {
     if (!voiceError) return;
@@ -292,7 +301,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
 
   // Get current input display value
   const getInputDisplayValue = () => {
-    if (isListening) {
+    if (isListening && !manualInputOverride && !isFocused) {
       if (voicePartialTranscript) return voicePartialTranscript;
       if (voiceTranscript) return voiceTranscript.split('\n').slice(-1)[0] || '';
       return '';
@@ -357,9 +366,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
             <PromptInputTextarea
               className="rounded-xl bg-transparent px-2 sm:px-3 py-1.5 text-sm leading-relaxed text-foreground/90 placeholder:text-muted-foreground/70 min-h-[36px] max-h-[120px] resize-none"
             value={getInputDisplayValue()}
-            onChange={(e) => onInputChange(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onChange={(e) => {
+              if (isListening && !manualInputOverride) setManualInputOverride(true);
+              onInputChange(e.target.value);
+            }}
             placeholder={getPlaceholder()}
-            disabled={isLoading || isListening}
+            disabled={isLoading}
           />
 
           <PromptInputAttachments className="pt-1">

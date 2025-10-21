@@ -120,6 +120,25 @@ export async function routeToAgent({
     }
   }
 
+  // Merge provided multimodalContext from incoming request context when present.
+  // This ensures E2E runs (and clients) can supply context even if storage misses.
+  if (context.multimodalContext) {
+    const provided = context.multimodalContext
+    multimodalContext = {
+      hasRecentImages: Boolean((multimodalContext?.hasRecentImages || provided.hasRecentImages)),
+      hasRecentAudio: Boolean((multimodalContext?.hasRecentAudio || provided.hasRecentAudio)),
+      hasRecentUploads: Boolean((multimodalContext?.hasRecentUploads || provided.hasRecentUploads)),
+      recentAnalyses: [
+        ...(multimodalContext?.recentAnalyses ?? []),
+        ...(provided.recentAnalyses ?? []),
+      ],
+      recentUploads: [
+        ...(multimodalContext?.recentUploads ?? []),
+        ...(provided.recentUploads ?? []),
+      ],
+    }
+  }
+
   // Determine funnel stage
   const stage = determineFunnelStage({
     conversationFlow: context.conversationFlow,

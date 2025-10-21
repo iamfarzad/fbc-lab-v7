@@ -1,72 +1,176 @@
-import { GoogleGenAI } from '@google/genai'
-import { GEMINI_MODELS } from '@/config/constants'
-
-export type LiveConnectOptions = {
-  apiKey: string
-  model?: string
-  config?: Record<string, unknown>
-}
+import { WEBSOCKET_CONFIG } from '@/config/constants'
+import type { LiveServerEvent, LiveClientEventMap } from '@/core/live/types'
+type ToolResponse = { functionResponses?: any[] }
 
 /**
- * Centralized adapter for Gemini Live connections.
- * NOTE: Gemini Live sessions are active immediately after `genAI.live.connect(...)`.
- * Some older call sites expect a `.start()` method. We shim a no-op `.start()`
- * to avoid runtime errors like "session.start is not a function".
+ * LiveClientWS — Evented client for the server-managed Live WebSocket.
+ * No API key in browser; connects to WEBSOCKET_CONFIG.URL and speaks
+ * the unified message protocol used in server/live-server.ts.
  */
-export async function connectLive({ apiKey, model, config }: LiveConnectOptions) {
-  const genAI = new GoogleGenAI({ apiKey })
-  const liveModel = model ?? GEMINI_MODELS.DEFAULT_VOICE
+export class LiveClientWS {
+  private socket: WebSocket | null = null
+  private listeners = new Map<keyof LiveClientEventMap, Set<Function>>()
+  // reserved for future state queries (intentionally unused)
+  // private isReady = false
+  private connectionId: string | null = null
+  private devLogEnabled = (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG === '1' || (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG !== '0')))
 
-  let isOpen = false
-
-  // Create config object matching official documentation
-  const liveConfig = {
-    // TODO: migrate — use official SDK types instead of any
-    responseModalities: ['AUDIO'] as any,
-    systemInstruction: 'You are a helpful assistant and answer in a friendly tone.',
-    ...config,
+  on<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
+    if (!this.listeners.has(event)) this.listeners.set(event, new Set())
+    this.listeners.get(event)!.add(cb as any)
+    return () => this.off(event, cb)
   }
 
-  // TODO: migrate — type session with official Live session interface
-  const session: any = await genAI.live.connect({
-    model: liveModel,
-    config: liveConfig,  // ← Pass config as separate parameter
-    callbacks: {
-      onopen: () => {
-        isOpen = true
-        console.log('Live API session opened')
-      },
-      // TODO: migrate — type message/error payloads
-      onmessage: (message: any) => console.log('Live API message received', message),
-      onerror: (error: any) => console.error('Live API error:', error),
-      onclose: () => {
-        isOpen = false
-        console.log('Live API session closed')
-      },
-    },
-  })
+  off<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
+    this.listeners.get(event)?.delete(cb as any)
+  }
 
-  // Shim: add a no-op start() for compatibility with older code paths.
-  if (typeof session.start !== 'function') {
-    session.start = async () => {
-      // No-op. Session is already active on connect.
-      if (!isOpen) {
-        // Wait a microtask to allow onopen to flip in edge cases.
-        await Promise.resolve()
+  private emit<K extends keyof LiveClientEventMap>(event: K, ...args: Parameters<LiveClientEventMap[K]>) {
+    this.listeners.get(event)?.forEach((fn) => {
+      try { (fn as any)(...args) } catch {}
+    })
+  }
+
+  connect() {
+    if (this.socket) return
+    const url = WEBSOCKET_CONFIG.URL
+    const ws = new WebSocket(url)
+    this.socket = ws
+
+    ws.onopen = () => {
+      this.emit('open')
+    }
+    ws.onclose = () => {
+      this.emit('close')
+      this.socket = null
+    }
+    ws.onerror = () => {
+      this.emit('error', 'WebSocket error')
+    }
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data) as LiveServerEvent
+        this.routeEvent(msg)
+      } catch (e) {
+        this.emit('error', 'Malformed server event')
       }
     }
   }
 
-  // Convenience helpers
-  session.isOpen = () => isOpen
-  session.waitUntilOpen = async (retries = 50, delayMs = 50) => {
-    for (let i = 0; i < retries; i++) {
-      if (isOpen) return
-      await new Promise((r) => setTimeout(r, delayMs))
+  private routeEvent(msg: LiveServerEvent) {
+    this.devLog('event', { type: msg.type })
+    switch (msg.type) {
+      case 'connected':
+        this.connectionId = msg.payload.connectionId
+        this.emit('connected', this.connectionId)
+        break
+      case 'session_started':
+        this.emit('session_started', msg.payload)
+        break
+      case 'session_closed':
+        this.emit('session_closed', msg.payload?.reason)
+        break
+      case 'input_transcript':
+        this.emit('input_transcript', msg.payload.text, Boolean(msg.payload.isFinal))
+        break
+      case 'output_transcript':
+        this.emit('output_transcript', msg.payload.text, Boolean(msg.payload.isFinal))
+        break
+      case 'text':
+        this.emit('text', msg.payload.content)
+        break
+      case 'audio':
+        this.emit('audio', msg.payload.audioData, msg.payload.mimeType)
+        break
+      case 'turn_complete':
+        this.emit('turn_complete')
+        break
+      case 'setup_complete':
+        this.emit('setup_complete')
+        break
+      case 'interrupted':
+        this.emit('interrupted')
+        break
+      case 'tool_call':
+        this.emit('tool_call', msg.payload)
+        break
+      case 'tool_result':
+        this.emit('tool_result', msg.payload)
+        break
+      case 'error':
+        this.emit('error', msg.payload.message)
+        break
     }
-    if (!isOpen) throw new Error('Live session failed to open in time')
   }
 
-  console.log('✅ Gemini Live API session established and ready')
-  return session
+  start(opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'start', payload: opts || {} })
+  }
+
+  stop() {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'TURN_COMPLETE' })
+    this.send({ type: 'stop' })
+  }
+
+  sendText(text: string) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'REALTIME_INPUT', payload: { chunks: [{ text }] } })
+  }
+
+  sendAudioBase64PCM16(base64: string, mimeType = 'audio/pcm;rate=16000') {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'user_audio', payload: { audioData: base64, mimeType } })
+  }
+
+  sendRealtimeInput(chunks: Array<{ mimeType: string; data: string }>) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'REALTIME_INPUT', payload: { chunks } })
+  }
+
+  sendContextUpdate(update: { sessionId?: string; modality: 'screen' | 'webcam'; analysis: string; imageData?: string; capturedAt?: number }) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'CONTEXT_UPDATE', payload: update })
+  }
+
+  sendToolResponse(responses: ToolResponse['functionResponses']) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    if (!responses || responses.length === 0) return
+    this.send({ type: 'TOOL_RESULT', payload: { responses } })
+  }
+
+  ackHeartbeat() {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'heartbeat_ack', timestamp: Date.now() })
+  }
+
+  disconnect() {
+    try { this.socket?.close() } catch {}
+    this.socket = null
+  }
+
+  private send(message: Record<string, unknown>) {
+    try { this.socket?.send(JSON.stringify(message)) } catch {}
+  }
+
+  private devLog(event: string, data?: any) {
+    if (!this.devLogEnabled) return
+    try {
+      const payload = { category: 'client-live', event, data, ts: Date.now() }
+      if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+        navigator.sendBeacon('/api/dev/log', blob)
+      } else if (typeof fetch !== 'undefined') {
+        fetch('/api/dev/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {})
+      }
+    } catch {}
+  }
+}
+
+// Backward-compat no-op export (previous prototype-based connect)
+export async function connectLive(): Promise<LiveClientWS> {
+  const client = new LiveClientWS()
+  client.connect()
+  return client
 }

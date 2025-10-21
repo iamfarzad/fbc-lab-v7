@@ -308,6 +308,22 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
             if (message?.toolCall) {
               safeSend(ws, JSON.stringify({ type: 'tool_call', payload: message.toolCall }));
               activeSessions.get(connectionId)?.logger?.log('tool_call', message.toolCall)
+
+              // Track tool call for export
+              const sessionClient = activeSessions.get(connectionId)
+              if (sessionClient?.sessionId && message.toolCall?.functionCalls?.[0]) {
+                try {
+                  const toolCall = message.toolCall.functionCalls[0]
+                  const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+                  await multimodalContextManager.addToolCallToLastTurn(sessionClient.sessionId, {
+                    name: toolCall.name,
+                    args: toolCall.args || {},
+                    id: toolCall.id
+                  })
+                } catch (err) {
+                  console.warn(`[${connectionId}] Failed to track tool call:`, err)
+                }
+              }
             }
 
             const serverContent = message?.serverContent;
@@ -320,6 +336,24 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
               // Compat: include both isFinal and final to support older clients
               safeSend(ws, JSON.stringify({ type: 'input_transcript', payload: { text, isFinal, final: isFinal } }));
               activeSessions.get(connectionId)?.logger?.log('input_transcript', { text, isFinal })
+
+              // Track conversation turn for export (when final)
+              if (isFinal) {
+                const sessionClient = activeSessions.get(connectionId)
+                if (sessionClient?.sessionId) {
+                  try {
+                    const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+                    await multimodalContextManager.addConversationTurn(sessionClient.sessionId, {
+                      role: 'user',
+                      text,
+                      isFinal: true,
+                      modality: 'voice'
+                    })
+                  } catch (err) {
+                    console.warn(`[${connectionId}] Failed to track user voice turn:`, err)
+                  }
+                }
+              }
 
               // Heuristic: if the user explicitly references visual context, inject latest snapshot
               if (isFinal) {
@@ -371,6 +405,24 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
               // Compat: include both isFinal and final to support older clients
               safeSend(ws, JSON.stringify({ type: 'output_transcript', payload: { text, isFinal, final: isFinal } }));
               activeSessions.get(connectionId)?.logger?.log('output_transcript', { text, isFinal })
+
+              // Track conversation turn for export (when final)
+              if (isFinal) {
+                const sessionClient = activeSessions.get(connectionId)
+                if (sessionClient?.sessionId) {
+                  try {
+                    const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+                    await multimodalContextManager.addConversationTurn(sessionClient.sessionId, {
+                      role: 'agent',
+                      text,
+                      isFinal: true,
+                      modality: 'voice'
+                    })
+                  } catch (err) {
+                    console.warn(`[${connectionId}] Failed to track AI voice turn:`, err)
+                  }
+                }
+              }
             }
 
             // Text + audio parts
@@ -582,6 +634,13 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
           try { activeSessions.get(connectionId)?.logger?.log('client_start', { payload: { languageCode: parsedMessage?.payload?.languageCode, voiceName: parsedMessage?.payload?.voiceName, sessionId: parsedMessage?.payload?.sessionId } }) } catch {}
           await handleStart(connectionId, ws, parsedMessage.payload);
           break;
+        case 'stop': {
+          console.info(`[${connectionId}] Handling stop message`)
+          await handleClose(connectionId)
+          // Acknowledge stop
+          safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'client_stop' } }))
+          break;
+        }
         case 'user_audio':
           console.info(`[${connectionId}] Handling user_audio message`);
           await handleUserMessage(connectionId, ws, parsedMessage.payload);
@@ -775,7 +834,7 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     }
   });
 
-  // Now do the rest of connection setup AFTER handler is registered
+  // Disable socket delay to improve performance                (This is a performance optimization)
   try { 
     (req.socket as any)?.setNoDelay?.(true) 
   } catch (error) {

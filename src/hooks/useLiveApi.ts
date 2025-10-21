@@ -1,11 +1,15 @@
 import { useCallback } from 'react'
 import { useRealtimeVoice, type UseRealtimeVoiceOptions } from '@/hooks/useRealtimeVoice'
+import type { VoiceContextUpdate } from '@/hooks/useRealtimeVoice'
+import type { LiveClientWS } from '@/core/live/client'
 import type { AttachmentUploadResponse } from '@/types/attachments'
 
-export type UseLiveApiOptions = UseRealtimeVoiceOptions
+export type UseLiveApiOptions = UseRealtimeVoiceOptions & {
+  liveClient?: LiveClientWS
+}
 
 export function useLiveApi(options: UseLiveApiOptions = {}) {
-  // Delegate all real-time responsibilities to the proven hook
+  // Delegate all real-time responsibilities to the proven hook (which now uses LiveClientWS)
   const realtime = useRealtimeVoice(options)
 
   // One-shot: Explicit screen analysis (HTTP)
@@ -90,6 +94,35 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
     []
   )
 
+  const directSendRealtimeInput = useCallback(
+    (chunks: Array<{ mimeType: string; data: string }>) => {
+      if (options?.liveClient) {
+        options.liveClient.sendRealtimeInput(chunks)
+      } else {
+        realtime.sendRealtimeInput(chunks)
+      }
+    },
+    [options?.liveClient, realtime.sendRealtimeInput]
+  )
+
+  const directSendContextUpdate = useCallback(
+    (update: VoiceContextUpdate) => {
+      if (options?.liveClient) {
+        options.liveClient.sendContextUpdate({
+          modality: update.modality,
+          analysis: update.analysis as string,
+          imageData: update.imageData,
+          capturedAt: update.capturedAt,
+          sessionId: (update.sessionId ?? undefined) as string | undefined,
+        })
+      } else {
+        // useRealtimeVoice enforces non-empty analysis before forwarding
+        realtime.sendContextUpdate(update)
+      }
+    },
+    [options?.liveClient, realtime.sendContextUpdate]
+  )
+
   return {
     // Real-time (WebSocket) — pass-through
     ...realtime,
@@ -98,5 +131,8 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
     sendScreenShareMessage,
     sendWebcamAnalyze,
     uploadAttachments,
+    // Prefer direct LiveClientWS when provided
+    sendRealtimeInput: directSendRealtimeInput,
+    sendContextUpdate: directSendContextUpdate,
   }
 }
