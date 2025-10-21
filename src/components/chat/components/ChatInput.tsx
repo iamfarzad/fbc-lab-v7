@@ -333,7 +333,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
         )}
         <PromptInput
           className={cn(
-            "flex flex-col gap-2 border border-border/20 bg-card/90 px-4 sm:px-6 pb-3 pt-3 shadow-sm",
+            "flex flex-col gap-2 border border-border/20 bg-card/90 px-3 sm:px-6 pb-3 pt-3 shadow-sm",
             VISUAL.CORNER_RADIUS,
             "[.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2"
           )}
@@ -442,7 +442,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                               className={cn(
                                 "border border-border/40 transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 shadow-sm",
                                 VISUAL.CORNER_RADIUS,
-                                "h-11 w-11 min-h-[44px] min-w-[44px]",
+                                "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
                                 isVoiceActive ? "bg-[hsl(var(--foreground))] text-[hsl(var(--background))]" : "bg-muted"
                               )}
                             />
@@ -474,7 +474,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                             onClick={handleDownloadSession}
                             disabled={isDownloadingSession || !sessionIdForExport}
                             className={cn(
-                              "h-11 w-11 min-h-[44px] min-w-[44px] border border-border/40 bg-muted text-foreground transition-transform duration-150 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2 shadow-sm",
+                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px] border border-border/40 bg-muted text-foreground transition-transform duration-150 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2 shadow-sm",
                               VISUAL.CORNER_RADIUS,
                               "[.monochrome_&]:rounded-none"
                             )}
@@ -485,7 +485,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                           </Button>
                           <PromptInputSubmit
                             className={cn(
-                              "h-11 w-11 min-h-[44px] min-w-[44px] bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[0_24px_60px_-30px_rgba(255,107,53,0.35)] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[hsl(var(--accent))]/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2",
+                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px] bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[0_24px_60px_-30px_rgba(255,107,53,0.35)] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[hsl(var(--accent))]/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2",
                               VISUAL.CORNER_RADIUS,
                               "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
                             )}
