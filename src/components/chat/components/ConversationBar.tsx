@@ -6,7 +6,6 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { BarVisualizer, type AgentState } from "@/components/ui/bar-visualizer";
 import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -15,7 +14,6 @@ type ConversationBarProps = React.ComponentProps<typeof ChatInput> & {
   visualizerState?: AgentState;
   micStream?: MediaStream | null;
   aiSpeechTranscript?: string;
-  onAnalyzeScreen?: (prompt: string) => void | Promise<void>;
   onSwitchCamera?: () => void | Promise<void>;
   availableCameras?: number;
 };
@@ -36,7 +34,6 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
       onSwitchCamera,
       onToggleScreenShare,
       className,
-      onAnalyzeScreen,
       availableCameras,
       ...rest
     } = props as ConversationBarProps & { onToggleCamera: () => void | Promise<void>; onToggleScreenShare: () => void | Promise<void> };
@@ -48,9 +45,8 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
     const [screenPopoverOpen, setScreenPopoverOpen] = React.useState(false);
     const camVideoRef = React.useRef<HTMLVideoElement | null>(null);
     const screenVideoRef = React.useRef<HTMLVideoElement | null>(null);
-    const [analyzeOpen, setAnalyzeOpen] = React.useState(false);
-    const [analyzePrompt, setAnalyzePrompt] = React.useState("");
-    const [analyzing, setAnalyzing] = React.useState(false);
+    // Manual analyze disabled: auto-analysis is handled by useScreenShareSnapshots
+    // Keep lightweight local state minimal for best performance
     const [previewOpen, setPreviewOpen] = React.useState(false);
     React.useEffect(() => {
       const el = camVideoRef.current;
@@ -232,119 +228,7 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
               </Popover>
             )}
 
-            {/* Explicit screen analysis trigger */}
-            {isScreenSharing && (
-              <Popover open={analyzeOpen} onOpenChange={setAnalyzeOpen}>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-full border border-border/40 bg-muted/40 px-3 py-2.5 text-[11px] min-h-[44px]"
-                  onClick={() => setAnalyzeOpen(v => !v)}
-                  aria-label="Analyze current screen frame"
-                >
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500" />
-                  <span>Analyze Screen</span>
-                </button>
-                <PopoverContent className="w-[300px] p-2 space-y-2">
-                  <label htmlFor="analyze-prompt" className="text-[11px] text-muted-foreground">Prompt (optional)</label>
-                  <Input
-                    id="analyze-prompt"
-                    value={analyzePrompt}
-                    placeholder="e.g., What’s the main error?"
-                    onChange={(e) => setAnalyzePrompt(e.target.value)}
-                    disabled={analyzing}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (typeof onAnalyzeScreen === 'function') {
-                          try {
-                            setAnalyzing(true);
-                            const maybe = onAnalyzeScreen(analyzePrompt.trim());
-                            if (maybe && typeof maybe === 'object' && 'then' in maybe) {
-                              maybe
-                                .catch(() => undefined)
-                                .finally(() => {
-                                  setAnalyzing(false);
-                                  setAnalyzeOpen(false);
-                                  setAnalyzePrompt('');
-                                });
-                            } else {
-                              setAnalyzing(false);
-                              setAnalyzeOpen(false);
-                              setAnalyzePrompt('');
-                            }
-                          } catch {
-                            setAnalyzing(false);
-                          }
-                        }
-                      }
-                    }}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {['Summarize this screen', 'What is the main error?', 'List key actions'].map((label) => (
-                      <Button
-                        key={label}
-                        size="sm"
-                        variant="outline"
-                        disabled={analyzing}
-                        onClick={() => {
-                          setAnalyzePrompt(label);
-                          if (typeof onAnalyzeScreen === 'function') {
-                            try {
-                              setAnalyzing(true);
-                              const maybe = onAnalyzeScreen(label);
-                              if (maybe && typeof (maybe as any).then === 'function') {
-                                (maybe as Promise<void>)
-                                  .catch(() => undefined)
-                                  .finally(() => {
-                                    setAnalyzing(false);
-                                    setAnalyzeOpen(false);
-                                    setAnalyzePrompt('');
-                                  });
-                              } else {
-                                setAnalyzing(false);
-                                setAnalyzeOpen(false);
-                                setAnalyzePrompt('');
-                              }
-                            } catch {
-                              setAnalyzing(false);
-                            }
-                          }
-                        }}
-                        className="text-[11px]"
-                      >
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => { if (!analyzing) setAnalyzeOpen(false); }} disabled={analyzing}>Cancel</Button>
-                    <Button size="sm" onClick={() => {
-                      if (typeof onAnalyzeScreen === 'function') {
-                        try {
-                          setAnalyzing(true);
-                          const maybe = onAnalyzeScreen(analyzePrompt.trim());
-                          if (maybe && typeof maybe === 'object' && 'then' in maybe) {
-                            maybe
-                              .catch(() => undefined)
-                              .finally(() => {
-                                setAnalyzing(false);
-                                setAnalyzeOpen(false);
-                                setAnalyzePrompt('');
-                              });
-                          } else {
-                            setAnalyzing(false);
-                            setAnalyzeOpen(false);
-                            setAnalyzePrompt('');
-                          }
-                        } catch {
-                          setAnalyzing(false);
-                        }
-                      }
-                    }} disabled={analyzing}>{analyzing ? 'Analyzing…' : 'Analyze'}</Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
+            {/* Manual screen analysis removed — analysis runs automatically while sharing */}
 
             {/* Voice error */}
             {voiceError && (
