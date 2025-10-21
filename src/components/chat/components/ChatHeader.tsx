@@ -1,7 +1,6 @@
-import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChatState } from "../types/chatTypes";
+import type { ChatState } from "../types/chatTypes";
 import { StatusIndicator } from "./StatusIndicator";
 import { BackendPill } from "./BackendPill";
 import { COLORS } from "../design-tokens";
@@ -17,6 +16,7 @@ import {
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { LiveStatusBadge } from './LiveStatusBadge'
+import { BarVisualizer } from '@/components/ui/bar-visualizer'
 import type { LiveClientWS } from '@/core/live/client'
 interface ChatHeaderProps {
   chatState: ChatState;
@@ -39,6 +39,7 @@ interface ChatHeaderProps {
   };
   liveClient?: LiveClientWS;
   onRunDiagnostics?: () => void;
+  micStream?: MediaStream | null;
 }
 
 export function ChatHeader({
@@ -54,7 +55,8 @@ export function ChatHeader({
   onOpenMedia,
   backend,
   onRunDiagnostics,
-  liveClient
+  liveClient,
+  micStream
 }: ChatHeaderProps) {
   return (
     <>
@@ -110,6 +112,19 @@ export function ChatHeader({
                   )}
                   {/* Mobile: Menu, expand/minimize, and close */}
                   <div className="flex items-center gap-1 md:hidden">
+                    {/* Tiny live bar visualizer when listening */}
+                    {isVoiceActive && micStream && (
+                      <div className="mr-1 w-10">
+                        <BarVisualizer
+                          state={"listening"}
+                          mediaStream={micStream}
+                          barCount={6}
+                          minHeight={10}
+                          maxHeight={60}
+                          className="h-6 bg-transparent"
+                        />
+                      </div>
+                    )}
                     {showNextSteps && sessionId && (
                       <NextStepsMenu sessionId={sessionId} show={showNextSteps} />
                     )}
@@ -166,7 +181,7 @@ export function ChatHeader({
                         variant="ghost"
                         size="sm"
                         onClick={onToggleExpand}
-                        className="h-8 w-8 p-0 touch-manipulation"
+                        className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation"
                         title="Expand chat interface"
                         aria-label="Expand chat"
                       >
@@ -179,7 +194,7 @@ export function ChatHeader({
                         variant="ghost"
                         size="sm"
                         onClick={onToggleExpand}
-                        className="h-8 w-8 p-0 touch-manipulation"
+                        className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation"
                         title="Exit fullscreen mode"
                         aria-label="Exit fullscreen"
                       >
@@ -191,7 +206,7 @@ export function ChatHeader({
                       variant="ghost"
                       size="sm"
                       onClick={onToggleMinimize}
-                      className="h-8 w-8 p-0 touch-manipulation"
+                      className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation"
                       title="Minimize chat"
                       aria-label="Minimize chat"
                     >
@@ -202,7 +217,7 @@ export function ChatHeader({
                       variant="ghost"
                       size="sm"
                       onClick={onToggleChat}
-                      className="h-8 w-8 p-0 touch-manipulation"
+                      className="h-11 w-11 min-h-[44px] min-w-[44px] p-0 touch-manipulation"
                       title="Close chat"
                       aria-label="Close chat"
                     >

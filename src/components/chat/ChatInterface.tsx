@@ -445,6 +445,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
           sseError: messagesHook.sseError?.message || null,
         }}
         liveClient={liveClient}
+        micStream={audioHook.micStream}
       />
 
       <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>

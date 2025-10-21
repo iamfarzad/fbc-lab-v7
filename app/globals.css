@@ -354,6 +354,8 @@
     --font-weight-bold: 700;
   }
 
+  /* (Removed Terminal theme — we stick to our own tokens) */
+
   /* Monochrome Orange - Terminal aesthetic with orange accent (light) */
   .monochrome.monochrome-orange {
     --background: 0 0% 98%;
@@ -610,6 +612,21 @@ pre span[class*="sh__token--"] { color: var(--sh-identifier); }
 }
 
 @layer components {
+  /* Subtle matrix-style background for full-screen modals */
+  .bg-matrix-soft {
+    position: relative;
+  }
+  .bg-matrix-soft::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(hsl(var(--foreground) / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.06) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px;
+    pointer-events: none;
+    z-index: 0;
+  }
   .btn,
   .midday-btn {
     @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none;
