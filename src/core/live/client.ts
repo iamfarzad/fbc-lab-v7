@@ -1,6 +1,6 @@
 import { WEBSOCKET_CONFIG } from '@/config/constants'
 import type { LiveServerEvent, LiveClientEventMap } from '@/core/live/types'
-type ToolResponse = { functionResponses?: any[] }
+type ToolResponse = { functionResponses?: unknown[] }
 
 /**
  * LiveClientWS — Evented client for the server-managed Live WebSocket.
@@ -9,7 +9,7 @@ type ToolResponse = { functionResponses?: any[] }
  */
 export class LiveClientWS {
   private socket: WebSocket | null = null
-  private listeners = new Map<keyof LiveClientEventMap, Set<Function>>()
+  private listeners = new Map<keyof LiveClientEventMap, Set<(...args: unknown[]) => void>>()
   // reserved for future state queries (intentionally unused)
   // private isReady = false
   private connectionId: string | null = null
@@ -17,27 +17,37 @@ export class LiveClientWS {
 
   on<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set())
-    this.listeners.get(event)!.add(cb as any)
+    const listeners = this.listeners.get(event)
+    if (listeners) listeners.add(cb as (...args: unknown[]) => void)
     return () => this.off(event, cb)
   }
 
   off<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
-    this.listeners.get(event)?.delete(cb as any)
+    this.listeners.get(event)?.delete(cb as (...args: unknown[]) => void)
   }
 
   private emit<K extends keyof LiveClientEventMap>(event: K, ...args: Parameters<LiveClientEventMap[K]>) {
     this.listeners.get(event)?.forEach((fn) => {
-      try { (fn as any)(...args) } catch {}
+      try { 
+        (fn as (...args: unknown[]) => void)(...args) 
+      } catch {
+        // Silently ignore errors in event handlers
+      }
     })
   }
 
   connect() {
-    if (this.socket) return
+    if (this.socket) {
+      console.log('🔌 [LiveClient] Socket already exists, skipping connect');
+      return;
+    }
     const url = WEBSOCKET_CONFIG.URL
+    console.log('🔌 [LiveClient] Connecting to:', url);
     const ws = new WebSocket(url)
     this.socket = ws
 
     ws.onopen = () => {
+      console.log('🔌 [LiveClient] WebSocket opened successfully');
       this.emit('open')
     }
     ws.onclose = () => {
@@ -51,7 +61,7 @@ export class LiveClientWS {
       try {
         const msg = JSON.parse(evt.data) as LiveServerEvent
         this.routeEvent(msg)
-      } catch (e) {
+      } catch {
         this.emit('error', 'Malformed server event')
       }
     }
@@ -154,7 +164,7 @@ export class LiveClientWS {
     try { this.socket?.send(JSON.stringify(message)) } catch {}
   }
 
-  private devLog(event: string, data?: any) {
+  private devLog(event: string, data?: unknown) {
     if (!this.devLogEnabled) return
     try {
       const payload = { category: 'client-live', event, data, ts: Date.now() }
