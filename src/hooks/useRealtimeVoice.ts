@@ -604,14 +604,35 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
     console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
     
+    // If socket isn't ready yet, attempt a quick connect-and-wait before failing
     if (!isSocketReady || !liveRef.current) {
-      const message = 'Voice server not ready';
-      console.error('🎤 [RealtimeVoice] Cannot start session - server not ready:', { 
-        isSocketReady, serverUrl 
-      });
-      setError(message);
-      callbacksRef.current?.onError?.(message);
-      return;
+      try {
+        liveRef.current?.connect()
+        const ok = await new Promise<boolean>((resolve) => {
+          let settled = false
+          const timeout = setTimeout(() => { if (!settled) { settled = true; resolve(false) } }, 2000)
+          const off = liveRef.current?.on('open', () => {
+            if (!settled) { 
+              settled = true
+              clearTimeout(timeout)
+              if (off) off()
+              resolve(true)
+            }
+          })
+        })
+        if (!ok) {
+          const message = 'Voice server not ready'
+          console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after wait:', { isSocketReady, serverUrl })
+          setError(message)
+          callbacksRef.current?.onError?.(message)
+          return
+        }
+      } catch {
+        const message = 'Voice server not ready'
+        setError(message)
+        callbacksRef.current?.onError?.(message)
+        return
+      }
     }
 
     try {
@@ -625,7 +646,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       });
 
       console.log('🎤 [RealtimeVoice] Sending start message');
-      liveRef.current.start({
+      liveRef.current?.start({
         languageCode: opts?.languageCode,
         voiceName: opts?.voiceName,
         sessionId: opts?.sessionId,
