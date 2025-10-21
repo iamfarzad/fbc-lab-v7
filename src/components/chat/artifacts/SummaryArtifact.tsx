@@ -28,6 +28,8 @@ export function SummaryArtifact({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
   const [pdfGenerated, setPdfGenerated] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -45,11 +47,17 @@ export function SummaryArtifact({
 
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
+      // Store for inline preview
+      setPdfUrl((oldUrl) => {
+        if (oldUrl && oldUrl !== url) {
+          try { URL.revokeObjectURL(oldUrl) } catch {}
+        }
+        return url
+      })
       const a = document.createElement('a');
       a.href = url;
       a.download = `fbc-consultation-summary-${sessionId.slice(0, 8)}.pdf`;
       a.click();
-      URL.revokeObjectURL(url);
 
       setPdfGenerated(true);
       toast.success('PDF downloaded successfully!');
@@ -175,6 +183,32 @@ export function SummaryArtifact({
             </Button>
           )}
         </div>
+
+        {/* Inline PDF Preview (collapsible) */}
+        {pdfUrl && (
+          <div className="mt-2 border rounded-md border-orange-200/70">
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-xs text-orange-800">Preview PDF</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={() => setPreviewOpen((v) => !v)}
+              >
+                {previewOpen ? 'Hide' : 'Show'}
+              </Button>
+            </div>
+            {previewOpen && (
+              <div className="px-3 pb-3">
+                <iframe
+                  src={pdfUrl}
+                  title="Summary PDF Preview"
+                  className="w-full h-[480px] bg-white border border-orange-200"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {pdfGenerated && (
           <p className="text-xs text-center text-muted-foreground">

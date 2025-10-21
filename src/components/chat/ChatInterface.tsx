@@ -257,6 +257,27 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   const sessionIdForExport = messagesHook.sessionId || intelligenceHook.sessionId;
 
+  // Booking CTA (outer-layer): detect latest assistant message with triggerBooking
+  const bookingTrigger = useMemo(() => {
+    for (let i = messagesHook.messages.length - 1; i >= 0; i--) {
+      const m = messagesHook.messages[i]
+      if (m.role === 'assistant' && (m.metadata as any)?.triggerBooking) {
+        return { id: m.id }
+      }
+    }
+    return null
+  }, [messagesHook.messages])
+
+  const [dismissedBookingId, setDismissedBookingId] = useState<string | null>(null)
+  useEffect(() => {
+    // Reset dismissal when a new booking-triggering message arrives
+    if (bookingTrigger && dismissedBookingId && bookingTrigger.id !== dismissedBookingId) {
+      setDismissedBookingId(null)
+    }
+  }, [bookingTrigger, dismissedBookingId])
+
+  const showBookingCta = Boolean(bookingTrigger && bookingTrigger.id !== dismissedBookingId)
+
   // Map HTTP chat tool approvals to actual UI toggles
   const handleApproveTool = useCallback(async (tool: string, args?: Record<string, any>) => {
     const t = String(tool || '').trim();
@@ -465,27 +486,59 @@ export function ChatInterface({ id }: { id?: string | null }) {
       <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>
         {sessionWarningNode}
 
-              <ChatMessages
-                messages={messagesHook.messages}
-                researchSummaries={messagesHook.researchSummaries}
-                isLoading={messagesHook.isLoading}
-                contextReady={intelligenceHook.contextReady}
-                currentContext={intelligenceHook.currentContext}
-                hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
-                onSendMessage={messagesHook.handleSendMessage}
-                aiElements={aiConfig}
-                isExpanded={isExpanded}
-                artifacts={artifactCards}
-                name={intelligenceHook.name}
-                email={intelligenceHook.email}
-                agreed={intelligenceHook.agreed}
-                onNameChange={intelligenceHook.setName}
-                onEmailChange={intelligenceHook.setEmail}
-                onAgreedChange={intelligenceHook.setAgreed}
-                onAcceptTerms={intelligenceHook.handleTermsAcceptance}
-                onApproveTool={handleApproveTool}
-                onDeclineTool={handleDeclineTool}
-              />
+            <ChatMessages
+              messages={messagesHook.messages}
+              researchSummaries={messagesHook.researchSummaries}
+              isLoading={messagesHook.isLoading}
+              contextReady={intelligenceHook.contextReady}
+              currentContext={intelligenceHook.currentContext}
+              hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
+              onSendMessage={messagesHook.handleSendMessage}
+              aiElements={aiConfig}
+              isExpanded={isExpanded}
+              artifacts={artifactCards}
+              name={intelligenceHook.name}
+              email={intelligenceHook.email}
+              agreed={intelligenceHook.agreed}
+              onNameChange={intelligenceHook.setName}
+              onEmailChange={intelligenceHook.setEmail}
+              onAgreedChange={intelligenceHook.setAgreed}
+              onAcceptTerms={intelligenceHook.handleTermsAcceptance}
+              onApproveTool={handleApproveTool}
+              onDeclineTool={handleDeclineTool}
+            />
+
+            {/* Inline booking CTA bar */}
+            {showBookingCta && (
+              <div className={cn(
+                "mt-3 mb-2 px-3 py-2 border border-border/30 rounded-md bg-card/80 flex items-center justify-between gap-2",
+                isExpanded ? "mx-auto w-full max-w-3xl" : "mx-4"
+              )}>
+                <div className="text-xs text-muted-foreground">
+                  Ready to book? Open the calendar to pick a time.
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="h-7 px-3 text-xs bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] hover:bg-[hsl(var(--accent))]/90"
+                    onClick={() => {
+                      openMeeting();
+                      setDismissedBookingId(bookingTrigger!.id)
+                    }}
+                  >
+                    Open Calendar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-3 text-xs"
+                    onClick={() => setDismissedBookingId(bookingTrigger!.id)}
+                  >
+                    Not now
+                  </Button>
+                </div>
+              </div>
+            )}
       </div>
 
       <div className={cn("flex-shrink-0 border-t border-border/20 safe-area-inset-bottom", isExpanded ? "px-0 sm:px-0 py-0 pb-0" : "px-0 py-0 pb-0")}>
