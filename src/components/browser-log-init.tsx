@@ -5,8 +5,8 @@ import { initBrowserLogCapture } from '@/lib/browser-log-capture'
 
 export function BrowserLogInit() {
   useEffect(() => {
-    // Initialize browser log capture in both dev and production
-    if (typeof window !== 'undefined') {
+    // Only initialize browser log capture in development
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       initBrowserLogCapture()
     }
   }, [])
