@@ -3,6 +3,7 @@ import { AudioRecorder, AudioPlayer } from '@/lib/audio';
 import { WEBSOCKET_CONFIG } from '@/config/constants';
 import type { LiveServerEvent } from '@/core/live/types'
 import { LiveClientWS } from '@/core/live/client'
+import type { LiveClientWS as LiveClientType } from '@/core/live/client'
 
 export type VoiceSession = {
   connectionId: string;
@@ -197,6 +198,7 @@ export interface UseRealtimeVoiceOptions {
   onToolCall?: (toolCall: any) => void;
   onToolResult?: (result: any) => void;
   onError?: (message: string) => void;
+  liveClient?: LiveClientType;
 }
 
 export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
@@ -220,7 +222,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     micStream,
   } = useInlineRecorder({ targetSampleRate: 16000 });
 
-  const liveRef = useRef<LiveClientWS | null>(null);
+  const liveRef = useRef<LiveClientWS | null>(options.liveClient ?? null);
+  const createdClientRef = useRef<boolean>(!options.liveClient);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
   const connectionIdRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -553,7 +556,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const connectWebSocket = useCallback(() => {
     if (!serverUrl) return
     if (!liveRef.current) {
-      liveRef.current = new LiveClientWS()
+      liveRef.current = options.liveClient ?? new LiveClientWS()
+      createdClientRef.current = !options.liveClient
       liveRef.current.on('open', () => {
         setSocketReady(true)
         setError(null)
@@ -595,7 +599,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       liveRef.current.on('tool_result', (p) => handleServerEvent({ type: 'tool_result', payload: p } as any))
     }
     liveRef.current.connect()
-  }, [callbacksRef, handleServerEvent, resetState, serverUrl])
+  }, [callbacksRef, handleServerEvent, resetState, serverUrl, options.liveClient])
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
     console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
@@ -728,7 +732,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         clearTimeout(sessionTimeoutRef.current);
         sessionTimeoutRef.current = null;
       }
-      liveRef.current?.disconnect();
+      if (createdClientRef.current) {
+        liveRef.current?.disconnect();
+      }
       liveRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
