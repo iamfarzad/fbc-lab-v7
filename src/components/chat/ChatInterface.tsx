@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { Button } from "@/components/ui/button";
 import { X, MessageCircle } from "lucide-react";
-import { cn, blobToBase64 } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 // Core chat components - clean imports
 import { ChatShell } from "./ChatShell";
@@ -175,7 +175,12 @@ export function ChatInterface({ id }: { id?: string | null }) {
   }, [camera]);
 
   const handleSwitchCamera = useCallback(async () => {
-    await camera.switchCamera();
+    // Prefer device cycling when multiple are exposed; otherwise flip facingMode (mobile)
+    if ((camera.availableCameraCount ?? 0) > 1) {
+      await camera.switchCamera();
+    } else {
+      await camera.flipFacingMode();
+    }
   }, [camera]);
 
   
@@ -304,56 +309,11 @@ export function ChatInterface({ id }: { id?: string | null }) {
     console.info('Tool declined:', tool);
   }, []);
 
-  // Explicit screen analysis handler (HTTP one-shot)
-  const handleAnalyzeScreen = useCallback(async (prompt: string) => {
-    if (!chatState.isScreenSharing || !chatState.screenShareStream) {
-      toast.error('No screen share active');
-      return;
-    }
-    try {
-      // Capture current frame into canvas
-      const stream = chatState.screenShareStream as MediaStream;
-      const video = document.createElement('video');
-      video.srcObject = stream as any;
-      await video.play();
-      const width = video.videoWidth || 1280;
-      const height = video.videoHeight || 720;
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Failed to get 2D context');
-      ctx.drawImage(video, 0, 0, width, height);
-      const blob: Blob = await new Promise((resolve) => canvas.toBlob(b => resolve(b as Blob), 'image/jpeg', 0.85));
-      const base64 = await blobToBase64(blob);
-
-      const { ok, analysis } = await audioHook.sendScreenShareMessage(base64, prompt || 'Analyze current screen', {
-        sessionId,
-        voiceConnectionId,
-        type: 'screen',
-      });
-
-      if (!ok) {
-        toast.error('Screen analysis failed');
-        return;
-      }
-      if (analysis && analysis.trim().length > 0) {
-        messagesHook.appendAssistantMessage(analysis, { source: 'screen', modality: 'image', tool: 'screen_analyze' });
-        setLastScreenSnapshot({ analysis, imageData: canvas.toDataURL('image/jpeg', 0.7), capturedAt: Date.now() });
-        toast.success('Screen analyzed');
-      } else {
-        toast.info('No analysis returned');
-      }
-    } catch (err) {
-      console.error('Analyze screen error:', err);
-      toast.error('Analyze screen error');
-    }
-  }, [audioHook, chatState.isScreenSharing, chatState.screenShareStream, messagesHook, sessionId, voiceConnectionId]);
-
+  // Manual screen analyze disabled — auto-analysis runs via useScreenShareSnapshots
   useEffect(() => {
-    registerScreenAnalyzer(handleAnalyzeScreen);
+    registerScreenAnalyzer(null);
     return () => registerScreenAnalyzer(null);
-  }, [handleAnalyzeScreen, registerScreenAnalyzer]);
+  }, [registerScreenAnalyzer]);
 
   useScreenShareSnapshots({
     isScreenSharing: chatState.isScreenSharing,
@@ -369,6 +329,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
     setHasNotifiedCapture,
   });
 
+  // Remove explicit one-shot screen analyze handler (auto handled by useScreenShareSnapshots)
+  // Retain export handler
   const handleExportSummary = () => {
     if (!sessionIdForExport) {
       toast.error('No active session to export.');
@@ -576,7 +538,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
           onSwitchCamera={handleSwitchCamera}
           onToggleScreenShare={chatStateHook.toggleScreenShare}
           onToggleSettings={chatStateHook.toggleSettings}
-          onAnalyzeScreen={handleAnalyzeScreen}
+          // Manual analyze removed — auto-analysis via useScreenShareSnapshots
           isExpanded={isExpanded}
           onOpenMeeting={openMeeting}
           onExportSummary={handleExportSummary}

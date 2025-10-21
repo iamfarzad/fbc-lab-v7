@@ -113,17 +113,20 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
 
               {showInlineTranscript && (
                 <div
-                  className="mt-1 max-h-24 overflow-y-auto rounded-md border border-border/40 bg-muted/30 p-2 text-[12px]"
+                  className="mt-1 max-h-28 overflow-y-auto rounded-md border border-border/40 bg-muted/30 p-2 text-[12px]"
                   role="log" aria-live="polite" aria-atomic={false}
                 >
-                  {voicePartialTranscript && (
-                    <div className="italic text-muted-foreground">{voicePartialTranscript}</div>
-                  )}
-                  {voiceTranscript && (
-                    <div className="text-foreground whitespace-pre-line">{voiceTranscript}</div>
+                  {(voicePartialTranscript || voiceTranscript) && (
+                    <div className="mb-1">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">You</div>
+                      <div className={cn("whitespace-pre-line", voicePartialTranscript ? "text-muted-foreground italic" : "text-foreground")}>{voicePartialTranscript || voiceTranscript}</div>
+                    </div>
                   )}
                   {aiSpeechTranscript && (
-                    <div className="text-blue-600 font-medium whitespace-pre-line">🤖 AI: {aiSpeechTranscript}</div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">AI</div>
+                      <div className="text-foreground whitespace-pre-line">{aiSpeechTranscript}</div>
+                    </div>
                   )}
                   {!voiceTranscript && !voicePartialTranscript && !aiSpeechTranscript && (
                     <div className="text-muted-foreground">Start speaking to see your transcript…</div>
@@ -155,14 +158,14 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
           )}
 
           {/* Media status chips */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             {/* Camera chip */}
             {cameraState && (
               <Popover open={cameraPopoverOpen} onOpenChange={setCameraPopoverOpen}>
                 <button
                   type="button"
                   className={cn(
-                    "inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/40 px-3 py-2 text-[11px] font-medium text-muted-foreground transition-colors",
+                    "inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/40 px-2.5 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-[11px] font-medium text-muted-foreground transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[hsl(var(--accent))]/40"
                   )}
                   aria-expanded={cameraPopoverOpen}
@@ -174,7 +177,7 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
                 </button>
                 <PopoverContent
                   id="camera-preview-popover"
-                  className="w-[220px] p-2 space-y-2"
+                  className="w-[200px] sm:w-[220px] p-2 space-y-2"
                 >
                   <video
                     ref={camVideoRef}
@@ -182,7 +185,7 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
                     playsInline
                     className="w-full h-auto rounded-sm border border-border/30"
                   />
-                  {Boolean(availableCameras && availableCameras > 1) && (
+                  {Boolean(availableCameras && availableCameras >= 1) && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -191,7 +194,7 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
                       }}
                       className="w-full"
                     >
-                      Switch camera
+                      Flip camera
                     </Button>
                   )}
                 </PopoverContent>
@@ -204,7 +207,7 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
                 <button
                   type="button"
                   className={cn(
-                    "inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/40 px-3 py-2 text-[11px] font-medium text-muted-foreground transition-colors",
+                    "inline-flex items-center gap-2 rounded-full border border-border/40 bg-muted/40 px-2.5 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-[11px] font-medium text-muted-foreground transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[hsl(var(--accent))]/40"
                   )}
                   aria-expanded={screenPopoverOpen}
@@ -216,7 +219,7 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
                 </button>
                 <PopoverContent
                   id="screen-preview-popover"
-                  className="w-[220px] p-1 space-y-2"
+                  className="w-[200px] sm:w-[220px] p-1 space-y-2"
                 >
                   <video
                     ref={screenVideoRef}

@@ -80,6 +80,7 @@ export function useCamera(options: UseCameraOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | undefined>();
+  const facingModeRef = useRef<'user' | 'environment'>('user');
 
   // Refs for resource management
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -136,7 +137,7 @@ export function useCamera(options: UseCameraOptions = {}) {
   }, []);
 
   // Start camera with specific device or default
-  const startCamera = useCallback(async (deviceId?: string) => {
+  const startCamera = useCallback(async (deviceId?: string, facingOverride?: 'user' | 'environment') => {
     if (isInitializing) {
       console.log('Camera initialization already in progress');
       return;
@@ -152,11 +153,12 @@ export function useCamera(options: UseCameraOptions = {}) {
         streamRef.current = null;
       }
 
+      const desiredFacing = facingOverride || facingModeRef.current || 'user'
       const constraints: MediaStreamConstraints = {
         video: deviceId
           ? { deviceId: { exact: deviceId } }
           : {
-              facingMode: 'user',
+              facingMode: desiredFacing,
               width: { ideal: 1280 },
               height: { ideal: 720 },
             },
@@ -171,6 +173,12 @@ export function useCamera(options: UseCameraOptions = {}) {
       const videoTrack = mediaStream.getVideoTracks()[0];
       const settings = videoTrack.getSettings();
       setCurrentDeviceId(settings.deviceId);
+      // Attempt to infer facing mode from label if available
+      try {
+        const label = (videoTrack.getSettings() as any)?.label || (videoTrack as any).label || ''
+        if (/back|rear|environment/i.test(label)) facingModeRef.current = 'environment'
+        else if (/front|user|face/i.test(label)) facingModeRef.current = 'user'
+      } catch {}
 
       // Set up track ended listener
       videoTrack.addEventListener('ended', () => {
@@ -238,18 +246,28 @@ export function useCamera(options: UseCameraOptions = {}) {
 
   // Switch to next available camera
   const switchCamera = useCallback(async () => {
-    if (!isActive || availableDevices.length <= 1) {
+    if (!isActive) return;
+    if (availableDevices.length > 1) {
+      const currentIndex = availableDevices.findIndex(
+        device => device.deviceId === currentDeviceId
+      );
+      const nextIndex = (currentIndex + 1) % availableDevices.length;
+      const nextDevice = availableDevices[nextIndex];
+      await startCamera(nextDevice.deviceId);
       return;
     }
-
-    const currentIndex = availableDevices.findIndex(
-      device => device.deviceId === currentDeviceId
-    );
-    const nextIndex = (currentIndex + 1) % availableDevices.length;
-    const nextDevice = availableDevices[nextIndex];
-
-    await startCamera(nextDevice.deviceId);
+    // Fallback for mobile where only one deviceId is exposed: flip facingMode
+    const nextFacing: 'user' | 'environment' = facingModeRef.current === 'user' ? 'environment' : 'user'
+    facingModeRef.current = nextFacing
+    await startCamera(undefined, nextFacing)
   }, [isActive, availableDevices, currentDeviceId, startCamera]);
+
+  const flipFacingMode = useCallback(async () => {
+    if (!isActive) return;
+    const nextFacing: 'user' | 'environment' = facingModeRef.current === 'user' ? 'environment' : 'user'
+    facingModeRef.current = nextFacing
+    await startCamera(undefined, nextFacing)
+  }, [isActive, startCamera])
 
   // Upload frame to backend for analysis
   const uploadToBackend = useCallback(async (
@@ -525,6 +543,7 @@ export function useCamera(options: UseCameraOptions = {}) {
     stopCamera,
     toggleCamera,
     switchCamera,
+    flipFacingMode,
     captureFrame,
     attachVideoElement,
     uploadToBackend,
