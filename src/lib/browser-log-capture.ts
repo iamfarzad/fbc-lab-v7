@@ -7,6 +7,9 @@ let isInitialized = false
 const logQueue: any[] = []
 let flushTimer: ReturnType<typeof setTimeout> | null = null
 
+// Recursion guard to prevent infinite loops
+let isCapturing = false
+
 async function flushLogs() {
   if (logQueue.length === 0) return
   
@@ -28,8 +31,9 @@ async function flushLogs() {
         keepalive: true
       })
     }
-  } catch (error) {
+  } catch {
     // Silently fail - don't break user experience
+    // Don't log the error to avoid infinite loops
   }
 }
 
@@ -44,18 +48,26 @@ export function initBrowserLogCapture() {
   const originalInfo = console.info
 
   function captureLog(level: 'debug' | 'info' | 'warn' | 'error', args: any[]) {
-    // Still call original console method
-    const original = {
-      debug: originalLog,
-      info: originalInfo,
-      warn: originalWarn,
-      error: originalError
-    }[level]
+    // Prevent recursive logging
+    if (isCapturing) {
+      return
+    }
     
-    original.apply(console, args)
+    isCapturing = true
+    
+    try {
+      // Still call original console method
+      const original = {
+        debug: originalLog,
+        info: originalInfo,
+        warn: originalWarn,
+        error: originalError
+      }[level]
+      
+      original.apply(console, args)
 
-    // Queue for sending
-    logQueue.push({
+      // Queue for sending
+      logQueue.push({
       service: 'browser',
       level,
       message: args.map(arg => {
@@ -78,21 +90,25 @@ export function initBrowserLogCapture() {
       }
     })
 
-    // Schedule flush
-    if (!flushTimer) {
-      flushTimer = setTimeout(() => {
-        flushTimer = null
-        flushLogs().catch(() => {})
-      }, 1000) // Flush every 1 second
-    }
-
-    // Flush immediately on errors
-    if (level === 'error' && logQueue.length >= 5) {
-      if (flushTimer) {
-        clearTimeout(flushTimer)
-        flushTimer = null
+      // Schedule flush
+      if (!flushTimer) {
+        flushTimer = setTimeout(() => {
+          flushTimer = null
+          flushLogs().catch(() => {})
+        }, 1000) // Flush every 1 second
       }
-      flushLogs().catch(() => {})
+
+      // Flush immediately on errors
+      if (level === 'error' && logQueue.length >= 5) {
+        if (flushTimer) {
+          clearTimeout(flushTimer)
+          flushTimer = null
+        }
+        flushLogs().catch(() => {})
+      }
+    } finally {
+      // Always reset the guard
+      isCapturing = false
     }
   }
 
@@ -104,6 +120,8 @@ export function initBrowserLogCapture() {
 
   // Capture unhandled errors
   window.addEventListener('error', (event) => {
+    if (isCapturing) return
+    
     logQueue.push({
       service: 'browser',
       level: 'error',
@@ -122,6 +140,8 @@ export function initBrowserLogCapture() {
 
   // Capture unhandled promise rejections
   window.addEventListener('unhandledrejection', (event) => {
+    if (isCapturing) return
+    
     logQueue.push({
       service: 'browser',
       level: 'error',
