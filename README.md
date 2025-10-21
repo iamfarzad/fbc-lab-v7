@@ -219,6 +219,50 @@ fbc-lab-v7/
 └── public/                # Static assets
 ```
 
+## 📚 Documentation Organization
+
+This project maintains organized documentation to prevent root directory clutter.
+
+### Active Documentation (Root Directory)
+
+Essential documents kept in the root for easy access:
+- `README.md` - Main project documentation
+- `README_FIRST.md` - Quick start guide
+- `NEXT_STEPS.md` - Current roadmap and priorities
+- `CLEANUP_GUIDE.md` - Project maintenance procedures
+- `DOCUMENT_LIFECYCLE.md` - Documentation management rules
+
+### Historical Documentation (docs/)
+
+Completed tasks, analyses, and historical records are archived in `/docs` with date prefixes:
+```
+docs/
+├── 2025-10-21_FEATURE_IMPLEMENTATION_COMPLETE.md
+├── 2025-10-17_VOICE_PIPELINE_FIX_COMPLETE.md
+├── 2025-10-15_TYPE_SYSTEM_COMPLETE.md
+└── ... (164+ archived documents)
+```
+
+**Note:** The `/docs` directory is not committed to git (see `.gitignore`). It serves as local historical reference.
+
+### Document Lifecycle States
+
+1. **ACTIVE** - Keep in root while task is ongoing
+2. **COMPLETE** - Archive to `/docs` when implemented and tested
+3. **ABANDONED** - Archive to `/docs` with status note when no longer pursued
+4. **OBSOLETE** - Delete if truly outdated with no historical value
+
+### Organizing Documentation
+
+Use the automated script to organize docs:
+```bash
+./organize-docs.sh
+```
+
+This moves completed/historical markdown files from root to `/docs` with date prefixes based on last modification date.
+
+For detailed rules, see `DOCUMENT_LIFECYCLE.md`.
+
 ## 🔧 Configuration
 
 ### Commit Rules

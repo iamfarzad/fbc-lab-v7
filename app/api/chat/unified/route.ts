@@ -587,7 +587,7 @@ export async function POST(req: NextRequest) {
     }))
     
     // CRITICAL FIX: Exit detection BEFORE AI generation
-    const lastUserMessage = messages.findLast(m => m.role === 'user');
+    const lastUserMessage = messages.filter((m) => m.role === 'user').pop();
     if (lastUserMessage) {
       const exitIntent = detectExitIntent(lastUserMessage.content);
       
