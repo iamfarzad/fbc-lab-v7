@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "../types/chatTypes";
 import { cn } from "@/lib/utils";
@@ -90,6 +90,7 @@ import { ChatSuggestions } from "./ChatSuggestions";
 import { ChatTermsAcceptance } from "./ChatTermsAcceptance";
 import { ToolApprovalPrompt } from "../ToolApprovalPrompt";
 import { CalendarWidget, ChartWidget, SummaryArtifact } from "../artifacts";
+import { validateAIElementMetadata } from "@/lib/ai-elements-validator";
 import {
   AI_ELEMENTS_ADVANCED,
   AI_ELEMENTS_DEFAULT,
@@ -213,6 +214,13 @@ export function ChatMessages({
   const [visibleCount, setVisibleCount] = useState(DEFAULT_VISIBLE);
   const [insightsOpen, setInsightsOpen] = useState<Record<string, boolean>>({});
   const budgetWarningsRef = useRef<Set<string>>(new Set());
+  
+  // Dev-only metadata validation to ensure AI-Elements render paths have compatible metadata
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      try { validateAIElementMetadata(messages as any) } catch {}
+    }
+  }, [messages])
   
   // Don't render messages in minimized state
   if (isMinimized) {

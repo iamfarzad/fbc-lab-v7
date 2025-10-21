@@ -258,8 +258,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, [recorderError]);
 
   const serverUrl = useMemo(() => {
-    if (typeof window === 'undefined') return undefined;
-    // Use centralized WebSocket config - automatically handles dev vs production
+    // Centralized WebSocket config handles both server and browser contexts safely.
+    // Returning the computed URL unconditionally avoids hydration edge cases.
     return WEBSOCKET_CONFIG.URL;
   }, []);
 
@@ -554,7 +554,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    if (!serverUrl) return
+    console.log('🔌 [RealtimeVoice] connectWebSocket called', { serverUrl, hasLiveRef: !!liveRef.current });
+    if (!serverUrl) {
+      console.warn('🔌 [RealtimeVoice] No serverUrl, skipping connect');
+      return;
+    }
     if (!liveRef.current) {
       liveRef.current = options.liveClient ?? new LiveClientWS()
       createdClientRef.current = !options.liveClient
@@ -758,8 +762,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       }
       liveRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only connect once on mount - connectWebSocket handles reconnections internally
+  }, [connectWebSocket]); // Connect on mount with proper dependency
 
   useEffect(() => {
     return () => {
