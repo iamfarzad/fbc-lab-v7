@@ -135,7 +135,7 @@ export function useChatMessages(initialSessionId?: string) {
     const attachments = normalized.attachments?.filter(Boolean) ?? [];
 
     if (!text && attachments.length === 0) return;
-    if (unifiedChat.isLoading) return;
+    if (unifiedChat.isLoading || unifiedChat.isStreaming) return;
 
     let uploadResult: AttachmentUploadResponse | null = null;
     if (attachments.length > 0) {
@@ -186,7 +186,7 @@ export function useChatMessages(initialSessionId?: string) {
 
   const updateChatContext = useCallback((context: Partial<UnifiedContext>) => {
     unifiedChat.updateContext(context);
-  }, [unifiedChat.updateContext]);
+  }, [unifiedChat]);
 
   const updatePartialUserTranscript = useCallback((text: string) => {
     if (!text.trim()) {
