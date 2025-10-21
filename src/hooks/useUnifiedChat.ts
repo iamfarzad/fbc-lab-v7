@@ -329,7 +329,32 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
   }, [commitMessages])
 
   const updateContext = useCallback((context: Partial<UnifiedContext>) => {
-    setChatContextState(prev => ({ ...prev, ...context }))
+    function normalize(value: unknown): unknown {
+      if (Array.isArray(value)) return value.map(normalize)
+      if (value && typeof value === 'object') {
+        const entries = Object.entries(value as Record<string, unknown>)
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, normalize(v)])
+        return Object.fromEntries(entries)
+      }
+      return value
+    }
+
+    setChatContextState(prev => {
+      // Build next by applying only changed keys (deep compare)
+      let changed = false
+      const next: UnifiedContext = { ...(prev as UnifiedContext) }
+      for (const [key, val] of Object.entries(context)) {
+        const pk = key as keyof UnifiedContext
+        const prevVal = (prev as UnifiedContext)[pk]
+        const equal = JSON.stringify(normalize(prevVal)) === JSON.stringify(normalize(val))
+        if (!equal) {
+          ;(next as any)[pk] = val as any
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
   }, [])
 
   const regenerate = useCallback(async () => {

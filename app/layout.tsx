@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import '@/components/ai-elements/theme-overrides.css'
 import { BrowserLogInit } from '@/components/browser-log-init'
 import { Analytics } from '@vercel/analytics/next'
 

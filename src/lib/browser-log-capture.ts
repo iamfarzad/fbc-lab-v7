@@ -40,6 +40,10 @@ async function flushLogs() {
 
 export function initBrowserLogCapture() {
   if (isInitialized || typeof window === 'undefined') return
+  // Allow disabling in development via env to avoid Fast Refresh loops
+  if ((process.env.NEXT_PUBLIC_DISABLE_LOG_CAPTURE || '').toLowerCase() === '1') {
+    return
+  }
   isInitialized = true
 
   // Store original console methods
@@ -63,24 +67,34 @@ export function initBrowserLogCapture() {
         debug: originalLog,
         info: originalInfo,
         warn: originalWarn,
-        error: originalError
+        error: originalError,
       }[level]
-      
-      original.apply(console, args)
+
+      // In production, echo logs as usual. In development, echo is disabled by
+      // default to avoid React Dev Overlay feedback loops. Opt-in via env.
+      const echoInDev = ((process.env.NEXT_PUBLIC_LOG_ECHO || '').toLowerCase() === '1') ||
+                        ((process.env.NEXT_PUBLIC_LOG_ECHO || '').toLowerCase() === 'true')
+      const shouldEcho = process.env.NODE_ENV === 'production' || echoInDev
+      if (shouldEcho && level !== 'error') {
+        original.apply(console, args)
+      }
 
       // Queue for sending
+      const joined = args.map(arg => {
+        if (typeof arg === 'string') return arg
+        if (arg instanceof Error) return arg.message
+        try { return JSON.stringify(arg) } catch { return String(arg) }
+      }).join(' ')
+
+      // Skip noisy Fast Refresh logs to reduce churn
+      if (/Fast Refresh/i.test(joined)) {
+        return
+      }
+
       logQueue.push({
       service: 'browser',
       level,
-      message: args.map(arg => {
-        if (typeof arg === 'string') return arg
-        if (arg instanceof Error) return arg.message
-        try {
-          return JSON.stringify(arg)
-        } catch {
-          return String(arg)
-        }
-      }).join(' '),
+      message: joined,
       timestamp: new Date().toISOString(),
       meta: {
         url: window.location.href,

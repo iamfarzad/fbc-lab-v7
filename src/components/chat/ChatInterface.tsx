@@ -33,6 +33,7 @@ import { CHAT_CONSTANTS } from "./constants/chatConstants";
 import { MeetingOverlay } from "@/components/meeting/MeetingOverlay";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { AIDevtools } from "@ai-sdk-tools/devtools";
+import { FEATURE_FLAGS } from "@/config/constants";
 import { useArtifacts } from "@ai-sdk-tools/artifacts/client";
 import { toast } from "sonner";
 
@@ -108,32 +109,64 @@ export function ChatInterface({ id }: { id?: string | null }) {
     onAnalysis: useCallback((analysis: string, _imageData: string, capturedAt: number) => {
       // Keep for legacy compatibility but not used in prototype pattern
       setLastWebcamSnapshot({ analysis, capturedAt });
-    }, [sessionId]),
+    }, []),
   });
 
-  // Sync camera state
+  // Sync camera state (only update when values actually change)
   useEffect(() => {
-    if (camera.isActive && camera.stream) {
-      chatStateHook.setChatState(prev => ({
-        ...prev,
-        isCameraActive: true,
-        cameraStream: camera.stream,
-        cameraError: null,
-        isCameraInitializing: false,
-      }));
-      if (camera.availableCameraCount !== undefined) {
-        chatStateHook.setAvailableCameras(camera.availableCameraCount);
+    chatStateHook.setChatState(prev => {
+      if (camera.isActive && camera.stream) {
+        const next = {
+          ...prev,
+          isCameraActive: true,
+          cameraStream: camera.stream,
+          cameraError: null as string | null,
+          isCameraInitializing: false,
+        }
+        if (
+          prev.isCameraActive !== next.isCameraActive ||
+          prev.cameraStream !== next.cameraStream ||
+          prev.cameraError !== next.cameraError ||
+          prev.isCameraInitializing !== next.isCameraInitializing
+        ) {
+          return next
+        }
+        return prev
+      } else if (camera.isActive === false) {
+        const next = {
+          ...prev,
+          isCameraActive: false,
+          cameraStream: null as MediaStream | null,
+          cameraError: camera.error || null,
+          isCameraInitializing: camera.isInitializing,
+        }
+        if (
+          prev.isCameraActive !== next.isCameraActive ||
+          prev.cameraStream !== next.cameraStream ||
+          prev.cameraError !== next.cameraError ||
+          prev.isCameraInitializing !== next.isCameraInitializing
+        ) {
+          return next
+        }
+        return prev
       }
-    } else if (camera.isActive === false) {
-      chatStateHook.setChatState(prev => ({
-        ...prev,
-        isCameraActive: false,
-        cameraStream: null,
-        cameraError: camera.error || null,
-        isCameraInitializing: camera.isInitializing,
-      }));
+      return prev
+    })
+
+    if (
+      camera.availableCameraCount !== undefined &&
+      camera.availableCameraCount !== chatStateHook.availableCameras
+    ) {
+      chatStateHook.setAvailableCameras(camera.availableCameraCount)
     }
-  }, [camera.isActive, camera.stream, camera.error, camera.isInitializing, camera.availableCameraCount]);
+  }, [
+    camera.isActive,
+    camera.stream,
+    camera.error,
+    camera.isInitializing,
+    camera.availableCameraCount,
+    chatStateHook.availableCameras,
+  ]);
 
   // Camera control handlers
   const handleToggleCamera = useCallback(async () => {
@@ -184,7 +217,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   // Enhanced AI elements for advanced features
   const aiConfig = {
-    showReasoning: true,  // Enable reasoning display (chain of thought)
+    showReasoning: FEATURE_FLAGS.REASONING_STREAMING,
     showSources: true,
     showActions: true,
     showCodeBlocks: true,
@@ -293,7 +326,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
       console.error('Analyze screen error:', err);
       toast.error('Analyze screen error');
     }
-  }, [audioHook, chatState.isScreenSharing, chatState.screenShareStream, messagesHook.appendAssistantMessage, sessionId, voiceConnectionId]);
+  }, [audioHook, chatState.isScreenSharing, chatState.screenShareStream, messagesHook, sessionId, voiceConnectionId]);
 
   useEffect(() => {
     registerScreenAnalyzer(handleAnalyzeScreen);
@@ -349,7 +382,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     if (trigger) {
       setRequestedPopover(trigger);
     }
-  }, [messagesHook.messages.length]); // Only depend on array length, not the array itself
+  }, [messagesHook.messages]);
 
   // Main render - clean and organized
   const minimizedContent = (
@@ -432,27 +465,27 @@ export function ChatInterface({ id }: { id?: string | null }) {
       <div className={cn("flex-1 overflow-hidden", isExpanded ? "px-0" : "px-5 sm:px-6")}>
         {sessionWarningNode}
 
-        <ChatMessages
-          messages={messagesHook.messages}
-          researchSummaries={messagesHook.researchSummaries}
-          isLoading={messagesHook.isLoading}
-          contextReady={intelligenceHook.contextReady}
-          currentContext={intelligenceHook.currentContext}
-          hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
-          onSendMessage={messagesHook.handleSendMessage}
-          aiElements={aiConfig}
-          isExpanded={isExpanded}
-          artifacts={artifactCards}
-          name={intelligenceHook.name}
-          email={intelligenceHook.email}
-          agreed={intelligenceHook.agreed}
-          onNameChange={intelligenceHook.setName}
-          onEmailChange={intelligenceHook.setEmail}
-          onAgreedChange={intelligenceHook.setAgreed}
-          onAcceptTerms={intelligenceHook.handleTermsAcceptance}
-          onApproveTool={handleApproveTool}
-          onDeclineTool={handleDeclineTool}
-        />
+              <ChatMessages
+                messages={messagesHook.messages}
+                researchSummaries={messagesHook.researchSummaries}
+                isLoading={messagesHook.isLoading}
+                contextReady={intelligenceHook.contextReady}
+                currentContext={intelligenceHook.currentContext}
+                hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
+                onSendMessage={messagesHook.handleSendMessage}
+                aiElements={aiConfig}
+                isExpanded={isExpanded}
+                artifacts={artifactCards}
+                name={intelligenceHook.name}
+                email={intelligenceHook.email}
+                agreed={intelligenceHook.agreed}
+                onNameChange={intelligenceHook.setName}
+                onEmailChange={intelligenceHook.setEmail}
+                onAgreedChange={intelligenceHook.setAgreed}
+                onAcceptTerms={intelligenceHook.handleTermsAcceptance}
+                onApproveTool={handleApproveTool}
+                onDeclineTool={handleDeclineTool}
+              />
       </div>
 
       <div className={cn("flex-shrink-0 border-t border-border/20 safe-area-inset-bottom", isExpanded ? "px-0 sm:px-0 py-0 pb-0" : "px-0 py-0 pb-0")}>

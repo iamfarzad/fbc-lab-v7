@@ -2,9 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import AI Elements theme overrides */
-@import '../src/components/ai-elements/theme-overrides.css';
-
 @layer base {
   :root {
     /* === BASE COLOR SYSTEM === */

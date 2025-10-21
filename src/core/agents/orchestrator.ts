@@ -1,4 +1,5 @@
 import type { AgentContext, ChatMessage, AgentResult, FunnelStage } from './types'
+import { preProcessIntent } from './intent'
 import { multimodalContextManager } from '@/core/context/multimodal-context'
 import { usageLimiter } from '@/lib/usage-limits'
 import { discoveryAgent } from './discovery-agent'
@@ -31,15 +32,16 @@ export async function routeToAgent({
   // CRITICAL FIX: Pre-process intent before routing
   const intentSignal = preProcessIntent(messages);
   if (intentSignal === 'BOOKING') {
-    return {
+    const immediate: AgentResult = {
       output: "Absolutely! I'll send you our calendar link. What time zone are you in?",
       agent: 'Discovery Agent (Booking Mode)',
-      metadata: { 
-        stage: 'BOOKING_REQUESTED' as FunnelStage, 
+      metadata: {
+        stage: 'BOOKING_REQUESTED' as FunnelStage,
         triggerBooking: true,
-        action: 'show_calendar_widget'
-      }
-    } as AgentResult;
+        action: 'show_calendar_widget',
+      },
+    }
+    return immediate
   }
   
   if (intentSignal === 'EXIT') {
@@ -134,8 +136,7 @@ export async function routeToAgent({
   }
 
   // Route to appropriate agent
-  // TODO: migrate — narrow result to AgentResult without casts
-  let result: any
+  let result: AgentResult
 
   try {
     switch (stage) {
@@ -200,15 +201,18 @@ export async function routeToAgent({
         break
 
       case 'BOOKING_REQUESTED':
-        result = {
-          output: "Perfect! I'll open our calendar. Pick a time that works for you.",
-          agent: 'Booking Agent',
-          metadata: {
-            stage: 'BOOKING_REQUESTED' as FunnelStage,
-            triggerBooking: true,
-            action: 'show_calendar_widget',
-          },
-        } as AgentResult
+        {
+          const booking: AgentResult = {
+            output: "Perfect! I'll open our calendar. Pick a time that works for you.",
+            agent: 'Booking Agent',
+            metadata: {
+              stage: 'BOOKING_REQUESTED' as FunnelStage,
+              triggerBooking: true,
+              action: 'show_calendar_widget',
+            },
+          }
+          result = booking
+        }
         break
 
       case 'FORCE_EXIT':
@@ -232,7 +236,7 @@ export async function routeToAgent({
       multimodalUsed: multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio || false
     }
 
-    return result as AgentResult
+    return result
 
   } catch (error) {
     console.error('[Orchestrator] Agent failed:', error)
@@ -250,45 +254,7 @@ export async function routeToAgent({
 /**
  * Pre-process user intent before routing
  */
-function preProcessIntent(messages: ChatMessage[]): 'BOOKING' | 'EXIT' | 'CONTINUE' {
-  const lastUserMessage = messages.filter(m => m.role === 'user').pop();
-  if (!lastUserMessage) return 'CONTINUE';
-  
-  const content = lastUserMessage.content.toLowerCase().trim();
-  
-  // Booking patterns
-  const bookingPatterns = [
-    /let'?s (just )?book/i,
-    /schedule (a|the) (call|meeting|workshop)/i,
-    /set up (a|the) (call|meeting)/i,
-    /book (a|the) (call|meeting|workshop)/i,
-    /calendar/i,
-    /when can we/i
-  ];
-  
-  if (bookingPatterns.some(pattern => pattern.test(content))) {
-    return 'BOOKING';
-  }
-  
-  // Exit patterns
-  const exitPatterns = [
-    /let'?s wrap/i,
-    /move on/i,
-    /that'?s enough/i,
-    /stop asking/i,
-    /wrap it up/i,
-    /move forward/i,
-    /for fuck'?s sake/i,
-    /this is ridiculous/i,
-    /enough already/i
-  ];
-  
-  if (exitPatterns.some(pattern => pattern.test(content))) {
-    return 'EXIT';
-  }
-  
-  return 'CONTINUE';
-}
+// preProcessIntent moved to './intent' for testability
 
 /**
  * Determine which funnel stage the conversation is in

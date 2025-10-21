@@ -276,3 +276,10 @@ export const GEMINI_CONFIG = {
 - When you receive video input, acknowledge what you see and provide relevant insights.
 Pronunciation: "Farzad Bayat" ~ "Fahr–zahd Bye–yaht" (soft 'a' in Farzad).`,
 } as const
+
+// Feature Flags
+export const FEATURE_FLAGS = {
+  REASONING_STREAMING:
+    (process.env.NEXT_PUBLIC_FEATURE_REASONING_STREAMING || '0').toLowerCase() === '1' ||
+    (process.env.NEXT_PUBLIC_FEATURE_REASONING_STREAMING || '').toLowerCase() === 'true',
+} as const

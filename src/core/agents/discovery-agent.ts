@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
-import type { AgentContext, ChatMessage, ChainOfThoughtStep } from './types'
+import type { AgentContext, ChatMessage, ChainOfThoughtStep, AgentResult, FunnelStage } from './types'
 import { GEMINI_MODELS } from '@/config/constants'
 import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
 
@@ -14,7 +14,7 @@ import { PHRASE_BANK } from '@/core/chat/conversation-phrases'
 export async function discoveryAgent(
   messages: ChatMessage[],
   context: AgentContext
-) {
+): Promise<AgentResult> {
   const { intelligenceContext, conversationFlow, multimodalContext, voiceActive } = context
 
   const steps: ChainOfThoughtStep[] = []
@@ -29,7 +29,7 @@ export async function discoveryAgent(
         output: "Absolutely! I'll send you our calendar link. What time zone are you in?",
         agent: 'Discovery Agent (Booking Mode)',
         metadata: { 
-          stage: 'BOOKING_REQUESTED', 
+          stage: 'BOOKING_REQUESTED' as FunnelStage, 
           triggerBooking: true,
           action: 'show_calendar_widget'
         }
@@ -42,7 +42,7 @@ export async function discoveryAgent(
         output: `Got it. Quick recap: ${recap}. Sound right? Let's schedule a call with Farzad to map this out.`,
         agent: 'Discovery Agent (Wrap-up Mode)',
         metadata: { 
-          stage: 'WRAP_UP', 
+          stage: 'WRAP_UP' as FunnelStage, 
           triggerBooking: true
         }
       };
@@ -182,7 +182,7 @@ ${conversationFlow?.shouldOfferRecap
     agent: 'Discovery Agent',
     model: GEMINI_MODELS.DEFAULT_CHAT,
     metadata: {
-      stage: 'DISCOVERY' as const,
+      stage: 'DISCOVERY' as FunnelStage,
       chainOfThought: { steps },
       categoriesCovered,
       recommendedNext: conversationFlow?.recommendedNext || null,
