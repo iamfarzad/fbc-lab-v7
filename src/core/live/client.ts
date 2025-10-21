@@ -21,11 +21,13 @@ export async function connectLive({ apiKey, model, config }: LiveConnectOptions)
 
   // Create config object matching official documentation
   const liveConfig = {
+    // TODO: migrate — use official SDK types instead of any
     responseModalities: ['AUDIO'] as any,
     systemInstruction: 'You are a helpful assistant and answer in a friendly tone.',
     ...config,
   }
 
+  // TODO: migrate — type session with official Live session interface
   const session: any = await genAI.live.connect({
     model: liveModel,
     config: liveConfig,  // ← Pass config as separate parameter
@@ -34,6 +36,7 @@ export async function connectLive({ apiKey, model, config }: LiveConnectOptions)
         isOpen = true
         console.log('Live API session opened')
       },
+      // TODO: migrate — type message/error payloads
       onmessage: (message: any) => console.log('Live API message received', message),
       onerror: (error: any) => console.error('Live API error:', error),
       onclose: () => {

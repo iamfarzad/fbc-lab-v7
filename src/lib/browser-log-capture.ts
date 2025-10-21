@@ -4,6 +4,7 @@ const LOG_INGEST_URL = '/api/logs/ingest'
 let isInitialized = false
 
 // Queue logs to avoid blocking main thread
+// TODO: migrate — replace any with a structured log type
 const logQueue: any[] = []
 let flushTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -47,6 +48,7 @@ export function initBrowserLogCapture() {
   const originalError = console.error
   const originalInfo = console.info
 
+  // TODO: migrate — replace any[] with a structured tuple of known console args
   function captureLog(level: 'debug' | 'info' | 'warn' | 'error', args: any[]) {
     // Prevent recursive logging
     if (isCapturing) {
@@ -168,4 +170,3 @@ export function initBrowserLogCapture() {
     }
   })
 }
-

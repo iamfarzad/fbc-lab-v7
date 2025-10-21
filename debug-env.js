@@ -51,9 +51,14 @@ const serverUrl = calculateServerUrl();
 console.log('\n🎯 Final Server URL:', serverUrl);
 
 console.log('\n💡 Analysis:');
-if (serverUrl === 'wss://fb-consulting-websocket.fly.dev') {
+// Avoid hardcoded URLs per .cursorrules; use env for expected value
+const expected = process.env.EXPECTED_WEBSOCKET_URL || process.env.NEXT_PUBLIC_LIVE_SERVER_URL || '';
+if (expected && serverUrl === expected) {
   console.log('   ✅ Environment variable is working correctly');
+} else if (expected) {
+  console.log('   ❌ Calculated URL does not match expected');
+  console.log('   Expected:', expected);
+  console.log('   🔧 Check environment variable configuration');
 } else {
-  console.log('   ❌ Environment variable is not being read');
-  console.log('   🔧 Check Vercel environment variable configuration');
+  console.log('   ℹ️ No expected URL provided via env; set EXPECTED_WEBSOCKET_URL to enable strict check');
 }

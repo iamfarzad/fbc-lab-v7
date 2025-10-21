@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useRealtimeVoice, type UseRealtimeVoiceOptions } from '@/hooks/useRealtimeVoice'
+import type { AttachmentUploadResponse } from '@/types/attachments'
 
 export type UseLiveApiOptions = UseRealtimeVoiceOptions
 
@@ -71,7 +72,7 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
 
   // One-shot: Attachments upload (HTTP)
   const uploadAttachments = useCallback(
-    async (files: File[], sessionId: string): Promise<{ attachments?: any[]; prompt?: string; ok: boolean }> => {
+    async (files: File[], sessionId: string): Promise<AttachmentUploadResponse> => {
       const formData = new FormData()
       formData.append('sessionId', sessionId)
       files.forEach((file) => formData.append('files', file, file.name))
@@ -81,9 +82,9 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
         body: formData,
       })
 
-      if (!response.ok) return { ok: false }
+      if (!response.ok) return { ok: false, attachments: [], error: 'Upload failed' }
       const data = await response.json().catch(() => ({}))
-      if (!data?.ok) return { ok: false }
+      if (!data?.ok) return { ok: false, attachments: [], error: data?.error || 'Upload error' }
       return { ok: true, attachments: data.attachments, prompt: data.prompt }
     },
     []
@@ -99,4 +100,3 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
     uploadAttachments,
   }
 }
-

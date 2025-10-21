@@ -36,6 +36,7 @@ export interface TermsAcceptanceState {
 export interface AudioState {
   isListening: boolean;
   isVoiceSupported: boolean;
+  // TODO: migrate — replace with exported VoiceHook API type from useRealtimeVoice
   voice: any; // WebSocket voice hook return type
   mediaStreamRef: React.MutableRefObject<MediaStream | null>;
   captureContextRef: React.MutableRefObject<AudioContext | null>;
