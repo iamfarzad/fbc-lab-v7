@@ -101,6 +101,13 @@ export function ChatHeader({
 
         {/* Right: Controls */}
         <div className="flex items-center gap-2">
+                  {/* Mobile live status */}
+                  {liveClient && (
+                    <div className="md:hidden mr-1">
+                      {/* dot only on mobile to save space */}
+                      <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+                    </div>
+                  )}
                   {/* Mobile: Menu, expand/minimize, and close */}
                   <div className="flex items-center gap-1 md:hidden">
                     {showNextSteps && sessionId && (
