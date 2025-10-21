@@ -1,15 +1,15 @@
 import { NextRequest } from 'next/server'
 import { respond } from '@/lib/api/response'
 import { GoogleGenAI } from '@google/genai'
-import { createOptimizedConfig } from '@/src/core/gemini-config-enhanced'
-import { selectModelForFeature } from '@/src/core/model-selector'
-import { enforceBudgetAndLog } from '@/src/core/token-usage-logger'
+import { createOptimizedConfig } from '@/core/gemini-config-enhanced'
+import { selectModelForFeature } from '@/core/model-selector'
+import { enforceBudgetAndLog } from '@/core/token-usage-logger'
 
-import { ScreenShareSchema } from '@/src/core/services/tool-service'
-import { recordCapabilityUsed } from '@/src/core/context/capabilities'
-import { multimodalContextManager } from '@/src/core/context/multimodal-context'
-import { APIErrorHandler, rateLimiter, performanceMonitor } from '@/src/core/api/error-handler'
-import { logJsonl } from '@/src/lib/jsonl-logger'
+import { ScreenShareSchema } from '@/core/services/tool-service'
+import { recordCapabilityUsed } from '@/core/context/capabilities'
+import { multimodalContextManager } from '@/core/context/multimodal-context'
+import { APIErrorHandler, rateLimiter, performanceMonitor } from '@/core/api/error-handler'
+import { logJsonl } from '@/lib/jsonl-logger'
 
 
 export async function POST(req: NextRequest) {
