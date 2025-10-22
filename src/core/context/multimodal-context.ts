@@ -463,9 +463,18 @@ export class MultimodalContextManager {
         }
       }
 
-      // Log to WAL first (critical for voice transcripts)
+      // 🔄 Non-blocking WAL logging to prevent voice pipeline freeze
       if (isFinal) {
-        await walLog.logOperation(sessionId, 'add_voice', audioEntry)
+        // Fire-and-forget pattern (no await)
+        walLog.logOperation(sessionId, 'add_voice', audioEntry)
+          .then(() => {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`🪵 WAL logged voice entry for session ${sessionId}`)
+            }
+          })
+          .catch((err) => {
+            console.warn('⚠️ WAL logging failed (non-critical):', err)
+          })
       }
 
       context.audioContext = context.audioContext || []
