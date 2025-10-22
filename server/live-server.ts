@@ -858,12 +858,6 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
           break;
         }
-        case 'TURN_COMPLETE': {
-          console.info(`[${connectionId}] Turn completion acknowledged`)
-          // Just acknowledge - don't send anything to Live API
-          safeSend(ws, JSON.stringify({ type: 'turn_complete_ack' }))
-          break
-        }
         case 'heartbeat_ack': {
           // Client acknowledged heartbeat - connection is healthy
           console.info(`[${connectionId}] Heartbeat acknowledged by client`)
