@@ -525,7 +525,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         setTranscript('');
         setPartialTranscript('');
         callbacks?.onSessionStateChange?.({
-          active: true,
+          active: false,
           connectionId: connectionIdRef.current,
           mock: session?.mock,
           isProcessing: false,
