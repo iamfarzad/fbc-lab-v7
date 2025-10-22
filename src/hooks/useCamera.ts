@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { blobToBase64 } from '@/src/lib/utils';
+import { blobToBase64 } from '@/lib/utils';
 // import { useSessionStore } from '@/stores/sessionStore'; // TODO: Re-enable when store is created
 
 export interface UseCameraOptions {
@@ -136,6 +136,37 @@ export function useCamera(options: UseCameraOptions = {}) {
     }
   }, []);
 
+  // Stop camera and cleanup resources
+  const stopCamera = useCallback(() => {
+    // Stop auto-capture if running
+    if (autoCaptureTimerRef.current) {
+      clearInterval(autoCaptureTimerRef.current);
+      autoCaptureTimerRef.current = null;
+    }
+
+    // Stop media stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
+    // Clear video element
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause?.();
+      } catch (pauseError) {
+        console.debug('📷 [useCamera] Unable to pause preview element', pauseError);
+      }
+      videoRef.current.srcObject = null;
+    }
+    videoRef.current = null;
+
+    setStream(null);
+    setIsActive(false);
+    setError(null);
+    setCurrentDeviceId(undefined);
+  }, []);
+
   // Start camera with specific device or default
   const startCamera = useCallback(async (deviceId?: string, facingOverride?: 'user' | 'environment') => {
     if (isInitializing) {
@@ -178,7 +209,9 @@ export function useCamera(options: UseCameraOptions = {}) {
         const label = (videoTrack.getSettings() as any)?.label || (videoTrack as any).label || ''
         if (/back|rear|environment/i.test(label)) facingModeRef.current = 'environment'
         else if (/front|user|face/i.test(label)) facingModeRef.current = 'user'
-      } catch {}
+      } catch (labelError) {
+        console.debug('📷 [useCamera] Unable to infer facing mode from label', labelError);
+      }
 
       // Set up track ended listener
       videoTrack.addEventListener('ended', () => {
@@ -191,6 +224,20 @@ export function useCamera(options: UseCameraOptions = {}) {
       setIsActive(true);
       setIsInitializing(false);
       console.log('📷 [useCamera] Camera started successfully');
+
+      // Create internal preview element for frame capture if consumer does not attach one
+      if (!videoRef.current) {
+        try {
+          const internalVideo = document.createElement('video');
+          internalVideo.srcObject = mediaStream;
+          internalVideo.muted = true;
+          internalVideo.playsInline = true;
+          await internalVideo.play().catch(() => undefined);
+          videoRef.current = internalVideo;
+        } catch (internalErr) {
+          console.debug('📷 [useCamera] Unable to prime internal video element', internalErr);
+        }
+      }
 
       // Enumerate devices after getting permission
       await enumerateDevices();
@@ -205,36 +252,15 @@ export function useCamera(options: UseCameraOptions = {}) {
       toast.error(message);
       throw err;
     }
-  }, [isInitializing, enumerateDevices]);
-
-  // Stop camera and cleanup resources
-  const stopCamera = useCallback(() => {
-    // Stop auto-capture if running
-    if (autoCaptureTimerRef.current) {
-      clearInterval(autoCaptureTimerRef.current);
-      autoCaptureTimerRef.current = null;
-    }
-
-    // Stop media stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-
-    // Clear video element
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-
-    setStream(null);
-    setIsActive(false);
-    setError(null);
-    setCurrentDeviceId(undefined);
-  }, []);
+  }, [enumerateDevices, isInitializing, stopCamera]);
 
   // Toggle camera on/off
   const toggleCamera = useCallback(async () => {
-    console.log('📷 [useCamera] toggleCamera called', { isActive, currentDeviceId });
+    console.log('📷 [useCamera] toggleCamera called', { isActive, currentDeviceId, isInitializing });
+    if (isInitializing) {
+      console.log('📷 [useCamera] Initialization in progress, ignoring toggle request.');
+      return;
+    }
     if (isActive) {
       console.log('📷 [useCamera] Camera is active, stopping...');
       stopCamera();
@@ -242,7 +268,7 @@ export function useCamera(options: UseCameraOptions = {}) {
       console.log('📷 [useCamera] Camera is inactive, starting...');
       await startCamera(currentDeviceId);
     }
-  }, [isActive, currentDeviceId, startCamera, stopCamera]);
+  }, [isActive, currentDeviceId, isInitializing, startCamera, stopCamera]);
 
   // Switch to next available camera
   const switchCamera = useCallback(async () => {
@@ -453,7 +479,18 @@ export function useCamera(options: UseCameraOptions = {}) {
       metricsRef.current.failedCaptures++;
       return null;
     }
-  }, [currentDeviceId, maxDimension, quality, onCapture, sessionId, voiceConnectionId, onAnalysis, uploadToBackend]);
+  }, [
+    currentDeviceId,
+    maxDimension,
+    quality,
+    onCapture,
+    sessionId,
+    voiceConnectionId,
+    onAnalysis,
+    uploadToBackend,
+    sendContextUpdate,
+    sendRealtimeInput,
+  ]);
 
   // Attach video element for capture
   const attachVideoElement = useCallback((element: HTMLVideoElement | null) => {
