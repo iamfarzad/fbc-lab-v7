@@ -112,7 +112,7 @@ export const GEMINI_MODELS = {
   
   // DEFAULTS: What each use case should use
   DEFAULT_CHAT: 'gemini-flash-latest',               // Auto-updates to best
-  DEFAULT_VOICE: 'gemini-2.5-flash', // Stable GA model for Live API
+  DEFAULT_VOICE: 'gemini-2.5-flash-preview-09-2025', // Stable GA model for Live API
   DEFAULT_MULTIMODAL: 'gemini-flash-latest',         // Best for images/video
   DEFAULT_WEBCAM: 'gemini-flash-latest',             // Webcam analysis
   DEFAULT_SCREEN: 'gemini-flash-latest',             // Screen capture
