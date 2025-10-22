@@ -224,6 +224,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
   const liveRef = useRef<LiveClientWS | null>(options.liveClient ?? null);
   const createdClientRef = useRef<boolean>(!options.liveClient);
+  const listenerUnsubRef = useRef<Array<() => void>>([]);
+  const hasBoundListenersRef = useRef<boolean>(false);
   const audioPlayerRef = useRef<AudioPlayer | null>(null);
   const connectionIdRef = useRef<string | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -562,47 +564,62 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     if (!liveRef.current) {
       liveRef.current = options.liveClient ?? new LiveClientWS()
       createdClientRef.current = !options.liveClient
-      liveRef.current.on('open', () => {
-        setSocketReady(true)
-        setError(null)
-        reconnectAttemptsRef.current = 0
-      })
-      liveRef.current.on('close', () => {
-        setSocketReady(false)
-        resetState({ soft: true })
-        if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-          const msg = 'Failed to connect to voice server after multiple attempts. Please check if the server is running.'
-          setError(msg)
-          callbacksRef.current?.onError?.(msg)
-          return
-        }
-        if (!reconnectTimerRef.current) {
-          reconnectAttemptsRef.current++
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 16000)
-          reconnectTimerRef.current = setTimeout(() => {
-            reconnectTimerRef.current = null
-            liveRef.current?.connect()
-          }, delay)
-        }
-      })
-      liveRef.current.on('error', (m) => {
-        setError(typeof m === 'string' ? m : 'WebSocket connection error')
-      })
-      // Route all server events through existing handler
-      liveRef.current.on('connected', (id) => handleServerEvent({ type: 'connected', payload: { connectionId: id } }))
-      liveRef.current.on('session_started', (p) => handleServerEvent({ type: 'session_started', payload: { ...p } } as any))
-      liveRef.current.on('session_closed', (reason) => handleServerEvent({ type: 'session_closed', payload: { reason } } as any))
-      liveRef.current.on('input_transcript', (t, f) => handleServerEvent({ type: 'input_transcript', payload: { text: t, isFinal: f } }))
-      liveRef.current.on('output_transcript', (t, f) => handleServerEvent({ type: 'output_transcript', payload: { text: t, isFinal: f } }))
-      liveRef.current.on('text', (content) => handleServerEvent({ type: 'text', payload: { content } }))
-      liveRef.current.on('audio', (base64, mime) => handleServerEvent({ type: 'audio', payload: { audioData: base64, mimeType: mime } }))
-      liveRef.current.on('turn_complete', () => handleServerEvent({ type: 'turn_complete' } as any))
-      liveRef.current.on('setup_complete', () => handleServerEvent({ type: 'setup_complete', payload: { setupComplete: true } }))
-      liveRef.current.on('interrupted', () => handleServerEvent({ type: 'interrupted', payload: { interrupted: true } }))
-      liveRef.current.on('tool_call', (p) => handleServerEvent({ type: 'tool_call', payload: p } as any))
-      liveRef.current.on('tool_result', (p) => handleServerEvent({ type: 'tool_result', payload: p } as any))
+      hasBoundListenersRef.current = false;
     }
-    liveRef.current.connect()
+    const client = liveRef.current;
+    if (!client) return;
+
+    if (!hasBoundListenersRef.current) {
+      // Remove any previous listeners before re-binding
+      for (const teardown of listenerUnsubRef.current) {
+        try { teardown(); } catch {}
+      }
+      listenerUnsubRef.current = [];
+
+      listenerUnsubRef.current.push(
+        client.on('open', () => {
+          setSocketReady(true)
+          setError(null)
+          reconnectAttemptsRef.current = 0
+        }),
+        client.on('close', () => {
+          setSocketReady(false)
+          resetState({ soft: true })
+          if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+            const msg = 'Failed to connect to voice server after multiple attempts. Please check if the server is running.'
+            setError(msg)
+            callbacksRef.current?.onError?.(msg)
+            return
+          }
+          if (!reconnectTimerRef.current) {
+            reconnectAttemptsRef.current++
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 16000)
+            reconnectTimerRef.current = setTimeout(() => {
+              reconnectTimerRef.current = null
+              liveRef.current?.connect()
+            }, delay)
+          }
+        }),
+        client.on('error', (m) => {
+          setError(typeof m === 'string' ? m : 'WebSocket connection error')
+        }),
+        client.on('connected', (id) => handleServerEvent({ type: 'connected', payload: { connectionId: id } })),
+        client.on('session_started', (p) => handleServerEvent({ type: 'session_started', payload: { ...p } } as any)),
+        client.on('session_closed', (reason) => handleServerEvent({ type: 'session_closed', payload: { reason } } as any)),
+        client.on('input_transcript', (t, f) => handleServerEvent({ type: 'input_transcript', payload: { text: t, isFinal: f } })),
+        client.on('output_transcript', (t, f) => handleServerEvent({ type: 'output_transcript', payload: { text: t, isFinal: f } })),
+        client.on('text', (content) => handleServerEvent({ type: 'text', payload: { content } })),
+        client.on('audio', (base64, mime) => handleServerEvent({ type: 'audio', payload: { audioData: base64, mimeType: mime } })),
+        client.on('turn_complete', () => handleServerEvent({ type: 'turn_complete' } as any)),
+        client.on('setup_complete', () => handleServerEvent({ type: 'setup_complete', payload: { setupComplete: true } })),
+        client.on('interrupted', () => handleServerEvent({ type: 'interrupted', payload: { interrupted: true } })),
+        client.on('tool_call', (p) => handleServerEvent({ type: 'tool_call', payload: p } as any)),
+        client.on('tool_result', (p) => handleServerEvent({ type: 'tool_result', payload: p } as any))
+      );
+      hasBoundListenersRef.current = true;
+    }
+
+    client.connect();
   }, [callbacksRef, handleServerEvent, resetState, serverUrl, options.liveClient])
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
@@ -760,6 +777,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       if (createdClientRef.current) {
         liveRef.current?.disconnect();
       }
+      for (const teardown of listenerUnsubRef.current) {
+        try { teardown(); } catch {}
+      }
+      listenerUnsubRef.current = [];
+      hasBoundListenersRef.current = false;
       liveRef.current = null;
     };
   }, [connectWebSocket]); // Connect on mount with proper dependency
