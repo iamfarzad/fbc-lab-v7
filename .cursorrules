@@ -41,6 +41,10 @@
 - Gemini Live API: use sendRealtimeInput() not session.send()
 - Voice hooks: ONLY use useRealtimeVoice.ts (NOT useWebSocketVoice.ts)
 - Model names: use GEMINI_MODELS constants from @/config/constants
+- Voice model: MUST use model with `-native-audio-` for Live API support
+- Current model: gemini-2.5-flash-native-audio-preview-09-2025
+- Source of truth: .cursor/rules/gemini-voice-model-sot.md
+- Before changing DEFAULT_VOICE: read source of truth documentation
 
 ## 7. COMMIT RULES
 - No "comprehensive fixes" - be specific about what you fixed

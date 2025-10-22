@@ -103,7 +103,7 @@ export const GEMINI_MODELS = {
   // NEW: Specific versions (predictable behavior)
   FLASH_2025_09: 'gemini-2.5-flash-preview-09-2025',
   FLASH_LITE_2025_09: 'gemini-2.5-flash-lite-preview-09-2025',
-  AUDIO_2025_09: 'gemini-2.5-flash-native-audio-preview-09-2025',
+  AUDIO_2025_09: 'gemini-2.5-flash-native-audio-preview-09-2025', // OFFICIAL: Only model supporting Live API + native audio
   
   // LEGACY: For backward compatibility (deprecated models)
   PRO: 'gemini-2.5-pro',
@@ -112,7 +112,7 @@ export const GEMINI_MODELS = {
   
   // DEFAULTS: What each use case should use
   DEFAULT_CHAT: 'gemini-flash-latest',               // Auto-updates to best
-  DEFAULT_VOICE: 'gemini-2.5-flash-preview-09-2025', // Stable GA model for Live API
+  DEFAULT_VOICE: 'gemini-2.5-flash-native-audio-preview-09-2025', // OFFICIAL: Only model supporting Live API + native audio
   DEFAULT_MULTIMODAL: 'gemini-flash-latest',         // Best for images/video
   DEFAULT_WEBCAM: 'gemini-flash-latest',             // Webcam analysis
   DEFAULT_SCREEN: 'gemini-flash-latest',             // Screen capture
