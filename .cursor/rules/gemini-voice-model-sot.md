@@ -57,3 +57,4 @@ gemini-2.5-flash-native-audio-preview-09-2025
 - [Google Gemini Models Docs](https://ai.google.dev/gemini-api/docs/models/experimental-models)
 - [Google Cloud Blog - Voice Agents](https://cloud.google.com/blog/products/ai-machine-learning/build-a-real-time-voice-agent-with-gemini-adk)
 - Working prototype: `/Users/farzad/Downloads/fcb_prototype_multimodal`
+

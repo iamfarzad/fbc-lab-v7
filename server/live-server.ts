@@ -31,6 +31,37 @@ function isBcp47(s?: string) {
   return typeof s === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z]{2}|-[A-Za-z]{4})?(-[A-Za-z]{2}|-[0-9]{3})?$/.test(s)
 }
 
+// Turn completion timeout configuration
+const TURN_COMPLETION_TIMEOUT_MS = 3000; // 3 seconds of silence = turn complete
+
+// Helper function to send turn completion and clear timer
+function sendTurnComplete(connectionId: string, client: ActiveSessionRecord, reason: string) {
+  console.info(`[${connectionId}] 🔄 Sending turn_complete (reason: ${reason})`);
+  safeSend(client.ws, JSON.stringify({ type: 'turn_complete', payload: { turnComplete: true } }));
+  client.logger?.log('turn_complete_auto', { reason });
+  
+  // Clear the timer
+  if (client.turnCompletionTimer) {
+    clearTimeout(client.turnCompletionTimer);
+    client.turnCompletionTimer = undefined;
+  }
+}
+
+// Helper function to reset turn completion timer
+function resetTurnCompletionTimer(connectionId: string, client: ActiveSessionRecord) {
+  // Clear existing timer
+  if (client.turnCompletionTimer) {
+    clearTimeout(client.turnCompletionTimer);
+  }
+  
+  // Set new timer
+  client.turnCompletionTimer = setTimeout(() => {
+    sendTurnComplete(connectionId, client, 'timeout_silence');
+  }, TURN_COMPLETION_TIMEOUT_MS);
+  
+  console.log(`[${connectionId}] ⏰ Turn completion timer reset (${TURN_COMPLETION_TIMEOUT_MS}ms timeout)`);
+}
+
 const decodeRawMessage = (raw: RawData): string => {
   if (typeof raw === 'string') return raw
   if (Buffer.isBuffer(raw)) return raw.toString('utf8')
@@ -161,6 +192,8 @@ type ActiveSessionRecord = {
     webcam?: ReturnType<typeof setTimeout>;
   };
   logger?: SessionLogger;
+  turnCompletionTimer?: ReturnType<typeof setTimeout>;
+  lastAudioActivity?: number;
 };
 
 // Store active Live API sessions
@@ -443,6 +476,13 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
             if (serverContent.turnComplete) {
               safeSend(ws, JSON.stringify({ type: 'turn_complete', payload: { turnComplete: true } }));
               activeSessions.get(connectionId)?.logger?.log('turn_complete')
+              // Clear any pending turn completion timer since we received a real one
+              const client = activeSessions.get(connectionId);
+              if (client?.turnCompletionTimer) {
+                clearTimeout(client.turnCompletionTimer);
+                client.turnCompletionTimer = undefined;
+                console.info(`[${connectionId}] 🔄 Cleared turn completion timer (received from Live API)`);
+              }
             }
           } catch (err) {
             console.error(`[${connectionId}] Live message handler error:`, err)
@@ -554,6 +594,10 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
     try {
       client.logger?.log('audio_chunk', { direction: 'client_to_server', bytes: approxBytes, mimeType })
       
+      // Update last audio activity time and reset turn completion timer
+      client.lastAudioActivity = Date.now();
+      resetTurnCompletionTimer(connectionId, client);
+      
       // Debug: log available session methods
       console.log(`[${connectionId}] Session methods:`, {
         hasSendRealtimeInput: typeof client.session.sendRealtimeInput,
@@ -588,6 +632,13 @@ async function handleUserMessage(connectionId: string, ws: WebSocket, payload: a
 async function handleClose(connectionId: string) {
   const client = activeSessions.get(connectionId);
   if (client) {
+    // Clear turn completion timer
+    if (client.turnCompletionTimer) {
+      clearTimeout(client.turnCompletionTimer);
+      client.turnCompletionTimer = undefined;
+      console.info(`[${connectionId}] 🔄 Cleared turn completion timer (session closing)`);
+    }
+
     // Archive conversation if it has meaningful content
     if (client.sessionId && CONTEXT_CONFIG.ARCHIVE_ON_DISCONNECT) {
       try {
