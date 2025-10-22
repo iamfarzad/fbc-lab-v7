@@ -14,6 +14,7 @@ export class LiveClientWS {
   // private isReady = false
   private connectionId: string | null = null
   private devLogEnabled = (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG === '1' || (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG !== '0')))
+  private lastLogTime = 0
 
   on<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set())
@@ -167,7 +168,14 @@ export class LiveClientWS {
   private devLog(event: string, data?: unknown) {
     if (!this.devLogEnabled) return
     try {
-      const payload = { category: 'client-live', event, data, ts: Date.now() }
+      // Throttle dev logging to prevent resource exhaustion
+      const now = Date.now()
+      if (this.lastLogTime && now - this.lastLogTime < 100) { // Max 10 logs per second
+        return
+      }
+      this.lastLogTime = now
+      
+      const payload = { category: 'client-live', event, data, ts: now }
       if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
         navigator.sendBeacon('/api/dev/log', blob)
