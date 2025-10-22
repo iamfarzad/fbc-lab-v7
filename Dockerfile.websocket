@@ -17,8 +17,9 @@ RUN pnpm install --prod
 COPY server/live-server.ts ./
 COPY server/session-logger.ts ./
 
-# Copy shared config used by the server (to /src, not /app/src, since live-server imports ../src/config)
+# Copy shared source files used by the server (to /src, not /app/src, since live-server imports ../src/config)
 COPY src/config /src/config
+COPY src/core/context /src/core/context
 
 # Install tsx for TypeScript execution
 RUN pnpm add tsx
