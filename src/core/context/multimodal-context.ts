@@ -7,6 +7,11 @@ import { summarizeConversationWindow, shouldSummarize, extractSummaries } from '
 import { detectPII, shouldRedact, redactPII } from '@/core/security/pii-detector'
 import { auditLog } from '@/core/security/audit-logger'
 
+const WAL_ENABLED = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
 // Define a local alias for the allowed modalities so we don't widen to string[]
 type Modality = 'text' | 'video' | 'image' | 'audio';
 
@@ -201,8 +206,10 @@ export class MultimodalContextManager {
       metadata: metadata ?? {}
     }
 
-    // Log to WAL first (critical path for data reliability)
-    await walLog.logOperation(sessionId, 'add_text', entry)
+    if (WAL_ENABLED) {
+      // Log to WAL first (critical path for data reliability)
+      await walLog.logOperation(sessionId, 'add_text', entry)
+    }
 
     context.conversationHistory.push(entry)
     context.metadata.lastUpdated = entry.timestamp
@@ -290,8 +297,10 @@ export class MultimodalContextManager {
       }
     }
 
-    // Log to WAL (critical for visual analyses)
-    await walLog.logOperation(sessionId, 'add_visual', visualEntry)
+    if (WAL_ENABLED) {
+      // Log to WAL (critical for visual analyses)
+      await walLog.logOperation(sessionId, 'add_visual', visualEntry)
+    }
 
     context.visualContext.push(visualEntry)
     context.metadata.lastUpdated = convEntry.timestamp
@@ -328,8 +337,10 @@ export class MultimodalContextManager {
       pages: payload.pages
     }
 
-    // Log to WAL (critical for file uploads)
-    await walLog.logOperation(sessionId, 'add_upload', uploadEntry)
+    if (WAL_ENABLED) {
+      // Log to WAL (critical for file uploads)
+      await walLog.logOperation(sessionId, 'add_upload', uploadEntry)
+    }
 
     context.uploadContext = context.uploadContext || []
     context.uploadContext.push(uploadEntry)
@@ -464,7 +475,7 @@ export class MultimodalContextManager {
       }
 
       // 🔄 Non-blocking WAL logging to prevent voice pipeline freeze
-      if (isFinal) {
+      if (isFinal && WAL_ENABLED) {
         // Fire-and-forget pattern (no await)
         walLog.logOperation(sessionId, 'add_voice', audioEntry)
           .then(() => {
