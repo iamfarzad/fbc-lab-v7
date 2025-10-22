@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { ChatShell } from "./ChatShell";
 import { ChatHeader } from "./components/ChatHeader";
 import { ChatMessages } from "./components/ChatMessages";
-import { type ChatInputHandle } from "./components/ChatInput";
+import { type ChatInputHandle, type SendMessageInput } from "./components/ChatInput";
 import { ConversationBar } from "./components/ConversationBar";
 import { SessionLimitWarning } from "./SessionLimitWarning";
 
@@ -70,11 +70,13 @@ export function ChatInterface({ id }: { id?: string | null }) {
 
   const chatInputRef = useRef<ChatInputHandle | null>(null);
   const {
+    handleSendMessage: sendMessage,
     appendVoiceUserMessage,
     updatePartialUserTranscript,
     appendVoiceAssistantChunk,
     finalizeVoiceAssistantMessage,
     updateChatContext,
+    setInputValue,
   } = messagesHook;
 
   const {
@@ -95,6 +97,23 @@ export function ChatInterface({ id }: { id?: string | null }) {
     lastScreenSnapshot,
     lastWebcamSnapshot,
   });
+
+  const intelligenceHook = useChatIntelligence(sessionId);
+
+  const termsAccepted = intelligenceHook.hasAcceptedTerms;
+
+  const promptTermsNotice = useCallback(() => {
+    if (termsAccepted) return;
+    toast.warning('Please share your name, email, and accept the terms to begin.');
+  }, [termsAccepted]);
+
+  const handleSendMessage = useCallback(async (message: SendMessageInput) => {
+    if (!termsAccepted) {
+      promptTermsNotice();
+      return;
+    }
+    await sendMessage(message);
+  }, [sendMessage, termsAccepted, promptTermsNotice]);
 
   // Camera integration with continuous frame streaming (prototype pattern)
   const camera = useCamera({
@@ -167,26 +186,47 @@ export function ChatInterface({ id }: { id?: string | null }) {
     camera.isInitializing,
     camera.availableCameraCount,
     chatStateHook.availableCameras,
+    chatStateHook,
   ]);
 
   // Camera control handlers
   const handleToggleCamera = useCallback(async () => {
+    if (!termsAccepted) {
+      promptTermsNotice();
+      return;
+    }
     await camera.toggleCamera();
-  }, [camera]);
+  }, [camera, termsAccepted, promptTermsNotice]);
 
   const handleSwitchCamera = useCallback(async () => {
+    if (!termsAccepted) {
+      promptTermsNotice();
+      return;
+    }
     // Prefer device cycling when multiple are exposed; otherwise flip facingMode (mobile)
     if ((camera.availableCameraCount ?? 0) > 1) {
       await camera.switchCamera();
     } else {
       await camera.flipFacingMode();
     }
-  }, [camera]);
+  }, [camera, termsAccepted, promptTermsNotice]);
 
-  
+  const handleVoiceToggle = useCallback(async () => {
+    if (!termsAccepted) {
+      promptTermsNotice();
+      return;
+    }
+    await toggleVoiceSession();
+  }, [termsAccepted, promptTermsNotice, toggleVoiceSession]);
 
-  
-  const intelligenceHook = useChatIntelligence(sessionId);
+  const handleToggleScreenShare = useCallback(async () => {
+    if (!termsAccepted) {
+      promptTermsNotice();
+      return;
+    }
+    await chatStateHook.toggleScreenShare();
+  }, [chatStateHook, termsAccepted, promptTermsNotice]);
+
   const artifactsState = useArtifacts();
 
   useEffect(() => {
@@ -259,6 +299,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     streamedArtifacts ?? []
   ), [streamedArtifacts]);
 
+
   const exportArtifacts = artifactCards;
 
   const sessionIdForExport = messagesHook.sessionId || intelligenceHook.sessionId;
@@ -290,10 +331,10 @@ export function ChatInterface({ id }: { id?: string | null }) {
     try {
       if (t === 'enable_voice') {
         setRequestedPopover('voice');
-        await toggleVoiceSession();
+        await handleVoiceToggle();
       } else if (t === 'enable_screen_share') {
         setRequestedPopover('screen');
-        await chatStateHook.toggleScreenShare();
+        await handleToggleScreenShare();
       } else if (t === 'enable_webcam') {
         setRequestedPopover('camera');
         await handleToggleCamera();
@@ -303,7 +344,7 @@ export function ChatInterface({ id }: { id?: string | null }) {
     } catch (e) {
       console.error('Failed to approve tool:', t, e);
     }
-  }, [chatStateHook, handleToggleCamera, toggleVoiceSession]);
+  }, [handleToggleCamera, handleToggleScreenShare, handleVoiceToggle]);
 
   const handleDeclineTool = useCallback((tool: string) => {
     console.info('Tool declined:', tool);
@@ -457,8 +498,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
               isLoading={messagesHook.isLoading}
               contextReady={intelligenceHook.contextReady}
               currentContext={intelligenceHook.currentContext}
-              hasAcceptedTerms={intelligenceHook.hasAcceptedTerms}
-              onSendMessage={messagesHook.handleSendMessage}
+              hasAcceptedTerms={termsAccepted}
+              onSendMessage={handleSendMessage}
               aiElements={aiConfig}
               isExpanded={isExpanded}
               artifacts={artifactCards}
@@ -532,12 +573,12 @@ export function ChatInterface({ id }: { id?: string | null }) {
           screenShareStream={chatState.screenShareStream}
           screenThumbnail={screenThumbnail}
           screenShareError={chatState.screenShareError ?? undefined}
-          onInputChange={messagesHook.setInputValue}
-          onSendMessage={messagesHook.handleSendMessage}
-          onToggleVoice={toggleVoiceSession}
+          onInputChange={setInputValue}
+          onSendMessage={handleSendMessage}
+          onToggleVoice={handleVoiceToggle}
           onToggleCamera={handleToggleCamera}
           onSwitchCamera={handleSwitchCamera}
-          onToggleScreenShare={chatStateHook.toggleScreenShare}
+          onToggleScreenShare={handleToggleScreenShare}
           onToggleSettings={chatStateHook.toggleSettings}
           // Manual analyze removed — auto-analysis via useScreenShareSnapshots
           isExpanded={isExpanded}
@@ -547,6 +588,8 @@ export function ChatInterface({ id }: { id?: string | null }) {
           autoOpenPopover={requestedPopover}
           onAutoOpenPopoverHandled={() => setRequestedPopover(null)}
           visualizerState={visualizerState}
+          termsAccepted={termsAccepted}
+          onRequireTerms={promptTermsNotice}
         />
       </div>
     </div>

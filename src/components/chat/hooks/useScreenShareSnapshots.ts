@@ -39,6 +39,8 @@ export function useScreenShareSnapshots({
     const video = document.createElement('video')
     video.srcObject = stream
     video.muted = true
+    video.playsInline = true
+    video.play().catch(() => undefined)
 
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')

@@ -114,7 +114,11 @@ export function useChatState() {
   }, []);
 
   const toggleScreenShare = useCallback(async () => {
-    console.log('🖥️ [useChatState] toggleScreenShare called', { isScreenSharing: chatState.isScreenSharing });
+    console.log('🖥️ [useChatState] toggleScreenShare called', { isScreenSharing: chatState.isScreenSharing, isScreenShareInitializing: chatState.isScreenShareInitializing });
+    if (chatState.isScreenShareInitializing) {
+      console.log('🖥️ [useChatState] Screen share is still initializing; ignoring toggle.');
+      return;
+    }
     if (chatState.isScreenSharing) {
       console.log('🖥️ [useChatState] Screen share is active, stopping...');
       stopScreenShare();
@@ -127,7 +131,7 @@ export function useChatState() {
     } catch (error) {
       console.error("🖥️ [useChatState] Failed to start screen sharing", error);
     }
-  }, [chatState.isScreenSharing, startScreenShare, stopScreenShare]);
+  }, [chatState.isScreenSharing, chatState.isScreenShareInitializing, startScreenShare, stopScreenShare]);
 
   const toggleSettings = useCallback(() => {
     setChatState(prev => ({ ...prev, showSettings: !prev.showSettings }));

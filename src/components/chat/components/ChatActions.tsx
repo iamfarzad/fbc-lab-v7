@@ -30,6 +30,7 @@ interface ChatActionsProps {
   className?: string;
   disabled?: boolean;
   analyticsId?: string;
+  onRequestUnlock?: () => void;
 }
 
 export function ChatActions({
@@ -44,15 +45,11 @@ export function ChatActions({
   className,
   disabled = false,
   analyticsId,
+  onRequestUnlock,
 }: ChatActionsProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const isMobile = useIsMobile(768);
-
-  // Add debugging
-  useEffect(() => {
-    console.log('[ChatActions] isMobile:', isMobile, 'popoverOpen:', popoverOpen);
-  }, [isMobile, popoverOpen]);
 
   const closeAll = useCallback(() => {
     setPopoverOpen(false);
@@ -88,8 +85,9 @@ export function ChatActions({
 
   const createHandler = useCallback(
     (handler?: () => void) => () => {
+      if (!handler) return;
       closeAll();
-      handler?.();
+      handler();
     },
     [closeAll]
   );
@@ -190,6 +188,7 @@ export function ChatActions({
             onClick={(event) => {
               if (disabled) {
                 event.preventDefault();
+                onRequestUnlock?.();
                 return;
               }
               if (isMobile) {

@@ -35,6 +35,8 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
       onToggleScreenShare,
       className,
       availableCameras,
+      termsAccepted = true,
+      onRequireTerms,
       ...rest
     } = props as ConversationBarProps & { onToggleCamera: () => void | Promise<void>; onToggleScreenShare: () => void | Promise<void> };
 
@@ -241,7 +243,22 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
         </div>
 
         {/* Existing input, with status line suppressed (Conversation Bar owns it) */}
-        <ChatInput ref={ref} {...(rest as any)} isMinimized={isMinimized} isVoiceActive={isVoiceActive!} isVoiceProcessing={isVoiceProcessing!} showStatusLine={false} cameraState={cameraState!} isScreenSharing={isScreenSharing!} onToggleCamera={onToggleCamera} onToggleScreenShare={onToggleScreenShare} voicePartialTranscript={voicePartialTranscript!} disableExpandedControls={true} />
+        <ChatInput
+          ref={ref}
+          {...(rest as any)}
+          termsAccepted={termsAccepted}
+          onRequireTerms={onRequireTerms}
+          isMinimized={isMinimized}
+          isVoiceActive={isVoiceActive!}
+          isVoiceProcessing={isVoiceProcessing!}
+          showStatusLine={false}
+          cameraState={cameraState!}
+          isScreenSharing={isScreenSharing!}
+          onToggleCamera={onToggleCamera}
+          onToggleScreenShare={onToggleScreenShare}
+          voicePartialTranscript={voicePartialTranscript!}
+          disableExpandedControls={true}
+        />
       </div>
     );
   }

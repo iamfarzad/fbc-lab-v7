@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react";
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
   PromptInput,
@@ -26,7 +26,7 @@ import { useMediaKeyboardShortcuts } from "@/hooks/useMediaKeyboardShortcuts";
 // MediaDrawer and MediaPanel removed
 import { ChatActions } from "./ChatActions";
 
-type SendMessageInput = string | {
+export type SendMessageInput = string | {
   text?: string;
   attachments?: PromptInputFile[];
 };
@@ -67,6 +67,8 @@ interface ChatInputProps {
   sessionIdForExport?: string | null;
   autoOpenPopover?: 'voice' | 'camera' | 'screen' | null;
   onAutoOpenPopoverHandled?: () => void;
+  termsAccepted?: boolean;
+  onRequireTerms?: () => void;
 }
 
 export type ChatInputHandle = {
@@ -118,6 +120,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   showStatusLine = true,
   showVoicePreview = false,
   disableExpandedControls = false,
+  termsAccepted = true,
+  onRequireTerms,
 }, ref) {
   const [isFocused, setIsFocused] = useState(false);
   const [manualInputOverride, setManualInputOverride] = useState(false);
@@ -190,11 +194,26 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
     onPermissionNeeded: setPendingPermission
   });
 
+  const ensureTerms = useCallback(() => {
+    if (termsAccepted) return true;
+    onRequireTerms?.();
+    return false;
+  }, [termsAccepted, onRequireTerms]);
+
   // Unified keyboard shortcuts
   useMediaKeyboardShortcuts({
-    onVoiceToggle: voiceToggle.handleButtonClick,
-    onCameraToggle: cameraToggle.handleButtonClick,
-    onScreenToggle: screenToggle.handleButtonClick,
+    onVoiceToggle: () => {
+      if (!ensureTerms()) return;
+      voiceToggle.handleButtonClick();
+    },
+    onCameraToggle: () => {
+      if (!ensureTerms()) return;
+      cameraToggle.handleButtonClick();
+    },
+    onScreenToggle: () => {
+      if (!ensureTerms()) return;
+      screenToggle.handleButtonClick();
+    },
     onClosePopover: () => setActivePopover(null)
   });
 
@@ -221,18 +240,22 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
 
   // Simplified handlers that close actions menu and delegate to hooks
   const handleVoiceButtonClick = () => {
+    if (!ensureTerms()) return;
     voiceToggle.handleButtonClick();
   };
 
   const handleCameraButtonClick = () => {
+    if (!ensureTerms()) return;
     cameraToggle.handleButtonClick();
   };
 
   const handleScreenButtonClick = () => {
+    if (!ensureTerms()) return;
     screenToggle.handleButtonClick();
   };
 
   const handleDownloadSession = async () => {
+    if (!ensureTerms()) return;
     if (!sessionIdForExport) {
       toast.error('Conversation not ready for download yet.');
       return;
@@ -339,6 +362,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
           )}
           accept="image/*,.pdf"
           onSubmit={async (message) => {
+            if (!ensureTerms()) {
+              return;
+            }
             const text = message.text?.trim() ?? '';
 
             if (!text && (!message.files || message.files.length === 0)) {
@@ -366,14 +392,20 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
             <PromptInputTextarea
               className="rounded-xl bg-transparent px-2 sm:px-3 py-1.5 text-sm leading-relaxed text-foreground/90 placeholder:text-muted-foreground/70 min-h-[36px] max-h-[120px] resize-none"
             value={getInputDisplayValue()}
-            onFocus={() => setIsFocused(true)}
+            onFocus={() => {
+              if (!ensureTerms()) {
+                (document.activeElement as HTMLElement | null)?.blur?.();
+                return;
+              }
+              setIsFocused(true);
+            }}
             onBlur={() => setIsFocused(false)}
             onChange={(e) => {
               if (isListening && !manualInputOverride) setManualInputOverride(true);
               onInputChange(e.target.value);
             }}
-            placeholder={getPlaceholder()}
-            disabled={isLoading}
+            placeholder={termsAccepted ? getPlaceholder() : 'Share your name and email above to begin.'}
+            disabled={isLoading || !termsAccepted}
           />
 
           <PromptInputAttachments className="pt-1">
@@ -403,26 +435,43 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                 onScheduleCall={onOpenMeeting}
                 onExportSummary={onExportSummary}
                 canExportSummary={Boolean(sessionIdForExport)}
-                onUploadFiles={() => hiddenFilesInputRef.current?.click()}
-                onUploadImages={() => hiddenImagesInputRef.current?.click()}
+                onUploadFiles={() => {
+                  if (!ensureTerms()) return;
+                  hiddenFilesInputRef.current?.click();
+                }}
+                onUploadImages={() => {
+                  if (!ensureTerms()) return;
+                  hiddenImagesInputRef.current?.click();
+                }}
+                onRequestUnlock={() => {
+                  if (!termsAccepted) ensureTerms();
+                }}
                 voice={{
                   isActive: isVoiceActive,
                   isProcessing: isVoiceProcessing,
                   onToggle: handleVoiceButtonClick,
-                  disabled: isVoiceProcessing || isVoiceInitializing,
+                  disabled: isVoiceInitializing,
                 }}
                 camera={{
                   isActive: cameraState,
                   isProcessing: Boolean(isCameraInitializing),
                   onToggle: handleCameraButtonClick,
+                  disabled: Boolean(isCameraInitializing),
                 }}
                 screen={{
                   isActive: isScreenSharing,
                   isProcessing: Boolean(isScreenShareInitializing),
                   onToggle: handleScreenButtonClick,
+                  disabled: Boolean(isScreenShareInitializing),
                 }}
               />
             </PromptInputTools>
+
+            {!termsAccepted && (
+              <p className="px-1 sm:px-0 text-[11px] text-muted-foreground">
+                Introduce yourself above and accept the terms to unlock chat, voice, and media tools.
+              </p>
+            )}
 
                         {/* Right side: Voice + Send */}
                         <div className="flex items-center gap-2">
