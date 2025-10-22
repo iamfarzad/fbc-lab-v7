@@ -810,15 +810,28 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
         case 'TURN_COMPLETE': {
           console.info(`[${connectionId}] Handling TURN_COMPLETE message`);
           const client = activeSessions.get(connectionId)
-          if (!client) {
+          if (!client || !client.session) {
             console.warn(`[${connectionId}] TURN_COMPLETE received but no active session`)
             console.warn(`[${connectionId}] Active sessions: ${Array.from(activeSessions.keys()).join(', ')}`)
             break
           }
-          // Don't send turnComplete to Live API - it's auto-detected when user stops speaking
-          // Just acknowledge to client
-          safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
-          client.logger?.log('turn_complete_received')
+          try {
+            if (typeof client.session.sendClientContent === 'function') {
+              await client.session.sendClientContent({ turns: [], turnComplete: true })
+            } else if (typeof client.session.sendTurnComplete === 'function') {
+              await client.session.sendTurnComplete()
+            } else if (typeof client.session.send === 'function') {
+              await client.session.send({ turnComplete: true })
+            } else {
+              console.warn(`[${connectionId}] Live session does not support turnComplete signaling`)
+            }
+            safeSend(ws, JSON.stringify({ type: 'turn_complete' }))
+            client.logger?.log('turn_complete_forwarded')
+          } catch (err) {
+            console.error(`[${connectionId}] Failed to forward turnComplete to Live API:`, err)
+            client.logger?.log('error', { where: 'turn_complete_forward', message: err instanceof Error ? err.message : String(err) })
+            safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Failed to complete voice turn' } }))
+          }
           break
         }
         case 'heartbeat_ack': {

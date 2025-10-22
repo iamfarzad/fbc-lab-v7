@@ -33,17 +33,8 @@ export function useVoicePipeline({
   lastWebcamSnapshot,
 }: VoicePipelineOptions) {
   const [aiSpeechTranscript, setAiSpeechTranscript] = useState('')
-  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const screenAnalyzerRef = useRef<ScreenAnalyzer>(null)
   const audioHookRef = useRef<ReturnType<typeof useLiveApi> | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (resetTimerRef.current) {
-        clearTimeout(resetTimerRef.current)
-      }
-    }
-  }, [])
 
   const handleVoiceSessionState = useCallback((state: { active: boolean; isProcessing?: boolean }) => {
     setListening(state.active || Boolean(state.isProcessing))
@@ -267,7 +258,7 @@ export function useVoicePipeline({
       console.error('🎤 Audio hook ref not available')
       return
     }
-    if (hook.isSessionActive) {
+    if (hook.isSessionActive || hook.isRecording || hook.isProcessing) {
       await hook.stopSession()
     } else {
       await hook.startSession({ sessionId })
