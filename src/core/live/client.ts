@@ -116,6 +116,17 @@ export class LiveClientWS {
 
   start(opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    if (!this.connectionId) {
+      console.log('🔌 [LiveClient] Waiting for server connected event before sending start message');
+      // Wait for connected event before sending start message
+      const handleConnected = () => {
+        console.log('🔌 [LiveClient] Server connected, now sending start message');
+        this.off('connected', handleConnected);
+        this.send({ type: 'start', payload: opts || {} })
+      };
+      this.on('connected', handleConnected);
+      return;
+    }
     this.send({ type: 'start', payload: opts || {} })
   }
 
