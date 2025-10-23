@@ -682,21 +682,31 @@ ARTIFACT CREATION:
 
 If conversationFlow.recommendedNext is null, you have enough information - offer a crisp recap and propose the next concrete move.`
 
-    // Add voice context if available
+    // Add multimodal context if available
     const voiceContextStart = Date.now()
     if (context?.sessionId) {
       try {
-        const voiceTranscripts = await multimodalContextManager.getVoiceTranscripts(context.sessionId, 3)
-        if (voiceTranscripts.length > 0) {
-          systemPrompt += `\n\nRECENT VOICE CONTEXT:\n${voiceTranscripts.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`
+        const recentHistory = await multimodalContextManager.getConversationHistory(context.sessionId, 8)
+        
+        if (recentHistory.length > 0) {
+          const formatted = recentHistory
+            .filter(entry => entry.modality === 'audio' || entry.modality === 'image')
+            .map(entry => {
+              const modality = entry.modality === 'audio' ? '[VOICE]' : '[VISUAL]'
+              return `${modality} ${entry.metadata?.speaker || 'user'}: ${entry.content}`
+            })
+            .join('\n')
+          
+          if (formatted) {
+            systemPrompt += `\n\nRECENT MULTIMODAL CONTEXT:\n${formatted}`
+          }
         }
       } catch (err) {
-        // Voice context is best-effort
-        console.error('Failed to load voice context (non-fatal):', err)
+        console.error('Failed to load multimodal context (non-fatal):', err)
       }
     }
     timings.voiceContext = Date.now() - voiceContextStart
-    console.log(`⏱️  [PERF] Voice context: ${timings.voiceContext}ms`)
+    console.log(`⏱️  [PERF] Multimodal context: ${timings.voiceContext}ms`)
 
     // Note if voice is currently active
     if (context?.voiceActive) {

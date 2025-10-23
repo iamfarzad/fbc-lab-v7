@@ -354,6 +354,7 @@ export class MultimodalContextManager {
   /**
    * Add conversation turn for Google-style export format
    * Tracks every user/AI message for clean transcript export
+   * CRITICAL FIX: Also syncs to conversationHistory for cross-modal visibility
    */
   async addConversationTurn(sessionId: string, turn: Omit<ConversationTurn, 'timestamp'> & { timestamp?: string }): Promise<void> {
     const context = await this.getOrCreateContext(sessionId)
@@ -368,6 +369,22 @@ export class MultimodalContextManager {
     }
     
     context.conversationTurns.push(conversationTurn)
+    
+    // CRITICAL FIX: Also add to conversationHistory for cross-modal visibility
+    const conversationEntry: ConversationEntry = {
+      id: crypto.randomUUID(),
+      timestamp: conversationTurn.timestamp,
+      modality: turn.modality === 'voice' ? 'audio' : 'text',
+      content: turn.text,
+      metadata: {
+        speaker: turn.role === 'user' ? 'user' : 'assistant',
+        isFinal: turn.isFinal,
+        ...(turn.toolCall && { toolCall: turn.toolCall }),
+        ...(turn.fileUpload && { fileUpload: turn.fileUpload })
+      }
+    }
+    context.conversationHistory.push(conversationEntry)
+    
     context.metadata.lastUpdated = conversationTurn.timestamp
 
     // Track modality usage

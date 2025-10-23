@@ -236,26 +236,26 @@ import { MESSAGE_TYPES } from './message-types.js'
     
     try {
       const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
-      const recentConversation = await multimodalContextManager.getConversationHistory(sessionId, 6)
+      
+      // Get COMPLETE conversation history (chat + voice + visual)
+      const recentConversation = await multimodalContextManager.getConversationHistory(sessionId, 10)
 
       if (recentConversation.length > 0) {
         const formatted = recentConversation
           .map((entry) => {
-            const rawSpeaker = typeof entry.metadata?.speaker === 'string' ? entry.metadata.speaker : undefined
-            const speaker = rawSpeaker === 'assistant' || rawSpeaker === 'model'
+            const speaker = entry.metadata?.speaker === 'assistant' || entry.metadata?.speaker === 'model'
               ? 'assistant'
-              : rawSpeaker === 'user'
-                ? 'user'
-                : entry.modality === 'text'
-                  ? 'user'
-                  : 'assistant'
+              : 'user'
+            const modality = entry.modality === 'audio' ? '[VOICE]' : 
+                            entry.modality === 'image' ? '[VISUAL]' : 
+                            entry.modality === 'video' ? '[VIDEO]' : ''
             const trimmed = entry.content.trim().replace(/\s+/g, ' ')
-            const truncated = trimmed.length > 220 ? `${trimmed.slice(0, 217).trimEnd()}...` : trimmed
-            return `${speaker}: ${truncated}`
+            const truncated = trimmed.length > 300 ? `${trimmed.slice(0, 297).trimEnd()}...` : trimmed
+            return `${speaker}${modality}: ${truncated}`
           })
           .join('\n')
 
-        return `\n\nRECENT TEXT CHAT (latest first shown last):\n${formatted}`
+        return `\n\nRECENT CONVERSATION (all modalities):\n${formatted}`
       }
     } catch (err) {
       console.warn(`[${connectionId}] Failed to load conversation history for voice session:`, err)
@@ -380,7 +380,20 @@ import { MESSAGE_TYPES } from './message-types.js'
           try {
             const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
             const imageBytes = typeof imageData === 'string' ? Math.floor(imageData.length * 0.75) : undefined
+            
+            // Add as conversation turn for unified visibility
+            await multimodalContextManager.addConversationTurn(client.sessionId!, {
+              role: 'user',
+              text: `[${modality.toUpperCase()}] ${analysis}`,
+              isFinal: true,
+              modality: 'image',
+              timestamp: new Date(capturedAt).toISOString()
+            })
+            
+            // Also add to visual context
             await multimodalContextManager.addVisualAnalysis(client.sessionId!, analysis, modalityKey, imageBytes, imageData)
+            
+            console.log(`[${connectionId}] ✅ ${modality} context persisted to conversation history`)
             client.logger?.log('context_persisted', { modality, imageBytes, analysisLength: analysis.length })
           } catch (err) {
             console.error(`[${connectionId}] Failed to persist ${modality} context:`, err);
