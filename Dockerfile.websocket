@@ -1,6 +1,6 @@
 # WebSocket Voice Server Dockerfile for Fly.io
-# IMPORTANT: Run from project root so the build context includes server/ and src/
-# Deploy with: fly deploy --config server/fly.toml --dockerfile Dockerfile.websocket
+# IMPORTANT: Build context is project root, fly.toml is in server/
+# Deploy with: fly deploy -c server/fly.toml (from project root)
 
 FROM node:20-alpine
 
@@ -17,9 +17,12 @@ RUN pnpm install --prod
 COPY server/live-server.ts ./
 COPY server/session-logger.ts ./
 
-# Copy shared source files used by the server (to /src, not /app/src, since live-server imports ../src/config)
+# Copy shared source files used by the server
 COPY src/config /src/config
 COPY src/core/context /src/core/context
+COPY src/core/live /src/core/live
+COPY src/lib/audio /src/lib/audio
+COPY src/types /src/types
 
 # Install tsx for TypeScript execution
 RUN pnpm add tsx

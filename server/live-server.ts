@@ -9,9 +9,10 @@
   import * as path from 'path'
   import * as dotenv from 'dotenv'
   import { fileURLToPath } from 'url'
-  import { SessionLogger } from './session-logger'
-  import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG } from '../src/config/constants.js'
-  // import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js' // Removed for simplified config
+import { SessionLogger } from './session-logger'
+import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG, ALLOWED_ORIGINS } from '../src/config/constants.js'
+import { MESSAGE_TYPES } from './message-types.js'
+// import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js' // Removed for simplified config
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -37,7 +38,7 @@
   // Helper function to send turn completion and clear timer
   function sendTurnComplete(connectionId: string, client: ActiveSessionRecord, reason: string) {
     console.info(`[${connectionId}] 🔄 Sending turn_complete (reason: ${reason})`);
-    safeSend(client.ws, JSON.stringify({ type: 'turn_complete', payload: { turnComplete: true } }));
+    safeSend(client.ws, JSON.stringify({ type: MESSAGE_TYPES.TURN_COMPLETE, payload: { turnComplete: true } }));
     client.logger?.log('turn_complete_auto', { reason });
     
     // Clear the timer
@@ -125,9 +126,21 @@
     perMessageDeflate: false,
     maxPayload: 10 * 1024 * 1024,
     verifyClient: (info: { origin: string; req: http.IncomingMessage; secure: boolean }) => {
-      // Log connection attempts for debugging
-      console.info(`🔌 WebSocket connection attempt from ${info.origin || 'unknown origin'}`)
-      return true // Accept all connections for now
+      const isProduction = process.env.NODE_ENV === 'production';
+      
+      if (!isProduction) {
+        console.info(`🔌 Dev mode: Accepting connection from ${info.origin || 'unknown'}`);
+        return true;
+      }
+      
+      const origin = info.origin;
+      const allowed = ALLOWED_ORIGINS.includes(origin);
+      
+      if (!allowed) {
+        console.warn(`🚫 Rejected connection from unauthorized origin: ${origin}`);
+      }
+      
+      return allowed;
     },
     handleProtocols: (protocols: Set<string>) => {
       // Handle any subprotocols if needed
@@ -142,7 +155,7 @@
         try {
           ws.ping();
           // Also send a lightweight heartbeat message for additional reliability
-          ws.send(JSON.stringify({ type: 'heartbeat', timestamp: Date.now() }));
+          ws.send(JSON.stringify({ type: MESSAGE_TYPES.HEARTBEAT, timestamp: Date.now() }));
         } catch (error) {
           console.warn('Failed to send ping to client:', error);
         }
@@ -217,11 +230,206 @@
     }
   }
 
+  // Helper function to load conversation history
+  async function loadConversationHistory(sessionId: string, connectionId: string): Promise<string> {
+    if (!sessionId) return '';
+    
+    try {
+      const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+      const recentConversation = await multimodalContextManager.getConversationHistory(sessionId, 6)
+
+      if (recentConversation.length > 0) {
+        const formatted = recentConversation
+          .map((entry) => {
+            const rawSpeaker = typeof entry.metadata?.speaker === 'string' ? entry.metadata.speaker : undefined
+            const speaker = rawSpeaker === 'assistant' || rawSpeaker === 'model'
+              ? 'assistant'
+              : rawSpeaker === 'user'
+                ? 'user'
+                : entry.modality === 'text'
+                  ? 'user'
+                  : 'assistant'
+            const trimmed = entry.content.trim().replace(/\s+/g, ' ')
+            const truncated = trimmed.length > 220 ? `${trimmed.slice(0, 217).trimEnd()}...` : trimmed
+            return `${speaker}: ${truncated}`
+          })
+          .join('\n')
+
+        return `\n\nRECENT TEXT CHAT (latest first shown last):\n${formatted}`
+      }
+    } catch (err) {
+      console.warn(`[${connectionId}] Failed to load conversation history for voice session:`, err)
+    }
+    
+    return '';
+  }
+
+  // Helper function to build Live API configuration
+  function buildLiveConfig(priorContext: string): any {
+    const liveConfig: any = {
+      responseModalities: ["AUDIO"],
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
+      speechConfig: {
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
+      },
+      systemInstruction: 'You are a friendly and helpful AI assistant. Keep your responses concise.'
+    }
+    
+    if (priorContext) {
+      liveConfig.systemInstruction = `${GEMINI_CONFIG.SYSTEM_PROMPT}${priorContext}`
+    }
+    
+    return liveConfig;
+  }
+
+  // Message handler functions
+  async function handleToolResult(connectionId: string, client: ActiveSessionRecord, payload: any) {
+    const responses = payload?.responses;
+    if (!Array.isArray(responses) || responses.length === 0) {
+      console.warn(`[${connectionId}] TOOL_RESULT missing responses`);
+      return;
+    }
+    
+    try {
+      client.logger?.log('tool_result_client', { responsesCount: responses.length })
+      await client.session.sendToolResponse({ functionResponses: responses });
+      safeSend(client.ws, JSON.stringify({ type: MESSAGE_TYPES.TOOL_CALL, payload: { responses } }));
+      client.logger?.log('tool_result_forwarded', { responsesCount: responses.length })
+    } catch (err) {
+      console.error(`[${connectionId}] Failed to forward tool responses to Live API:`, err);
+      safeSend(client.ws, JSON.stringify({ type: MESSAGE_TYPES.TOOL_CALL, payload: { error: err instanceof Error ? err.message : 'Tool response failed' } }));
+      client.logger?.log('error', { where: 'tool_result_forward', message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  async function handleRealtimeInput(connectionId: string, client: ActiveSessionRecord, payload: any) {
+    const chunks = Array.isArray(payload?.chunks) ? payload.chunks : [];
+
+    if (chunks.length === 0) {
+      console.warn(`[${connectionId}] REALTIME_INPUT received but no chunks`);
+      return;
+    }
+
+    try {
+      // Send chunks directly to Live API using sendRealtimeInput
+      if (typeof client.session.sendRealtimeInput === 'function') {
+        await client.session.sendRealtimeInput({ media: chunks[0] }); // Send first chunk
+        console.info(`[${connectionId}] ✅ Webcam frame sent to Live API via sendRealtimeInput`);
+        client.logger?.log('realtime_input_sent', { chunks: chunks.length, mimeType: chunks[0]?.mimeType });
+      } else {
+        console.warn(`[${connectionId}] sendRealtimeInput not available on session`);
+      }
+    } catch (err) {
+      console.error(`[${connectionId}] Failed to send realtime input:`, err);
+      client.logger?.log('error', { where: 'realtime_input', message: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  async function handleContextUpdate(connectionId: string, client: ActiveSessionRecord, payload: any) {
+    const modality = typeof payload?.modality === 'string' ? payload.modality : '';
+    if (modality !== 'screen' && modality !== 'webcam') {
+      console.warn(`[${connectionId}] CONTEXT_UPDATE ignored due to invalid modality: ${modality}`);
+      return;
+    }
+
+    const analysis = typeof payload.analysis === 'string' ? payload.analysis : '';
+    if (!analysis) {
+      console.warn(`[${connectionId}] CONTEXT_UPDATE missing analysis text`);
+      return;
+    }
+
+    const capturedAt = typeof payload.capturedAt === 'number' ? payload.capturedAt : Date.now();
+    const imageData = typeof payload.imageData === 'string' ? payload.imageData : undefined;
+
+    client.latestContext = client.latestContext || {};
+    const modalityKey = modality as 'screen' | 'webcam';
+    const prev = client.latestContext[modalityKey];
+    client.latestContext[modalityKey] = {
+      analysis,
+      capturedAt,
+      imageData,
+      lastInjected: prev?.lastInjected,
+      lastPersisted: prev?.lastPersisted
+    };
+    client.logger?.log('context_update', { modality, analysis, capturedAt, hasImage: Boolean(imageData), imageBytes: typeof imageData === 'string' ? Math.floor(imageData.length * 0.75) : 0 })
+
+    if (client.sessionId) {
+      const snapRef = client.latestContext[modalityKey];
+      const now = Date.now();
+      if (!snapRef.lastPersisted || now - snapRef.lastPersisted >= VISUAL_PERSIST_THROTTLE_MS) {
+        snapRef.lastPersisted = now;
+        (async () => {
+          try {
+            const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+            const imageBytes = typeof imageData === 'string' ? Math.floor(imageData.length * 0.75) : undefined
+            await multimodalContextManager.addVisualAnalysis(client.sessionId!, analysis, modalityKey, imageBytes, imageData)
+            client.logger?.log('context_persisted', { modality, imageBytes, analysisLength: analysis.length })
+          } catch (err) {
+            console.error(`[${connectionId}] Failed to persist ${modality} context:`, err);
+            client.logger?.log('error', { where: 'context_persist', modality, message: err instanceof Error ? err.message : String(err) })
+          }
+        })().catch(() => {
+          // handled in logger
+        })
+      }
+    }
+
+    if (!INJECT_ON_CONTEXT_UPDATE) {
+      console.info(`[${connectionId}] CONTEXT_UPDATE received; injection disabled by flag`);
+      return;
+    }
+
+    // Debounce injection per-modality to avoid spamming the Live API
+    client.injectionTimers = client.injectionTimers || {};
+    const timers = client.injectionTimers;
+    if (timers[modalityKey]) {
+      clearTimeout(timers[modalityKey]);
+    }
+
+    timers[modalityKey] = setTimeout(async () => {
+      try {
+        const snap = client.latestContext[modalityKey];
+        if (!snap) return;
+        const now = Date.now();
+        if (typeof snap.lastInjected === 'number' && snap.lastInjected > now - VISUAL_INJECT_THROTTLE_MS) {
+          console.info(`[${connectionId}] ${modality} context injection skipped (recently injected)`);
+          client.logger?.log('context_injection_skipped', { modality, reason: 'debounce_throttle', throttleMs: CONTEXT_INJECT_DEBOUNCE_MS })
+          return;
+        }
+
+        if (typeof client.session.sendRealtimeInput === 'function') {
+          // Send image first if available
+          if (snap.imageData) {
+            const base64Data = snap.imageData.replace(/^data:image\/\w+;base64,/, '');
+            await client.session.sendRealtimeInput({ 
+              media: { mimeType: 'image/jpeg', data: base64Data } 
+            });
+          }
+          // Then send text context
+          await client.session.sendRealtimeInput({ 
+            media: { mimeType: 'text/plain', data: `[${modality} context]: ${snap.analysis}` }
+          });
+        } else {
+          throw new Error('sendRealtimeInput not available');
+        }
+        snap.lastInjected = now;
+        console.info(`[${connectionId}] ✅ ${modality} context injected to Live API`);
+        client.logger?.log('context_injected', { modality, hadImage: Boolean(snap.imageData), analysisSnippet: snap.analysis?.slice(0, 500) })
+      } catch (err) {
+        console.error(`[${connectionId}] Failed debounced inject for ${modality}:`, err);
+        client.logger?.log('error', { where: 'debounced_inject', modality, message: err instanceof Error ? err.message : String(err) })
+      } finally {
+        timers[modalityKey] = undefined;
+      }
+    }, CONTEXT_INJECT_DEBOUNCE_MS);
+  }
+
   async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
     console.info(`[${connectionId}] 🔊 handleStart called with payload:`, JSON.stringify(payload));
 
     // Acknowledge start immediately so client doesn't timeout
-    safeSend(ws, JSON.stringify({ type: 'start_ack', payload: { connectionId } }));
+    safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.START_ACK, payload: { connectionId } }));
 
     // Prevent concurrent starts
     if (sessionStarting.has(connectionId)) {
@@ -245,7 +453,7 @@
 
     if (!process.env.GEMINI_API_KEY) {
       console.error(`[${connectionId}] FATAL: GEMINI_API_KEY not configured.`);
-      safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'GEMINI_API_KEY not configured on server.' } }));
+      safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.ERROR, payload: { message: 'GEMINI_API_KEY not configured on server.' } }));
       sessionStarting.delete(connectionId)
       return;
     }
@@ -257,35 +465,7 @@
       const voiceName = requestedVoice || VOICE_CONFIG.BY_LANG[lang as keyof typeof VOICE_CONFIG.BY_LANG] || VOICE_CONFIG.DEFAULT_VOICE
       const sessionId = typeof payload?.sessionId === 'string' ? payload.sessionId.trim() : ''
 
-      let priorChatContext = ''
-      if (sessionId) {
-        try {
-          const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
-          const recentConversation = await multimodalContextManager.getConversationHistory(sessionId, 6)
-
-          if (recentConversation.length > 0) {
-            const formatted = recentConversation
-              .map((entry) => {
-                const rawSpeaker = typeof entry.metadata?.speaker === 'string' ? entry.metadata.speaker : undefined
-                const speaker = rawSpeaker === 'assistant' || rawSpeaker === 'model'
-                  ? 'assistant'
-                  : rawSpeaker === 'user'
-                    ? 'user'
-                    : entry.modality === 'text'
-                      ? 'user'
-                      : 'assistant'
-                const trimmed = entry.content.trim().replace(/\s+/g, ' ')
-                const truncated = trimmed.length > 220 ? `${trimmed.slice(0, 217).trimEnd()}...` : trimmed
-                return `${speaker}: ${truncated}`
-              })
-              .join('\n')
-
-            priorChatContext = `\n\nRECENT TEXT CHAT (latest first shown last):\n${formatted}`
-          }
-        } catch (err) {
-          console.warn(`[${connectionId}] Failed to load conversation history for voice session:`, err)
-        }
-      }
+      const priorChatContext = await loadConversationHistory(sessionId, connectionId);
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -296,19 +476,8 @@
 
       let isOpen = false
 
-      // Simplified Live configuration - match working prototype exactly  
-      const liveConfig: any = {
-        responseModalities: ["AUDIO"],
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
-        },
-        systemInstruction: 'You are a friendly and helpful AI assistant. Keep your responses concise.'
-      }
-      if (priorChatContext) {
-        liveConfig.systemInstruction = `${GEMINI_CONFIG.SYSTEM_PROMPT}${priorChatContext}`
-      }
+      // Build Live API configuration
+      const liveConfig = buildLiveConfig(priorChatContext);
 
       // Add connection timeout to prevent infinite hangs
       const connectTimeout = new Promise((_, reject) => 
@@ -329,13 +498,13 @@
             try {
               // Setup complete
               if (message?.setupComplete) {
-                safeSend(ws, JSON.stringify({ type: 'setup_complete', payload: { setupComplete: true } }));
+                safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.SETUP_COMPLETE, payload: { setupComplete: true } }));
                 activeSessions.get(connectionId)?.logger?.log('setup_complete')
               }
 
               // Tool calls
               if (message?.toolCall) {
-                safeSend(ws, JSON.stringify({ type: 'tool_call', payload: message.toolCall }));
+                safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.TOOL_CALL, payload: message.toolCall }));
                 activeSessions.get(connectionId)?.logger?.log('tool_call', message.toolCall)
 
                 // Track tool call for export
@@ -363,7 +532,7 @@
                 const text = serverContent.inputTranscription.text;
                 const isFinal = (serverContent.inputTranscription as any).isFinal ?? false;
                 // Compat: include both isFinal and final to support older clients
-                safeSend(ws, JSON.stringify({ type: 'input_transcript', payload: { text, isFinal, final: isFinal } }));
+                safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.INPUT_TRANSCRIPT, payload: { text, isFinal, final: isFinal } }));
                 activeSessions.get(connectionId)?.logger?.log('input_transcript', { text, isFinal })
 
                 // Track conversation turn for export (when final)
@@ -398,20 +567,21 @@
                           console.info(`[${connectionId}] Visual trigger detected but recent injection exists; skipping`);
                           clientRec.logger?.log('context_injection_skipped', { reason: 'recent_injection', throttleMs: VISUAL_INJECT_THROTTLE_MS })
                         } else {
-                          const parts: any[] = [];
-                          if (snap.imageData) {
-                            const base64Data = snap.imageData.replace(/^data:image\/\w+;base64,/, '');
-                            parts.push({ inlineData: { mimeType: 'image/jpeg', data: base64Data } });
-                          }
-                          parts.push({ text: `Visual context: ${snap.analysis.substring(0, 200)}` });
-                          // Prefer sendClientContent if available; fallback to send with clientContent wrapper
-                          if (typeof clientRec.session.sendClientContent === 'function') {
-                            await clientRec.session.sendClientContent({
-                              turns: [{ role: 'user', parts }],
-                              turnComplete: false,
+                          // Use sendRealtimeInput for visual context injection
+                          if (typeof clientRec.session.sendRealtimeInput === 'function') {
+                            // Send image first if available
+                            if (snap.imageData) {
+                              const base64Data = snap.imageData.replace(/^data:image\/\w+;base64,/, '');
+                              await clientRec.session.sendRealtimeInput({ 
+                                media: { mimeType: 'image/jpeg', data: base64Data } 
+                              });
+                            }
+                            // Then send text context
+                            await clientRec.session.sendRealtimeInput({ 
+                              media: { mimeType: 'text/plain', data: `Visual context: ${snap.analysis.substring(0, 200)}` }
                             });
                           } else {
-                            throw new Error('Live session cannot accept client content (no method)');
+                            throw new Error('sendRealtimeInput not available');
                           }
                           snap.lastInjected = now;
                           console.info(`[${connectionId}] ✅ Injected visual context due to transcript trigger`);
@@ -432,7 +602,7 @@
                 const text = serverContent.outputTranscription.text;
                 const isFinal = (serverContent.outputTranscription as any).isFinal ?? false;
                 // Compat: include both isFinal and final to support older clients
-                safeSend(ws, JSON.stringify({ type: 'output_transcript', payload: { text, isFinal, final: isFinal } }));
+                safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.OUTPUT_TRANSCRIPT, payload: { text, isFinal, final: isFinal } }));
                 activeSessions.get(connectionId)?.logger?.log('output_transcript', { text, isFinal })
 
                 // Track conversation turn for export (when final)
@@ -458,19 +628,19 @@
               if (serverContent.modelTurn?.parts) {
                 for (const part of serverContent.modelTurn.parts) {
                   if (part.text) {
-                    safeSend(ws, JSON.stringify({ type: 'text', payload: { content: part.text } }));
+                    safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.TEXT, payload: { content: part.text } }));
                     activeSessions.get(connectionId)?.logger?.log('model_text', { text: part.text })
                   }
                   if (part.inlineData?.data) {
                     const audioBase64 = part.inlineData.data;
-                    safeSend(ws, JSON.stringify({ type: 'audio', payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' } }));
+                    safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.AUDIO, payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' } }));
                     activeSessions.get(connectionId)?.logger?.log('audio_chunk', { direction: 'server_to_client', bytes: (audioBase64?.length || 0) * 0.75, mimeType: 'audio/pcm;rate=24000' })
                   }
                 }
               }
 
               if (serverContent.turnComplete) {
-                safeSend(ws, JSON.stringify({ type: 'turn_complete', payload: { turnComplete: true } }));
+                safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.TURN_COMPLETE, payload: { turnComplete: true } }));
                 activeSessions.get(connectionId)?.logger?.log('turn_complete')
                 // Clear any pending turn completion timer since we received a real one
                 const client = activeSessions.get(connectionId);
@@ -489,7 +659,7 @@
             const message = error?.message || (error instanceof Error ? error.message : 'Live API error');
             const code = (error && (error.code || error.status)) || undefined;
             console.error(`[${connectionId}] Live API error:`, { message, code, raw: error });
-            safeSend(ws, JSON.stringify({ type: 'error', payload: { message, code } }))
+            safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.ERROR, payload: { message, code } }))
             activeSessions.get(connectionId)?.logger?.log('error', { where: 'live_api', message, code })
           },
           onclose: (event: any) => {
@@ -511,7 +681,7 @@
             if (closingForRestart.has(connectionId)) {
               closingForRestart.delete(connectionId)
             } else {
-              safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'live_api_closed' } }))
+              safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.SESSION_CLOSED, payload: { reason: 'live_api_closed' } }))
             }
           }
         }
@@ -550,13 +720,13 @@
       console.info(`[${connectionId}] Live API session established for sessionId: ${sessionId || 'anonymous'}`)
 
       // Send session started message to client
-      safeSend(ws, JSON.stringify({ type: 'session_started', payload: { connectionId, languageCode: lang, voiceName } }));
+      safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.SESSION_STARTED, payload: { connectionId, languageCode: lang, voiceName } }));
       activeSessions.get(connectionId)?.logger?.log('session_started', { languageCode: lang, voiceName })
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start session';
       console.error(`[${connectionId}] Failed to start Live API session:`, error);
-      safeSend(ws, JSON.stringify({ type: 'error', payload: { message } }));
+      safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.ERROR, payload: { message } }));
       activeSessions.get(connectionId)?.logger?.log('error', { where: 'handleStart', message })
     } finally {
       sessionStarting.delete(connectionId)
@@ -606,7 +776,7 @@
           console.info(`[${connectionId}] ✅ Audio sent via sendRealtimeInput (${audioData.length} chars, ${mimeType})`)
         } else {
           console.error(`[${connectionId}] ❌ sendRealtimeInput method not available on session`) 
-          safeSend(ws, JSON.stringify({ type: 'error', payload: { message: 'Live session cannot accept audio (no sendRealtimeInput method)' } }))
+          safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.ERROR, payload: { message: 'Live session cannot accept audio (no sendRealtimeInput method)' } }))
         }
       } catch (e: any) {
         const msg = e?.message || String(e)
@@ -617,7 +787,7 @@
           hasRealtimeMethod: typeof client.session.sendRealtimeInput === 'function',
           hasSendMethod: typeof client.session.send === 'function'
         })
-        safeSend(ws, JSON.stringify({ type: 'error', payload: { message: `Failed to send audio to Live API: ${msg}` } }))
+        safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.ERROR, payload: { message: `Failed to send audio to Live API: ${msg}` } }))
       }
       return
     }
@@ -676,7 +846,7 @@
       if (!heartbeatTimer) {
         heartbeatTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'heartbeat', timestamp: Date.now() }));
+            ws.send(JSON.stringify({ type: MESSAGE_TYPES.HEARTBEAT, timestamp: Date.now() }));
           }
         }, WEBSOCKET_CONFIG.HEARTBEAT_INTERVAL);
       }
@@ -700,185 +870,52 @@
         
         console.info(`[${connectionId}] Received message type: ${messageType}`);
         switch (parsedMessage.type) {
-          case 'start':
+          case MESSAGE_TYPES.START:
             console.info(`[${connectionId}] Handling start message`);
             try { activeSessions.get(connectionId)?.logger?.log('client_start', { payload: { languageCode: parsedMessage?.payload?.languageCode, voiceName: parsedMessage?.payload?.voiceName, sessionId: parsedMessage?.payload?.sessionId } }) } catch {}
             await handleStart(connectionId, ws, parsedMessage.payload);
             break;
-          case 'stop': {
+          case MESSAGE_TYPES.STOP: {
             console.info(`[${connectionId}] Handling stop message`)
             await handleClose(connectionId)
             // Acknowledge stop
-            safeSend(ws, JSON.stringify({ type: 'session_closed', payload: { reason: 'client_stop' } }))
+            safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.SESSION_CLOSED, payload: { reason: 'client_stop' } }))
             break;
           }
-          case 'user_audio':
+          case MESSAGE_TYPES.USER_AUDIO:
             console.info(`[${connectionId}] Handling user_audio message`);
             await handleUserMessage(connectionId, ws, parsedMessage.payload);
             break;
-          case 'TOOL_RESULT': {
+          case MESSAGE_TYPES.TOOL_RESULT: {
             const client = activeSessions.get(connectionId);
             if (!client) {
               console.warn(`[${connectionId}] TOOL_RESULT received but no active session`);
               break;
             }
-            const responses = parsedMessage.payload?.responses;
-            if (!Array.isArray(responses) || responses.length === 0) {
-              console.warn(`[${connectionId}] TOOL_RESULT missing responses`);
-              break;
-            }
-            try {
-              client.logger?.log('tool_result_client', { responsesCount: responses.length })
-              await client.session.sendToolResponse({ functionResponses: responses });
-              safeSend(ws, JSON.stringify({ type: 'tool_result', payload: { responses } }));
-              client.logger?.log('tool_result_forwarded', { responsesCount: responses.length })
-            } catch (err) {
-              console.error(`[${connectionId}] Failed to forward tool responses to Live API:`, err);
-              safeSend(ws, JSON.stringify({ type: 'tool_result', payload: { error: err instanceof Error ? err.message : 'Tool response failed' } }));
-              client.logger?.log('error', { where: 'tool_result_forward', message: err instanceof Error ? err.message : String(err) })
-            }
+            await handleToolResult(connectionId, client, parsedMessage.payload);
             break;
           }
-          case 'REALTIME_INPUT': {
+          case MESSAGE_TYPES.REALTIME_INPUT: {
             console.info(`[${connectionId}] Handling REALTIME_INPUT message`);
             const client = activeSessions.get(connectionId);
             if (!client) {
               console.warn(`[${connectionId}] REALTIME_INPUT received but no active session`);
               break;
             }
-
-            const payload = parsedMessage.payload ?? {};
-            const chunks = Array.isArray(payload?.chunks) ? payload.chunks : [];
-
-            if (chunks.length === 0) {
-              console.warn(`[${connectionId}] REALTIME_INPUT received but no chunks`);
-              break;
-            }
-
-            try {
-              // Send chunks directly to Live API using sendRealtimeInput
-              if (typeof client.session.sendRealtimeInput === 'function') {
-                await client.session.sendRealtimeInput({ media: chunks[0] }); // Send first chunk
-                console.info(`[${connectionId}] ✅ Webcam frame sent to Live API via sendRealtimeInput`);
-                client.logger?.log('realtime_input_sent', { chunks: chunks.length, mimeType: chunks[0]?.mimeType });
-              } else {
-                console.warn(`[${connectionId}] sendRealtimeInput not available on session`);
-              }
-            } catch (err) {
-              console.error(`[${connectionId}] Failed to send realtime input:`, err);
-              client.logger?.log('error', { where: 'realtime_input', message: err instanceof Error ? err.message : String(err) });
-            }
+            await handleRealtimeInput(connectionId, client, parsedMessage.payload);
             break;
           }
-          case 'CONTEXT_UPDATE': {
+          case MESSAGE_TYPES.CONTEXT_UPDATE: {
             console.info(`[${connectionId}] Handling CONTEXT_UPDATE message`);
             const client = activeSessions.get(connectionId);
             if (!client) {
               console.warn(`[${connectionId}] CONTEXT_UPDATE received but no active session`);
               break;
             }
-
-            const payload = parsedMessage.payload ?? {};
-            const modality = typeof payload?.modality === 'string' ? payload.modality : '';
-            if (modality !== 'screen' && modality !== 'webcam') {
-              console.warn(`[${connectionId}] CONTEXT_UPDATE ignored due to invalid modality: ${modality}`);
-              break;
-            }
-
-            const analysis = typeof payload.analysis === 'string' ? payload.analysis : '';
-            if (!analysis) {
-              console.warn(`[${connectionId}] CONTEXT_UPDATE missing analysis text`);
-              break;
-            }
-
-            const capturedAt = typeof payload.capturedAt === 'number' ? payload.capturedAt : Date.now();
-            const imageData = typeof payload.imageData === 'string' ? payload.imageData : undefined;
-
-            client.latestContext = client.latestContext || {};
-            const modalityKey = modality as 'screen' | 'webcam';
-            const prev = client.latestContext[modalityKey];
-            client.latestContext[modalityKey] = {
-              analysis,
-              capturedAt,
-              imageData,
-              lastInjected: prev?.lastInjected,
-              lastPersisted: prev?.lastPersisted
-            };
-            client.logger?.log('context_update', { modality, analysis, capturedAt, hasImage: Boolean(imageData), imageBytes: typeof imageData === 'string' ? Math.floor(imageData.length * 0.75) : 0 })
-
-            if (client.sessionId) {
-              const snapRef = client.latestContext[modalityKey];
-              const now = Date.now();
-              if (!snapRef.lastPersisted || now - snapRef.lastPersisted >= VISUAL_PERSIST_THROTTLE_MS) {
-                snapRef.lastPersisted = now;
-                (async () => {
-                  try {
-                    const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
-                    const imageBytes = typeof imageData === 'string' ? Math.floor(imageData.length * 0.75) : undefined
-                    await multimodalContextManager.addVisualAnalysis(client.sessionId!, analysis, modalityKey, imageBytes, imageData)
-                    client.logger?.log('context_persisted', { modality, imageBytes, analysisLength: analysis.length })
-                  } catch (err) {
-                    console.error(`[${connectionId}] Failed to persist ${modality} context:`, err);
-                    client.logger?.log('error', { where: 'context_persist', modality, message: err instanceof Error ? err.message : String(err) })
-                  }
-                })().catch(() => {
-                  // handled in logger
-                })
-              }
-            }
-
-            if (!INJECT_ON_CONTEXT_UPDATE) {
-              console.info(`[${connectionId}] CONTEXT_UPDATE received; injection disabled by flag`);
-              break;
-            }
-
-            // Debounce injection per-modality to avoid spamming the Live API
-            client.injectionTimers = client.injectionTimers || {};
-            const timers = client.injectionTimers;
-            if (timers[modalityKey]) {
-              clearTimeout(timers[modalityKey]);
-            }
-
-            timers[modalityKey] = setTimeout(async () => {
-              try {
-                const snap = client.latestContext[modalityKey];
-                if (!snap) return;
-                const now = Date.now();
-                if (typeof snap.lastInjected === 'number' && snap.lastInjected > now - VISUAL_INJECT_THROTTLE_MS) {
-                  console.info(`[${connectionId}] ${modality} context injection skipped (recently injected)`);
-                  client.logger?.log('context_injection_skipped', { modality, reason: 'debounce_throttle', throttleMs: CONTEXT_INJECT_DEBOUNCE_MS })
-                  return;
-                }
-
-                const parts: any[] = [];
-                if (snap.imageData) {
-                  const base64Data = snap.imageData.replace(/^data:image\/\w+;base64,/, '');
-                  parts.push({ inlineData: { mimeType: 'image/jpeg', data: base64Data } });
-                }
-                parts.push({ text: `[${modality} context]: ${snap.analysis}` });
-
-                if (typeof client.session.sendClientContent === 'function') {
-                  await client.session.sendClientContent({
-                    turns: [{ role: 'user', parts }],
-                    turnComplete: false,
-                  });
-                } else {
-                  throw new Error('Live session cannot accept client content (no sendClientContent method)');
-                }
-                snap.lastInjected = now;
-                console.info(`[${connectionId}] ✅ ${modality} context injected to Live API`);
-                client.logger?.log('context_injected', { modality, hadImage: Boolean(snap.imageData), analysisSnippet: snap.analysis?.slice(0, 500) })
-              } catch (err) {
-                console.error(`[${connectionId}] Failed debounced inject for ${modality}:`, err);
-                client.logger?.log('error', { where: 'debounced_inject', modality, message: err instanceof Error ? err.message : String(err) })
-              } finally {
-                timers[modalityKey] = undefined;
-              }
-            }, CONTEXT_INJECT_DEBOUNCE_MS);
-
+            await handleContextUpdate(connectionId, client, parsedMessage.payload);
             break;
           }
-          case 'heartbeat_ack': {
+          case MESSAGE_TYPES.HEARTBEAT_ACK: {
             // Client acknowledged heartbeat - connection is healthy
             console.info(`[${connectionId}] Heartbeat acknowledged by client`)
             break
@@ -899,7 +936,7 @@
     }
 
     // Acknowledge connection
-    const connectedMessage = JSON.stringify({ type: 'connected', payload: { connectionId } })
+    const connectedMessage = JSON.stringify({ type: MESSAGE_TYPES.CONNECTED, payload: { connectionId } })
     console.info(`[${connectionId}] Sending connected event to client`)
     safeSend(ws, connectedMessage)
 
