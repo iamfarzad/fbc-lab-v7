@@ -31,8 +31,19 @@ export class AudioPlayer {
     try {
       const now = performance.now()
       const float32 = base64PCM16ToFloat32(chunkBase64)
+      
+      // Check if queue was empty before this chunk
+      const wasQueueEmpty = this.queue.length === 0
       this.queue.push(float32)
       this.chunkCount++
+      
+      // If transitioning from empty to non-empty and not playing, force restart
+      const shouldForceRestart = wasQueueEmpty && !this.isPlaying && this.ctx
+      if (shouldForceRestart) {
+        if (DEBUG_AUDIO) {
+          console.log('🔄 [AudioPlayer] Forcing playback restart (queue was empty)')
+        }
+      }
 
       if (DEBUG_AUDIO) {
         const metrics = this.calculateSignalMetrics(float32)
@@ -155,39 +166,54 @@ export class AudioPlayer {
       }
     }
 
-    // Keep checking queue periodically (Google's pattern)
+    // Always clear existing interval to prevent race conditions
+    if (this.checkInterval) {
+      clearTimeout(this.checkInterval)
+      this.checkInterval = null
+    }
+
+    // Then set new interval if needed
     if (this.queue.length > 0) {
       const nextCheckMs = Math.max(0, (this.scheduledTime - this.ctx.currentTime) * 1000 - 50)
       this.checkInterval = setTimeout(() => this.scheduleBuffers(), nextCheckMs)
     } else {
       // Queue empty - wait for more chunks
-      if (!this.checkInterval) {
-        this.checkInterval = setTimeout(() => {
-          if (this.queue.length > 0) {
-            this.scheduleBuffers()
-          } else {
-            this.isPlaying = false
-            if (DEBUG_AUDIO) {
-              console.log('📭 [AudioPlayer] Queue empty, stopping playback')
-            }
+      this.checkInterval = setTimeout(() => {
+        if (this.queue.length > 0) {
+          this.scheduleBuffers()
+        } else {
+          this.isPlaying = false
+          if (DEBUG_AUDIO) {
+            console.log('📭 [AudioPlayer] Queue empty, stopping playback')
           }
-        }, 100)
-      }
+        }
+      }, 100)
     }
   }
 
   clear() {
     if (DEBUG_AUDIO && this.queue.length > 0) {
-      console.log('🗑️ [AudioPlayer] Clearing queue', { chunksDropped: this.queue.length })
+      console.log('🗑️ [AudioPlayer] Clearing queue', { 
+        chunksDropped: this.queue.length,
+        wasPlaying: this.isPlaying 
+      })
     }
+    
+    // Critical: Clear interval first to prevent race conditions
     if (this.checkInterval) {
       clearTimeout(this.checkInterval)
       this.checkInterval = null
     }
+    
+    // Reset all playback state atomically
+    this.isPlaying = false
     this.queue = []
     this.scheduledTime = 0
-    this.isPlaying = false
     this.lastChunkTime = 0
+    
+    if (DEBUG_AUDIO) {
+      console.log('✅ [AudioPlayer] State fully reset for next turn')
+    }
   }
 
   setSampleRate(sampleRate: number) {

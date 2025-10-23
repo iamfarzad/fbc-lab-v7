@@ -421,6 +421,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         setIsProcessing(false);
         // Clear audio queue on session close
         audioPlayerRef.current?.clear();
+        console.log('🧹 [RealtimeVoice] Audio player cleared for session restart', {
+          playerExists: !!audioPlayerRef.current,
+          willAutoRestart: isRecordingRef.current
+        });
         void resetRecording();
         callbacks?.onSessionStateChange?.({
           active: false,
