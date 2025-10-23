@@ -82,14 +82,14 @@ export function TranscriptDisplay({
     if (variant === 'conversation') {
       return (
         <>
-          {(partialTranscript || transcript) && (
+          {(transcript || partialTranscript) && (
             <div className="mb-1">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">You</div>
               <div className={cn(
                 "whitespace-pre-line",
-                partialTranscript ? "text-muted-foreground italic" : "text-foreground"
+                transcript ? "text-foreground" : "text-muted-foreground italic"
               )}>
-                {partialTranscript || transcript}
+                {transcript || partialTranscript}
               </div>
             </div>
           )}
@@ -109,10 +109,12 @@ export function TranscriptDisplay({
         {showLabel && (
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Transcript</div>
         )}
-        {partialTranscript ? (
+        {transcript ? (
+          <div className="whitespace-pre-line">{transcript}</div>
+        ) : partialTranscript ? (
           <div className="italic text-muted-foreground whitespace-pre-line">{partialTranscript}</div>
         ) : (
-          <div className="whitespace-pre-line">{transcript || 'No transcript yet.'}</div>
+          <div className="whitespace-pre-line">No transcript yet.</div>
         )}
       </>
     )
