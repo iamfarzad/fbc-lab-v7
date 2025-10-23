@@ -22,7 +22,7 @@ export function preProcessIntent(messages: ChatMessage[]): IntentSignal {
     /move on/i,
     /that'?s enough/i,
     /stop asking/i,
-    /wrap it up/i,
+    /wrap it up(?!.*talk|.*speak|.*call|.*meeting)/i, // Only if not followed by talk/speak/call/meeting
     /move forward/i,
     /for fuck'?s sake/i,
     /this is ridiculous/i,

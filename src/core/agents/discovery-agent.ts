@@ -220,7 +220,7 @@ function detectExitInMessage(content: string): 'BOOKING' | 'WRAP_UP' | 'FRUSTRAT
     /let'?s wrap/i,
     /move on/i,
     /that'?s enough/i,
-    /wrap it up/i,
+    /wrap it up(?!.*talk|.*speak|.*call|.*meeting)/i, // Only if not followed by talk/speak/call/meeting
     /move forward/i
   ];
   
