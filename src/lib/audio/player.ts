@@ -47,21 +47,41 @@ export class AudioPlayer {
           peak: metrics.peak.toFixed(3),
           rms: metrics.rms.toFixed(3),
           clipped: metrics.clipped,
-          silenceRatio: (metrics.silenceRatio * 100).toFixed(1) + '%'
+          silenceRatio: (metrics.silenceRatio * 100).toFixed(1) + '%',
+          contextState: this.ctx?.state || 'no-context'
         })
       }
 
       this.lastChunkTime = now
 
+      // Ensure context is valid and running before scheduling
+      if (!this.ctx || this.ctx.state === 'closed') {
+        if (DEBUG_AUDIO) {
+          console.log('🎵 [AudioPlayer] Recreating AudioContext (was closed/missing)')
+        }
+        this.ensureContext()
+      }
+
+      // Resume context if suspended (common after user interaction gaps)
+      if (this.ctx && this.ctx.state === 'suspended') {
+        if (DEBUG_AUDIO) {
+          console.log('🔊 [AudioPlayer] Resuming suspended AudioContext')
+        }
+        this.ctx.resume().catch(err => {
+          console.warn('[AudioPlayer] Failed to resume AudioContext:', err)
+        })
+      }
+
       if (!this.isPlaying) {
         this.isPlaying = true
-        this.ensureContext()
         // Google's pattern: Add initial buffer delay
         this.scheduledTime = this.ctx!.currentTime + this.initialBufferTime
         if (DEBUG_AUDIO) {
           console.log('🎵 [AudioPlayer] Starting playback with initial buffer', {
             initialDelay: (this.initialBufferTime * 1000).toFixed(0) + 'ms',
-            scheduleAhead: (this.scheduleAheadTime * 1000).toFixed(0) + 'ms'
+            scheduleAhead: (this.scheduleAheadTime * 1000).toFixed(0) + 'ms',
+            contextState: this.ctx!.state,
+            currentTime: this.ctx!.currentTime.toFixed(3)
           })
         }
         this.scheduleBuffers()
@@ -104,7 +124,9 @@ export class AudioPlayer {
       const float32 = this.queue.shift()!
       
       const buffer = this.ctx.createBuffer(1, float32.length, this.sampleRate)
-      buffer.copyToChannel(float32, 0)
+      const channelData = new Float32Array(float32.length)
+      channelData.set(float32)
+      buffer.copyToChannel(channelData, 0)
       
       const src = this.ctx.createBufferSource()
       src.buffer = buffer

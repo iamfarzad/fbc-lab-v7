@@ -1,4 +1,4 @@
-  import { WebSocketServer, WebSocket } from 'ws'
+import { WebSocketServer, WebSocket } from 'ws'
   import type { RawData } from 'ws'
   import { GoogleGenAI } from '@google/genai'
   import { v4 as uuidv4 } from 'uuid'
@@ -266,19 +266,36 @@ import { MESSAGE_TYPES } from './message-types.js'
 
   // Helper function to build Live API configuration
   function buildLiveConfig(priorContext: string): any {
+    console.log(`[buildLiveConfig] Building config with priorContext: ${priorContext ? 'YES' : 'NO'}`);
+    
+    // Always use the full system prompt, adding context if available
+    const baseInstruction = GEMINI_CONFIG.SYSTEM_PROMPT;
+    const fullInstruction = priorContext 
+      ? `${baseInstruction}${priorContext}` 
+      : baseInstruction;
+    
     const liveConfig: any = {
       responseModalities: ["AUDIO"],
       inputAudioTranscription: {},
       outputAudioTranscription: {},
       speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
+        voiceConfig: { 
+          prebuiltVoiceConfig: { 
+            voiceName: 'Zephyr' 
+          } 
+        }
       },
-      systemInstruction: 'You are a friendly and helpful AI assistant. Keep your responses concise.'
-    }
+      systemInstruction: fullInstruction
+    };
     
-    if (priorContext) {
-      liveConfig.systemInstruction = `${GEMINI_CONFIG.SYSTEM_PROMPT}${priorContext}`
-    }
+    console.log(`[buildLiveConfig] Final config:`, {
+      responseModalities: liveConfig.responseModalities,
+      hasInputTranscription: !!liveConfig.inputAudioTranscription,
+      hasOutputTranscription: !!liveConfig.outputAudioTranscription,
+      hasSpeechConfig: !!liveConfig.speechConfig,
+      systemInstructionLength: liveConfig.systemInstruction.length,
+      voiceName: liveConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName
+    });
     
     return liveConfig;
   }
@@ -496,8 +513,12 @@ import { MESSAGE_TYPES } from './message-types.js'
           },
           onmessage: async (message: any) => {
             try {
+              // Log EVERY message from Gemini for comprehensive debugging
+              console.log(`[${connectionId}] [GEMINI MESSAGE]`, JSON.stringify(message, null, 2));
+              
               // Setup complete
               if (message?.setupComplete) {
+                console.log(`[${connectionId}] [SETUP COMPLETE] Full details:`, JSON.stringify(message.setupComplete, null, 2));
                 safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.SETUP_COMPLETE, payload: { setupComplete: true } }));
                 activeSessions.get(connectionId)?.logger?.log('setup_complete')
               }
@@ -526,6 +547,23 @@ import { MESSAGE_TYPES } from './message-types.js'
 
               const serverContent = message?.serverContent;
               if (!serverContent) return;
+
+              // Log server content structure for debugging
+              console.log(`[${connectionId}] [SERVER CONTENT] Full structure:`, JSON.stringify(serverContent, null, 2));
+              console.log(`[${connectionId}] [SERVER CONTENT] Has modelTurn?:`, !!serverContent.modelTurn);
+              console.log(`[${connectionId}] [SERVER CONTENT] Model turn parts:`, serverContent.modelTurn?.parts);
+              
+              if (serverContent.modelTurn) {
+                console.log(`[${connectionId}] [MODEL TURN] Exists!`, {
+                  hasparts: !!serverContent.modelTurn.parts,
+                  partsLength: serverContent.modelTurn.parts?.length,
+                  partTypes: serverContent.modelTurn.parts?.map((p: any) => ({
+                    hasText: !!p.text,
+                    hasInlineData: !!p.inlineData,
+                    inlineDataKeys: p.inlineData ? Object.keys(p.inlineData) : []
+                  }))
+                });
+              }
 
               // Transcriptions
               if (serverContent.inputTranscription) {
@@ -628,10 +666,12 @@ import { MESSAGE_TYPES } from './message-types.js'
               if (serverContent.modelTurn?.parts) {
                 for (const part of serverContent.modelTurn.parts) {
                   if (part.text) {
+                    console.log(`[${connectionId}] [MODEL TEXT] Received text:`, part.text);
                     safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.TEXT, payload: { content: part.text } }));
                     activeSessions.get(connectionId)?.logger?.log('model_text', { text: part.text })
                   }
                   if (part.inlineData?.data) {
+                    console.log(`[${connectionId}] [MODEL AUDIO] Received audio chunk! Size:`, (part.inlineData.data?.length || 0) * 0.75, 'bytes');
                     const audioBase64 = part.inlineData.data;
                     safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.AUDIO, payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' } }));
                     activeSessions.get(connectionId)?.logger?.log('audio_chunk', { direction: 'server_to_client', bytes: (audioBase64?.length || 0) * 0.75, mimeType: 'audio/pcm;rate=24000' })

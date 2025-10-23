@@ -235,6 +235,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const pendingChunksRef = useRef<MediaRecorderVoiceResult[]>([]);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
+  const isRecordingRef = useRef(false);
 
   useEffect(() => {
     callbacksRef.current = options;
@@ -246,6 +247,19 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     console.log('🎵 [RealtimeVoice] AudioPlayer created on mount', { 
       sampleRate: DEFAULT_SERVER_SAMPLE_RATE 
     });
+    
+    // Proactively resume audio context on user interaction
+    const resumeAudio = async () => {
+      if (audioPlayerRef.current?.contextState === 'suspended') {
+        console.log('🔊 [RealtimeVoice] Proactively resuming AudioContext');
+        await audioPlayerRef.current.resume();
+      }
+    };
+    
+    // Resume on any user interaction
+    document.addEventListener('click', resumeAudio, { once: true });
+    document.addEventListener('touchstart', resumeAudio, { once: true });
+    document.addEventListener('keydown', resumeAudio, { once: true });
 
     return () => {
       audioPlayerRef.current?.destroy();
@@ -350,7 +364,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     });
   }, [resetRecording, session?.mock]);
 
-  const handleServerEvent = useCallback((event: LiveServerEvent) => {
+  const handleServerEvent = useCallback(async (event: LiveServerEvent) => {
     const callbacks = callbacksRef.current;
 
     switch (event.type) {
@@ -414,6 +428,17 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           mock: session?.mock,
           isProcessing: false,
         });
+        
+        // Auto-restart session for continuous conversation if user is still in voice mode
+        // This prevents the need to manually click the voice button after each response
+        if (isRecordingRef.current) {
+          console.log('🔄 [RealtimeVoice] Auto-restarting session for continuous conversation');
+          setTimeout(() => {
+            if (isRecordingRef.current && !isSessionActiveRef.current) {
+              startSession();
+            }
+          }, 100); // Small delay to ensure clean state
+        }
         break;
       }
       case 'input_transcript': {
@@ -455,9 +480,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         const declaredRate = extractSampleRate(event.payload.mimeType);
         const playbackRate = declaredRate ?? DEFAULT_SERVER_SAMPLE_RATE;
 
-        // Log audio event reception
+        // Enhanced logging for audio pipeline debugging
         const padding = audioData.endsWith('==') ? 2 : audioData.endsWith('=') ? 1 : 0;
         const approxBytes = Math.max(0, Math.floor((audioData.length * 3) / 4) - padding);
+        const turnCount = modelReplies.length;
+        
         console.log('🎧 [RealtimeVoice] Audio event received', {
           base64Length: audioData.length,
           approxBytes,
@@ -469,24 +496,53 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
             playing: audioPlayerRef.current.playing,
             rate: audioPlayerRef.current.getSampleRate(),
             contextState: audioPlayerRef.current.contextState
-          } : null
+          } : null,
+          turnCount,
+          isSessionActive,
+          isProcessing,
+          timestamp: Date.now()
         });
 
         if (!audioPlayerRef.current) {
           console.error('🚫 [RealtimeVoice] AudioPlayer should exist but is missing!', { 
             sampleRate: playbackRate,
-            playerExists: !!audioPlayerRef.current 
+            playerExists: !!audioPlayerRef.current,
+            turnCount,
+            isSessionActive 
           });
           break;
         } else if (declaredRate && audioPlayerRef.current.getSampleRate() !== playbackRate) {
           console.warn('⚠️ [RealtimeVoice] Sample rate mismatch, updating player', {
             from: audioPlayerRef.current.getSampleRate(),
-            to: playbackRate
+            to: playbackRate,
+            turnCount
           });
           audioPlayerRef.current.setSampleRate(playbackRate);
         }
 
-        audioPlayerRef.current.addBase64PCM16(audioData);
+        // Check AudioContext state before adding audio
+        if (audioPlayerRef.current.contextState === 'suspended') {
+          console.warn('🔊 [RealtimeVoice] AudioContext is suspended, attempting to resume');
+          await audioPlayerRef.current.resume();
+        }
+
+        try {
+          audioPlayerRef.current.addBase64PCM16(audioData);
+          console.log('✅ [RealtimeVoice] Audio chunk successfully added to player', {
+            turnCount,
+            playerPlaying: audioPlayerRef.current.playing,
+            contextState: audioPlayerRef.current.contextState
+          });
+        } catch (err) {
+          console.error('❌ [RealtimeVoice] Failed to add audio chunk to player', {
+            error: err instanceof Error ? err.message : String(err),
+            turnCount,
+            playerState: audioPlayerRef.current ? {
+              playing: audioPlayerRef.current.playing,
+              contextState: audioPlayerRef.current.contextState
+            } : null
+          });
+        }
         break;
       }
       case 'heartbeat': {
@@ -543,7 +599,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
     }
-  }, [recorderProcessing, resetRecording, sendMessage, session?.mock]);
+  }, [recorderProcessing, resetRecording, session?.mock, modelReplies.length, isSessionActive, isProcessing]);
 
   const handleRecorderChunk = useCallback((chunk: MediaRecorderVoiceResult) => {
     if (!chunk?.base64) return;
@@ -621,7 +677,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     }
 
     client.connect();
-  }, [callbacksRef, handleServerEvent, resetState, serverUrl, options.liveClient])
+  }, [handleServerEvent, resetState, serverUrl, options.liveClient])
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
     console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
@@ -681,7 +737,15 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       }
 
       console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
+      
+      // Resume audio context on user interaction (required by browser policy)
+      if (audioPlayerRef.current?.contextState === 'suspended') {
+        console.log('🔊 [RealtimeVoice] Resuming AudioContext for user interaction');
+        await audioPlayerRef.current.resume();
+      }
+      
       await startRecording({ onChunk: handleRecorderChunk });
+      isRecordingRef.current = true;
       console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
       if (!isSessionActiveRef.current) {
         console.log('🎤 [RealtimeVoice] Awaiting session activation while buffering audio chunks');
@@ -721,7 +785,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       callbacksRef.current?.onError?.(message);
       await resetRecording();
     }
-  }, [handleRecorderChunk, isSocketReady, sendMessage, session, startRecording, resetRecording, serverUrl]);
+  }, [handleRecorderChunk, isSocketReady, session, startRecording, resetRecording, serverUrl]);
 
   const stopSession = useCallback(async () => {
     console.log('🎤 [RealtimeVoice] stopSession called', {
@@ -745,6 +809,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       });
 
       await stopRecording();
+      isRecordingRef.current = false;
       pendingChunksRef.current = [];
 
       // Notify server to mark turn complete and stop the Live session cleanly
@@ -762,7 +827,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       setIsProcessing(false);
       callbacksRef.current?.onError?.(message);
     }
-  }, [isSessionActive, isRecording, isProcessing, sendMessage, session, stopRecording]);
+  }, [isSessionActive, isRecording, isProcessing, session, stopRecording]);
 
   useEffect(() => {
     connectWebSocket();
