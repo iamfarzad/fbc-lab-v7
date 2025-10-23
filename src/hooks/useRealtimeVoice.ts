@@ -649,19 +649,14 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         if (off) off(); // Clean up listener
       });
       
-      // 3. Connect if not already connected
+      // 3. Always wait for connected event, even if socket appears ready
       if (!isSocketReady || !liveRef.current) {
         console.log('🎤 [RealtimeVoice] Connecting to WebSocket...');
         liveRef.current?.connect();
       } else {
-        // If already connected, send start message immediately
-        console.log('🎤 [RealtimeVoice] Already connected - sending start message immediately');
-        liveRef.current?.start({
-          languageCode: opts?.languageCode,
-          voiceName: opts?.voiceName,
-          sessionId: opts?.sessionId,
-        });
-        if (off) off(); // Clean up listener
+        // Even if socket appears ready, wait for server's connected event
+        console.log('🎤 [RealtimeVoice] Socket appears ready, waiting for server connected event...');
+        // The connected event listener above will handle sending the start message
       }
       console.log('🎤 [RealtimeVoice] Microphone ready and connection setup complete');
 

@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws'
 import type { RawData } from 'ws'
-import { GoogleGenAI, Modality } from '@google/genai'
+import { GoogleGenAI } from '@google/genai'
 import { v4 as uuidv4 } from 'uuid'
 import { Buffer } from 'buffer'
 import * as https from 'https'
@@ -220,6 +220,9 @@ function safeSend(ws: WebSocket, data: any, isBinary = false) {
 async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
   console.info(`[${connectionId}] 🔊 handleStart called with payload:`, JSON.stringify(payload));
 
+  // Acknowledge start immediately so client doesn't timeout
+  safeSend(ws, JSON.stringify({ type: 'start_ack', payload: { connectionId } }));
+
   // Prevent concurrent starts
   if (sessionStarting.has(connectionId)) {
     console.info(`[${connectionId}] 🔊 start() already in progress; skipping duplicate call.`)
@@ -228,7 +231,7 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
   sessionStarting.add(connectionId)
 
   // Close existing session if any
-  if (activeSessions.has(connectionId)) {
+  if (activeSessions.has(connectionId) && !closingForRestart.has(connectionId) && !sessionStarting.has(connectionId)) {
     console.info(`[${connectionId}] Session already exists. Closing old one.`);
     try {
       closingForRestart.add(connectionId)
@@ -293,22 +296,23 @@ async function handleStart(connectionId: string, ws: WebSocket, payload: any) {
 
     let isOpen = false
 
-    // Restored working Live configuration (from before c9ace40)
-    const modalities: Modality[] = [Modality.AUDIO]
-    // Only enable TEXT modality when explicitly opted-in (some audio-native models do not support TEXT)
-    if (process.env.LIVE_SERVER_TEXT_MODALITY === '1' || process.env.LIVE_SERVER_TEXT_MODALITY === 'true') {
-      modalities.push(Modality.TEXT as any)
-    }
+    // Updated Live configuration - match Google prototype exactly
     const liveConfig: any = {
-      responseModalities: modalities,
       systemInstruction: GEMINI_CONFIG.SYSTEM_PROMPT,
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
       speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName } }
+        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
       },
       // Enable transcriptions - languageCode removed (API no longer supports it)
       inputAudioTranscription: {},
       outputAudioTranscription: {},
+      // CRITICAL: Specify response modalities for audio input/output
+      responseModalities: ["AUDIO", "TEXT"],
+      // CRITICAL: Configure turn detection for proper silence detection
+      turnDetection: {
+        mode: "server_vad",
+        silenceMs: 3000
+      }
     }
     if (priorChatContext) {
       liveConfig.systemInstruction = `${GEMINI_CONFIG.SYSTEM_PROMPT}${priorChatContext}`
@@ -670,10 +674,21 @@ async function handleClose(connectionId: string) {
 wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   const connectionId = uuidv4();
   console.info(`[${connectionId}] Client connected.`);
+  
+  let heartbeatTimer: NodeJS.Timeout | null = null;
 
   // Register message handler IMMEDIATELY (before any other operations)
   // This ensures we capture ALL messages regardless of timing
   ws.on('message', async (message: RawData) => {
+    // Start heartbeat only after first message
+    if (!heartbeatTimer) {
+      heartbeatTimer = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'heartbeat', timestamp: Date.now() }));
+        }
+      }, WEBSOCKET_CONFIG.HEARTBEAT_INTERVAL);
+    }
+    
     try {
       const rawString = decodeRawMessage(message)
       const parsedMessage = rawString ? JSON.parse(rawString) : { type: 'unknown' }
@@ -900,6 +915,11 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
 
   ws.on('close', (code: number, reason: Buffer) => {
     console.info(`[${connectionId}] WebSocket closed. Code: ${code}, Reason: ${reason?.toString?.() || 'N/A'}`)
+    console.warn(`[${connectionId}] CLOSED early code=${code} reason=${reason?.toString()}`);
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
     const rec = activeSessions.get(connectionId)
     try { rec?.logger?.log('session_closed', { source: 'websocket', code, reason: reason?.toString?.() }) } catch {}
     try { rec?.logger?.close() } catch {}

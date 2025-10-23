@@ -123,7 +123,7 @@ export class LiveClientWS {
   }
 
   start(opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) {
-    const startMessage = { type: 'start', payload: opts || {} }
+    const startMessage = { type: 'start' as const, payload: opts || {} }
     
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       // Queue the start message to send when connection opens
