@@ -524,8 +524,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         // Clear transcripts when turn completes
         setTranscript('');
         setPartialTranscript('');
+        // Keep session active for next turn - don't set active: false
         callbacks?.onSessionStateChange?.({
-          active: false,
+          active: true,  // Keep session active
           connectionId: connectionIdRef.current,
           mock: session?.mock,
           isProcessing: false,
