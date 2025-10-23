@@ -15,6 +15,7 @@ export class LiveClientWS {
   private connectionId: string | null = null
   private devLogEnabled = (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG === '1' || (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG !== '0')))
   private lastLogTime = 0
+  private pendingStartMessage: { type: 'start'; payload: any } | null = null
 
   on<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set())
@@ -50,6 +51,13 @@ export class LiveClientWS {
     ws.onopen = () => {
       console.log('🔌 [LiveClient] WebSocket opened successfully');
       this.emit('open')
+      
+      // Send any pending start message
+      if (this.pendingStartMessage) {
+        console.log('🔌 [LiveClient] Sending queued start message')
+        this.send(this.pendingStartMessage)
+        this.pendingStartMessage = null
+      }
     }
     ws.onclose = () => {
       this.emit('close')
@@ -115,8 +123,17 @@ export class LiveClientWS {
   }
 
   start(opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
-    this.send({ type: 'start', payload: opts || {} })
+    const startMessage = { type: 'start', payload: opts || {} }
+    
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      // Queue the start message to send when connection opens
+      this.pendingStartMessage = startMessage
+      console.log('🔌 [LiveClient] Socket not ready, queuing start message')
+      return
+    }
+    
+    this.send(startMessage)
+    console.log('🔌 [LiveClient] Start message sent immediately')
   }
 
   stop() {
