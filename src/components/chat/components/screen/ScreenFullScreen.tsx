@@ -3,6 +3,7 @@ import { Monitor, MonitorOff, Camera, Mic, MessageSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScreenDisplay } from './ScreenDisplay'
 import { FullScreenModal } from '@/components/ui/full-screen-modal'
+import { TranscriptDisplay } from '../TranscriptDisplay'
 
 interface ScreenFullScreenProps {
   isOpen: boolean
@@ -46,14 +47,13 @@ export function ScreenFullScreen({
           error={error}
         />
         {showTranscript && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-4 mx-4 rounded-md border border-border/40 bg-background/85 p-3 text-foreground shadow-lg">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Transcript</div>
-            {partialTranscript ? (
-              <div className="italic text-muted-foreground whitespace-pre-line">{partialTranscript}</div>
-            ) : (
-              <div className="whitespace-pre-line">{transcript || 'No transcript yet.'}</div>
-            )}
-          </div>
+          <TranscriptDisplay
+            transcript={transcript}
+            partialTranscript={partialTranscript}
+            variant="overlay"
+            showLabel={true}
+            className="pointer-events-none absolute inset-x-0 bottom-4 mx-4"
+          />
         )}
       </div>
 

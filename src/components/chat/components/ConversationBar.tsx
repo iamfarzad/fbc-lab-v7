@@ -8,6 +8,7 @@ import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TranscriptDisplay } from "./TranscriptDisplay";
 
 type ConversationBarProps = React.ComponentProps<typeof ChatInput> & {
   className?: string;
@@ -114,26 +115,13 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
               </div>
 
               {showInlineTranscript && (
-                <div
-                  className="mt-1 max-h-28 overflow-y-auto rounded-md border border-border/40 bg-muted/30 p-2 text-[12px]"
-                  role="log" aria-live="polite" aria-atomic={false}
-                >
-                  {(voicePartialTranscript || voiceTranscript) && (
-                    <div className="mb-1">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">You</div>
-                      <div className={cn("whitespace-pre-line", voicePartialTranscript ? "text-muted-foreground italic" : "text-foreground")}>{voicePartialTranscript || voiceTranscript}</div>
-                    </div>
-                  )}
-                  {aiSpeechTranscript && (
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">AI</div>
-                      <div className="text-foreground whitespace-pre-line">{aiSpeechTranscript}</div>
-                    </div>
-                  )}
-                  {!voiceTranscript && !voicePartialTranscript && !aiSpeechTranscript && (
-                    <div className="text-muted-foreground">Start speaking to see your transcript…</div>
-                  )}
-                </div>
+                <TranscriptDisplay
+                  transcript={voiceTranscript}
+                  partialTranscript={voicePartialTranscript}
+                  aiTranscript={aiSpeechTranscript}
+                  variant="conversation"
+                  className="mt-1"
+                />
               )}
             </div>
           )}
