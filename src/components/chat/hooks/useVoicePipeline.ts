@@ -78,15 +78,19 @@ export function useVoicePipeline({
   }, [appendVoiceAssistantChunk, sessionId])
 
   const handleVoiceOutputTranscript = useCallback((text: string, isFinal: boolean) => {
-    // Remove the 3-second timeout to persist transcripts after voice ends
-    // The transcript should remain visible in the chat area as a permanent message
+    // Set transcript for display
     setAiSpeechTranscript(text)
     
-    // Optional: Log when transcript is finalized for debugging
+    // Send to chat area as permanent message
+    if (text.trim()) {
+      appendVoiceAssistantChunk(text)
+    }
+    
+    // Log when transcript is finalized for debugging
     if (isFinal) {
       console.log('🎤 Final AI transcript completed:', text.substring(0, 50) + '...')
     }
-  }, [])
+  }, [appendVoiceAssistantChunk])
 
   const handleVoiceTurnComplete = useCallback(() => {
     finalizeVoiceAssistantMessage()
