@@ -52,12 +52,16 @@ export class LiveClientWS {
       console.log('🔌 [LiveClient] WebSocket opened successfully');
       this.emit('open')
       
-      // Send any pending start message
-      if (this.pendingStartMessage) {
-        console.log('🔌 [LiveClient] Sending queued start message')
-        this.send(this.pendingStartMessage)
-        this.pendingStartMessage = null
-      }
+      // Set up connected event listener immediately to catch server's connected event
+      this.on('connected', () => {
+        console.log('🔌 [LiveClient] Received connected event from server')
+        // Send any pending start message after connection is established
+        if (this.pendingStartMessage) {
+          console.log('🔌 [LiveClient] Sending queued start message after handshake')
+          this.send(this.pendingStartMessage)
+          this.pendingStartMessage = null
+        }
+      })
     }
     ws.onclose = () => {
       this.emit('close')
