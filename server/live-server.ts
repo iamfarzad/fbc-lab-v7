@@ -894,7 +894,9 @@ wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
   }
 
   // Acknowledge connection
-  safeSend(ws, JSON.stringify({ type: 'connected', payload: { connectionId } }))
+  const connectedMessage = JSON.stringify({ type: 'connected', payload: { connectionId } })
+  console.info(`[${connectionId}] Sending connected event to client`)
+  safeSend(ws, connectedMessage)
 
   // Initialize session logger asynchronously to not block message handling
   Promise.resolve().then(() => {

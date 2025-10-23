@@ -124,16 +124,25 @@ export class LiveClientWS {
 
   start(opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) {
     const startMessage = { type: 'start' as const, payload: opts || {} }
-    
+
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      // Queue the start message to send when connection opens
       this.pendingStartMessage = startMessage
       console.log('🔌 [LiveClient] Socket not ready, queuing start message')
       return
     }
-    
+
+    // ✅ Wait until we get the "connected" handshake from the server
+    if (!this.connectionId) {
+      console.log('🔌 [LiveClient] Waiting for server "connected" event before sending start')
+      this.on('connected', () => {
+        this.send(startMessage)
+        console.log('🔌 [LiveClient] Start message sent after handshake')
+      })
+      return
+    }
+
     this.send(startMessage)
-    console.log('🔌 [LiveClient] Start message sent immediately')
+    console.log('🔌 [LiveClient] Start message sent immediately (connection already established)')
   }
 
   stop() {
