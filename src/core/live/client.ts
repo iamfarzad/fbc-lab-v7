@@ -51,17 +51,6 @@ export class LiveClientWS {
     ws.onopen = () => {
       console.log('🔌 [LiveClient] WebSocket opened successfully');
       this.emit('open')
-      
-      // Set up connected event listener immediately to catch server's connected event
-      this.on('connected', () => {
-        console.log('🔌 [LiveClient] Received connected event from server')
-        // Send any pending start message after connection is established
-        if (this.pendingStartMessage) {
-          console.log('🔌 [LiveClient] Sending queued start message after handshake')
-          this.send(this.pendingStartMessage)
-          this.pendingStartMessage = null
-        }
-      })
     }
     ws.onclose = () => {
       this.emit('close')
@@ -86,6 +75,13 @@ export class LiveClientWS {
       case 'connected':
         this.connectionId = msg.payload.connectionId
         this.emit('connected', this.connectionId)
+        
+        // Send any pending start message now that we have connectionId
+        if (this.pendingStartMessage) {
+          console.log('🔌 [LiveClient] Sending queued start message after connected event')
+          this.send(this.pendingStartMessage)
+          this.pendingStartMessage = null
+        }
         break
       case 'session_started':
         this.emit('session_started', msg.payload)
@@ -135,13 +131,9 @@ export class LiveClientWS {
       return
     }
 
-    // ✅ Wait until we get the "connected" handshake from the server
     if (!this.connectionId) {
-      console.log('🔌 [LiveClient] Waiting for server "connected" event before sending start')
-      this.on('connected', () => {
-        this.send(startMessage)
-        console.log('🔌 [LiveClient] Start message sent after handshake')
-      })
+      this.pendingStartMessage = startMessage
+      console.log('🔌 [LiveClient] No connectionId yet, queuing start message for when connected')
       return
     }
 
