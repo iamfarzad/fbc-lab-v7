@@ -625,6 +625,37 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
     console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
     
+    // If socket isn't ready yet, attempt a quick connect-and-wait before failing
+    if (!isSocketReady || !liveRef.current) {
+      try {
+        liveRef.current?.connect()
+        const ok = await new Promise<boolean>((resolve) => {
+          let settled = false
+          const timeout = setTimeout(() => { if (!settled) { settled = true; resolve(false) } }, 2000)
+          const off = liveRef.current?.on('open', () => {
+            if (!settled) { 
+              settled = true
+              clearTimeout(timeout)
+              if (off) off()
+              resolve(true)
+            }
+          })
+        })
+        if (!ok) {
+          const message = 'Voice server not ready'
+          console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after wait:', { isSocketReady, serverUrl })
+          setError(message)
+          callbacksRef.current?.onError?.(message)
+          return
+        }
+      } catch {
+        const message = 'Voice server not ready'
+        setError(message)
+        callbacksRef.current?.onError?.(message)
+        return
+      }
+    }
+
     try {
       console.log('🎤 [RealtimeVoice] Starting session - setting processing state');
       setIsProcessing(true);
@@ -635,35 +666,22 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isProcessing: true,
       });
 
-      // 1. Get microphone ready FIRST (like prototype)
-      await startRecording({ onChunk: handleRecorderChunk });
-      
-      // 2. Setup connection listener - send start message ONLY when connection is fully ready
-      const off = liveRef.current?.on('connected', () => {
-        console.log('🎤 [RealtimeVoice] Connection fully ready - sending start message');
-        liveRef.current?.start({
-          languageCode: opts?.languageCode,
-          voiceName: opts?.voiceName,
-          sessionId: opts?.sessionId,
-        });
-        if (off) off(); // Clean up listener
+      console.log('🎤 [RealtimeVoice] Sending start message');
+      liveRef.current?.start({
+        languageCode: opts?.languageCode,
+        voiceName: opts?.voiceName,
+        sessionId: opts?.sessionId,
       });
-      
-      // 3. Always wait for connected event, even if socket appears ready
-      if (!isSocketReady || !liveRef.current) {
-        console.log('🎤 [RealtimeVoice] Connecting to WebSocket...');
-        liveRef.current?.connect();
-      } else {
-        // Even if socket appears ready, wait for server's connected event
-        console.log('🎤 [RealtimeVoice] Socket appears ready, waiting for server connected event...');
-        // The connected event listener above will handle sending the start message
-      }
-      console.log('🎤 [RealtimeVoice] Microphone ready and connection setup complete');
+      console.log('🎤 [RealtimeVoice] Start message sent successfully; preparing microphone');
 
       if (sessionTimeoutRef.current) {
         clearTimeout(sessionTimeoutRef.current);
         sessionTimeoutRef.current = null;
       }
+
+      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
+      await startRecording({ onChunk: handleRecorderChunk });
+      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
       if (!isSessionActiveRef.current) {
         console.log('🎤 [RealtimeVoice] Awaiting session activation while buffering audio chunks');
       }

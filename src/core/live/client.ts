@@ -15,7 +15,6 @@ export class LiveClientWS {
   private connectionId: string | null = null
   private devLogEnabled = (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG === '1' || (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG !== '0')))
   private lastLogTime = 0
-  private pendingStartMessage: { type: 'start'; payload: any } | null = null
 
   on<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set())
@@ -75,13 +74,6 @@ export class LiveClientWS {
       case 'connected':
         this.connectionId = msg.payload.connectionId
         this.emit('connected', this.connectionId)
-        
-        // Send any pending start message now that we have connectionId
-        if (this.pendingStartMessage) {
-          console.log('🔌 [LiveClient] Sending queued start message after connected event')
-          this.send(this.pendingStartMessage)
-          this.pendingStartMessage = null
-        }
         break
       case 'session_started':
         this.emit('session_started', msg.payload)
@@ -123,22 +115,8 @@ export class LiveClientWS {
   }
 
   start(opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) {
-    const startMessage = { type: 'start' as const, payload: opts || {} }
-
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      this.pendingStartMessage = startMessage
-      console.log('🔌 [LiveClient] Socket not ready, queuing start message')
-      return
-    }
-
-    if (!this.connectionId) {
-      this.pendingStartMessage = startMessage
-      console.log('🔌 [LiveClient] No connectionId yet, queuing start message for when connected')
-      return
-    }
-
-    this.send(startMessage)
-    console.log('🔌 [LiveClient] Start message sent immediately (connection already established)')
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    this.send({ type: 'start', payload: opts || {} })
   }
 
   stop() {
