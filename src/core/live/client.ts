@@ -13,6 +13,7 @@ export class LiveClientWS {
   // reserved for future state queries (intentionally unused)
   // private isReady = false
   private connectionId: string | null = null
+  private pendingStartOpts: { languageCode?: string; voiceName?: string; sessionId?: string } | null = null
   private devLogEnabled = (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG === '1' || (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG !== '0')))
   private lastLogTime = 0
 
@@ -74,6 +75,12 @@ export class LiveClientWS {
       case 'connected':
         this.connectionId = msg.payload.connectionId
         this.emit('connected', this.connectionId)
+        // Send queued start message if it exists
+        if (this.pendingStartOpts) {
+          const opts = this.pendingStartOpts
+          this.pendingStartOpts = null
+          this.send({ type: 'start', payload: opts })
+        }
         break
       case 'session_started':
         this.emit('session_started', msg.payload)
@@ -116,17 +123,15 @@ export class LiveClientWS {
 
   start(opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
+    
+    // Always queue the start message until we receive 'connected' from server
     if (!this.connectionId) {
-      console.log('🔌 [LiveClient] Waiting for server connected event before sending start message');
-      // Wait for connected event before sending start message
-      const handleConnected = () => {
-        console.log('🔌 [LiveClient] Server connected, now sending start message');
-        this.off('connected', handleConnected);
-        this.send({ type: 'start', payload: opts || {} })
-      };
-      this.on('connected', handleConnected);
-      return;
+      console.log('🔌 [LiveClient] Queueing start message until server sends connected event');
+      this.pendingStartOpts = opts || {}
+      return
     }
+    
+    // If already connected, send immediately
     this.send({ type: 'start', payload: opts || {} })
   }
 
