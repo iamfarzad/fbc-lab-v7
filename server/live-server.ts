@@ -11,7 +11,7 @@
   import { fileURLToPath } from 'url'
   import { SessionLogger } from './session-logger'
   import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG } from '../src/config/constants.js'
-  import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
+  // import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js' // Removed for simplified config
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -163,7 +163,7 @@
   // --- Live Config: System instruction and tool declarations ---
   // Imported from constants.ts - GEMINI_CONFIG.SYSTEM_PROMPT
 
-  const FUNCTION_DECLARATIONS = LIVE_FUNCTION_DECLARATIONS;
+  // const FUNCTION_DECLARATIONS = LIVE_FUNCTION_DECLARATIONS; // Removed for simplified config
 
   // Visual trigger + throttle configuration - imported from constants.ts
   const VISUAL_TRIGGER_WORDS = VOICE_CONFIG.VISUAL_TRIGGERS;
@@ -296,23 +296,15 @@
 
       let isOpen = false
 
-      // Updated Live configuration - match Google prototype exactly
+      // Simplified Live configuration - match working prototype exactly  
       const liveConfig: any = {
-        systemInstruction: GEMINI_CONFIG.SYSTEM_PROMPT,
-        tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+        responseModalities: ["AUDIO"],
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
         },
-        // Enable transcriptions - languageCode removed (API no longer supports it)
-        inputAudioTranscription: {},
-        outputAudioTranscription: {},
-        // CRITICAL: Specify response modalities for audio input/output
-        responseModalities: ["AUDIO", "TEXT"],
-        // CRITICAL: Configure turn detection for proper silence detection
-        turnDetection: {
-          mode: "server_vad",
-          silenceMs: 3000
-        }
+        systemInstruction: 'You are a friendly and helpful AI assistant. Keep your responses concise.'
       }
       if (priorChatContext) {
         liveConfig.systemInstruction = `${GEMINI_CONFIG.SYSTEM_PROMPT}${priorChatContext}`
