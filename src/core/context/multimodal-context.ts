@@ -1,7 +1,7 @@
 import { ContextStorage } from './context-storage'
 import { MultimodalContext, ConversationEntry, VisualEntry, LeadContext, UploadEntry, AudioEntry, ConversationTurn } from './context-types'
 import { vercelCache } from '@/lib/vercel-cache'
-import { CONTEXT_CONFIG, SECURITY_CONFIG } from '@/config/constants'
+import { CONTEXT_CONFIG, SECURITY_CONFIG, GEMINI_CONFIG } from '@/config/constants'
 import { walLog } from './write-ahead-log'
 import { summarizeConversationWindow, shouldSummarize, extractSummaries } from './context-summarizer'
 import { detectPII, shouldRedact, redactPII } from '@/core/security/pii-detector'
@@ -697,7 +697,7 @@ export class MultimodalContextManager {
     const context = await this.getConversationContext(sessionId, includeVisual, includeAudio)
 
     // Build system prompt with multimodal context
-    let systemPrompt = "You are F.B/c AI, a helpful business assistant with multimodal capabilities."
+    let systemPrompt = GEMINI_CONFIG.SYSTEM_PROMPT
 
     // Extract conversation summaries (for long conversations)
     const summaries = extractSummaries(context.conversationHistory)

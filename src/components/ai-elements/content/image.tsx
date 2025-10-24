@@ -13,11 +13,12 @@ export const Image = ({
 }: ImageProps) => (
   <img
     {...props}
-    alt={props.alt}
+    alt={props.alt || "AI generated image"}
     className={cn(
       "h-auto max-w-full overflow-hidden rounded-md",
       props.className
     )}
     src={`data:${mediaType};base64,${base64}`}
+    loading="lazy"
   />
 );

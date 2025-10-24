@@ -48,6 +48,76 @@ export async function routeToAgent({
     context.stage = 'FORCE_EXIT' as FunnelStage;
     return summaryAgent(messages, context);
   }
+
+  // Handle tool request intents
+  if (intentSignal === 'VOICE_REQUEST') {
+    const immediate: AgentResult = {
+      output: "I'd love to have a voice conversation! Let me enable voice chat for you.",
+      agent: 'Tool Detection',
+      metadata: {
+        stage: 'DISCOVERY' as FunnelStage,
+        toolCall: {
+          tool: 'enable_voice',
+          arguments: { reason: 'User requested voice conversation' },
+          requiresApproval: true
+        }
+      },
+    }
+    return immediate
+  }
+
+  if (intentSignal === 'SCREEN_SHARE_REQUEST') {
+    const immediate: AgentResult = {
+      output: "Great idea! Screen sharing will help me see what you're working on. Let me enable that for you.",
+      agent: 'Tool Detection',
+      metadata: {
+        stage: 'DISCOVERY' as FunnelStage,
+        toolCall: {
+          tool: 'enable_screen_share',
+          arguments: { reason: 'User wants to show something on screen' },
+          requiresApproval: true
+        }
+      },
+    }
+    return immediate
+  }
+
+  if (intentSignal === 'WEBCAM_REQUEST') {
+    const immediate: AgentResult = {
+      output: "Perfect! Video will make our conversation more personal. Let me enable the webcam for you.",
+      agent: 'Tool Detection',
+      metadata: {
+        stage: 'DISCOVERY' as FunnelStage,
+        toolCall: {
+          tool: 'enable_webcam',
+          arguments: { reason: 'User requested video conversation' },
+          requiresApproval: true
+        }
+      },
+    }
+    return immediate
+  }
+
+  if (intentSignal === 'CHART_REQUEST') {
+    const immediate: AgentResult = {
+      output: "I'd be happy to create a chart for you! What data would you like me to visualize?",
+      agent: 'Tool Detection',
+      metadata: {
+        stage: 'DISCOVERY' as FunnelStage,
+        toolCall: {
+          tool: 'create_chart',
+          arguments: { 
+            type: 'bar',
+            title: 'Data Visualization',
+            data: [],
+            description: 'Please provide the data you want to visualize'
+          },
+          requiresApproval: false
+        }
+      },
+    }
+    return immediate
+  }
   
   // Handle conversation end (archive before generating summary)
   if (trigger === 'conversation_end' && context.sessionId) {

@@ -99,6 +99,46 @@ export function ContactSection({ className, ...props }: ComponentProps<"section"
                   Take the first step towards AI transformation. Book a free 30-minute consultation to discuss your goals and explore how we can work together.
                 </p>
                 
+                {/* Cal.com Widget */}
+                <div className="bg-muted/5 rounded-lg p-4 border border-border">
+                  <div className="text-center mb-4">
+                    <h3 className={cn(
+                      "text-lg font-semibold mb-2",
+                      "font-mono text-foreground"
+                    )}>
+                      BOOK A CALL
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a time that works for you
+                    </p>
+                  </div>
+                  
+                  <div className="cal-embed" 
+                    data-cal-link="farzad-bayat/consultation"
+                    data-cal-config='{"layout":"month_view","theme":"light"}'
+                    style={{ width: "100%", height: "600px", overflow: "scroll" }}
+                  >
+                    <div className="text-center py-8">
+                      <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground mb-4">
+                        Loading calendar...
+                      </p>
+                      <Button 
+                        onClick={() => window.open('https://cal.com/farzad-bayat/consultation', '_blank')}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 font-mono"
+                      >
+                        OPEN CALENDAR
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Or fill out the form below for a callback
+                  </p>
+                </div>
+                
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <FormField
                     name="name"

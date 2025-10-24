@@ -33,6 +33,7 @@ export const SourcesTrigger = ({
 }: SourcesTriggerProps) => (
   <CollapsibleTrigger
     className={cn("flex items-center gap-1.5", className)}
+    aria-label={isLoading ? "Gathering sources" : `View ${count} sources`}
     {...props}
   >
     {children ?? (
@@ -42,7 +43,7 @@ export const SourcesTrigger = ({
         ) : (
           <p className="font-medium">Used {count} sources</p>
         )}
-        <ChevronDownIcon className="h-3 w-3" />
+        <ChevronDownIcon className="h-3 w-3" aria-hidden="true" />
       </>
     )}
   </CollapsibleTrigger>
@@ -72,11 +73,12 @@ export const Source = ({ href, title, children, ...props }: SourceProps) => (
     href={href}
     rel="noreferrer"
     target="_blank"
+    aria-label={`Open source: ${title}`}
     {...props}
   >
     {children ?? (
       <>
-        <BookIcon className="h-3 w-3" />
+        <BookIcon className="h-3 w-3" aria-hidden="true" />
         <span className="block font-medium">{title}</span>
       </>
     )}
