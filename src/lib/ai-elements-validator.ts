@@ -23,7 +23,7 @@ export function validateAIElementMetadata(messages: Message[]) {
     }
   }
   if (issues.length) {
-    // eslint-disable-next-line no-console
+     
     console.warn('[AI-Elements] Metadata validation warnings:', issues)
   }
 }

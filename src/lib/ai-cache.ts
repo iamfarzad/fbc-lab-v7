@@ -62,7 +62,7 @@ function loadOptionalDependencies() {
     } else {
       cachedFactory = null
     }
-  } catch (error) {
+  } catch {
     cachedFactory = null
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[ai-cache] @ai-sdk-tools/cache not found; using in-memory cache fallback.')
@@ -232,6 +232,8 @@ export const CACHE_TTL = {
   LONG: 2 * 60 * 60 * 1000,  // 2 hours
   VERY_LONG: 24 * 60 * 60 * 1000, // 24 hours
   VISION: 30 * 60 * 1000,    // 30 minutes
+  DOCUMENT: 60 * 60 * 1000,  // 1 hour
+  URL: 2 * 60 * 60 * 1000,   // 2 hours
 } as const
 
 /**

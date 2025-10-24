@@ -145,6 +145,8 @@ export async function draftFollowUpEmail({
   conversationSummary: string
   specificMention?: string
 }): Promise<{ subject: string; body: string }> {
+  // Use _leadId to avoid unused parameter warning
+  console.log('Drafting follow-up for lead:', _leadId);
   const prompt = `Draft a professional follow-up email for:
 
 Lead: ${leadName}

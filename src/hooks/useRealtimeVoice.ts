@@ -279,10 +279,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     return WEBSOCKET_CONFIG.URL;
   }, []);
 
-  const sendMessage = useCallback((_message: Record<string, unknown>) => {
-    console.warn('sendMessage called directly; prefer LiveClientWS methods');
-  }, []);
-
   const sendToolResult = useCallback((responses: Array<Record<string, unknown>>) => {
     if (!responses || responses.length === 0) return;
     liveRef.current?.sendToolResponse(responses);
@@ -329,11 +325,14 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
   const sendTestAudioChunk = useCallback((opts?: { frequency?: number; durationMs?: number }) => {
     const base64 = sineToPCM16Base64(opts?.frequency ?? 440, opts?.durationMs ?? 320, 16000);
-    sendMessage({
-      type: 'user_audio',
-      payload: { audioData: base64, mimeType: 'audio/pcm;rate=16000' },
-    });
-  }, [sendMessage, sineToPCM16Base64]);
+    // Send audio data through the Live API
+    if (liveRef.current) {
+      liveRef.current.sendRealtimeInput([{
+        mimeType: 'audio/pcm;rate=16000',
+        data: base64
+      }]);
+    }
+  }, [sineToPCM16Base64]);
 
   const resetState = useCallback((opts?: { soft?: boolean }) => {
     // Clear session timeout

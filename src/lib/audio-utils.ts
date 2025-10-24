@@ -46,7 +46,7 @@ export const audioContext: (
         map.set(options.id, ctx);
       }
       return ctx;
-    } catch (e) {
+    } catch {
       const interactionPromise = getInteractionPromise();
       if (interactionPromise) {
         await interactionPromise;
