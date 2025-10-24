@@ -105,8 +105,8 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
     try {
       const stream = (audioWorkletRecorderRef.current as any)?.getStream?.() ?? null;
       if (stream) setMicStream(stream);
-    } catch {}
-  }, [handleWorkletData, handleWorkletError, hasAudioWorkletSupport, isSupported]);
+    } catch { /* ignore stream errors */ }
+  }, [handleWorkletData, handleWorkletError, hasAudioWorkletSupport, isSupported, targetSampleRate]);
 
   const stopRecording = useCallback(async () => {
     try {
@@ -133,7 +133,7 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
       if (audioWorkletRecorderRef.current) {
         audioWorkletRecorderRef.current.off('data', handleWorkletData);
         audioWorkletRecorderRef.current.off('error', handleWorkletError);
-        try { await audioWorkletRecorderRef.current.stop(); } catch {}
+        try { await audioWorkletRecorderRef.current.stop(); } catch { /* ignore stop errors */ }
         audioWorkletRecorderRef.current = null;
       }
     } finally {
@@ -362,6 +362,125 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       isProcessing: false,
     });
   }, [resetRecording, session?.mock]);
+
+  const handleRecorderChunk = useCallback((chunk: MediaRecorderVoiceResult) => {
+    if (!chunk?.base64) return;
+
+    if (!isSessionActiveRef.current) {
+      pendingChunksRef.current.push(chunk);
+      return;
+    }
+
+    liveRef.current?.sendAudioBase64PCM16(chunk.base64, chunk.mimeType);
+  }, []);
+
+  const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
+    console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
+    
+    // If socket isn't ready yet, attempt a quick connect-and-wait before failing
+    if (!isSocketReady || !liveRef.current) {
+      try {
+        liveRef.current?.connect()
+        const ok = await new Promise<boolean>((resolve) => {
+          let settled = false
+          const timeout = setTimeout(() => { if (!settled) { settled = true; resolve(false) } }, 2000)
+          const off = liveRef.current?.on('open', () => {
+            if (!settled) { 
+              settled = true
+              clearTimeout(timeout)
+              if (off) off()
+              resolve(true)
+            }
+          })
+        })
+        if (!ok) {
+          const message = 'Voice server not ready'
+          console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after wait:', { isSocketReady, serverUrl })
+          setError(message)
+          callbacksRef.current?.onError?.(message)
+          return
+        }
+      } catch {
+        const message = 'Voice server not ready'
+        setError(message)
+        callbacksRef.current?.onError?.(message)
+        return
+      }
+    }
+
+    try {
+      console.log('🎤 [RealtimeVoice] Starting session - setting processing state');
+      setIsProcessing(true);
+      callbacksRef.current?.onSessionStateChange?.({
+        active: false,
+        connectionId: connectionIdRef.current,
+        mock: session?.mock,
+        isProcessing: true,
+      });
+
+      console.log('🎤 [RealtimeVoice] Sending start message');
+      liveRef.current?.start({
+        languageCode: opts?.languageCode,
+        voiceName: opts?.voiceName,
+        sessionId: opts?.sessionId,
+      });
+      console.log('🎤 [RealtimeVoice] Start message sent successfully; preparing microphone');
+
+      if (sessionTimeoutRef.current) {
+        clearTimeout(sessionTimeoutRef.current);
+        sessionTimeoutRef.current = null;
+      }
+
+      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
+      
+      // Resume audio context on user interaction (required by browser policy)
+      if (audioPlayerRef.current?.contextState === 'suspended') {
+        console.log('🔊 [RealtimeVoice] Resuming AudioContext for user interaction');
+        await audioPlayerRef.current.resume();
+      }
+      
+      await startRecording({ onChunk: handleRecorderChunk });
+      isRecordingRef.current = true;
+      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
+      if (!isSessionActiveRef.current) {
+        console.log('🎤 [RealtimeVoice] Awaiting session activation while buffering audio chunks');
+      }
+      
+      // Set timeout to handle case where server never responds
+      sessionTimeoutRef.current = setTimeout(() => {
+        console.log('🎤 [RealtimeVoice] Session timeout check:', {
+          isSessionActive: isSessionActiveRef.current,
+          hasSession: session !== null,
+          isRecording
+        });
+        
+        // Only timeout if session truly didn't start
+        if (!isSessionActiveRef.current && !session) {
+          const timeoutMsg = 'Voice session failed to start - server did not respond in time';
+          console.error('🎤 [RealtimeVoice] Session timeout triggered');
+          setError(timeoutMsg);
+          setIsProcessing(false);
+          callbacksRef.current?.onError?.(timeoutMsg);
+          void stopRecording();
+        } else {
+          console.log('🎤 [RealtimeVoice] Session timeout check passed - session is active');
+        }
+      }, 10000); // 10 second timeout
+    } catch (err) {
+      // Clear session timeout on error
+      if (sessionTimeoutRef.current) {
+        clearTimeout(sessionTimeoutRef.current);
+        sessionTimeoutRef.current = null;
+      }
+      
+      const message = err instanceof Error ? err.message : 'Failed to start voice session';
+      console.error('🎤 [RealtimeVoice] Failed to start session:', err);
+      setError(message);
+      setIsProcessing(false);
+      callbacksRef.current?.onError?.(message);
+      await resetRecording();
+    }
+  }, [handleRecorderChunk, isSocketReady, session, startRecording, resetRecording, serverUrl, isRecording, stopRecording]);
 
   const handleServerEvent = useCallback(async (event: LiveServerEvent) => {
     const callbacks = callbacksRef.current;
@@ -602,18 +721,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
     }
-  }, [recorderProcessing, resetRecording, session?.mock, modelReplies.length, isSessionActive, isProcessing]);
+  }, [recorderProcessing, resetRecording, session?.mock, modelReplies.length, isSessionActive, isProcessing, startSession]);
 
-  const handleRecorderChunk = useCallback((chunk: MediaRecorderVoiceResult) => {
-    if (!chunk?.base64) return;
-
-    if (!isSessionActiveRef.current) {
-      pendingChunksRef.current.push(chunk);
-      return;
-    }
-
-    liveRef.current?.sendAudioBase64PCM16(chunk.base64, chunk.mimeType);
-  }, []);
 
   const connectWebSocket = useCallback(() => {
     console.log('🔌 [RealtimeVoice] connectWebSocket called', { serverUrl, hasLiveRef: !!liveRef.current });
@@ -632,7 +741,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     if (!hasBoundListenersRef.current) {
       // Remove any previous listeners before re-binding
       for (const teardown of listenerUnsubRef.current) {
-        try { teardown(); } catch {}
+        try { teardown(); } catch { /* ignore teardown errors */ }
       }
       listenerUnsubRef.current = [];
 
@@ -682,113 +791,6 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     client.connect();
   }, [handleServerEvent, resetState, serverUrl, options.liveClient])
 
-  const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
-    console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
-    
-    // If socket isn't ready yet, attempt a quick connect-and-wait before failing
-    if (!isSocketReady || !liveRef.current) {
-      try {
-        liveRef.current?.connect()
-        const ok = await new Promise<boolean>((resolve) => {
-          let settled = false
-          const timeout = setTimeout(() => { if (!settled) { settled = true; resolve(false) } }, 2000)
-          const off = liveRef.current?.on('open', () => {
-            if (!settled) { 
-              settled = true
-              clearTimeout(timeout)
-              if (off) off()
-              resolve(true)
-            }
-          })
-        })
-        if (!ok) {
-          const message = 'Voice server not ready'
-          console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after wait:', { isSocketReady, serverUrl })
-          setError(message)
-          callbacksRef.current?.onError?.(message)
-          return
-        }
-      } catch {
-        const message = 'Voice server not ready'
-        setError(message)
-        callbacksRef.current?.onError?.(message)
-        return
-      }
-    }
-
-    try {
-      console.log('🎤 [RealtimeVoice] Starting session - setting processing state');
-      setIsProcessing(true);
-      callbacksRef.current?.onSessionStateChange?.({
-        active: false,
-        connectionId: connectionIdRef.current,
-        mock: session?.mock,
-        isProcessing: true,
-      });
-
-      console.log('🎤 [RealtimeVoice] Sending start message');
-      liveRef.current?.start({
-        languageCode: opts?.languageCode,
-        voiceName: opts?.voiceName,
-        sessionId: opts?.sessionId,
-      });
-      console.log('🎤 [RealtimeVoice] Start message sent successfully; preparing microphone');
-
-      if (sessionTimeoutRef.current) {
-        clearTimeout(sessionTimeoutRef.current);
-        sessionTimeoutRef.current = null;
-      }
-
-      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
-      
-      // Resume audio context on user interaction (required by browser policy)
-      if (audioPlayerRef.current?.contextState === 'suspended') {
-        console.log('🔊 [RealtimeVoice] Resuming AudioContext for user interaction');
-        await audioPlayerRef.current.resume();
-      }
-      
-      await startRecording({ onChunk: handleRecorderChunk });
-      isRecordingRef.current = true;
-      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
-      if (!isSessionActiveRef.current) {
-        console.log('🎤 [RealtimeVoice] Awaiting session activation while buffering audio chunks');
-      }
-      
-      // Set timeout to handle case where server never responds
-      sessionTimeoutRef.current = setTimeout(() => {
-        console.log('🎤 [RealtimeVoice] Session timeout check:', {
-          isSessionActive: isSessionActiveRef.current,
-          hasSession: session !== null,
-          isRecording
-        });
-        
-        // Only timeout if session truly didn't start
-        if (!isSessionActiveRef.current && !session) {
-          const timeoutMsg = 'Voice session failed to start - server did not respond in time';
-          console.error('🎤 [RealtimeVoice] Session timeout triggered');
-          setError(timeoutMsg);
-          setIsProcessing(false);
-          callbacksRef.current?.onError?.(timeoutMsg);
-          void stopRecording();
-        } else {
-          console.log('🎤 [RealtimeVoice] Session timeout check passed - session is active');
-        }
-      }, 10000); // 10 second timeout
-    } catch (err) {
-      // Clear session timeout on error
-      if (sessionTimeoutRef.current) {
-        clearTimeout(sessionTimeoutRef.current);
-        sessionTimeoutRef.current = null;
-      }
-      
-      const message = err instanceof Error ? err.message : 'Failed to start voice session';
-      console.error('🎤 [RealtimeVoice] Failed to start session:', err);
-      setError(message);
-      setIsProcessing(false);
-      callbacksRef.current?.onError?.(message);
-      await resetRecording();
-    }
-  }, [handleRecorderChunk, isSocketReady, session, startRecording, resetRecording, serverUrl]);
 
   const stopSession = useCallback(async () => {
     console.log('🎤 [RealtimeVoice] stopSession called', {
@@ -847,7 +849,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         liveRef.current?.disconnect();
       }
       for (const teardown of listenerUnsubRef.current) {
-        try { teardown(); } catch {}
+        try { teardown(); } catch { /* ignore teardown errors */ }
       }
       listenerUnsubRef.current = [];
       hasBoundListenersRef.current = false;

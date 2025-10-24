@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { Check, ChevronsUpDown, Mic, MicOff } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useAudioDevices } from "./mic-selector-utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,11 +15,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { LiveWaveform } from "@/components/ui/live-waveform"
 
-export interface AudioDevice {
-  deviceId: string
-  label: string
-  groupId: string
-}
 
 export interface MicSelectorProps {
   value?: string
@@ -173,112 +169,3 @@ export function MicSelector({
   )
 }
 
-export function useAudioDevices() {
-  const [devices, setDevices] = useState<AudioDevice[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [hasPermission, setHasPermission] = useState(false)
-
-  const loadDevicesWithoutPermission = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      const deviceList = await navigator.mediaDevices.enumerateDevices()
-
-      const audioInputs = deviceList
-        .filter((device) => device.kind === "audioinput")
-        .map((device) => {
-          let cleanLabel =
-            device.label || `Microphone ${device.deviceId.slice(0, 8)}`
-          cleanLabel = cleanLabel.replace(/\s*\([^)]*\)/g, "").trim()
-
-          return {
-            deviceId: device.deviceId,
-            label: cleanLabel,
-            groupId: device.groupId,
-          }
-        })
-
-      setDevices(audioInputs)
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to get audio devices"
-      )
-      console.error("Error getting audio devices:", err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const loadDevicesWithPermission = useCallback(async () => {
-    if (loading) return
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      const tempStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      })
-      tempStream.getTracks().forEach((track) => track.stop())
-
-      const deviceList = await navigator.mediaDevices.enumerateDevices()
-
-      const audioInputs = deviceList
-        .filter((device) => device.kind === "audioinput")
-        .map((device) => {
-          let cleanLabel =
-            device.label || `Microphone ${device.deviceId.slice(0, 8)}`
-          cleanLabel = cleanLabel.replace(/\s*\([^)]*\)/g, "").trim()
-
-          return {
-            deviceId: device.deviceId,
-            label: cleanLabel,
-            groupId: device.groupId,
-          }
-        })
-
-      setDevices(audioInputs)
-      setHasPermission(true)
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to get audio devices"
-      )
-      console.error("Error getting audio devices:", err)
-    } finally {
-      setLoading(false)
-    }
-  }, [loading])
-
-  useEffect(() => {
-    loadDevicesWithoutPermission()
-  }, [loadDevicesWithoutPermission])
-
-  useEffect(() => {
-    const handleDeviceChange = () => {
-      if (hasPermission) {
-        loadDevicesWithPermission()
-      } else {
-        loadDevicesWithoutPermission()
-      }
-    }
-
-    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange)
-
-    return () => {
-      navigator.mediaDevices.removeEventListener(
-        "devicechange",
-        handleDeviceChange
-      )
-    }
-  }, [hasPermission, loadDevicesWithPermission, loadDevicesWithoutPermission])
-
-  return {
-    devices,
-    loading,
-    error,
-    hasPermission,
-    loadDevices: loadDevicesWithPermission,
-  }
-}

@@ -27,7 +27,7 @@ export function useMicLevel(active: boolean) {
         srcRef.current = null;
       }
       if (ctxRef.current) {
-        try { ctxRef.current.close(); } catch {}
+        try { ctxRef.current.close(); } catch { /* ignore close errors */ }
         ctxRef.current = null;
       }
       if (streamRef.current) {

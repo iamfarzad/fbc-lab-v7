@@ -218,7 +218,7 @@ export function ChatMessages({
   // Dev-only metadata validation to ensure AI-Elements render paths have compatible metadata
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
-      try { validateAIElementMetadata(messages as any) } catch {}
+      try { validateAIElementMetadata(messages as any) } catch { /* ignore validation errors in dev */ }
     }
   }, [messages])
   

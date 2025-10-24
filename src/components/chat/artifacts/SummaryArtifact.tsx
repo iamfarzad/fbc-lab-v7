@@ -50,7 +50,7 @@ export function SummaryArtifact({
       // Store for inline preview
       setPdfUrl((oldUrl) => {
         if (oldUrl && oldUrl !== url) {
-          try { URL.revokeObjectURL(oldUrl) } catch {}
+          try { URL.revokeObjectURL(oldUrl) } catch { /* ignore revoke errors */ }
         }
         return url
       })

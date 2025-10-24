@@ -45,7 +45,7 @@ export function CameraFullScreen({
     }
     if (!isActive && !stream && !didAutoStartRef.current) {
       didAutoStartRef.current = true
-      try { void onToggle() } catch {}
+      try { void onToggle() } catch { /* ignore toggle errors */ }
     }
   }, [isOpen, isActive, stream, onToggle])
 

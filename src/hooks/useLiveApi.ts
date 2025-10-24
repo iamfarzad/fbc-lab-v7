@@ -102,7 +102,7 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
         realtime.sendRealtimeInput(chunks)
       }
     },
-    [options?.liveClient, realtime.sendRealtimeInput]
+    [options?.liveClient, realtime]
   )
 
   const directSendContextUpdate = useCallback(
@@ -120,7 +120,7 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
         realtime.sendContextUpdate(update)
       }
     },
-    [options?.liveClient, realtime.sendContextUpdate]
+    [options?.liveClient, realtime]
   )
 
   return {

@@ -27,7 +27,7 @@ export function useIsMobile(breakpoint = 768): boolean {
       window.removeEventListener('resize', handleResize);
       visualViewport?.removeEventListener('resize', handleResize);
     };
-  }, [breakpoint]);
+  }, [breakpoint, getViewportWidth]);
 
   return isMobile;
 }

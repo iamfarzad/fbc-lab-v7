@@ -173,12 +173,12 @@ export class LiveClientWS {
   }
 
   disconnect() {
-    try { this.socket?.close() } catch {}
+    try { this.socket?.close() } catch { /* ignore close errors */ }
     this.socket = null
   }
 
   private send(message: Record<string, unknown>) {
-    try { this.socket?.send(JSON.stringify(message)) } catch {}
+    try { this.socket?.send(JSON.stringify(message)) } catch { /* ignore send errors */ }
   }
 
   private devLog(event: string, data?: unknown) {
@@ -198,7 +198,7 @@ export class LiveClientWS {
       } else if (typeof fetch !== 'undefined') {
         fetch('/api/dev/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => {})
       }
-    } catch {}
+    } catch { /* ignore dev log errors */ }
   }
 }
 

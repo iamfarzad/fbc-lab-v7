@@ -5,10 +5,8 @@ import type { ElevenLabs } from "@elevenlabs/elevenlabs-js"
 import { Check, ChevronsUpDown, Pause, Play } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import {
-  AudioPlayerProvider,
-  useAudioPlayer,
-} from "@/components/ui/audio-player"
+import { AudioPlayerProvider } from "@/components/ui/audio-player"
+import { useAudioPlayer } from "@/components/ui/audio-player-hooks"
 import { Button } from "@/components/ui/button"
 import {
   Command,

@@ -266,7 +266,7 @@ export function useChatMessages(initialSessionId?: string) {
     // NOTE: Intent detection happens server-side when this message is sent to /api/chat/unified
     // The unified API route handles conversation flow analysis and intent detection
     console.log('🎤 Voice message added:', content.substring(0, 50) + '...')
-  }, [unifiedChat, sessionId]);
+  }, [unifiedChat]);
 
   const appendVoiceAssistantChunk = useCallback((chunk: string) => {
     if (!chunk) return;

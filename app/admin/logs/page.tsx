@@ -105,7 +105,7 @@ export default function AdminLogsPage() {
       return () => clearInterval(interval)
     }
     return undefined
-  }, [serviceFilter, levelFilter, searchTerm, autoRefresh, isAuthenticated])
+  }, [serviceFilter, levelFilter, searchTerm, autoRefresh, isAuthenticated, fetchLogs])
 
   const exportLogs = () => {
     const dataStr = JSON.stringify(logs, null, 2)
