@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { VISUAL } from "../design-tokens";
 import { Download } from "lucide-react";
 import { VoiceButton } from "@/components/ui/voice-button";
+import { VoiceStatusIndicator } from "@/components/ui/voice-status-indicator";
 import { Button } from "@/components/ui/button";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
 import { CameraFullScreen } from "./camera/CameraFullScreen";
@@ -488,28 +489,25 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                               isExpanded={isExpanded}
                               isMinimized={isMinimized}
                               variant="ghost"
+                              animationStyle="svg"
                               className={cn(
-                                "border border-border/40 transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 shadow-sm",
+                                "border border-border/30 transition-all duration-300 ease-out",
+                                "hover:scale-[1.02] hover:border-border/50 hover:shadow-md active:scale-[0.98]",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
                                 VISUAL.CORNER_RADIUS,
                                 "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                                isVoiceActive ? "bg-[hsl(var(--foreground))] text-[hsl(var(--background))]" : "bg-muted"
+                                isVoiceActive 
+                                  ? "bg-accent/10 border-accent/30 text-accent ring-2 ring-accent/20" 
+                                  : "bg-muted/50 text-muted-foreground"
                               )}
                             />
                           </div>
-                          {/* Inline voice status chip */}
+                          {/* Combined voice status with waveform */}
                           {(isVoiceProcessing || isVoiceActive) && (
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-md border",
-                                isVoiceProcessing
-                                  ? "border-amber-500/30 bg-amber-500/10 text-amber-600"
-                                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-600"
-                              )}
-                              aria-live="polite"
-                            >
-                              <span className={cn("inline-block h-1.5 w-1.5 rounded-full", isVoiceProcessing ? "bg-amber-500" : "bg-emerald-500")} />
-                              {isVoiceProcessing ? 'Processing' : 'Recording'}
-                            </span>
+                            <VoiceStatusIndicator
+                              isActive={isVoiceActive}
+                              isProcessing={isVoiceProcessing}
+                            />
                           )}
                           {/* Anchor placeholders for camera/screen popovers on desktop */}
                           <div ref={cameraButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
@@ -523,7 +521,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                             onClick={handleDownloadSession}
                             disabled={isDownloadingSession || !sessionIdForExport}
                             className={cn(
-                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px] border border-border/40 bg-muted text-foreground transition-transform duration-150 hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2 shadow-sm",
+                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
+                              "border border-border/30 bg-muted/50 text-muted-foreground",
+                              "transition-all duration-300 ease-out",
+                              "hover:scale-[1.02] hover:border-border/50 hover:bg-muted/70 hover:shadow-md",
+                              "active:scale-[0.98]",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
                               VISUAL.CORNER_RADIUS,
                               "[.monochrome_&]:rounded-none"
                             )}
@@ -534,7 +537,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                           </Button>
                           <PromptInputSubmit
                             className={cn(
-                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px] bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] shadow-[0_24px_60px_-30px_rgba(255,107,53,0.35)] transition-transform duration-150 hover:-translate-y-0.5 hover:bg-[hsl(var(--accent))]/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 focus-visible:ring-offset-2",
+                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
+                              "bg-accent text-accent-foreground",
+                              "shadow-[0_20px_50px_-30px_rgba(255,107,53,0.4)]",
+                              "transition-all duration-300 ease-out",
+                              "hover:scale-[1.02] hover:shadow-[0_25px_60px_-30px_rgba(255,107,53,0.5)]",
+                              "active:scale-[0.98]",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
                               VISUAL.CORNER_RADIUS,
                               "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
                             )}

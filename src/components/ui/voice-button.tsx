@@ -224,8 +224,12 @@ export function VoiceButton({
 
   const handleClick = () => {
     if (isDisabled) return;
-    onPress?.();
-    onToggle?.();
+    // Only call one handler - prefer onPress, fallback to onToggle
+    if (onPress) {
+      onPress();
+    } else if (onToggle) {
+      onToggle();
+    }
   };
 
   const getIcon = () => {
