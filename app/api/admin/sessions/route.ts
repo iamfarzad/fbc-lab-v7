@@ -1,115 +1,117 @@
 import { NextRequest } from 'next/server'
 import { respond } from '@/lib/api/response'
-import { adminAuthMiddleware } from '@/app/api-utils/auth'
-import { adminRateLimit } from '@/app/api-utils/rate-limiting'
-import { adminChatService } from '@/src/core/admin/admin-chat-service'
-import { supabaseService } from '@/src/core/supabase/client'
+import { multimodalContextManager } from '@/core/context/multimodal-context'
+import { logJsonl } from '@/src/lib/jsonl-logger'
 
-interface AdminSessionResponse {
-  id: string
-  adminId: string | null
-  sessionName: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
+// Simple authentication check (in production, use proper auth)
+function checkAdminAuth(req: NextRequest): boolean {
+  const authHeader = req.headers.get('authorization')
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return false
+  }
+  
+  const token = authHeader.substring(7)
+  return token === adminPassword
 }
 
-function ensureSupabase() {
-  const supabase = supabaseService
-  if (!supabase || typeof (supabase as any)?.from !== 'function') {
-    throw new Error('Supabase service client unavailable. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.')
-  }
-  return supabase
-}
-
-export async function GET(request: NextRequest) {
-  const hasSupabaseEnv = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  if (!hasSupabaseEnv) {
-    return respond.ok({ disabled: true, message: 'Admin features require Supabase configuration' })
-  }
-
-  const rateLimitResult = adminRateLimit(request)
-  if (rateLimitResult) {
-    return rateLimitResult
-  }
-
-  const authResult = await adminAuthMiddleware(request)
-  if (authResult) {
-    return authResult
-  }
-
+export async function GET(req: NextRequest) {
   try {
-    ensureSupabase()
-    const { searchParams } = new URL(request.url)
-    const adminId = searchParams.get('adminId') ?? undefined
-    const sessions = await adminChatService.getAdminSessions(adminId) as AdminSessionResponse[]
-    return respond.ok({ sessions })
-  } catch (error) {
-    console.error('Admin sessions GET error:', error)
-    return respond.serverError('Failed to retrieve sessions')
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const rateLimitResult = adminRateLimit(request)
-  if (rateLimitResult) {
-    return rateLimitResult
-  }
-
-  const authResult = await adminAuthMiddleware(request)
-  if (authResult) {
-    return authResult
-  }
-
-  try {
-    ensureSupabase()
-    const { sessionId, adminId, sessionName } = (await request.json()) as {
-      sessionId?: string
-      adminId?: string
-      sessionName?: string
+    // Check admin authentication
+    if (!checkAdminAuth(req)) {
+      return respond.unauthorized('Admin authentication required')
     }
 
-    if (!sessionId) {
-      return respond.badRequest('sessionId is required')
-    }
+    console.log('🔍 Admin: Listing sessions')
+    logJsonl('admin', 'sessions_listed')
 
-    const session = await adminChatService.getOrCreateSession(sessionId, adminId, sessionName)
-    return respond.ok({ session })
+    // Get active sessions
+    const activeSessions = multimodalContextManager.getActiveSessions()
+    
+    // Get session details
+    const sessionDetails = await Promise.all(
+      activeSessions.map(async (sessionId) => {
+        try {
+          const context = await multimodalContextManager.getContext(sessionId)
+          if (!context) return null
+          
+          return {
+            sessionId,
+            leadContext: context.leadContext,
+            messageCount: context.conversationHistory.length,
+            modalitiesUsed: context.metadata.modalitiesUsed,
+            lastActivity: context.metadata.lastUpdated,
+            createdAt: context.metadata.createdAt,
+            totalTokens: context.metadata.totalTokens
+          }
+        } catch (err) {
+          console.warn(`Failed to get context for session ${sessionId}:`, err)
+          return null
+        }
+      })
+    )
+
+    const validSessions = sessionDetails.filter(Boolean)
+
+    return respond.ok({
+      sessions: validSessions,
+      totalCount: validSessions.length,
+      exportedAt: new Date().toISOString()
+    })
   } catch (error) {
-    console.error('Admin sessions POST error:', error)
-    return respond.serverError('Failed to create session')
+    const message = error instanceof Error ? error.message : 'Failed to list sessions'
+    console.error('❌ [Admin] Error:', message)
+    logJsonl('admin', 'error', { message })
+    return respond.serverError(message)
   }
 }
 
-export async function DELETE(request: NextRequest) {
-  const rateLimitResult = adminRateLimit(request)
-  if (rateLimitResult) {
-    return rateLimitResult
-  }
-
-  const authResult = await adminAuthMiddleware(request)
-  if (authResult) {
-    return authResult
-  }
-
+export async function POST(req: NextRequest) {
   try {
-    const supabase = ensureSupabase()
-    const { searchParams } = new URL(request.url)
-    const sessionId = searchParams.get('sessionId')
-
-    if (!sessionId) {
-      return respond.badRequest('sessionId is required')
+    // Check admin authentication
+    if (!checkAdminAuth(req)) {
+      return respond.unauthorized('Admin authentication required')
     }
 
-    await (supabase as any)
-      .schema('admin')
-      .from('admin_sessions')
-      .update({ is_active: false })
-      .eq('id', sessionId)
+    const body = await req.json()
+    const { sessionId, action } = body
 
-    return respond.ok({ success: true })
+    if (!sessionId || !action) {
+      return respond.badRequest('Session ID and action required')
+    }
+
+    console.log('🔍 Admin: Session action', { sessionId, action })
+    logJsonl('admin', 'session_action', { sessionId, action })
+
+    switch (action) {
+      case 'export':
+        const context = await multimodalContextManager.getContext(sessionId)
+        if (!context) {
+          return respond.notFound('Session not found')
+        }
+        
+        return respond.ok({
+          sessionId,
+          context,
+          exportedAt: new Date().toISOString()
+        })
+
+      case 'clear':
+        await multimodalContextManager.clearSession(sessionId)
+        return respond.ok({ message: 'Session cleared' })
+
+      case 'archive':
+        await multimodalContextManager.archiveConversation(sessionId)
+        return respond.ok({ message: 'Session archived' })
+
+      default:
+        return respond.badRequest('Invalid action')
+    }
   } catch (error) {
-    console.error('Admin sessions DELETE error:', error)
-    return respond.serverError('Failed to delete session')
+    const message = error instanceof Error ? error.message : 'Failed to process session action'
+    console.error('❌ [Admin] Error:', message)
+    logJsonl('admin', 'error', { message })
+    return respond.serverError(message)
   }
 }

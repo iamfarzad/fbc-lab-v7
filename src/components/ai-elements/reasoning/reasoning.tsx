@@ -134,17 +134,19 @@ export const ReasoningTrigger = memo(
           "flex w-full items-center gap-1 text-muted-foreground text-[11px] transition-colors duration-200 hover:text-foreground",
           className
         )}
+        aria-label={isOpen ? "Hide reasoning details" : "Show reasoning details"}
         {...props}
       >
         {children ?? (
           <>
-            <BrainIcon className="size-3.5" />
+            <BrainIcon className="size-3.5" aria-hidden="true" />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
               className={cn(
                 "size-3 transition-transform duration-200",
                 isOpen ? "rotate-180" : "rotate-0"
               )}
+              aria-hidden="true"
             />
           </>
         )}
