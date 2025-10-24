@@ -96,7 +96,20 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
                   />
                 </div>
               )}
-              <span className="text-[10px] font-medium">{isVoiceProcessing ? 'Processing' : 'Recording'}</span>
+              <span className="text-[10px] font-medium">
+                {isVoiceProcessing ? 'AI is thinking...' : 'Recording your voice'}
+              </span>
+            </div>
+          )}
+
+          {/* AI Speech Transcript Display */}
+          {aiSpeechTranscript && (
+            <div className="mb-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-sm shadow-sm border-primary/30 bg-primary/10 text-primary transition-all duration-300 ease-out" role="status" aria-live="polite" aria-atomic="true">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="text-[10px] font-medium">AI is speaking:</span>
+              <span className="text-[10px] text-primary-foreground/80 max-w-xs truncate">
+                {aiSpeechTranscript}
+              </span>
             </div>
           )}
 

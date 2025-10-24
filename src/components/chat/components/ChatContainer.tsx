@@ -13,13 +13,16 @@ export function ChatContainer({ chatState, children }: ChatContainerProps) {
   const getContainerClasses = () => {
     // Mobile-first: full screen on mobile, floating on desktop
     if (chatState.isExpanded) {
-      return "fixed inset-0 z-[100] flex flex-col bg-[hsl(var(--background))] text-[hsl(var(--foreground))] overflow-hidden";
+      return "fixed inset-0 z-[100] flex flex-col bg-[hsl(var(--background))] text-[hsl(var(--foreground))] overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]";
     }
 
     // Mobile (< 640px): Full screen with safe areas
     const mobileClasses = [
       "fixed inset-0 z-[100] flex flex-col bg-[hsl(var(--background))] text-[hsl(var(--foreground))]",
-      "overflow-hidden safe-area-inset-top safe-area-inset-bottom",
+      "overflow-hidden",
+      // Proper safe area handling for iOS notches and home indicators
+      "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]",
+      "pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]",
       // Remove rounded corners and shadows on mobile
       "md:rounded-[32px] md:shadow-[0_24px_80px_-60px_rgba(12,18,26,0.45)] md:border md:border-border/40",
     ];

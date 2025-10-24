@@ -25,12 +25,31 @@ export function ChatTermsAcceptance({
   onAgreedChange,
   onAcceptTerms,
 }: ChatTermsAcceptanceProps) {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (agreed && email.trim() && name.trim()) {
+      onAcceptTerms();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && agreed && email.trim() && name.trim()) {
+      e.preventDefault();
+      onAcceptTerms();
+    }
+  };
+
   return (
-    <div className={cn(
-      "border bg-card p-6 space-y-4 shadow-lg max-w-md mx-auto",
-      VISUAL.CORNER_RADIUS,
-      "[.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2"
-    )}>
+    <form 
+      onSubmit={handleSubmit}
+      className={cn(
+        "border bg-card p-6 space-y-4 shadow-lg max-w-md mx-auto",
+        VISUAL.CORNER_RADIUS,
+        "[.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2"
+      )}
+      role="form"
+      aria-label="Terms and conditions acceptance form"
+    >
       <div className="text-xs uppercase tracking-widest text-muted-foreground text-center">
         Continue with F.B/c
       </div>
@@ -45,8 +64,12 @@ export function ChatTermsAcceptance({
             type="text"
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Your name"
             className="h-10"
+            aria-required="true"
+            aria-invalid={!name.trim()}
+            autoComplete="name"
           />
         </div>
 
@@ -59,8 +82,12 @@ export function ChatTermsAcceptance({
             type="email"
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="work@company.com"
             className="h-10"
+            aria-required="true"
+            aria-invalid={!email.trim()}
+            autoComplete="email"
           />
         </div>
 
@@ -70,7 +97,9 @@ export function ChatTermsAcceptance({
               id="terms"
               checked={agreed}
               onCheckedChange={(checked) => onAgreedChange(checked === true)}
+              onKeyDown={handleKeyDown}
               className="mt-0.5"
+              aria-required="true"
             />
             <Label 
               htmlFor="terms" 
@@ -98,19 +127,20 @@ export function ChatTermsAcceptance({
               </a>
             </Label>
           </div>
-          <p className="text-[10px] text-muted-foreground ml-6 leading-relaxed">
+          <p id="terms-description" className="text-[10px] text-muted-foreground ml-6 leading-relaxed">
             Your data will be processed according to GDPR regulations. Voice transcripts and visual captures are automatically deleted after 7 days.
           </p>
         </div>
 
         <Button
-          onClick={onAcceptTerms}
+          type="submit"
           disabled={!agreed || !email.trim() || !name.trim()}
           className="w-full min-h-[44px]"
+          aria-describedby="terms-description"
         >
           Continue
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

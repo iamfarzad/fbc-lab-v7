@@ -216,7 +216,15 @@ export function ChatInterface({ id }: { id?: string | null }) {
       promptTermsNotice();
       return;
     }
-    await toggleVoiceSession();
+    
+    // Show immediate feedback for voice toggle
+    console.log('🎤 [ChatInterface] Voice toggle initiated');
+    try {
+      await toggleVoiceSession();
+    } catch (error) {
+      console.error('🎤 [ChatInterface] Voice toggle failed:', error);
+      toast.error('Failed to toggle voice session. Please try again.');
+    }
   }, [termsAccepted, promptTermsNotice, toggleVoiceSession]);
 
   const handleToggleScreenShare = useCallback(async () => {
