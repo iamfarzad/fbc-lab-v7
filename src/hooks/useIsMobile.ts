@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 export function useIsMobile(breakpoint = 768): boolean {
-  const getViewportWidth = () => {
+  const getViewportWidth = useCallback(() => {
     if (typeof window === 'undefined') return breakpoint;
     if (window.visualViewport) {
       return window.visualViewport.width;
     }
     return window.innerWidth;
-  };
+  }, [breakpoint]);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => getViewportWidth() <= breakpoint);
 

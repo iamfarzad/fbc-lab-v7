@@ -38,7 +38,7 @@ const cachedAnalyzeUrl = createCachedFunction(
       const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
       const title = titleMatch ? titleMatch[1].trim() : 'Untitled'
       
-      const descMatch = html.match(/<meta[^>]*name=["\']description["\'][^>]*content=["\']([^"']*)["\'][^>]*>/i)
+      const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i)
       const description = descMatch ? descMatch[1].trim() : 'No description available'
 
       // Normalize API key for @google/genai

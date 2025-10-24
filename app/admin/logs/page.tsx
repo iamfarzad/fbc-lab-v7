@@ -3,7 +3,7 @@
 // eslint-disable-next-line react-refresh/only-export-components
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -60,7 +60,7 @@ export default function AdminLogsPage() {
     void verifyAccess()
   }, [router])
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       let query = supabase
         .from('logs')
@@ -91,7 +91,7 @@ export default function AdminLogsPage() {
       console.error('Failed to fetch logs:', error)
       setLoading(false)
     }
-  }
+  }, [serviceFilter, levelFilter, searchTerm])
 
   useEffect(() => {
     if (!isAuthenticated) return

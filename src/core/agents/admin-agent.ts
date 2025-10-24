@@ -12,6 +12,7 @@ import { GEMINI_MODELS } from '@/config/constants'
  */
 export async function adminAgent(
   messages: ChatMessage[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _context: {
     sessionId: string
     adminId?: string
@@ -135,6 +136,7 @@ export async function searchConversations(query: {
  * Helper: Draft follow-up email for a lead
  */
 export async function draftFollowUpEmail({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   leadId: _leadId,
   leadName,
   conversationSummary,

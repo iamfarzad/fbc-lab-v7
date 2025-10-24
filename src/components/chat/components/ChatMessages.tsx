@@ -570,8 +570,8 @@ export function ChatMessages({
                             <Tool key={index} defaultOpen={false}>
                               <ToolHeader title={tool.name} type={tool.type as any} state={tool.state as any} />
                               <ToolContent>
-                                {tool.input ? <ToolInput input={String(tool.input)} /> : null}
-                                {tool.output ? <ToolOutput output={String(tool.output)} errorText={tool.error || ''} /> : null}
+                                {tool.input ? <ToolInput input={JSON.stringify(tool.input)} /> : null}
+                                {tool.output ? <ToolOutput output={JSON.stringify(tool.output)} errorText={tool.error || ''} /> : null}
                               </ToolContent>
                             </Tool>
                           ))}

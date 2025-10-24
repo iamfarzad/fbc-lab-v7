@@ -30,7 +30,7 @@ export function generateCSPHeader(): string {
 // Input validation patterns
 export const VALIDATION_PATTERNS = {
   // Allow only alphanumeric, spaces, and basic punctuation for user input
-  text: /^[a-zA-Z0-9\s\.\,\!\?\-\(\)\[\]\{\}:;'"@#$%^&*+=<>~`]*$/,
+  text: /^[a-zA-Z0-9\s.,!?\-()[\]{}:;'"@#$%^&*+=<>~`]*$/,
   
   // Email validation
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -45,7 +45,7 @@ export const VALIDATION_PATTERNS = {
   base64: /^[A-Za-z0-9+/]*={0,2}$/,
   
   // URL validation
-  url: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?//=]*)$/,
+  url: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?//=]*)$/,
 } as const;
 
 // XSS prevention utilities

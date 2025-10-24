@@ -1,7 +1,7 @@
 // Utility functions for mic selector
 // Moved from mic-selector.tsx to fix fast refresh warnings
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 
 export interface AudioDevice {
   deviceId: string
@@ -47,7 +47,7 @@ export function useAudioDevices() {
     }
   }
 
-  const loadDevicesWithPermission = async () => {
+  const loadDevicesWithPermission = useCallback(async () => {
     if (loading) return
 
     try {
@@ -85,7 +85,7 @@ export function useAudioDevices() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [loading])
 
   useEffect(() => {
     loadDevicesWithoutPermission()

@@ -1,3 +1,6 @@
+// Button variants
+// Moved from button.tsx to fix fast refresh warnings
+
 import { cva } from "class-variance-authority"
 
 export const buttonVariants = cva(

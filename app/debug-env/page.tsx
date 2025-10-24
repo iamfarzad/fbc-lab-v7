@@ -64,7 +64,7 @@ export default function DebugEnvPage() {
               ws.close();
             };
             ws.onerror = (error) => {
-              alert(`❌ WebSocket error: ${error}`);
+              alert(`❌ WebSocket error: ${error?.type || 'Unknown error'}`);
             };
           }}
         >

@@ -37,7 +37,7 @@ export function createLoggedSupabaseClient(url: string, key: string): SupabaseCl
     let operation = 'unknown'
 
     // Wrap common query methods
-    const wrapMethod = (method: string, originalMethod: Function) => {
+    const wrapMethod = (method: string, originalMethod: (...args: any[]) => any) => {
       return async function(this: any, ...args: any[]) {
         operation = method
         const methodStartTime = Date.now()

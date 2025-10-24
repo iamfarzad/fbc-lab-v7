@@ -1,3 +1,6 @@
+// Badge variants
+// Moved from badge.tsx to fix fast refresh warnings
+
 import { cva } from "class-variance-authority"
 
 export const badgeVariants = cva(

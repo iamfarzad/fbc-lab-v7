@@ -165,7 +165,7 @@ export function initBrowserLogCapture() {
       timestamp: new Date().toISOString(),
       meta: {
         reason: String(event.reason),
-        promise: String(event.promise),
+        promise: event.promise?.constructor?.name || 'Unknown',
         url: window.location.href
       }
     })
