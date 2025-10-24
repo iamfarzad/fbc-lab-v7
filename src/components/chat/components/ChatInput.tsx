@@ -13,9 +13,10 @@ import {
 } from "@/components/ai-elements/interactive/prompt-input";
 import { toast } from "sonner";
 import { VISUAL } from "../design-tokens";
-import { Download } from "lucide-react";
+import { Download, Keyboard, ChevronDown } from "lucide-react";
 import { VoiceButton } from "@/components/ui/voice-button";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
 import { CameraFullScreen } from "./camera/CameraFullScreen";
 import { ScreenFullScreen } from "./screen/ScreenFullScreen";
@@ -129,6 +130,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   const [pendingPermission, setPendingPermission] = useState<'voice' | 'camera' | 'screen' | null>(null);
   const [isDownloadingSession, setIsDownloadingSession] = useState(false);
   const [voicePermissionGranted, setVoicePermissionGranted] = useState(false);
+  const [isTextareaExpanded, setIsTextareaExpanded] = useState(false);
 
   useEffect(() => {
     if (voicePermissionGranted) return;
@@ -214,7 +216,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
       if (!ensureTerms()) return;
       screenToggle.handleButtonClick();
     },
-    onClosePopover: () => setActivePopover(null)
+    onClosePopover: () => setActivePopover(null),
+    onTextareaToggle: () => setIsTextareaExpanded(v => !v)
   });
 
   // Auto-open popover when media becomes active
@@ -388,174 +391,230 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
             }
           }}
         >
-          <PromptInputBody className="flex flex-col gap-2" data-ui-rev="2025-10-10-polish2">
-            <PromptInputTextarea
-              className="rounded-xl bg-transparent px-2 sm:px-3 py-1.5 text-sm leading-relaxed text-foreground/90 placeholder:text-muted-foreground/70 min-h-[36px] max-h-[120px] resize-none"
-            value={getInputDisplayValue()}
-            onFocus={() => {
-              if (!ensureTerms()) {
-                (document.activeElement as HTMLElement | null)?.blur?.();
-                return;
-              }
-              setIsFocused(true);
-            }}
-            onBlur={() => setIsFocused(false)}
-            onChange={(e) => {
-              if (isListening && !manualInputOverride) setManualInputOverride(true);
-              onInputChange(e.target.value);
-            }}
-            placeholder={termsAccepted ? getPlaceholder() : 'Share your name and email above to begin.'}
-            disabled={isLoading || !termsAccepted}
-          />
+          <div className="flex flex-col-reverse">
+            {/* TOOLBAR SECTION (renders second, displays at bottom) */}
+            <div>
+              {isTextareaExpanded && <Separator />}
+              
+              <PromptInputToolbar className="items-center px-1 sm:px-0 pb-0 pt-1 overflow-visible">
+                <PromptInputTools className="gap-2">
+                  <ChatActions
+                    className={VISUAL.CORNER_RADIUS}
+                    analyticsId="chat-actions-trigger"
+                    onScheduleCall={onOpenMeeting}
+                    onExportSummary={onExportSummary}
+                    canExportSummary={Boolean(sessionIdForExport)}
+                    onUploadFiles={() => {
+                      if (!ensureTerms()) return;
+                      hiddenFilesInputRef.current?.click();
+                    }}
+                    onUploadImages={() => {
+                      if (!ensureTerms()) return;
+                      hiddenImagesInputRef.current?.click();
+                    }}
+                    onRequestUnlock={() => {
+                      if (!termsAccepted) ensureTerms();
+                    }}
+                    voice={{
+                      isActive: isVoiceActive,
+                      isProcessing: isVoiceProcessing,
+                      onToggle: handleVoiceButtonClick,
+                      disabled: isVoiceInitializing,
+                    }}
+                    camera={{
+                      isActive: cameraState,
+                      isProcessing: Boolean(isCameraInitializing),
+                      onToggle: handleCameraButtonClick,
+                      disabled: Boolean(isCameraInitializing),
+                    }}
+                    screen={{
+                      isActive: isScreenSharing,
+                      isProcessing: Boolean(isScreenShareInitializing),
+                      onToggle: handleScreenButtonClick,
+                      disabled: Boolean(isScreenShareInitializing),
+                    }}
+                  />
+                </PromptInputTools>
 
-          <PromptInputAttachments className="pt-1">
-            {(attachment) => (
-              <PromptInputAttachment key={attachment.id} data={attachment} />
-            )}
-          </PromptInputAttachments>
+                {!termsAccepted && (
+                  <p className="px-1 sm:px-0 text-[11px] text-muted-foreground">
+                    Introduce yourself above and accept the terms to unlock chat, voice, and media tools.
+                  </p>
+                )}
 
-          {showVoicePreview && isListening && (voicePartialTranscript || voiceTranscript) && (
-            <div className="px-1 sm:px-2 text-xs text-muted-foreground/75">
-              <span className="font-medium text-muted-foreground/90">Voice preview:</span>{' '}
-              {voicePartialTranscript || voiceTranscript?.split('\n').slice(-1)[0]}
+                {/* Right side: Voice + Download + Send + Keyboard Toggle */}
+                <div className="flex items-center gap-2">
+                  {/* Voice Button */}
+                  <div ref={voiceButtonRef} className="flex items-center">
+                    <VoiceButton
+                      state={
+                        voiceError ? "error" :
+                        isVoiceProcessing ? "processing" :
+                        isVoiceActive ? "recording" :
+                        "idle"
+                      }
+                      onPress={handleVoiceButtonClick}
+                      isExpanded={isExpanded}
+                      isMinimized={isMinimized}
+                      variant="ghost"
+                      animationStyle="svg"
+                      className={cn(
+                        "border border-border/30 transition-all duration-300 ease-out",
+                        "hover:scale-[1.02] hover:border-border/50 hover:shadow-md active:scale-[0.98]",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
+                        VISUAL.CORNER_RADIUS,
+                        "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
+                        isVoiceActive 
+                          ? "bg-accent/10 border-accent/30 text-accent ring-2 ring-accent/20" 
+                          : "bg-muted/50 text-muted-foreground"
+                      )}
+                    />
+                  </div>
+                  
+                  {/* Anchor placeholders for camera/screen popovers on desktop */}
+                  <div ref={cameraButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
+                  <div ref={screenButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
+
+                  {/* Download Button */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleDownloadSession}
+                    disabled={isDownloadingSession || !sessionIdForExport}
+                    className={cn(
+                      "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
+                      "border border-border/30 bg-muted/50 text-muted-foreground",
+                      "transition-all duration-300 ease-out",
+                      "hover:scale-[1.02] hover:border-border/50 hover:bg-muted/70 hover:shadow-md",
+                      "active:scale-[0.98]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
+                      VISUAL.CORNER_RADIUS,
+                      "[.monochrome_&]:rounded-none"
+                    )}
+                    aria-label="Download session JSON"
+                    title="Download session JSON"
+                  >
+                    <Download className={cn("h-4 w-4", isDownloadingSession && "animate-pulse")} />
+                  </Button>
+                  
+                  {/* Send Button */}
+                  <PromptInputSubmit
+                    className={cn(
+                      "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
+                      "bg-accent text-accent-foreground",
+                      "shadow-[0_20px_50px_-30px_rgba(255,107,53,0.4)]",
+                      "transition-all duration-300 ease-out",
+                      "hover:scale-[1.02] hover:shadow-[0_25px_60px_-30px_rgba(255,107,53,0.5)]",
+                      "active:scale-[0.98]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+                      VISUAL.CORNER_RADIUS,
+                      "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
+                    )}
+                    variant="ghost"
+                    status={isLoading ? 'submitted' : undefined}
+                    disabled={isLoading || !getInputDisplayValue().trim()}
+                    aria-label={isLoading ? 'Sending message...' : 'Send message'}
+                  />
+                  
+                  {/* NEW: Keyboard Toggle with Icon Crossfade */}
+                  <Separator orientation="vertical" className="mx-1 -my-2.5" />
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsTextareaExpanded(v => !v)}
+                    aria-pressed={isTextareaExpanded}
+                    aria-label={isTextareaExpanded ? "Hide text input" : "Show text input"}
+                    className={cn(
+                      "relative h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
+                      "border border-border/30 bg-muted/50 text-muted-foreground",
+                      "hover:scale-[1.02] hover:border-border/50 hover:bg-muted/70",
+                      "active:scale-[0.98]",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
+                      VISUAL.CORNER_RADIUS
+                    )}
+                  >
+                    <Keyboard
+                      className={
+                        "h-5 w-5 transform-gpu transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] " +
+                        (isTextareaExpanded ? "scale-75 opacity-0" : "scale-100 opacity-100")
+                      }
+                    />
+                    <ChevronDown
+                      className={
+                        "absolute inset-0 m-auto h-5 w-5 transform-gpu transition-all delay-50 duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] " +
+                        (isTextareaExpanded ? "scale-100 opacity-100" : "scale-75 opacity-0")
+                      }
+                    />
+                  </Button>
+                </div>
+              </PromptInputToolbar>
+              
+              {/* Footer - only when collapsed */}
+              {!isTextareaExpanded && (
+                <>
+                  <div className="px-1 sm:px-2 text-[10px] text-muted-foreground/50 text-right">
+                    <span className="font-medium">Shift + Enter</span> for newline
+                  </div>
+                  <div className="px-1 sm:px-2 text-[10px] text-muted-foreground/50 text-center">
+                    Strategic guidance only - not legal, medical, or financial advice.
+                  </div>
+                </>
+              )}
             </div>
-          )}
+            
+            {/* TEXTAREA SECTION (renders first, displays at top) */}
+            <div
+              className={cn(
+                "overflow-hidden transition-all duration-300 ease-out",
+                isTextareaExpanded ? "max-h-[200px]" : "max-h-0"
+              )}
+            >
+              <PromptInputBody className="flex flex-col gap-2">
+                <PromptInputTextarea
+                  className="rounded-xl bg-transparent px-2 sm:px-3 py-1.5 text-sm leading-relaxed text-foreground/90 placeholder:text-muted-foreground/70 min-h-[36px] max-h-[120px] resize-none"
+                  value={getInputDisplayValue()}
+                  onFocus={() => {
+                    if (!ensureTerms()) {
+                      (document.activeElement as HTMLElement | null)?.blur?.();
+                      return;
+                    }
+                    setIsFocused(true);
+                  }}
+                  onBlur={() => setIsFocused(false)}
+                  onChange={(e) => {
+                    if (isListening && !manualInputOverride) setManualInputOverride(true);
+                    onInputChange(e.target.value);
+                  }}
+                  placeholder={termsAccepted ? getPlaceholder() : 'Share your name and email above to begin.'}
+                  disabled={isLoading || !termsAccepted}
+                />
 
-          {voiceError && (
-            <div className="px-1 sm:px-2 text-xs text-destructive/80">
-              {voiceError}
+                <PromptInputAttachments className="pt-1">
+                  {(attachment) => (
+                    <PromptInputAttachment key={attachment.id} data={attachment} />
+                  )}
+                </PromptInputAttachments>
+
+                {showVoicePreview && isListening && (voicePartialTranscript || voiceTranscript) && (
+                  <div className="px-1 sm:px-2 text-xs text-muted-foreground/75">
+                    <span className="font-medium text-muted-foreground/90">Voice preview:</span>{' '}
+                    {voicePartialTranscript || voiceTranscript?.split('\n').slice(-1)[0]}
+                  </div>
+                )}
+
+                {voiceError && (
+                  <div className="px-1 sm:px-2 text-xs text-destructive/80">
+                    {voiceError}
+                  </div>
+                )}
+              </PromptInputBody>
             </div>
-          )}
-
-          <PromptInputToolbar className="items-center px-1 sm:px-0 pb-0 pt-1 overflow-visible">
-            <PromptInputTools className="gap-2">
-              <ChatActions
-                className={VISUAL.CORNER_RADIUS}
-                analyticsId="chat-actions-trigger"
-                onScheduleCall={onOpenMeeting}
-                onExportSummary={onExportSummary}
-                canExportSummary={Boolean(sessionIdForExport)}
-                onUploadFiles={() => {
-                  if (!ensureTerms()) return;
-                  hiddenFilesInputRef.current?.click();
-                }}
-                onUploadImages={() => {
-                  if (!ensureTerms()) return;
-                  hiddenImagesInputRef.current?.click();
-                }}
-                onRequestUnlock={() => {
-                  if (!termsAccepted) ensureTerms();
-                }}
-                voice={{
-                  isActive: isVoiceActive,
-                  isProcessing: isVoiceProcessing,
-                  onToggle: handleVoiceButtonClick,
-                  disabled: isVoiceInitializing,
-                }}
-                camera={{
-                  isActive: cameraState,
-                  isProcessing: Boolean(isCameraInitializing),
-                  onToggle: handleCameraButtonClick,
-                  disabled: Boolean(isCameraInitializing),
-                }}
-                screen={{
-                  isActive: isScreenSharing,
-                  isProcessing: Boolean(isScreenShareInitializing),
-                  onToggle: handleScreenButtonClick,
-                  disabled: Boolean(isScreenShareInitializing),
-                }}
-              />
-            </PromptInputTools>
-
-            {!termsAccepted && (
-              <p className="px-1 sm:px-0 text-[11px] text-muted-foreground">
-                Introduce yourself above and accept the terms to unlock chat, voice, and media tools.
-              </p>
-            )}
-
-                        {/* Right side: Voice + Send */}
-                        <div className="flex items-center gap-2">
-                          {/* Voice Button - Moved next to send */}
-                          <div ref={voiceButtonRef} className="flex items-center">
-                            <VoiceButton
-                              state={
-                                voiceError ? "error" :
-                                isVoiceProcessing ? "processing" :
-                                isVoiceActive ? "recording" :
-                                "idle"
-                              }
-                              onPress={handleVoiceButtonClick}
-                              isExpanded={isExpanded}
-                              isMinimized={isMinimized}
-                              variant="ghost"
-                              animationStyle="svg"
-                              className={cn(
-                                "border border-border/30 transition-all duration-300 ease-out",
-                                "hover:scale-[1.02] hover:border-border/50 hover:shadow-md active:scale-[0.98]",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
-                                VISUAL.CORNER_RADIUS,
-                                "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                                isVoiceActive 
-                                  ? "bg-accent/10 border-accent/30 text-accent ring-2 ring-accent/20" 
-                                  : "bg-muted/50 text-muted-foreground"
-                              )}
-                            />
-                          </div>
-                          {/* Anchor placeholders for camera/screen popovers on desktop */}
-                          <div ref={cameraButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
-                          <div ref={screenButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
-
-                          {/* Send Button */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={handleDownloadSession}
-                            disabled={isDownloadingSession || !sessionIdForExport}
-                            className={cn(
-                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                              "border border-border/30 bg-muted/50 text-muted-foreground",
-                              "transition-all duration-300 ease-out",
-                              "hover:scale-[1.02] hover:border-border/50 hover:bg-muted/70 hover:shadow-md",
-                              "active:scale-[0.98]",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
-                              VISUAL.CORNER_RADIUS,
-                              "[.monochrome_&]:rounded-none"
-                            )}
-                            aria-label="Download session JSON"
-                            title="Download session JSON"
-                          >
-                            <Download className={cn("h-4 w-4", isDownloadingSession && "animate-pulse")} />
-                          </Button>
-                          <PromptInputSubmit
-                            className={cn(
-                              "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                              "bg-accent text-accent-foreground",
-                              "shadow-[0_20px_50px_-30px_rgba(255,107,53,0.4)]",
-                              "transition-all duration-300 ease-out",
-                              "hover:scale-[1.02] hover:shadow-[0_25px_60px_-30px_rgba(255,107,53,0.5)]",
-                              "active:scale-[0.98]",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-                              VISUAL.CORNER_RADIUS,
-                              "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
-                            )}
-                            variant="ghost"
-                            status={isLoading ? 'submitted' : undefined}
-                            disabled={isLoading || !getInputDisplayValue().trim()}
-                            aria-label={isLoading ? 'Sending message...' : 'Send message'}
-                          />
-                        </div>
-                      </PromptInputToolbar>
-
-                      <div className="px-1 sm:px-2 text-[10px] text-muted-foreground/50 text-right">
-                        <span className="font-medium">Shift + Enter</span> for newline
-                      </div>
-                      <div className="px-1 sm:px-2 text-[10px] text-muted-foreground/50 text-center">
-                        Strategic guidance only - not legal, medical, or financial advice.
-                      </div>
-        </PromptInputBody>
-        {/* Bridge lives inside PromptInput to gain access to attachments context */}
-        <AttachmentsBridge onReady={(add) => { attachmentsBridgeRef.current = { add }; }} />
+          </div>
+          
+          {/* Bridge lives inside PromptInput to gain access to attachments context */}
+          <AttachmentsBridge onReady={(add) => { attachmentsBridgeRef.current = { add }; }} />
         </PromptInput>
       </div>
 

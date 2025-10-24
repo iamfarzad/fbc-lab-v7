@@ -5,6 +5,7 @@ interface MediaKeyboardShortcutsHandlers {
   onCameraToggle: () => void
   onScreenToggle: () => void
   onClosePopover?: () => void
+  onTextareaToggle?: () => void
 }
 
 export function useMediaKeyboardShortcuts({
@@ -12,6 +13,7 @@ export function useMediaKeyboardShortcuts({
   onCameraToggle,
   onScreenToggle,
   onClosePopover,
+  onTextareaToggle,
 }: MediaKeyboardShortcutsHandlers) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -35,11 +37,16 @@ export function useMediaKeyboardShortcuts({
         e.preventDefault()
         onClosePopover()
       }
+      // Ctrl/Cmd + K = Toggle textarea
+      else if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        onTextareaToggle?.()
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onVoiceToggle, onCameraToggle, onScreenToggle, onClosePopover])
+  }, [onVoiceToggle, onCameraToggle, onScreenToggle, onClosePopover, onTextareaToggle])
 }
 
 
