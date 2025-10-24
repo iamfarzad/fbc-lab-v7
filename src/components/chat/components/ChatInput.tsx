@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { VISUAL } from "../design-tokens";
 import { Download } from "lucide-react";
 import { VoiceButton } from "@/components/ui/voice-button";
-import { VoiceStatusIndicator } from "@/components/ui/voice-status-indicator";
 import { Button } from "@/components/ui/button";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
 import { CameraFullScreen } from "./camera/CameraFullScreen";
@@ -502,13 +501,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
                               )}
                             />
                           </div>
-                          {/* Combined voice status with waveform */}
-                          {(isVoiceProcessing || isVoiceActive) && (
-                            <VoiceStatusIndicator
-                              isActive={isVoiceActive}
-                              isProcessing={isVoiceProcessing}
-                            />
-                          )}
                           {/* Anchor placeholders for camera/screen popovers on desktop */}
                           <div ref={cameraButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
                           <div ref={screenButtonRef} className="hidden sm:block w-[1px] h-[1px]" />

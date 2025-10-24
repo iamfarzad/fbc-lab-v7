@@ -79,11 +79,24 @@ export const ConversationBar = forwardRef<ChatInputHandle, ConversationBarProps>
       <div className={cn("w-full", className)}>
         {/* Unified status + waveform + media chips */}
         <div className="mx-auto w-full max-w-3xl px-4">
-          {/* Status line */}
+          {/* Enhanced status line with waveform */}
           {(isVoiceProcessing || isVoiceActive) && (
-            <div className="mb-1 text-[11px] text-muted-foreground flex items-center gap-2" role="status" aria-live="polite" aria-atomic="true">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))] animate-pulse" />
-              <span>{isVoiceProcessing ? 'Processing voice…' : 'Recording…'}</span>
+            <div className="mb-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border backdrop-blur-sm shadow-sm border-accent/30 bg-accent/10 text-accent transition-all duration-300 ease-out" role="status" aria-live="polite" aria-atomic="true">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+              {showVoiceBar && (
+                <div className="h-3 w-8">
+                  <BarVisualizer
+                    state={props.visualizerState}
+                    barCount={8}
+                    mediaStream={props.micStream}
+                    minHeight={20}
+                    maxHeight={100}
+                    centerAlign={false}
+                    className="h-full w-full"
+                  />
+                </div>
+              )}
+              <span className="text-[10px] font-medium">{isVoiceProcessing ? 'Processing' : 'Recording'}</span>
             </div>
           )}
 
