@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
-  PromptInputTextarea,
   type PromptInputFile
 } from "@/components/ai-elements/interactive/prompt-input";
 import { toast } from "sonner";
@@ -374,7 +373,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
             )}
           >
             <div className="bg-background/80 backdrop-blur-sm border border-border/20 rounded-lg p-3">
-              <PromptInputTextarea
+              <textarea
                 className="w-full bg-transparent border-none outline-none resize-none text-sm leading-relaxed"
                 value={getInputDisplayValue()}
                 onFocus={() => {
