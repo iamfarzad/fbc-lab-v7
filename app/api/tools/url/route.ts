@@ -25,8 +25,7 @@ const cachedAnalyzeUrl = createCachedFunction(
       const response = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; F.B/c AI Bot/1.0)'
-        },
-        timeout: 10000 // 10 second timeout
+        }
       })
 
       if (!response.ok) {

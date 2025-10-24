@@ -113,7 +113,6 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
 
       const constraints: MediaStreamConstraints = {
         video: {
-          mediaSource: 'screen',
           width: { ideal: 1920 },
           height: { ideal: 1080 },
         },
