@@ -1,31 +1,20 @@
 import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
-  PromptInput,
-  PromptInputBody,
   PromptInputTextarea,
-  PromptInputToolbar,
-  PromptInputTools,
-  PromptInputSubmit,
-  PromptInputAttachment,
-  PromptInputAttachments,
   type PromptInputFile
 } from "@/components/ai-elements/interactive/prompt-input";
 import { toast } from "sonner";
-import { VISUAL } from "../design-tokens";
-import { Download, Keyboard, ChevronDown } from "lucide-react";
-import { VoiceButton } from "@/components/ui/voice-button";
+import { Download, Keyboard, Mic, MicOff, Video, VideoOff, Monitor, MonitorOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { VoiceFullScreen } from "./voice/VoiceFullScreen";
 import { CameraFullScreen } from "./camera/CameraFullScreen";
 import { ScreenFullScreen } from "./screen/ScreenFullScreen";
 import { PermissionExplanationDialog } from "./PermissionExplanationDialog";
-import { usePromptInputAttachments } from "@/components/ai-elements/interactive/prompt-input";
 import { useMediaToggle } from "@/hooks/useMediaToggle";
 import { useMediaKeyboardShortcuts } from "@/hooks/useMediaKeyboardShortcuts";
-// MediaDrawer and MediaPanel removed
-import { ChatActions } from "./ChatActions";
+import { LiveWaveformMatrix } from "@/components/ui/live-waveform-matrix";
 
 export type SendMessageInput = string | {
   text?: string;
@@ -76,14 +65,6 @@ export type ChatInputHandle = {
   openMedia: (tab?: 'voice' | 'camera' | 'screen') => void;
 }
 
-// Small bridge to lift attachments.add API from PromptInput's context
-function AttachmentsBridge({ onReady }: { onReady: (addFn: (files: File[] | FileList) => void) => void }) {
-  const ctx = usePromptInputAttachments();
-  useEffect(() => {
-    onReady(ctx.add);
-  }, [ctx.add, onReady]);
-  return null;
-}
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStatusLine?: boolean; showVoicePreview?: boolean; disableExpandedControls?: boolean }>(function ChatInput({
   inputValue,
@@ -94,11 +75,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   voiceError,
   isVoiceActive,
   isVoiceProcessing,
-  isVoiceInitializing = false,
   cameraState,
-  isCameraInitializing = false,
   isScreenSharing,
-  isScreenShareInitializing = false,
   cameraStream,
   screenShareStream,
   screenThumbnail,
@@ -111,15 +89,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   onToggleCamera,
   onToggleScreenShare,
   onSwitchCamera,
-  isExpanded = false,
   isMinimized = false,
-  onOpenMeeting,
-  onExportSummary,
   sessionIdForExport,
   autoOpenPopover = null,
   onAutoOpenPopoverHandled,
-  showStatusLine = true,
-  showVoicePreview = false,
   disableExpandedControls = false,
   termsAccepted = true,
   onRequireTerms,
@@ -165,10 +138,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
   }), []);
   // Auto-show feature disabled by consolidation
   
-  // Refs for popover positioning
-  const voiceButtonRef = useRef<HTMLDivElement>(null);
-  const cameraButtonRef = useRef<HTMLDivElement>(null);
-  const screenButtonRef = useRef<HTMLDivElement>(null);
+  // Refs for file uploads
   const attachmentsBridgeRef = useRef<{ add: (files: File[] | FileList) => void } | null>(null);
   const hiddenFilesInputRef = useRef<HTMLInputElement>(null);
   const hiddenImagesInputRef = useRef<HTMLInputElement>(null);
@@ -343,280 +313,206 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps & { showStat
     return "Ask about AI consulting...";
   };
 
+  // Unified status determination
+  const getStatusInfo = () => {
+    if (isVoiceActive) {
+      return { type: "recording", label: "Recording your voice", color: "bg-blue-500" }
+    }
+    if (isVoiceProcessing) {
+      return { type: "processing", label: "AI is speaking", color: "bg-orange-500" }
+    }
+    if (isListening) {
+      return { type: "listening", label: "Listening...", color: "bg-green-500" }
+    }
+    return { type: "idle", label: "Ready to chat", color: "bg-gray-500" }
+  }
+
+  const statusInfo = getStatusInfo()
+
   return (
-    <div className="w-full pb-safe-area-inset-bottom">
-      <div className={cn(
-        "mx-auto w-full",
-        isExpanded ? "max-w-3xl px-4" : "px-4"
-      )}>
-        {showStatusLine && (isLoading || isVoiceProcessing || isVoiceActive) && (
-          <output className="mb-1 text-[11px] text-muted-foreground flex items-center gap-2" aria-live="polite" aria-atomic="true">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))] animate-pulse" />
-            <span>
-              {isVoiceProcessing ? 'Processing voice…' : isVoiceActive ? 'Recording…' : 'AI is responding…'}
-            </span>
-          </output>
-        )}
-        <PromptInput
-          className={cn(
-            "flex flex-col gap-2 border border-border/20 bg-card/90 px-3 sm:px-6 pb-3 pt-3 shadow-sm",
-            VISUAL.CORNER_RADIUS,
-            "[.monochrome_&]:rounded-none [.monochrome_&]:shadow-none [.monochrome_&]:border-2"
-          )}
-          accept="image/*,.pdf"
-          onSubmit={async (message) => {
-            if (!ensureTerms()) {
-              return;
-            }
-            const text = message.text?.trim() ?? '';
+    <div className="flex flex-col gap-4">
+      {/* Status Indicators */}
+      <div className="flex items-center justify-center gap-4">
+        <div className={cn(
+          "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium",
+          "bg-background/80 backdrop-blur-sm border border-border/20",
+          statusInfo.color === "bg-blue-500" && "bg-blue-500/10 border-blue-500/30 text-blue-700",
+          statusInfo.color === "bg-orange-500" && "bg-orange-500/10 border-orange-500/30 text-orange-700",
+          statusInfo.color === "bg-green-500" && "bg-green-500/10 border-green-500/30 text-green-700",
+          statusInfo.color === "bg-gray-500" && "bg-gray-500/10 border-gray-500/30 text-gray-700"
+        )}>
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            statusInfo.color === "bg-blue-500" && "bg-blue-500",
+            statusInfo.color === "bg-orange-500" && "bg-orange-500",
+            statusInfo.color === "bg-green-500" && "bg-green-500",
+            statusInfo.color === "bg-gray-500" && "bg-gray-500"
+          )} />
+          {statusInfo.label}
+        </div>
+      </div>
 
-            if (!text && (!message.files || message.files.length === 0)) {
-              toast.error('Please add a message or at least one attachment.');
-              return;
-            }
+      {/* Matrix Waveform Center */}
+      <div className="flex justify-center">
+        <div className="w-32 h-16 flex items-center justify-center">
+          <LiveWaveformMatrix
+            mode={isVoiceActive ? "user" : isVoiceProcessing ? "ai" : "idle"}
+            active={isVoiceActive || isVoiceProcessing}
+            size={3}
+            gap={1}
+          />
+        </div>
+      </div>
 
-            try {
-              await onSendMessage({
-                text,
-                attachments: message.files,
-              });
-
-              if (message.files && message.files.length > 0) {
-                toast.success('Attachments uploaded for analysis.');
-              }
-            } catch (error) {
-              console.error('Failed to send message:', error);
-              toast.error('Failed to send message. Please try again.');
-              throw error;
-            }
-          }}
-        >
-          <div className="flex flex-col-reverse">
-            {/* TOOLBAR SECTION (renders second, displays at bottom) */}
-            <div>
-              {isTextareaExpanded && <Separator />}
-              
-              <PromptInputToolbar className="items-center px-1 sm:px-0 pb-0 pt-1 overflow-visible">
-                <PromptInputTools className="gap-2">
-                  <ChatActions
-                    className={VISUAL.CORNER_RADIUS}
-                    analyticsId="chat-actions-trigger"
-                    onScheduleCall={onOpenMeeting}
-                    onExportSummary={onExportSummary}
-                    canExportSummary={Boolean(sessionIdForExport)}
-                    onUploadFiles={() => {
-                      if (!ensureTerms()) return;
-                      hiddenFilesInputRef.current?.click();
-                    }}
-                    onUploadImages={() => {
-                      if (!ensureTerms()) return;
-                      hiddenImagesInputRef.current?.click();
-                    }}
-                    onRequestUnlock={() => {
-                      if (!termsAccepted) ensureTerms();
-                    }}
-                    voice={{
-                      isActive: isVoiceActive,
-                      isProcessing: isVoiceProcessing,
-                      onToggle: handleVoiceButtonClick,
-                      disabled: isVoiceInitializing,
-                    }}
-                    camera={{
-                      isActive: cameraState,
-                      isProcessing: Boolean(isCameraInitializing),
-                      onToggle: handleCameraButtonClick,
-                      disabled: Boolean(isCameraInitializing),
-                    }}
-                    screen={{
-                      isActive: isScreenSharing,
-                      isProcessing: Boolean(isScreenShareInitializing),
-                      onToggle: handleScreenButtonClick,
-                      disabled: Boolean(isScreenShareInitializing),
-                    }}
-                  />
-                </PromptInputTools>
-
-                {!termsAccepted && (
-                  <p className="px-1 sm:px-0 text-[11px] text-muted-foreground">
-                    Introduce yourself above and accept the terms to unlock chat, voice, and media tools.
-                  </p>
-                )}
-
-                {/* Right side: Voice + Download + Send + Keyboard Toggle */}
-                <div className="flex items-center gap-2">
-                  {/* Voice Button */}
-                  <div ref={voiceButtonRef} className="flex items-center">
-                    <VoiceButton
-                      state={
-                        voiceError ? "error" :
-                        isVoiceProcessing ? "processing" :
-                        isVoiceActive ? "recording" :
-                        "idle"
-                      }
-                      onPress={handleVoiceButtonClick}
-                      isExpanded={isExpanded}
-                      isMinimized={isMinimized}
-                      variant="ghost"
-                      animationStyle="svg"
-                      className={cn(
-                        "border border-border/30 transition-all duration-300 ease-out",
-                        "hover:scale-[1.02] hover:border-border/50 hover:shadow-md active:scale-[0.98]",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
-                        VISUAL.CORNER_RADIUS,
-                        "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                        isVoiceActive 
-                          ? "bg-accent/10 border-accent/30 text-accent ring-2 ring-accent/20" 
-                          : "bg-muted/50 text-muted-foreground"
-                      )}
-                    />
-                  </div>
-                  
-                  {/* Anchor placeholders for camera/screen popovers on desktop */}
-                  <div ref={cameraButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
-                  <div ref={screenButtonRef} className="hidden sm:block w-[1px] h-[1px]" />
-
-                  {/* Download Button */}
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleDownloadSession}
-                    disabled={isDownloadingSession || !sessionIdForExport}
-                    className={cn(
-                      "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                      "border border-border/30 bg-muted/50 text-muted-foreground",
-                      "transition-all duration-300 ease-out",
-                      "hover:scale-[1.02] hover:border-border/50 hover:bg-muted/70 hover:shadow-md",
-                      "active:scale-[0.98]",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
-                      VISUAL.CORNER_RADIUS,
-                      "[.monochrome_&]:rounded-none"
-                    )}
-                    aria-label="Download session JSON"
-                    title="Download session JSON"
-                  >
-                    <Download className={cn("h-4 w-4", isDownloadingSession && "animate-pulse")} />
-                  </Button>
-                  
-                  {/* Send Button */}
-                  <PromptInputSubmit
-                    className={cn(
-                      "h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                      "bg-accent text-accent-foreground",
-                      "shadow-[0_20px_50px_-30px_rgba(255,107,53,0.4)]",
-                      "transition-all duration-300 ease-out",
-                      "hover:scale-[1.02] hover:shadow-[0_25px_60px_-30px_rgba(255,107,53,0.5)]",
-                      "active:scale-[0.98]",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
-                      VISUAL.CORNER_RADIUS,
-                      "[.monochrome_&]:rounded-none [.monochrome_&]:font-mono"
-                    )}
-                    variant="ghost"
-                    status={isLoading ? 'submitted' : undefined}
-                    disabled={isLoading || !getInputDisplayValue().trim()}
-                    aria-label={isLoading ? 'Sending message...' : 'Send message'}
-                  />
-                  
-                  {/* NEW: Keyboard Toggle with Icon Crossfade */}
-                  <Separator orientation="vertical" className="mx-1 -my-2.5" />
-                  
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsTextareaExpanded(v => !v)}
-                    aria-pressed={isTextareaExpanded}
-                    aria-label={isTextareaExpanded ? "Hide text input" : "Show text input"}
-                    className={cn(
-                      "relative h-10 w-10 min-h-[40px] min-w-[40px] sm:h-11 sm:w-11 sm:min-h-[44px] sm:min-w-[44px]",
-                      "border border-border/30 bg-muted/50 text-muted-foreground",
-                      "hover:scale-[1.02] hover:border-border/50 hover:bg-muted/70",
-                      "active:scale-[0.98]",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30",
-                      VISUAL.CORNER_RADIUS
-                    )}
-                  >
-                    <Keyboard
-                      className={
-                        "h-5 w-5 transform-gpu transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] " +
-                        (isTextareaExpanded ? "scale-75 opacity-0" : "scale-100 opacity-100")
-                      }
-                    />
-                    <ChevronDown
-                      className={
-                        "absolute inset-0 m-auto h-5 w-5 transform-gpu transition-all delay-50 duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] " +
-                        (isTextareaExpanded ? "scale-100 opacity-100" : "scale-75 opacity-0")
-                      }
-                    />
-                  </Button>
-                </div>
-              </PromptInputToolbar>
-              
-              {/* Footer - only when collapsed */}
-              {!isTextareaExpanded && (
-                <>
-                  <div className="px-1 sm:px-2 text-[10px] text-muted-foreground/50 text-right">
-                    <span className="font-medium">Shift + Enter</span> for newline
-                  </div>
-                  <div className="px-1 sm:px-2 text-[10px] text-muted-foreground/50 text-center">
-                    Strategic guidance only - not legal, medical, or financial advice.
-                  </div>
-                </>
-              )}
-            </div>
-            
-            {/* TEXTAREA SECTION (renders first, displays at top) */}
-            <div
-              className={cn(
-                "overflow-hidden transition-all duration-300 ease-out",
-                isTextareaExpanded ? "max-h-[200px]" : "max-h-0"
-              )}
-            >
-              <PromptInputBody className="flex flex-col gap-2">
-                <PromptInputTextarea
-                  className="rounded-xl bg-transparent px-2 sm:px-3 py-1.5 text-sm leading-relaxed text-foreground/90 placeholder:text-muted-foreground/70 min-h-[36px] max-h-[120px] resize-none"
-                  value={getInputDisplayValue()}
-                  onFocus={() => {
-                    if (!ensureTerms()) {
-                      (document.activeElement as HTMLElement | null)?.blur?.();
-                      return;
-                    }
-                    setIsFocused(true);
-                  }}
-                  onBlur={() => setIsFocused(false)}
-                  onChange={(e) => {
-                    if (isListening && !manualInputOverride) setManualInputOverride(true);
-                    onInputChange(e.target.value);
-                  }}
-                  placeholder={termsAccepted ? getPlaceholder() : 'Share your name and email above to begin.'}
-                  disabled={isLoading || !termsAccepted}
-                />
-
-                <PromptInputAttachments className="pt-1">
-                  {(attachment) => (
-                    <PromptInputAttachment key={attachment.id} data={attachment} />
-                  )}
-                </PromptInputAttachments>
-
-                {showVoicePreview && isListening && (voicePartialTranscript || voiceTranscript) && (
-                  <div className="px-1 sm:px-2 text-xs text-muted-foreground/75">
-                    <span className="font-medium text-muted-foreground/90">Voice preview:</span>{' '}
-                    {voicePartialTranscript || voiceTranscript?.split('\n').slice(-1)[0]}
-                  </div>
-                )}
-
-                {voiceError && (
-                  <div className="px-1 sm:px-2 text-xs text-destructive/80">
-                    {voiceError}
-                  </div>
-                )}
-              </PromptInputBody>
+      {/* Collapsible Transcript */}
+      <div className="flex justify-center">
+        <div className="w-full max-w-md">
+          <div
+            className={cn(
+              "overflow-hidden transition-all duration-300 ease-out",
+              isTextareaExpanded ? "max-h-[200px]" : "max-h-0"
+            )}
+          >
+            <div className="bg-background/80 backdrop-blur-sm border border-border/20 rounded-lg p-3">
+              <PromptInputTextarea
+                className="w-full bg-transparent border-none outline-none resize-none text-sm leading-relaxed"
+                value={getInputDisplayValue()}
+                onFocus={() => {
+                  if (!ensureTerms()) {
+                    (document.activeElement as HTMLElement | null)?.blur?.();
+                    return;
+                  }
+                  setIsFocused(true);
+                }}
+                onBlur={() => setIsFocused(false)}
+                onChange={(e) => {
+                  if (isListening && !manualInputOverride) setManualInputOverride(true);
+                  onInputChange(e.target.value);
+                }}
+                placeholder={termsAccepted ? getPlaceholder() : 'Share your name and email above to begin.'}
+                disabled={isLoading || !termsAccepted}
+              />
             </div>
           </div>
-          
-          {/* Bridge lives inside PromptInput to gain access to attachments context */}
-          <AttachmentsBridge onReady={(add) => { attachmentsBridgeRef.current = { add }; }} />
-        </PromptInput>
+        </div>
       </div>
+
+      {/* Unified Control Bar */}
+      <div className="flex items-center justify-center">
+        <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border/20 rounded-full px-4 py-2">
+          {/* Customer Support Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Customer Support
+          </Button>
+
+          {/* Separator */}
+          <Separator orientation="vertical" className="mx-2" />
+
+          {/* Media Controls */}
+          <div className="flex items-center gap-1">
+            {/* Voice Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleVoiceButtonClick}
+              className={cn(
+                "h-8 w-8",
+                isVoiceActive && "bg-accent/10 text-accent"
+              )}
+            >
+              {isVoiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
+
+            {/* Camera Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCameraButtonClick}
+              className={cn(
+                "h-8 w-8",
+                cameraState && "bg-accent/10 text-accent"
+              )}
+            >
+              {cameraState ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+            </Button>
+
+            {/* Screen Share Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleScreenButtonClick}
+              className={cn(
+                "h-8 w-8",
+                isScreenSharing && "bg-accent/10 text-accent"
+              )}
+            >
+              {isScreenSharing ? <MonitorOff className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+            </Button>
+          </div>
+
+          {/* Separator */}
+          <Separator orientation="vertical" className="mx-2" />
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1">
+            {/* Download Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDownloadSession}
+              disabled={isDownloadingSession || !sessionIdForExport}
+              className="h-8 w-8"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+
+            {/* Send Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={async () => {
+                if (!ensureTerms()) return;
+                const text = getInputDisplayValue().trim();
+                if (!text) return;
+                try {
+                  await onSendMessage(text);
+                } catch (error) {
+                  console.error('Failed to send message:', error);
+                  toast.error('Failed to send message. Please try again.');
+                }
+              }}
+              disabled={isLoading || !getInputDisplayValue().trim()}
+              className="h-8 w-8 bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            </Button>
+
+            {/* Keyboard Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsTextareaExpanded(v => !v)}
+              className="h-8 w-8"
+            >
+              <Keyboard className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer Text */}
+      {!isTextareaExpanded && (
+        <div className="text-center text-xs text-muted-foreground/50 space-y-1">
+          <div>Shift + Enter for newline</div>
+          <div>Strategic guidance only - not legal, medical, or financial advice.</div>
+        </div>
+      )}
 
       {/* Hidden inputs for upload actions */}
       <input
