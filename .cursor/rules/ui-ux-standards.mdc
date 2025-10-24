@@ -1,0 +1,306 @@
+---
+alwaysApply: true
+description: UI/UX standards and issue tracking for F.B/c AI
+---
+
+# UI/UX Standards
+
+## Active UI/UX Issues
+See full list: [UI_UX_ISSUES.md](mdc:UI_UX_ISSUES.md)
+
+**Current Status**: 25 issues documented (Day 0 audit in progress)
+- Critical: 3 issues
+- High: 7 issues
+- Medium: 8 issues
+- Low: 6 issues
+
+## Design System
+
+### Spacing Scale
+- Use consistent spacing: 4, 8, 12, 16, 24, 32, 48, 64px
+- Tailwind classes: `gap-1`, `gap-2`, `gap-3`, `gap-4`, `gap-6`, `gap-8`, `gap-12`, `gap-16`
+- Mobile: Prefer smaller spacing (16px max between sections)
+- Desktop: Can use larger spacing (24-32px between sections)
+
+### Border Radius
+- Cards: 8px (`rounded-lg`)
+- Modals: 12px (`rounded-xl`)
+- Buttons: 24px (`rounded-3xl`)
+- Pills/Badges: Full rounded (`rounded-full`)
+
+### Shadows
+- sm: Subtle elevation (`shadow-sm`)
+- md: Default cards (`shadow-md`)  
+- lg: Modals and floating elements (`shadow-lg`)
+- Use sparingly in monochrome mode
+
+### Colors
+- Use CSS variables from `app/globals.css`
+- Primary actions: `bg-primary text-primary-foreground`
+- Secondary actions: `bg-secondary text-secondary-foreground`
+- Accent: `bg-accent text-accent-foreground`
+- Muted text: `text-muted-foreground`
+- **Always verify contrast** ≥4.5:1 for text
+
+## Mobile-First Development
+
+### Breakpoints
+- Mobile: `< 640px` (default, no prefix)
+- Tablet: `sm: 640px+`
+- Desktop: `md: 768px+`, `lg: 1024px+`, `xl: 1280px+`
+
+### Mobile Requirements
+- Always test at 375px width (iPhone standard)
+- Test at 320px width (iPhone SE)
+- Touch targets minimum 44x44px
+- Use responsive Tailwind classes (`flex-col sm:flex-row`)
+- Test landscape orientation
+- Handle safe areas on iOS (`safe-area-inset-bottom`)
+
+### Responsive Patterns
+```tsx
+// Good: Mobile-first
+className="flex flex-col gap-2 sm:flex-row sm:gap-4"
+
+// Bad: Desktop-first
+className="flex flex-row gap-4 max-sm:flex-col max-sm:gap-2"
+```
+
+## Accessibility (WCAG AA)
+
+### Interactive Elements
+- All buttons have ARIA labels
+- All images have alt text
+- All form inputs have labels (visible or `aria-label`)
+- Custom controls have proper ARIA roles
+
+### Keyboard Navigation
+- Tab order logical and predictable
+- All interactive elements focusable
+- Enter/Space activate buttons
+- Escape closes modals/dialogs
+- Arrow keys for lists/menus
+
+### Focus Indicators
+- Visible focus ring on all interactive elements
+- Contrast ≥3:1 against background
+- Use `focus-visible:ring-2 focus-visible:ring-primary`
+- Never use `outline-none` without replacement
+
+### Color Contrast
+- Normal text: ≥4.5:1 contrast ratio
+- Large text (18px+): ≥3:1 contrast ratio
+- UI components: ≥3:1 contrast ratio
+- Test in both light and dark modes
+
+## Loading & Error States
+
+### Loading States
+- Show skeleton loaders for content
+- Show spinners for actions
+- Show progress bars for uploads
+- Never show blank space while loading
+
+### Error States
+- Display error message clearly
+- Provide specific, actionable error text
+- Include retry button when applicable
+- Log errors to console for debugging
+
+### Success Feedback
+- Toast notifications for actions
+- Inline success messages for forms
+- Visual checkmarks for completion
+- Clear confirmation of state changes
+
+## Component Standards
+
+### Buttons
+```tsx
+// Primary action
+<Button className="bg-primary text-primary-foreground">
+  Submit
+</Button>
+
+// Secondary action  
+<Button variant="outline">
+  Cancel
+</Button>
+
+// Destructive action
+<Button variant="destructive">
+  Delete
+</Button>
+```
+
+### Cards
+```tsx
+<div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+  {/* Card content */}
+</div>
+```
+
+### Form Inputs
+```tsx
+<div className="space-y-2">
+  <label htmlFor="email" className="text-sm font-medium">
+    Email
+  </label>
+  <input
+    id="email"
+    type="email"
+    className="w-full rounded-md border border-input px-3 py-2"
+    aria-required="true"
+    aria-invalid={hasError}
+  />
+  {hasError && (
+    <p className="text-sm text-destructive" role="alert">
+      {errorMessage}
+    </p>
+  )}
+</div>
+```
+
+## Animation Guidelines
+
+### Performance
+- Use `transform` and `opacity` for animations (GPU-accelerated)
+- Avoid animating `width`, `height`, `top`, `left` (CPU-intensive)
+- Use `will-change` sparingly and remove after animation
+- Test on low-end devices
+
+### Duration
+- Micro-interactions: 150-200ms
+- UI transitions: 200-300ms  
+- Page transitions: 300-500ms
+- Never exceed 500ms for UI animations
+
+### Easing
+- Entrance: `ease-out` (fast start, slow end)
+- Exit: `ease-in` (slow start, fast end)
+- Movement: `ease-in-out` (smooth both ends)
+
+### Framer Motion
+```tsx
+// Good: Simple, performant
+<motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.2, ease: "easeOut" }}
+>
+  {content}
+</motion.div>
+
+// Avoid: Complex, may lag
+<motion.div
+  animate={{
+    scale: [1, 1.2, 1],
+    rotate: [0, 360, 0],
+    borderRadius: ["0%", "50%", "0%"]
+  }}
+  transition={{ repeat: Infinity }}
+>
+  {content}
+</motion.div>
+```
+
+## Voice & Multimodal UI
+
+### Voice Status Indicators
+- Show clear "Listening..." indicator when recording
+- Show "Processing..." during AI response
+- Display partial transcripts as they arrive
+- Show waveform or volume visualizer
+
+### Visual Context Indicators
+- Badge showing "Webcam active" with small thumbnail
+- Badge showing "Screen share active" with preview
+- Timestamp of last analysis
+- Clear way to stop/pause capture
+
+### Upload Feedback
+- Progress bar during upload
+- "Analyzing..." status after upload
+- Summary card when analysis complete
+- Error handling with retry option
+
+## File Organization
+
+Related components should be co-located:
+
+```
+src/components/chat/
+├── ChatInterface.tsx (main component)
+├── components/
+│   ├── ChatHeader.tsx
+│   ├── ChatMessages.tsx
+│   ├── ChatInput.tsx
+│   └── ChatActions.tsx
+├── hooks/
+│   ├── useChatState.ts
+│   └── useChatMessages.ts
+└── constants/
+    └── chatConstants.ts
+```
+
+## Testing Checklist
+
+Before marking UI/UX task complete:
+- [ ] Tested on mobile (375px and 320px)
+- [ ] Tested on tablet (768px)
+- [ ] Tested on desktop (1440px)
+- [ ] Keyboard navigation works
+- [ ] Screen reader announces correctly
+- [ ] Color contrast verified
+- [ ] Loading states implemented
+- [ ] Error states implemented
+- [ ] Animations smooth (60fps)
+- [ ] No console errors or warnings
+
+## Common Patterns
+
+### Conditional Rendering
+```tsx
+// Good: Clear, readable
+{isLoading ? (
+  <Skeleton />
+) : error ? (
+  <ErrorState error={error} onRetry={handleRetry} />
+) : (
+  <Content data={data} />
+)}
+
+// Bad: Hard to follow
+{!isLoading && !error && data && <Content data={data} />}
+```
+
+### Responsive Layout
+```tsx
+// Good: Mobile-first
+<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+  <h2 className="text-xl font-semibold">Title</h2>
+  <Button>Action</Button>
+</div>
+```
+
+### Loading States
+```tsx
+// Good: Clear feedback
+{isLoading ? (
+  <div className="flex items-center gap-2">
+    <Loader2 className="h-4 w-4 animate-spin" />
+    <span>Loading messages...</span>
+  </div>
+) : (
+  <MessageList messages={messages} />
+)}
+```
+
+## References
+
+- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [Radix UI Primitives](https://www.radix-ui.com/)
+- [Framer Motion API](https://www.framer.com/motion/)
+- [UI_UX_ISSUES.md](mdc:UI_UX_ISSUES.md) - Current issues
+- [PRODUCTION_ROADMAP.md](mdc:PRODUCTION_ROADMAP.md) - Implementation plan
