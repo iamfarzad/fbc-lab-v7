@@ -196,7 +196,7 @@ function parseStructuredResponse(content: string) {
   // Extract code blocks
   const codeMatches = content.match(/<code(?:\s+language="([^"]*)")?>(.*?)<\/code>/gs)
   if (codeMatches) {
-    metadata.codeBlocks = codeMatches.map((match) => {
+    metadata.codeBlocks = codeMatches.map((match, _index) => {
       const languageMatch = match.match(/language="([^"]*)"/)
       const codeMatch = match.match(/<code(?:\s+language="[^"]*")?>(.*?)<\/code>/s)
       return {

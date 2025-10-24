@@ -25,6 +25,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <script
+          type="text/javascript"
+          src="https://app.cal.com/embed/embed.js"
+          async
+        />
+      </head>
       <body className={inter.className}>
         <BrowserLogInit />
         {children}
