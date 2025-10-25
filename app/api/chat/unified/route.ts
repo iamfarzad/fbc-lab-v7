@@ -24,6 +24,7 @@ import { ContextStorage } from '@/core/context/context-storage'
 import { routeToAgent } from '@/core/agents'
 import type { AgentContext } from '@/core/agents'
 import type { Message as ChatMessage } from '@/types/core'
+// import { WorkflowEngine } from '@/lib/workflow/engine'
 // Note: @ai-sdk-tools/devtools only exports AIDevtools component, not wrap()
 
 interface UnifiedMessage {
@@ -128,6 +129,14 @@ const isMockUnifiedChat = (() => {
 // Feature flag for multi-agent system
 const ENABLE_MULTI_AGENT = (() => {
   const flag = process.env.ENABLE_MULTI_AGENT
+  if (!flag) return false
+  const normalized = flag.toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes'
+})()
+
+// Feature flag for workflow system
+const ENABLE_WORKFLOW = (() => {
+  const flag = process.env.ENABLE_WORKFLOW
   if (!flag) return false
   const normalized = flag.toLowerCase()
   return normalized === '1' || normalized === 'true' || normalized === 'yes'
@@ -916,6 +925,23 @@ Citations: ${researchResult.allCitations.length} sources processed
       return respond.badRequest('No valid messages provided. Please ensure messages have content.')
     }
 
+    // ⭐ WORKFLOW SYSTEM (if enabled)
+    if (ENABLE_WORKFLOW && stream !== false) {
+      const workflowStart = Date.now()
+      console.log('🔄 [Workflow] Executing workflow...')
+      
+      try {
+        // TODO: Implement workflow execution when ready
+        console.log('⚠️  [Workflow] Workflow system not yet implemented')
+        timings.workflow = Date.now() - workflowStart
+        // Fall through to multi-agent system
+      } catch (workflowError) {
+        console.error('❌ [Workflow] Error:', workflowError)
+        timings.workflow = Date.now() - workflowStart
+        // Fall through to multi-agent system
+      }
+    }
+    
     // ⭐ MULTI-AGENT SYSTEM (if enabled)
     if (ENABLE_MULTI_AGENT && stream !== false) {
       const multiAgentStart = Date.now()

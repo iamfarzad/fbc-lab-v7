@@ -1,0 +1,81 @@
+name: fbc-sales-funnel
+version: 1.0.0
+description: F.B/c multimodal sales funnel workflow
+
+triggers:
+  - type: webhook
+    path: /api/workflow/trigger
+    method: POST
+
+steps:
+  - id: receive-input
+    type: function
+    function: receive-multimodal-input
+    timeout: 30s
+    
+  - id: load-context
+    type: function
+    function: load-conversation-context
+    depends_on: [receive-input]
+    
+  - id: determine-stage
+    type: function
+    function: determine-funnel-stage
+    depends_on: [load-context]
+    
+  - id: route-agent
+    type: switch
+    condition: ${steps.determine-stage.output.stage}
+    cases:
+      - case: DISCOVERY
+        step: discovery-agent
+      - case: SCORING
+        step: scoring-agent
+      - case: WORKSHOP_PITCH
+        step: workshop-sales-agent
+      - case: CONSULTING_PITCH
+        step: consulting-sales-agent
+      - case: CLOSING
+        step: closer-agent
+      - case: SUMMARY
+        step: summary-agent
+        
+  - id: discovery-agent
+    type: function
+    function: discovery-agent
+    depends_on: [route-agent]
+    
+  - id: scoring-agent
+    type: function
+    function: scoring-agent
+    depends_on: [route-agent]
+    
+  - id: workshop-sales-agent
+    type: function
+    function: workshop-sales-agent
+    depends_on: [route-agent]
+    
+  - id: consulting-sales-agent
+    type: function
+    function: consulting-sales-agent
+    depends_on: [route-agent]
+    
+  - id: closer-agent
+    type: function
+    function: closer-agent
+    depends_on: [route-agent]
+    
+  - id: summary-agent
+    type: function
+    function: summary-agent
+    depends_on: [route-agent]
+    
+  - id: update-context
+    type: function
+    function: update-conversation-context
+    depends_on: [route-agent]
+    
+  - id: send-response
+    type: function
+    function: send-response-to-client
+    depends_on: [update-context]
