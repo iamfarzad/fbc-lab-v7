@@ -14,7 +14,7 @@ import { useConnectionTimeout } from '@/components/agent-ui/hooks/useConnectionT
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
 import { AGENT_UI_CONFIG, FEATURE_FLAGS } from '@/config/constants';
-import { useSession } from '@/components/agent-ui/app/session-provider';
+import { useSession } from '@/components/agent-ui/app/session-context';
 import { useCamera } from '@/hooks/useCamera'
 import { useScreenShare } from '@/hooks/useScreenShare'
 import { useLiveApi } from '@/hooks/useLiveApi'
@@ -157,13 +157,15 @@ export const SessionView = ({
     enableAutoCapture: Boolean(isSessionActive),
     captureInterval: 4000,
   })
+  const updateContext = chat.updateContext;
+
   React.useEffect(() => {
-    chat.updateContext?.({
+    updateContext?.({
       voiceActive: isSessionActive,
       webcamActive: camera.isActive,
       screenShareActive: screenShare.isActive,
     } as any)
-  }, [isSessionActive, camera.isActive, screenShare.isActive])
+  }, [isSessionActive, camera.isActive, screenShare.isActive, updateContext])
 
   // Chat panel states: minimized | normal | expanded
   type ChatPanelState = 'minimized' | 'normal' | 'expanded'
@@ -176,12 +178,15 @@ export const SessionView = ({
       if (saved === 'minimized' || saved === 'expanded' || saved === 'normal') {
         setChatState(saved)
       }
-    } catch {
-      // ignore hydration/localStorage access issues; default state is 'normal'
+    } catch (error) {
+      console.warn('[SessionView] Failed to read saved chat state', error)
     }
   }, [])
   useEffect(() => {
-    try { window.localStorage.setItem('fbc-live-chat-state', chatState) } catch {}
+    try { window.localStorage.setItem('fbc-live-chat-state', chatState) }
+    catch (error) {
+      console.warn('[SessionView] Failed to persist chat state', error)
+    }
   }, [chatState])
   const isMinimized = chatState === 'minimized'
   const isExpanded = chatState === 'expanded'

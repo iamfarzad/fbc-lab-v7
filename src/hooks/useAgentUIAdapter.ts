@@ -6,58 +6,69 @@ import type { UseAgentUIAdapterReturn, AgentUIRoom, AgentUIParticipant } from '@
 
 export function useAgentUIAdapter(): UseAgentUIAdapterReturn {
   const liveApi = useLiveApi()
+  const {
+    startSession,
+    stopSession,
+    pauseMicrophone,
+    resumeMicrophone,
+    sendRealtimeInput,
+    isRecording,
+    isProcessing,
+    isSessionActive,
+    error,
+  } = liveApi
   
   // Create mock room state based on FBC session
   const room = useMemo((): AgentUIRoom => ({
     name: 'fbc-agent-room',
     participants: [],
-    isConnected: liveApi.isSessionActive,
+    isConnected: isSessionActive,
     isConnecting: false, // FBC doesn't have isConnecting, use false
-    isDisconnected: !liveApi.isSessionActive,
-  }), [liveApi.isSessionActive])
+    isDisconnected: !isSessionActive,
+  }), [isSessionActive])
 
   // Create mock participants (user and assistant)
   const participants = useMemo((): AgentUIParticipant[] => {
     const userParticipant: AgentUIParticipant = {
       identity: 'user',
       name: 'You',
-      isSpeaking: liveApi.isRecording,
-      isMuted: !liveApi.isRecording,
+      isSpeaking: isRecording,
+      isMuted: !isRecording,
       isCameraEnabled: false, // Will be handled by camera hooks
-      isMicrophoneEnabled: !liveApi.isRecording,
+      isMicrophoneEnabled: !isRecording,
     }
 
     const assistantParticipant: AgentUIParticipant = {
       identity: 'assistant',
       name: 'F.B/c AI',
-      isSpeaking: liveApi.isProcessing,
+      isSpeaking: isProcessing,
       isMuted: false,
       isCameraEnabled: false,
       isMicrophoneEnabled: false,
     }
 
     return [userParticipant, assistantParticipant]
-  }, [liveApi.isRecording, liveApi.isProcessing])
+  }, [isRecording, isProcessing])
 
   const connect = useCallback(() => {
-    liveApi.startSession()
-  }, [liveApi])
+    void startSession()
+  }, [startSession])
 
   const disconnect = useCallback(() => {
-    liveApi.stopSession()
-  }, [liveApi])
+    void stopSession()
+  }, [stopSession])
 
   // Camera and screen share controls via FBC hooks
   const camera = useCamera()
   const screenShare = useScreenShare()
 
   const toggleMicrophone = useCallback(() => {
-    if (liveApi.isRecording) {
-      void liveApi.pauseMicrophone?.()
+    if (isRecording) {
+      void pauseMicrophone?.()
     } else {
-      void liveApi.resumeMicrophone?.()
+      void resumeMicrophone?.()
     }
-  }, [liveApi.isRecording, liveApi.pauseMicrophone, liveApi.resumeMicrophone])
+  }, [isRecording, pauseMicrophone, resumeMicrophone])
 
   const toggleCamera = useCallback(() => {
     if (camera.isActive) {
@@ -76,21 +87,21 @@ export function useAgentUIAdapter(): UseAgentUIAdapterReturn {
   }, [screenShare])
 
   const sendMessage = useCallback(async (text: string) => {
-    await liveApi.sendRealtimeInput([
+    await sendRealtimeInput([
       {
         mimeType: 'text/plain',
         data: text,
       },
     ])
-  }, [liveApi])
+  }, [sendRealtimeInput])
 
   return {
     room,
     participants,
-    isConnected: liveApi.isSessionActive,
+    isConnected: isSessionActive,
     isConnecting: false, // FBC doesn't have isConnecting
-    isDisconnected: !liveApi.isSessionActive,
-    error: liveApi.error || undefined,
+    isDisconnected: !isSessionActive,
+    error: error || undefined,
     connect,
     disconnect,
     toggleMicrophone,

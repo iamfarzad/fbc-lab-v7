@@ -34,7 +34,14 @@ export async function POST(request: NextRequest) {
     console.log('[WORKFLOW_TRIGGER] Request received:', reqId)
     
     const body: WorkflowTriggerRequest = await request.json()
-    const { sessionId, messages, multimodalContext: _multimodalContext, intelligenceContext: _intelligenceContext, conversationFlow: _conversationFlow, voiceActive: _voiceActive } = body
+    const {
+      sessionId,
+      messages,
+      multimodalContext,
+      intelligenceContext,
+      conversationFlow,
+      voiceActive
+    } = body
     
     if (!sessionId || !messages || messages.length === 0) {
       return respond.badRequest('Missing required fields: sessionId and messages')
@@ -45,6 +52,32 @@ export async function POST(request: NextRequest) {
     
     // Execute workflow
     // const result = await workflow.execute({...})
+    
+    // Basic signal logging to help workflow diagnostics
+    const lastUserMessage = messages.slice().reverse().find((m) => m.role === 'user')
+    if (lastUserMessage) {
+      console.log('[WORKFLOW_TRIGGER] Last user input:', {
+        sessionId,
+        messagePreview: lastUserMessage.content.slice(0, 120),
+        modality: lastUserMessage.modality ?? 'text'
+      })
+    }
+    
+    if (conversationFlow || intelligenceContext || multimodalContext) {
+      console.log('[WORKFLOW_TRIGGER] Context snapshot', {
+        sessionId,
+        hasConversationFlow: Boolean(conversationFlow),
+        hasIntelligenceContext: Boolean(intelligenceContext),
+        multimodalSignals: multimodalContext
+          ? {
+              hasRecentImages: multimodalContext.hasRecentImages,
+              hasRecentAudio: multimodalContext.hasRecentAudio,
+              recentAnalyses: multimodalContext.recentAnalyses?.length ?? 0
+            }
+          : null,
+        voiceActive: Boolean(voiceActive)
+      })
+    }
     
     const duration = Date.now() - startTime
     console.log('[WORKFLOW_TRIGGER] Completed:', { reqId, duration })
@@ -57,7 +90,12 @@ export async function POST(request: NextRequest) {
         agent: 'Test Agent',
         stage: 'TEST',
         duration,
-        success: true
+        success: true,
+        contextFlags: {
+          hasConversationFlow: Boolean(conversationFlow),
+          hasIntelligenceContext: Boolean(intelligenceContext),
+          voiceActive: Boolean(voiceActive)
+        }
       })
     } catch (logErr) {
       console.warn('[WORKFLOW_TRIGGER] Failed to log execution:', logErr)
@@ -66,7 +104,14 @@ export async function POST(request: NextRequest) {
     return respond.ok({
       output: 'Workflow execution completed',
       agent: 'Test Agent',
-      metadata: { stage: 'TEST' },
+      metadata: {
+        stage: 'TEST',
+        contextFlags: {
+          hasConversationFlow: Boolean(conversationFlow),
+          hasIntelligenceContext: Boolean(intelligenceContext),
+          voiceActive: Boolean(voiceActive)
+        }
+      },
       requestId: reqId,
       duration
     })

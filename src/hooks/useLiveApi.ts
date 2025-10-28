@@ -3,7 +3,7 @@ import { useRealtimeVoice, type UseRealtimeVoiceOptions } from '@/hooks/useRealt
 import type { VoiceContextUpdate } from '@/hooks/useRealtimeVoice'
 import type { LiveClientWS } from '@/core/live/client'
 import type { AttachmentUploadResponse } from '@/types/attachments'
-import { useLiveApiContext } from '@/hooks/LiveApiProvider'
+import { useLiveApiContext } from '@/hooks/live-api-context'
 
 export type UseLiveApiOptions = UseRealtimeVoiceOptions & {
   liveClient?: LiveClientWS

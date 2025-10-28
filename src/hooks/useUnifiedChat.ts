@@ -313,7 +313,7 @@ export function useUnifiedChat(options: UnifiedChatOptions): UnifiedChatReturn {
     } finally {
       abortControllerRef.current = null
     }
-  }, [options, commitMessages])
+  }, [options, commitMessages, sessionId])
 
   const sendMessage = useCallback(async (
     content: string,

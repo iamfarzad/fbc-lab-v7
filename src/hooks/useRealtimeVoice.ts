@@ -38,7 +38,7 @@ const extractSampleRate = (mimeType?: string): number | undefined => {
 
 // Inlined minimal recorder hook using AudioWorklet via AudioRecorder
 function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
-  const targetSampleRate = options.targetSampleRate ?? 24000;
+  const targetSampleRate = options.targetSampleRate ?? 16000;
 
   const [isSupported, setIsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -230,7 +230,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     isProcessing: recorderProcessing,
     error: recorderError,
     micStream,
-  } = useInlineRecorder({ targetSampleRate: 24000 });
+  } = useInlineRecorder({ targetSampleRate: 16000 });
 
   const liveRef = useRef<LiveClientWS | null>(options.liveClient ?? null);
   const createdClientRef = useRef<boolean>(!options.liveClient);
@@ -262,7 +262,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     try {
       const st = (audioPlayerRef.current as any)?.contextState as 'suspended' | 'running' | 'closed' | undefined
       setAudioContextState(st ?? 'unknown')
-    } catch {}
+    } catch (error) {
+      console.warn('[useRealtimeVoice] Unable to read initial audio context state', error)
+    }
 
     // Proactively resume audio context on user interaction
     const resumeAudio = async () => {
@@ -375,10 +377,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     callbacksRef.current?.onSessionStateChange?.({
       active: false,
       connectionId: connectionIdRef.current,
-      mock: session?.mock,
+      mock: session?.mock ?? false,
       isProcessing: false,
     });
-  }, [resetRecording, session?.mock]);
+  }, [resetRecording, session]);
 
   const handleRecorderChunk = useCallback((chunk: MediaRecorderVoiceResult) => {
     if (!chunk?.base64) return;
@@ -432,7 +434,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       callbacksRef.current?.onSessionStateChange?.({
         active: false,
         connectionId: connectionIdRef.current,
-        mock: session?.mock,
+        mock: session?.mock ?? false,
         isProcessing: true,
       });
 
@@ -470,7 +472,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       sessionTimeoutRef.current = setTimeout(() => {
         debugLog('🎤 [RealtimeVoice] Session timeout check:', {
           isSessionActive: isSessionActiveRef.current,
-          hasSession: session !== null,
+          hasSession: Boolean(session),
           isRecording
         });
         
@@ -571,7 +573,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         callbacks?.onSessionStateChange?.({
           active: false,
           connectionId: connectionIdRef.current,
-          mock: session?.mock,
+          mock: session?.mock ?? false,
           isProcessing: false,
         });
         
@@ -762,7 +764,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         callbacks?.onSessionStateChange?.({
           active: true,  // Keep session active
           connectionId: connectionIdRef.current,
-          mock: session?.mock,
+          mock: session?.mock ?? false,
           isProcessing: false,
         });
         callbacks?.onTurnComplete?.();
@@ -777,7 +779,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
     }
-  }, [recorderProcessing, resetRecording, session?.mock, modelReplies.length, isSessionActive, isProcessing, startSession]);
+  }, [recorderProcessing, resetRecording, session, modelReplies.length, isSessionActive, isProcessing, startSession]);
 
 
   const connectWebSocket = useCallback(() => {
@@ -890,7 +892,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       callbacksRef.current?.onSessionStateChange?.({
         active: false,
         connectionId: connectionIdRef.current,
-        mock: session?.mock,
+        mock: session?.mock ?? false,
         isProcessing: true,
       });
 
@@ -996,7 +998,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           await audioPlayerRef.current.resume();
           setAudioContextState(audioPlayerRef.current.contextState ?? 'unknown')
         }
-      } catch {}
+      } catch (error) {
+        console.warn('[useRealtimeVoice] Failed to resume audio context on demand', error)
+      }
     },
     startSession,
     stopSession,

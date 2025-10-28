@@ -8,9 +8,12 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { sessionId = 'test-session', message: _message = 'Hello, I need help with AI implementation' } = body
+    const {
+      sessionId = 'test-session',
+      message = 'Hello, I need help with AI implementation'
+    } = body
     
-    console.log('[WORKFLOW_TEST] Testing workflow with session:', sessionId)
+    console.log('[WORKFLOW_TEST] Testing workflow with session:', sessionId, 'message:', message)
     
     // Initialize workflow engine
     // const workflow = new WorkflowEngine('fbc-sales-funnel')

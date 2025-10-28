@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { toastAlert } from '@/components/agent-ui/livekit/alert-toast'
-import { useSession } from '@/components/agent-ui/app/session-provider'
+import { toastAlert } from '@/components/agent-ui/livekit/toast-alert'
+import { useSession } from '@/components/agent-ui/app/session-context'
 import { useLiveApi } from '@/hooks/useLiveApi'
 
 export function useConnectionTimeout(timeoutMs = 20_000) {
@@ -21,7 +21,10 @@ export function useConnectionTimeout(timeoutMs = 20_000) {
             </p>
           ),
         })
-        try { endSession() } catch {}
+        try { endSession() }
+        catch (error) {
+          console.warn('[useConnectionTimeout] Failed to end session after timeout', error)
+        }
       }
     }, timeoutMs)
 

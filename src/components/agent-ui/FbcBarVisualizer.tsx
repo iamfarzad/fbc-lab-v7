@@ -53,14 +53,23 @@ export function FbcBarVisualizer({ barCount = 5, className }: FbcBarVisualizerPr
         rafRef.current = requestAnimationFrame(tick)
       }
       rafRef.current = requestAnimationFrame(tick)
-    } catch {
-      // If attaching analyser fails, fall back to simple animation below
+    } catch (error) {
+      console.warn('[FbcBarVisualizer] Falling back to simple animation, analyser setup failed', error)
     }
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      try { sourceRef.current?.disconnect() } catch {}
-      try { analyserRef.current?.disconnect() } catch {}
-      try { audioCtxRef.current?.close() } catch {}
+      try { sourceRef.current?.disconnect() }
+      catch (error) {
+        console.warn('[FbcBarVisualizer] Failed to disconnect source', error)
+      }
+      try { analyserRef.current?.disconnect() }
+      catch (error) {
+        console.warn('[FbcBarVisualizer] Failed to disconnect analyser', error)
+      }
+      try { audioCtxRef.current?.close() }
+      catch (error) {
+        console.warn('[FbcBarVisualizer] Failed to close AudioContext', error)
+      }
       analyserRef.current = null
       sourceRef.current = null
       audioCtxRef.current = null
@@ -85,4 +94,3 @@ export function FbcBarVisualizer({ barCount = 5, className }: FbcBarVisualizerPr
     </div>
   )
 }
-

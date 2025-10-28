@@ -64,11 +64,6 @@
     "app/chat-ui-test/**",
     "scripts/log-collectors/**",
     "scripts/test-logging.ts",
-    "scripts/test-enhancements.ts",
-    // Exclude legacy test files that are not currently used
-    "src/hooks/useRoom.ts",
-    "src/components/agent-ui/AgentInterface.tsx",
-    "src/components/livekit/LiveKitRoom.tsx",
-    "app/livekit-demo/**"
+    "scripts/test-enhancements.ts"
   ]
 }

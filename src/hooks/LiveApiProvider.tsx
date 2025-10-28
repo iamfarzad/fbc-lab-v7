@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useRealtimeVoice, type UseRealtimeVoiceOptions, type VoiceContextUpdate } from "@/hooks/useRealtimeVoice";
+import { LiveApiContext } from '@/hooks/live-api-context';
 
 // Unified Live API surface made available via React context so all Agent UI
 // components share a single voice session instance. This fixes the issue where
@@ -27,8 +28,6 @@ export type LiveApiValue = ReturnType<typeof useRealtimeVoice> & {
   sendContextUpdate: (update: VoiceContextUpdate) => void;
 };
 
-const LiveApiContext = createContext<LiveApiValue | null>(null);
-
 export function LiveApiProvider({
   children,
   sessionId,
@@ -41,7 +40,7 @@ export function LiveApiProvider({
   const realtime = useRealtimeVoice({ ...(options || {}), sessionId });
 
   // One-shot HTTP helpers mirrored from useLiveApi
-  const sendScreenShareMessage: LiveApiValue["sendScreenShareMessage"] = async (
+  const sendScreenShareMessage: LiveApiValue["sendScreenShareMessage"] = useCallback(async (
     imageBase64,
     prompt,
     opts
@@ -69,9 +68,9 @@ export function LiveApiProvider({
     const data = await response.json().catch(() => ({}));
     const analysis = data?.output?.analysis || data?.analysis;
     return { ok: true, analysis };
-  };
+  }, [realtime]);
 
-  const sendWebcamAnalyze: LiveApiValue["sendWebcamAnalyze"] = async (blob, opts) => {
+  const sendWebcamAnalyze: LiveApiValue["sendWebcamAnalyze"] = useCallback(async (blob, opts) => {
     const formData = new FormData();
     formData.append("webcamCapture", blob, `webcam-${Date.now()}.jpg`);
     const response = await fetch("/api/tools/webcam", {
@@ -86,9 +85,9 @@ export function LiveApiProvider({
     const data = await response.json().catch(() => ({}));
     const analysis = data?.analysis || data?.output?.analysis;
     return { ok: true, analysis };
-  };
+  }, []);
 
-  const uploadAttachments: LiveApiValue["uploadAttachments"] = async (files, sid) => {
+  const uploadAttachments: LiveApiValue["uploadAttachments"] = useCallback(async (files, sid) => {
     const formData = new FormData();
     formData.append("sessionId", sid);
     files.forEach((file) => formData.append("files", file, file.name));
@@ -97,16 +96,16 @@ export function LiveApiProvider({
     const data = await response.json().catch(() => ({}));
     if (!data?.ok) return { ok: false, attachments: [], error: data?.error || "Upload error" } as const;
     return { ok: true, attachments: data.attachments, prompt: data.prompt } as const;
-  };
+  }, []);
 
-  const directSendRealtimeInput: LiveApiValue["sendRealtimeInput"] = (chunks) => {
+  const directSendRealtimeInput: LiveApiValue["sendRealtimeInput"] = useCallback((chunks) => {
     realtime.sendRealtimeInput(chunks);
-  };
+  }, [realtime]);
 
-  const directSendContextUpdate: LiveApiValue["sendContextUpdate"] = (update) => {
+  const directSendContextUpdate: LiveApiValue["sendContextUpdate"] = useCallback((update) => {
     if (!update?.analysis) return; // require analysis text
     realtime.sendContextUpdate(update);
-  };
+  }, [realtime]);
 
   const value: LiveApiValue = useMemo(
     () => ({
@@ -117,13 +116,8 @@ export function LiveApiProvider({
       sendRealtimeInput: directSendRealtimeInput,
       sendContextUpdate: directSendContextUpdate,
     }),
-    [realtime]
+    [realtime, directSendContextUpdate, directSendRealtimeInput, sendScreenShareMessage, sendWebcamAnalyze, uploadAttachments]
   );
 
   return <LiveApiContext.Provider value={value}>{children}</LiveApiContext.Provider>;
 }
-
-export function useLiveApiContext(): LiveApiValue | null {
-  return useContext(LiveApiContext);
-}
-

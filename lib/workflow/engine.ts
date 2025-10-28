@@ -39,6 +39,40 @@ export class WorkflowEngine {
   constructor(workflowName: string) {
     this.workflowName = workflowName
   }
+
+  private extractContextStats(conversationContext: any) {
+    if (!conversationContext) {
+      return {
+        totalMessages: 0,
+        modalities: [] as string[],
+        lastActivity: null as string | null,
+        recentVisualAnalyses: 0,
+        recentAudioEntries: 0,
+        recentUploads: 0
+      }
+    }
+
+    const summary = conversationContext.summary ?? {}
+    const historyCount = Array.isArray(conversationContext.conversationHistory)
+      ? conversationContext.conversationHistory.length
+      : 0
+
+    return {
+      totalMessages: summary.totalMessages ?? historyCount,
+      modalities: summary.modalitiesUsed ?? [],
+      lastActivity: summary.lastActivity ?? null,
+      recentVisualAnalyses: summary.recentVisualAnalyses ?? 0,
+      recentAudioEntries: summary.recentAudioEntries ?? 0,
+      recentUploads: summary.recentUploads ?? 0
+    }
+  }
+
+  private describeContextStats(conversationContext: any): string {
+    const stats = this.extractContextStats(conversationContext)
+    const modalities = stats.modalities.length > 0 ? stats.modalities.join(', ') : 'none'
+
+    return `Messages: ${stats.totalMessages}, Modalities: ${modalities}, Last activity: ${stats.lastActivity ?? 'n/a'}, Visual analyses: ${stats.recentVisualAnalyses}, Audio entries: ${stats.recentAudioEntries}, Uploads: ${stats.recentUploads}`
+  }
   
   async execute(context: WorkflowContext): Promise<WorkflowResult> {
     console.log(`[WORKFLOW_ENGINE] Executing ${this.workflowName} for session ${context.sessionId}`)
@@ -66,7 +100,7 @@ export class WorkflowEngine {
     }
   }
   
-  private async loadConversationContext(_context: WorkflowContext) {
+  private async loadConversationContext(context: WorkflowContext) {
     // Load from multimodal context manager
     try {
       // const { multimodalContextManager } = await import('@/core/context/multimodal-context')
@@ -81,7 +115,14 @@ export class WorkflowEngine {
         visualContext: [],
         audioContext: [],
         uploadContext: [],
-        summary: { totalMessages: 0, modalitiesUsed: [], lastActivity: '', recentVisualAnalyses: 0, recentAudioEntries: 0, recentUploads: 0 }
+        summary: {
+          totalMessages: context.messages.length,
+          modalitiesUsed: Array.from(new Set(context.messages.map((m) => m.modality ?? 'text'))),
+          lastActivity: context.timestamp,
+          recentVisualAnalyses: context.multimodalContext.recentAnalyses.length,
+          recentAudioEntries: context.multimodalContext.hasRecentAudio ? 1 : 0,
+          recentUploads: context.multimodalContext.recentUploads.length
+        }
       }
     } catch (error) {
       console.warn('[WORKFLOW_ENGINE] Failed to load conversation context:', error)
@@ -90,13 +131,32 @@ export class WorkflowEngine {
         visualContext: [],
         audioContext: [],
         uploadContext: [],
-        summary: { totalMessages: 0, modalitiesUsed: [], lastActivity: '', recentVisualAnalyses: 0, recentAudioEntries: 0, recentUploads: 0 }
+        summary: {
+          totalMessages: context.messages.length,
+          modalitiesUsed: Array.from(new Set(context.messages.map((m) => m.modality ?? 'text'))),
+          lastActivity: context.timestamp,
+          recentVisualAnalyses: context.multimodalContext.recentAnalyses.length,
+          recentAudioEntries: context.multimodalContext.hasRecentAudio ? 1 : 0,
+          recentUploads: context.multimodalContext.recentUploads.length
+        }
       }
     }
   }
   
-  private async determineFunnelStage(context: WorkflowContext, _conversationContext: any): Promise<string> {
+  private async determineFunnelStage(context: WorkflowContext, conversationContext: any): Promise<string> {
     const { conversationFlow, intelligenceContext } = context
+    const contextStats = this.extractContextStats(conversationContext)
+    
+    console.log('[WORKFLOW_ENGINE] Stage evaluation context', {
+      sessionId: context.sessionId,
+      totalMessages: contextStats.totalMessages,
+      coveredCategories: Object.values(conversationFlow?.covered || {}).filter(Boolean).length,
+      hasFitScore: Boolean(intelligenceContext?.fitScore)
+    })
+    
+    if (contextStats.totalMessages <= 1) {
+      return 'DISCOVERY'
+    }
     
     // Admin queries
     if (context.requestId.includes('admin')) return 'ADMIN'
@@ -159,8 +219,9 @@ export class WorkflowEngine {
     }
   }
   
-  private async discoveryAgent(context: WorkflowContext, _conversationContext: any): Promise<WorkflowResult> {
+  private async discoveryAgent(context: WorkflowContext, conversationContext: any): Promise<WorkflowResult> {
     const { intelligenceContext, conversationFlow, multimodalContext, voiceActive } = context
+    const contextSnapshot = this.describeContextStats(conversationContext)
     
     // Build system prompt
     let systemPrompt = `You are F.B/c Discovery AI - a lead qualification specialist.
@@ -182,6 +243,9 @@ Systematically discover lead's needs across 6 categories:
 
 CONVERSATION FLOW STATUS:
 ${conversationFlow ? this.formatConversationStatus(conversationFlow) : 'Starting discovery'}
+
+CONVERSATION SNAPSHOT:
+${contextSnapshot}
 
 MULTIMODAL AWARENESS:`
 
@@ -237,8 +301,9 @@ ${conversationFlow?.shouldOfferRecap
     }
   }
   
-  private async scoringAgent(context: WorkflowContext, _conversationContext: any): Promise<WorkflowResult> {
+  private async scoringAgent(context: WorkflowContext, conversationContext: any): Promise<WorkflowResult> {
     const { intelligenceContext, conversationFlow, multimodalContext } = context
+    const contextSnapshot = this.describeContextStats(conversationContext)
     
     const systemPrompt = `You are F.B/c Scoring AI - calculate lead scores.
 
@@ -248,6 +313,9 @@ ${JSON.stringify(intelligenceContext, null, 2)}
 CONVERSATION DATA:
 Categories covered: ${conversationFlow ? Object.values(conversationFlow.covered || {}).filter(Boolean).length : 0}/6
 User turns: ${conversationFlow?.totalUserTurns || 0}
+
+CONVERSATION SNAPSHOT:
+${contextSnapshot}
 
 MULTIMODAL ENGAGEMENT:
 Voice used: ${multimodalContext.hasRecentAudio ? 'Yes' : 'No'}
@@ -352,13 +420,17 @@ OUTPUT REQUIRED (JSON only, no explanation):
     }
   }
   
-  private async workshopSalesAgent(context: WorkflowContext, _conversationContext: any): Promise<WorkflowResult> {
+  private async workshopSalesAgent(context: WorkflowContext, conversationContext: any): Promise<WorkflowResult> {
     const { intelligenceContext, conversationFlow, multimodalContext } = context
+    const contextSnapshot = this.describeContextStats(conversationContext)
     
     const systemPrompt = `You are F.B/c Workshop Sales AI - pitch hands-on AI workshops.
 
 LEAD PROFILE:
 ${JSON.stringify(intelligenceContext, null, 2)}
+
+CONVERSATION SNAPSHOT:
+${contextSnapshot}
 
 DISCOVERY INSIGHTS:
 ${conversationFlow?.evidence ? JSON.stringify(conversationFlow.evidence).substring(0, 800) : 'None'}
@@ -409,13 +481,17 @@ STYLE: Conversational, no fluff, focus on value`
     }
   }
   
-  private async consultingSalesAgent(context: WorkflowContext, _conversationContext: any): Promise<WorkflowResult> {
+  private async consultingSalesAgent(context: WorkflowContext, conversationContext: any): Promise<WorkflowResult> {
     const { intelligenceContext, conversationFlow, multimodalContext } = context
+    const contextSnapshot = this.describeContextStats(conversationContext)
     
     const systemPrompt = `You are F.B/c Consulting Sales AI - pitch custom AI implementations.
 
 LEAD PROFILE:
 ${JSON.stringify(intelligenceContext, null, 2)}
+
+CONVERSATION SNAPSHOT:
+${contextSnapshot}
 
 DISCOVERY INSIGHTS:
 ${conversationFlow?.evidence ? JSON.stringify(conversationFlow.evidence).substring(0, 800) : 'None'}
@@ -466,13 +542,17 @@ STYLE: Enterprise-focused, consultative, high-value`
     }
   }
   
-  private async closerAgent(context: WorkflowContext, _conversationContext: any): Promise<WorkflowResult> {
+  private async closerAgent(context: WorkflowContext, conversationContext: any): Promise<WorkflowResult> {
     const { intelligenceContext, conversationFlow, multimodalContext } = context
+    const contextSnapshot = this.describeContextStats(conversationContext)
     
     const systemPrompt = `You are F.B/c Closer AI - handle objections and close deals.
 
 LEAD PROFILE:
 ${JSON.stringify(intelligenceContext, null, 2)}
+
+CONVERSATION SNAPSHOT:
+${contextSnapshot}
 
 DISCOVERY INSIGHTS:
 ${conversationFlow?.evidence ? JSON.stringify(conversationFlow.evidence).substring(0, 800) : 'None'}
@@ -522,8 +602,10 @@ STYLE: Consultative, understanding, but confident`
     }
   }
   
-  private async summaryAgent(context: WorkflowContext, _conversationContext: any): Promise<WorkflowResult> {
+  private async summaryAgent(context: WorkflowContext, conversationContext: any): Promise<WorkflowResult> {
     const { intelligenceContext, conversationFlow, multimodalContext } = context
+    const contextSnapshot = this.describeContextStats(conversationContext)
+    const stats = this.extractContextStats(conversationContext)
     
     const systemPrompt = `You are F.B/c Summary AI - create post-conversation analysis.
 
@@ -531,7 +613,7 @@ LEAD PROFILE:
 ${JSON.stringify(intelligenceContext, null, 2)}
 
 CONVERSATION SUMMARY:
-0 messages across text modalities
+${contextSnapshot}
 
 DISCOVERY INSIGHTS:
 ${conversationFlow?.evidence ? JSON.stringify(conversationFlow.evidence).substring(0, 1000) : 'None'}
@@ -572,13 +654,14 @@ STYLE: Professional, comprehensive, actionable`
       metadata: {
         stage: 'SUMMARY',
         summaryGenerated: true,
-        totalMessages: 0,
-        modalitiesUsed: ['text']
+        totalMessages: stats.totalMessages,
+        modalitiesUsed: stats.modalities
       }
     }
   }
   
-  private async adminAgent(context: WorkflowContext, _conversationContext: any): Promise<WorkflowResult> {
+  private async adminAgent(context: WorkflowContext, conversationContext: any): Promise<WorkflowResult> {
+    const contextSnapshot = this.describeContextStats(conversationContext)
     const systemPrompt = `You are F.B/c AI Admin Assistant, specialized in business intelligence and management.
 
 Your capabilities:
@@ -588,6 +671,9 @@ Your capabilities:
 - Interpret analytics and performance metrics
 - Provide business recommendations based on data
 - Help with lead scoring and prioritization
+
+CONVERSATION SNAPSHOT:
+${contextSnapshot}
 
 Response style: Be concise, actionable, and data-driven.`
 

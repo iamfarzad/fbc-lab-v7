@@ -220,13 +220,22 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                     error: 'output-error',
                   };
                   const mapped = stateMap[t.state] ?? 'output-available';
+                  const outputText = (() => {
+                    if (t.output == null) return ''
+                    if (typeof t.output === 'string') return t.output
+                    if (typeof t.output === 'number' || typeof t.output === 'boolean') return String(t.output)
+                    try {
+                      return JSON.stringify(t.output, null, 2)
+                    } catch (error) {
+                      console.warn('[LiveChatMessages] Failed to serialise tool output', error)
+                      return '[unserialisable output]'
+                    }
+                  })()
                   return (
                     <Tool key={t.name}>
                       <ToolHeader type={t.type as any} state={mapped} />
                       <ToolContent>
-                        {t.output && typeof t.output === "object"
-                          ? JSON.stringify(t.output, null, 2)
-                          : String(t.output ?? "")}
+                        {outputText}
                       </ToolContent>
                     </Tool>
                   );

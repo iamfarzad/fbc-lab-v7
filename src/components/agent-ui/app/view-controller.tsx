@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSession } from '@/components/agent-ui/app/session-provider';
+import { useSession } from '@/components/agent-ui/app/session-context';
 import { SessionView, type SessionInsights } from '@/components/agent-ui/app/session-view';
 import { TermsOverlay } from '@/components/agent-ui/app/terms-overlay';
 import { useChatIntelligence, type ResearchSnapshot, type ResearchSection } from '@/components/chat/hooks/useChatIntelligence';

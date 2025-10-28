@@ -79,13 +79,19 @@ export function TileLayout({ chatOpen, camera, screen }: TileLayoutProps) {
 
   useEffect(() => {
     if (cameraVideoRef.current && camera.stream) {
-      try { cameraVideoRef.current.srcObject = camera.stream } catch {}
+      try { cameraVideoRef.current.srcObject = camera.stream }
+      catch (error) {
+        console.warn('[TileLayout] Failed to bind camera stream', error)
+      }
     }
   }, [camera.stream])
 
   useEffect(() => {
     if (screenVideoRef.current && screen.stream) {
-      try { screenVideoRef.current.srcObject = screen.stream } catch {}
+      try { screenVideoRef.current.srcObject = screen.stream }
+      catch (error) {
+        console.warn('[TileLayout] Failed to bind screen stream', error)
+      }
     }
   }, [screen.stream])
 

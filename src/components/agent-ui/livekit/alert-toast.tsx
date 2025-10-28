@@ -5,17 +5,10 @@ import { toast as sonnerToast } from 'sonner';
 import { WarningIcon } from '@phosphor-icons/react/dist/ssr';
 import { Alert, AlertDescription, AlertTitle } from '@/components/agent-ui/livekit/alert';
 
-interface ToastProps {
+export interface ToastProps {
   id: string | number;
   title: ReactNode;
   description: ReactNode;
-}
-
-export function toastAlert(toast: Omit<ToastProps, 'id'>) {
-  return sonnerToast.custom(
-    (id) => <AlertToast id={id} title={toast.title} description={toast.description} />,
-    { duration: 10_000 }
-  );
 }
 
 export function AlertToast(props: ToastProps) {

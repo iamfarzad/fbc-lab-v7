@@ -28,7 +28,10 @@ function LiveInner() {
     ]
     const fromQuery = allowed.find((t) => t === (raw as ThemeVariant))
     if (fromQuery) {
-      try { localStorage.setItem('theme', fromQuery) } catch {}
+      try { localStorage.setItem('theme', fromQuery) }
+      catch (error) {
+        console.warn('[LivePage] Failed to persist theme preference', error)
+      }
       applyThemeVariant(fromQuery)
       return
     }

@@ -212,7 +212,9 @@ export function useChatIntelligence(id?: string | null, options?: { forceTermsRe
       setContextReady(false);
       setResearchSnapshot(null);
       setResearchStatus('idle');
-    } catch {}
+    } catch (error) {
+      console.warn('[useChatIntelligence] Failed to reset forced terms state', error);
+    }
   }, [options?.forceTermsReset]);
 
   const fetchResearchSnapshot = useCallback(async (): Promise<'pending' | 'ready' | 'skipped' | 'error'> => {

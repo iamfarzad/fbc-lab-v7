@@ -2,7 +2,7 @@
 
 import { type HTMLAttributes, useCallback, useState } from 'react';
 import { ChatTextIcon, PhoneDisconnectIcon, MicrophoneIcon, CameraIcon, MonitorIcon, PaperclipIcon, DownloadSimpleIcon, CalendarBlankIcon } from '@phosphor-icons/react/dist/ssr';
-import { useSession } from '@/components/agent-ui/app/session-provider';
+import { useSession } from '@/components/agent-ui/app/session-context';
 import { Button } from '@/components/agent-ui/livekit/button';
 import { Toggle } from '@/components/agent-ui/livekit/toggle';
 import { cn } from '@/lib/utils';

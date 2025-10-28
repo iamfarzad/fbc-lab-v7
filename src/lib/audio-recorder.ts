@@ -107,6 +107,7 @@ export class AudioRecorder extends EventEmitter {
   private source: MediaStreamAudioSourceNode | null = null;
   private recordingWorklet: AudioWorkletNode | null = null;
   private legacyProcessor: ScriptProcessorNode | null = null;
+  private fallbackSilencer: GainNode | null = null;
   private stream: MediaStream | null = null;
   private isActive = false;
   private actualSampleRate = 16000;
@@ -126,24 +127,24 @@ export class AudioRecorder extends EventEmitter {
       });
       debugLog('🎤 [AudioRecorder] Microphone access granted');
 
-      // Create audio context targeting 24kHz to align with Live API playback
+      // Create audio context targeting 16kHz to align with Live API expectations
       debugLog('🎤 [AudioRecorder] Creating audio context...');
-      this.audioContext = new AudioContext({ sampleRate: 24000 });
+      this.audioContext = new AudioContext({ sampleRate: 16000 });
       debugLog('🎤 [AudioRecorder] Audio context created');
       try {
         await this.audioContext.resume();
       } catch {
         // Some browsers may reject resume when already running; ignore
       }
-      debugLog('🎤 [AudioRecorder] Requested sample rate: 24000');
+      debugLog('🎤 [AudioRecorder] Requested sample rate: 16000');
       debugLog('🎤 [AudioRecorder] Actual sample rate:', this.audioContext.sampleRate);
       this.actualSampleRate = this.audioContext.sampleRate ?? 16000;
       
-      if (this.audioContext.sampleRate !== 24000) {
-        console.warn('⚠️ [AudioRecorder] Hardware did not honor 24kHz request! Using:', this.audioContext.sampleRate);
+      if (this.audioContext.sampleRate !== 16000) {
+        console.warn('⚠️ [AudioRecorder] Hardware did not honor 16kHz request! Using:', this.audioContext.sampleRate);
         console.warn('⚠️ [AudioRecorder] Audio may be resampled by the browser');
       } else {
-        debugLog('✅ [AudioRecorder] Sample rate verified: 24kHz');
+        debugLog('✅ [AudioRecorder] Sample rate verified: 16kHz');
       }
       
       // Create source
@@ -240,8 +241,12 @@ export class AudioRecorder extends EventEmitter {
       this.source.connect(captureNode);
 
       if (captureNode === this.legacyProcessor && this.audioContext) {
-        this.legacyProcessor.connect(this.audioContext.destination);
+        this.fallbackSilencer = this.audioContext.createGain();
+        this.fallbackSilencer.gain.value = 0;
+        captureNode.connect(this.fallbackSilencer);
+        this.fallbackSilencer.connect(this.audioContext.destination);
       }
+      // Worklet path is not connected to destination; legacy path runs through a zero-gain node.
       debugLog('🎤 [AudioRecorder] Audio nodes connected');
       
       this.isActive = true;
@@ -281,6 +286,14 @@ export class AudioRecorder extends EventEmitter {
       }
       this.legacyProcessor.onaudioprocess = null;
       this.legacyProcessor = null;
+    }
+    if (this.fallbackSilencer) {
+      try {
+        this.fallbackSilencer.disconnect();
+      } catch {
+        // ignore disconnect errors during teardown
+      }
+      this.fallbackSilencer = null;
     }
     
     if (this.source) {
