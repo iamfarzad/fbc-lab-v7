@@ -22,7 +22,7 @@ export function LiveCaptions({ className }: { className?: string }) {
         {userText && (
           <div className="bg-primary/10 text-primary border-primary/30 pointer-events-auto inline-block max-w-full rounded-md border text-[12px]">
             <MessageContent className="px-2 py-1">
-              <span className="font-medium mr-1">You:</span>
+              <Response className="font-medium mr-1 inline">You:</Response>
               <Response className="inline opacity-90">{userText}</Response>
             </MessageContent>
           </div>
@@ -30,7 +30,7 @@ export function LiveCaptions({ className }: { className?: string }) {
         {assistantText && (
           <div className="bg-muted/60 text-foreground/90 border-muted/50 pointer-events-auto inline-block max-w-full rounded-md border text-[12px]">
             <MessageContent className="px-2 py-1">
-              <span className="font-medium mr-1">Assistant:</span>
+              <Response className="font-medium mr-1 inline">Assistant:</Response>
               <Response className="inline opacity-90">{assistantText}</Response>
             </MessageContent>
           </div>

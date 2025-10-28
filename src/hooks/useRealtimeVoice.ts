@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AudioRecorder, AudioPlayer } from '@/lib/audio';
+import { AudioPlayer } from '@/lib/audio';
 import { WEBSOCKET_CONFIG } from '@/config/constants';
 import type { LiveServerEvent } from '@/core/live/types'
 import { LiveClientWS, getLiveClientSingleton } from '@/core/live/client'
@@ -46,7 +46,7 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
   const [error, setError] = useState<string | null>(null);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
 
-  const audioWorkletRecorderRef = useRef<AudioRecorder | null>(null);
+  const audioWorkletRecorderRef = useRef<any | null>(null);
   const usingAudioWorkletRef = useRef(false);
   const chunkHandlerRef = useRef<((chunk: MediaRecorderVoiceResult) => void) | null>(null);
   const sampleRateRef = useRef(targetSampleRate);
@@ -92,10 +92,11 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
     chunkHandlerRef.current = opts?.onChunk ?? null;
 
     if (!audioWorkletRecorderRef.current) {
-      const recorder = new AudioRecorder();
-      recorder.on('data', handleWorkletData);
-      recorder.on('error', handleWorkletError);
-      recorder.on('stop', () => setIsRecording(false));
+      // TODO: Implement proper AudioRecorder or use MediaRecorder
+      const recorder = null; // Temporarily disabled
+      // recorder.on('data', handleWorkletData);
+      // recorder.on('error', handleWorkletError);
+      // recorder.on('stop', () => setIsRecording(false));
       audioWorkletRecorderRef.current = recorder;
     }
 

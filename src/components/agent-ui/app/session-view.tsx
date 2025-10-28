@@ -21,6 +21,7 @@ import { useLiveApi } from '@/hooks/useLiveApi'
 import { useUnifiedChat } from '@/hooks/useUnifiedChat'
 import { ChainOfThought, ChainOfThoughtContent, ChainOfThoughtHeader, ChainOfThoughtStep } from '@/components/ai-elements/reasoning/chain-of-thought';
 import { Sources, SourcesContent, SourcesTrigger, Source } from '@/components/ai-elements/sources/sources';
+import { Response } from '@/components/ai-elements/core/response';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
 
@@ -218,11 +219,11 @@ export const SessionView = ({
         <div className="pointer-events-auto absolute right-3 top-4 z-[60] w-[240px] rounded-2xl border bg-card/90 p-3 shadow-lg backdrop-blur">
           <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
             <Loader2 className="size-3.5 animate-spin" />
-            Tailoring your briefing…
+            <Response className="inline">Tailoring your briefing…</Response>
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <Response className="mt-2 text-[11px] text-muted-foreground">
             Pulling public records, team info, and recent updates so we can hit the ground running.
-          </p>
+          </Response>
         </div>
       );
     }
@@ -230,10 +231,10 @@ export const SessionView = ({
     if (researchStatus === 'skipped') {
       return (
         <div className="pointer-events-auto absolute right-3 top-4 z-[60] w-[240px] rounded-2xl border border-dashed bg-card/80 p-3 text-[11px] shadow-md backdrop-blur">
-          <span className="font-medium text-foreground">Limited briefing</span>
-          <p className="mt-1 text-muted-foreground">
+          <Response className="font-medium text-foreground">Limited briefing</Response>
+          <Response className="mt-1 text-muted-foreground">
             Using the details you provided. Share a business email next time for deeper research.
-          </p>
+          </Response>
         </div>
       );
     }
@@ -256,9 +257,9 @@ export const SessionView = ({
               </ChainOfThoughtContent>
             </ChainOfThought>
             {researchInsights.summary && (
-              <p className="mt-2 text-[11px] text-muted-foreground whitespace-pre-line">
+              <Response className="mt-2 text-[11px] text-muted-foreground whitespace-pre-line">
                 {researchInsights.summary}
-              </p>
+              </Response>
             )}
           </div>
           {researchInsights.sources.length > 0 && (
@@ -269,7 +270,7 @@ export const SessionView = ({
                   <div key={source.id} className="flex flex-col">
                     <Source href={source.url} title={source.title} />
                     {source.description && (
-                      <span className="pl-5 text-[10px] text-muted-foreground">{source.description}</span>
+                      <Response className="pl-5 text-[10px] text-muted-foreground">{source.description}</Response>
                     )}
                   </div>
                 ))}

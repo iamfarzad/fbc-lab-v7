@@ -108,11 +108,11 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                         <InlineCitationCarouselContent>
                           {meta.inlineCitations.map((c:any, idx:number) => (
                             <InlineCitationCarouselItem key={idx}>
-                              <div className="text-[12px] font-medium">{c.title || c.url}</div>
+                              <Response className="text-[12px] font-medium">{c.title || c.url}</Response>
                               <a className="text-[11px] text-blue-600 underline" href={c.url} target="_blank" rel="noreferrer">
                                 {c.url}
                               </a>
-                              {c.text && <div className="text-[11px] text-muted-foreground mt-1">{c.text}</div>}
+                              {c.text && <Response className="text-[11px] text-muted-foreground mt-1">{c.text}</Response>}
                             </InlineCitationCarouselItem>
                           ))}
                         </InlineCitationCarouselContent>
@@ -257,9 +257,9 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 <div className="mt-2">
                   <WebPreview defaultUrl={meta.webPreview.url}>
                     <div className="p-2 text-[12px]">
-                      <div className="font-medium">{meta.webPreview.title}</div>
+                      <Response className="font-medium">{meta.webPreview.title}</Response>
                       {meta.webPreview.description && (
-                        <div className="text-muted-foreground">{meta.webPreview.description}</div>
+                        <Response className="text-muted-foreground">{meta.webPreview.description}</Response>
                       )}
                       <a className="text-blue-600 underline" href={meta.webPreview.url} target="_blank" rel="noreferrer">
                         {meta.webPreview.url}
