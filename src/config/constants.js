@@ -113,7 +113,7 @@ export const LIVE_API_CONFIG = {
     // Use sendRealtimeInput(), NOT session.send()
     METHOD_NAME: 'sendRealtimeInput',
     AUDIO_ENCODING: 'pcm_s16le',
-    SAMPLE_RATE: 16000,
+    SAMPLE_RATE: 24000,
     CHANNELS: 1,
 };
 // API Rate Limits
@@ -147,7 +147,7 @@ export const SESSION_CONFIG = {
 };
 // Audio Configuration
 export const AUDIO_CONFIG = {
-    SAMPLE_RATE: 16000,
+    SAMPLE_RATE: 24000,
     CHANNELS: 1,
     BIT_DEPTH: 16,
     CHUNK_SIZE: 4096,

@@ -32,7 +32,7 @@ const extractSampleRate = (mimeType?: string): number | undefined => {
 
 // Inlined minimal recorder hook using AudioWorklet via AudioRecorder
 function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
-  const targetSampleRate = options.targetSampleRate ?? 16000;
+  const targetSampleRate = options.targetSampleRate ?? 24000;
 
   const [isSupported, setIsSupported] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -224,7 +224,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     isProcessing: recorderProcessing,
     error: recorderError,
     micStream,
-  } = useInlineRecorder({ targetSampleRate: 16000 });
+  } = useInlineRecorder({ targetSampleRate: 24000 });
 
   const liveRef = useRef<LiveClientWS | null>(options.liveClient ?? null);
   const createdClientRef = useRef<boolean>(!options.liveClient);

@@ -10,7 +10,6 @@ import {
   AgentControlBar,
   type ControlBarControls,
 } from '@/components/agent-ui/livekit/agent-control-bar/agent-control-bar';
-import { useChatMessages } from '@/components/agent-ui/hooks/useChatMessages';
 import { useConnectionTimeout } from '@/components/agent-ui/hooks/useConnectionTimout';
 import { useDebugMode } from '@/components/agent-ui/hooks/useDebug';
 import { cn } from '@/lib/utils';
@@ -106,7 +105,11 @@ export const SessionView = ({
   useDebugMode({ enabled: IN_DEVELOPMENT });
 
   const { sessionId, isSessionActive } = useSession();
-  const messages = useChatMessages(sessionId);
+  
+  // Single source of truth for chat messages
+  const chat = useUnifiedChat({ sessionId });
+  const messages = chat.messages;
+
   const live = useLiveApi();
   // Shared media hook instances for both layout and controls to stay in sync
   const camera = useCamera({
@@ -125,8 +128,6 @@ export const SessionView = ({
     enableAutoCapture: Boolean(isSessionActive),
     captureInterval: 4000,
   })
-  // Bridge key flags into unified chat context so /api/chat/unified can use them
-  const chat = useUnifiedChat({ sessionId })
   React.useEffect(() => {
     chat.updateContext?.({
       voiceActive: isSessionActive,
@@ -306,6 +307,7 @@ export const SessionView = ({
             onChatStateChange={setChatState}
             camera={camera}
             screenShare={screenShare}
+            unifiedChat={chat}
           />
         </div>
       </MotionBottom>

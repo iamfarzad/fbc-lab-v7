@@ -65,18 +65,12 @@
     "scripts/log-collectors/**",
     "scripts/test-logging.ts",
     "scripts/test-enhancements.ts",
-    "my-agent-app/**",
-    // Exclude legacy LiveKit runtime files; UI clones remain
+    // Exclude legacy test files that are not currently used
     "src/hooks/useRoom.ts",
-    "src/hooks/useChatMessages.ts",
+    "src/hooks/useChatMessages.ts", 
     "src/hooks/useDebug.ts",
     "src/components/agent-ui/AgentInterface.tsx",
     "src/components/livekit/LiveKitRoom.tsx",
-    "app/livekit-demo/**",
-    "src/components/agent-ui/livekit/agent-control-bar/track-toggle.tsx",
-    "src/components/agent-ui/livekit/agent-control-bar/track-device-select.tsx",
-    "src/components/agent-ui/livekit/agent-control-bar/track-selector.tsx",
-    "src/components/agent-ui/livekit/agent-control-bar/hooks/use-input-controls.ts",
-    "src/components/agent-ui/livekit/agent-control-bar/hooks/use-publish-permissions.ts"
+    "app/livekit-demo/**"
   ]
 }

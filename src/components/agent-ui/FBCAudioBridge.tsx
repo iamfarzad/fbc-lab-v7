@@ -2,15 +2,13 @@
 
 import { useEffect, useRef } from 'react';
 import { useLiveApi } from '@/hooks/useLiveApi';
-import { useUnifiedChat } from '@/hooks/useUnifiedChat';
-import { useSession } from '@/components/agent-ui/app/session-provider';
+import { useUnifiedChatActions } from '@/core/chat/state/unified-chat-store';
 
 // Bridges voice input (final user transcript) to the unified chat API so that
 // /live shows rich AI-elements messages (metadata, sources, artifacts).
 export function FBCAudioBridge() {
   const liveApi = useLiveApi();
-  const { sessionId } = useSession();
-  const chat = useUnifiedChat({ sessionId });
+  const { sendMessage } = useUnifiedChatActions();
   // Track the last single utterance we forwarded to unified chat
   const lastSentLineRef = useRef<string>('');
 
@@ -25,9 +23,11 @@ export function FBCAudioBridge() {
     if (!lastLine) return;
     if (lastLine === lastSentLineRef.current) return;
 
-    lastSentLineRef.current = lastLine;
-    void chat.sendMessage(lastLine);
-  }, [liveApi.transcript]);
+    if (typeof sendMessage === 'function') {
+      lastSentLineRef.current = lastLine;
+      void sendMessage(lastLine);
+    }
+  }, [liveApi.transcript, sendMessage]);
 
   return null;
 }

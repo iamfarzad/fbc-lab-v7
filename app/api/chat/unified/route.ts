@@ -274,13 +274,7 @@ function parseStructuredResponse(content: string) {
     }
   }
   
-  // Add context usage tracking
-  metadata.contextUsage = {
-    usedTokens: Math.floor(content.length / 4), // Rough token estimate
-    maxTokens: GEMINI_CONFIG.MAX_TOKENS,
-    usage: Math.floor(content.length / 4) / GEMINI_CONFIG.MAX_TOKENS,
-    modelId: GEMINI_MODELS.FLASH_LATEST
-  }
+  // Removed UI token usage injection to avoid legacy banner rendering in Agent UI
   
   return metadata
 }

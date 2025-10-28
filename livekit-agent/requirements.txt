@@ -1,4 +1,0 @@
-livekit-agents
-livekit
-google-generativeai
-python-dotenv

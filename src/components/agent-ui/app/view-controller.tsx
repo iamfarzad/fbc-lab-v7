@@ -5,7 +5,7 @@ import { useSession } from '@/components/agent-ui/app/session-provider';
 import { SessionView, type SessionInsights } from '@/components/agent-ui/app/session-view';
 import { TermsOverlay } from '@/components/agent-ui/app/terms-overlay';
 import { useChatIntelligence, type ResearchSnapshot, type ResearchSection } from '@/components/chat/hooks/useChatIntelligence';
-import { useUnifiedChat } from '@/hooks/useUnifiedChat';
+import { useUnifiedChatActions, useUnifiedChatMessages } from '@/core/chat/state/unified-chat-store';
 
 const MAX_SUMMARY_LENGTH = 220;
 
@@ -118,7 +118,8 @@ function transformInsights(snapshot: ResearchSnapshot | null, leadName: string, 
 
 export function ViewController({ forceTermsReset }: { forceTermsReset?: boolean }) {
   const { sessionId, isSessionActive, startSession, error } = useSession();
-  const chat = useUnifiedChat({ sessionId });
+  const { setMessages } = useUnifiedChatActions();
+  const existingMessages = useUnifiedChatMessages();
   const {
     hasAcceptedTerms,
     currentContext,
@@ -169,20 +170,24 @@ export function ViewController({ forceTermsReset }: { forceTermsReset?: boolean 
     const chainOfThought = buildChainOfThought(researchSnapshot, firstName, companyName);
     const reasoning = buildWelcomeReasoning(researchSnapshot, companyName);
 
-    chat.addMessage({
-      role: 'assistant',
+    const welcome = {
+      id: crypto.randomUUID(),
+      role: 'assistant' as const,
       content: `Welcome ${firstName}! I've pulled a quick brief on ${companyName}. Ask me anything—or say "What did you find out about me?" to review the sources.`,
       timestamp: new Date(),
       metadata: {
-        type: 'text',
+        type: 'text' as const,
         sources,
         chainOfThought: { steps: chainOfThought },
         reasoning,
       },
-    });
+    };
+    if (typeof setMessages === 'function') {
+      setMessages([...(existingMessages as any), welcome as any]);
+    }
 
     hasSentWelcomeRef.current = true;
-  }, [hasAcceptedTerms, researchSnapshot, researchStatus, chat, firstName, companyName]);
+  }, [hasAcceptedTerms, researchSnapshot, researchStatus, setMessages, existingMessages, firstName, companyName]);
 
   const insights = useMemo(() => transformInsights(researchSnapshot, firstName, companyName), [researchSnapshot, firstName, companyName]);
 

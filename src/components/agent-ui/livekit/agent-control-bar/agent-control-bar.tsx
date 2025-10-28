@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { ChatInput } from './chat-input';
 import { useAgentUIAdapter } from '@/hooks/useAgentUIAdapter';
 import { useLiveApi } from '@/hooks/useLiveApi';
-import { useUnifiedChat } from '@/hooks/useUnifiedChat'
 import { CONTACT_CONFIG } from '@/config/constants'
 import { toast } from 'sonner'
 import { useRef } from 'react'
@@ -39,6 +38,7 @@ export interface AgentControlBarProps  {
   onChatStateChange?: (state: ChatPanelState) => void;
   camera?: CameraHook;
   screenShare?: ScreenHook;
+  unifiedChat?: ReturnType<typeof import('@/hooks/useUnifiedChat').useUnifiedChat>;
 }
 
 /**
@@ -53,22 +53,27 @@ export function AgentControlBar({
   onChatStateChange,
   camera: cameraProp,
   screenShare: screenShareProp,
+  unifiedChat,
   ...props
 }: AgentControlBarProps & HTMLAttributes<HTMLDivElement>) {
   const adapter = useAgentUIAdapter();
   const liveApi = useLiveApi();
-  // Prefer shared instances passed from parent to keep UI in sync
-  const camera = cameraProp ?? useCameraHook()
-  const screenShare = screenShareProp ?? useScreenShareHook()
+  // Always call hooks, but prefer shared instances passed from parent to keep UI in sync
+  const cameraHook = useCameraHook()
+  const screenShareHook = useScreenShareHook()
+  const camera = cameraProp ?? cameraHook
+  const screenShare = screenShareProp ?? screenShareHook
   const [chatOpenInternal, setChatOpenInternal] = useState(false);
   const { isSessionActive, endSession, sessionId } = useSession();
-  const unifiedChat = useUnifiedChat({ sessionId: useSession().sessionId });
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
 
   const handleSendMessage = async (message: string) => {
-    // Use unified chat for text messages to get full metadata + AI-elements
-    await unifiedChat.sendMessage(message);
+    if (unifiedChat) {
+      await unifiedChat.sendMessage(message);
+    } else {
+      console.warn('AgentControlBar: No unified chat instance provided as prop');
+    }
   };
 
   const nextChatState = useCallback((state: ChatPanelState): ChatPanelState => {
@@ -114,7 +119,9 @@ export function AgentControlBar({
       toast.success(`Uploaded ${count} file${count === 1 ? '' : 's'}`)
       if (res.prompt) {
         // Kick off a chat turn using server-provided prompt (e.g., extracted from docs)
-        void unifiedChat.sendMessage(res.prompt)
+        if (unifiedChat) {
+          void unifiedChat.sendMessage(res.prompt)
+        }
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Upload error')

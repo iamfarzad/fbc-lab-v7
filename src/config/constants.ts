@@ -138,7 +138,7 @@ export const LIVE_API_CONFIG = {
   // Use sendRealtimeInput(), NOT session.send()
   METHOD_NAME: 'sendRealtimeInput',
   AUDIO_ENCODING: 'pcm_s16le',
-  SAMPLE_RATE: 16000,
+  SAMPLE_RATE: 24000,
   CHANNELS: 1,
 } as const
 
@@ -181,7 +181,7 @@ export const SESSION_CONFIG = {
 
 // Audio Configuration
 export const AUDIO_CONFIG = {
-  SAMPLE_RATE: 16000,
+  SAMPLE_RATE: 24000,
   CHANNELS: 1,
   BIT_DEPTH: 16,
   CHUNK_SIZE: 4096,
@@ -287,6 +287,9 @@ export const FEATURE_FLAGS = {
   SHOW_VOICE_OVERLAY:
     (process.env.NEXT_PUBLIC_FEATURE_VOICE_OVERLAY || '1').toLowerCase() === '1' ||
     (process.env.NEXT_PUBLIC_FEATURE_VOICE_OVERLAY || '').toLowerCase() === 'true',
+  SHOW_USAGE_CARD:
+    (process.env.NEXT_PUBLIC_FEATURE_SHOW_USAGE_CARD || '0').toLowerCase() === '1' ||
+    (process.env.NEXT_PUBLIC_FEATURE_SHOW_USAGE_CARD || '').toLowerCase() === 'true',
   // Controls whether the primary chat experience is the dedicated /live page
 } as const
 

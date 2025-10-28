@@ -25,6 +25,7 @@ import { Actions, Action } from "@/components/ai-elements/interactive/actions";
 import { Task, TaskTrigger, TaskContent, TaskItem, TaskItemFile } from "@/components/ai-elements/reasoning/task";
 import { WebPreview } from "@/components/ai-elements/content/web-preview";
 import type { Message as MessageType } from "@/types/core";
+import { FEATURE_FLAGS } from '@/config/constants'
 import {
   Context,
   ContextTrigger,
@@ -54,7 +55,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
             <MessageAvatar />
             <MessageContent>
               {/* Context usage / cost banner (if available) */}
-              {meta.contextUsage && (
+              {FEATURE_FLAGS.SHOW_USAGE_CARD && meta.contextUsage && (
                 <div className="mb-1 flex items-center gap-1">
                   <Context
                     usedTokens={meta.contextUsage.usedTokens}

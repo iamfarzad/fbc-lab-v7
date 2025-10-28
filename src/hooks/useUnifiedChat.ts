@@ -23,7 +23,18 @@ function normaliseStreamMessage(
 ): UnifiedMessage | null {
   if (!data || typeof data !== 'object') return null
   const payload = data as Record<string, unknown>
+  
+  // Filter out meta events and invalid messages
   if (payload.type === 'meta') return null
+  if (!payload.role || (payload.role !== 'user' && payload.role !== 'assistant')) return null
+  if (typeof payload.content !== 'string') return null
+  
+  // Reject messages that are just percentages, numbers, or streaming metadata
+  const content = payload.content.trim()
+  if (!content || /^[\d.%\s]*$/.test(content)) {
+    console.debug('[SSE] Filtered streaming metadata:', content)
+    return null
+  }
 
   const metadata = typeof payload.metadata === 'object' && payload.metadata
     ? { ...(payload.metadata as Record<string, unknown>) }
@@ -44,8 +55,8 @@ function normaliseStreamMessage(
 
   return {
     id,
-    role: payload.role === 'user' ? 'user' : 'assistant',
-    content: typeof payload.content === 'string' ? payload.content : '',
+    role: payload.role as 'user' | 'assistant',
+    content,
     timestamp: payload.timestamp ? new Date(payload.timestamp as string) : new Date(),
     metadata: {
       ...metadata,

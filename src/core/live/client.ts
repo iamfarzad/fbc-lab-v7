@@ -146,7 +146,7 @@ export class LiveClientWS {
     this.send({ type: 'REALTIME_INPUT', payload: { chunks: [{ text }] } })
   }
 
-  sendAudioBase64PCM16(base64: string, mimeType = 'audio/pcm;rate=16000') {
+  sendAudioBase64PCM16(base64: string, mimeType = 'audio/pcm;rate=24000') {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
     this.send({ type: 'user_audio', payload: { audioData: base64, mimeType } })
   }

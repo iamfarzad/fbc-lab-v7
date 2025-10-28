@@ -138,24 +138,24 @@ export class AudioRecorder extends EventEmitter {
       });
       console.log('🎤 [AudioRecorder] Microphone access granted');
 
-      // Create audio context with forced 16kHz for Gemini compatibility
+      // Create audio context targeting 24kHz to align with Live API playback
       console.log('🎤 [AudioRecorder] Creating audio context...');
-      this.audioContext = new AudioContext({ sampleRate: 16000 });
+      this.audioContext = new AudioContext({ sampleRate: 24000 });
       console.log('🎤 [AudioRecorder] Audio context created');
       try {
         await this.audioContext.resume();
       } catch {
         // Some browsers may reject resume when already running; ignore
       }
-      console.log('🎤 [AudioRecorder] Requested sample rate: 16000');
+      console.log('🎤 [AudioRecorder] Requested sample rate: 24000');
       console.log('🎤 [AudioRecorder] Actual sample rate:', this.audioContext.sampleRate);
       this.actualSampleRate = this.audioContext.sampleRate ?? 16000;
       
-      if (this.audioContext.sampleRate !== 16000) {
-        console.warn('⚠️ [AudioRecorder] Hardware does not support 16kHz! Using:', this.audioContext.sampleRate);
-        console.warn('⚠️ [AudioRecorder] Audio quality may be degraded - resampling required');
+      if (this.audioContext.sampleRate !== 24000) {
+        console.warn('⚠️ [AudioRecorder] Hardware did not honor 24kHz request! Using:', this.audioContext.sampleRate);
+        console.warn('⚠️ [AudioRecorder] Audio may be resampled by the browser');
       } else {
-        console.log('✅ [AudioRecorder] Sample rate verified: 16kHz');
+        console.log('✅ [AudioRecorder] Sample rate verified: 24kHz');
       }
       
       // Create source

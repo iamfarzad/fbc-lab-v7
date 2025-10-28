@@ -1,4 +1,3 @@
-import { useUnifiedChat } from '@/hooks/useUnifiedChat'
 import { useUnifiedChatMessages, UNIFIED_CHAT_STORE_ID } from '@/core/chat/state/unified-chat-store'
 import type { Message } from '@/types/core'
 
@@ -10,9 +9,6 @@ export function useLiveChatAPI(sessionId: string): Message[] {
   // Ensure at least one instance is mounted in the tree (AgentControlBar does this)
   // Read from the shared store so multiple components stay in sync.
   const messages = useUnifiedChatMessages(UNIFIED_CHAT_STORE_ID)
-
-  // Also mount a local instance to initialize context/session ID when used standalone
-  useUnifiedChat({ sessionId })
 
   return messages as Message[]
 }
