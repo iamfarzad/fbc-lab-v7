@@ -1,96 +1,64 @@
-import { cn } from '@/lib/utils';
+export type ThemeVariant =
+  | 'orange-light'
+  | 'orange-dark'
+  | 'monochrome'
+  | 'monochrome-dark'
+  | 'monochrome-orange'
+  | 'monochrome-orange-dark'
+  | 'system'
 
-export const getThemeColors = () => ({
-  // Backgrounds
-  background: 'hsl(var(--background))',
-  foreground: 'hsl(var(--foreground))',
-  muted: 'hsl(var(--muted))',
-  mutedForeground: 'hsl(var(--muted-foreground))',
-  
-  // Accents
-  primary: 'hsl(var(--primary))',
-  primaryForeground: 'hsl(var(--primary-foreground))',
-  accent: 'hsl(var(--accent))',
-  accentForeground: 'hsl(var(--accent-foreground))',
-  
-  // States
-  destructive: 'hsl(var(--destructive))',
-  destructiveForeground: 'hsl(var(--destructive-foreground))',
-  
-  // Borders
-  border: 'hsl(var(--border))',
-  ring: 'hsl(var(--ring))',
-});
+export function applyThemeVariant(themeVariant: ThemeVariant) {
+  if (typeof document === 'undefined') return
+  const root = document.documentElement
 
-export const getGradientForTheme = () => {
-  // Return theme-aware gradients
-  return {
-    voice: 'bg-gradient-to-b from-background via-muted to-background',
-    camera: 'bg-background',
-    overlay: 'bg-background/50 backdrop-blur-sm',
-    card: 'bg-gradient-to-b from-card to-card/80',
-  };
-};
+  // Remove all theme classes we manage
+  root.classList.remove(
+    'orange-light',
+    'orange-dark',
+    'monochrome',
+    'monochrome-dark',
+    'monochrome-orange',
+    'monochrome-orange-dark',
+    'reduce-motion',
+    'dark'
+  )
 
-export const getMonochromeClass = () => '[.monochrome_&]:rounded-none [.monochrome_&]:border-2';
+  switch (themeVariant) {
+    case 'orange-light':
+      root.classList.add('orange-light')
+      break
+    case 'orange-dark':
+      root.classList.add('dark', 'orange-dark')
+      break
+    case 'monochrome':
+      root.classList.add('monochrome')
+      break
+    case 'monochrome-dark':
+      root.classList.add('dark', 'monochrome', 'monochrome-dark')
+      break
+    case 'monochrome-orange':
+      root.classList.add('monochrome', 'monochrome-orange', 'orange-light')
+      break
+    case 'monochrome-orange-dark':
+      root.classList.add('dark', 'monochrome', 'monochrome-orange-dark', 'orange-dark')
+      break
+    case 'system': {
+      const prefersDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+      const prefersMonochrome = typeof window !== 'undefined' && window.matchMedia('(prefers-contrast: more)').matches
+      const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-export const getThemeAwareBackdrop = () => 'bg-background/50 backdrop-blur-sm';
+      if (prefersReducedMotion) root.classList.add('reduce-motion')
 
-export const getThemeAwareShadow = () => 'shadow-[0_24px_60px_-40px_rgba(12,18,26,0.45)]';
-
-export const combineThemeClasses = (...classes: string[]) => {
-  return cn(...classes);
-};
-
-// Chat animations for smooth state transitions
-export const chatAnimations = {
-  // Slide from button position (bottom-right) to full-screen
-  expandFromButton: {
-    initial: { 
-      x: 'calc(100vw - 400px)', 
-      y: 'calc(100vh - 200px)',
-      width: '380px',
-      height: '160px',
-      opacity: 0.8
-    },
-    animate: { 
-      x: 0, 
-      y: 0,
-      width: '100vw',
-      height: '100vh',
-      opacity: 1
-    },
-    transition: {
-      type: 'spring' as const,
-      stiffness: 300,
-      damping: 30
-    }
-  },
-  
-  // Minimize to ConversationBar
-  minimizeToBar: {
-    initial: { 
-      x: 0, 
-      y: 0,
-      width: '100vw',
-      height: '100vh',
-      opacity: 1
-    },
-    animate: { 
-      x: 'calc(100vw - 420px)', 
-      y: 'calc(100vh - 180px)',
-      width: '400px',
-      height: '160px',
-      opacity: 1
-    },
-    exit: {
-      opacity: 0,
-      scale: 0.95
-    },
-    transition: {
-      type: 'spring' as const,
-      stiffness: 300,
-      damping: 30
+      if (prefersMonochrome) {
+        root.classList.add('monochrome')
+        if (prefersDark) root.classList.add('dark', 'monochrome-dark')
+      } else {
+        if (prefersDark) root.classList.add('dark', 'orange-dark')
+        else root.classList.add('orange-light')
+      }
+      break
     }
   }
-};
+}
+
+// Legacy helpers used by older chat components — keep minimal, theme-safe

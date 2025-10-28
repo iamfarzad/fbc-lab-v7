@@ -1,148 +1,105 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { respond } from '@/lib/api/response'
-import type { ToolRunResult } from '@/src/core/types/intelligence'
 import { ContextStorage } from '@/src/core/context/context-storage'
-import crypto from 'crypto'
-
-export const dynamic = 'force-dynamic'
 
 const contextStorage = new ContextStorage()
 
-// Simple in-memory rate limiting (in production, use Redis)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+function normaliseCitations(raw: any): Array<{ url: string; title?: string; description?: string }> {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((entry) => {
+      const uri = entry?.uri || entry?.url || entry?.href
+      if (!uri || typeof uri !== 'string') return null
+      return {
+        url: uri,
+        title: typeof entry?.title === 'string' && entry.title.length > 0 ? entry.title : undefined,
+        description: typeof entry?.description === 'string' && entry.description.length > 0 ? entry.description : undefined,
+      }
+    })
+    .filter(Boolean) as Array<{ url: string; title?: string; description?: string }>
+}
 
-// Rate limit: 3 requests per 5 seconds per session
-const RATE_LIMIT_WINDOW = 5000 // 5 seconds
-const RATE_LIMIT_MAX_REQUESTS = 3
-
-function checkRateLimit(sessionId: string): boolean {
-  const now = Date.now()
-  const key = `context:${sessionId}`
-  const record = rateLimitMap.get(key)
-
-  if (!record || now > record.resetTime) {
-    // Reset or create new record
-    rateLimitMap.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW })
-    return true
+function normaliseResearchSection(section: any | null | undefined) {
+  if (!section) return null
+  if (typeof section === 'string') {
+    return { summary: section, citations: [] as Array<{ url: string; title?: string; description?: string }> }
   }
 
-  if (record.count >= RATE_LIMIT_MAX_REQUESTS) return false
-  record.count++
-  return true
+  const summary = typeof section.summary === 'string' ? section.summary : undefined
+  const text = typeof section.text === 'string' ? section.text : undefined
+
+  return {
+    ...section,
+    summary: summary ?? text ?? '',
+    citations: normaliseCitations(section.citations),
+  }
 }
 
-function getRateState(sessionId: string) {
-  const key = `context:${sessionId}`
-  const record = rateLimitMap.get(key)
-  if (!record) return { remaining: RATE_LIMIT_MAX_REQUESTS, resetTime: Date.now() + RATE_LIMIT_WINDOW }
-  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - record.count)
-  return { remaining, resetTime: record.resetTime }
+async function buildSnapshot(sessionId: string) {
+  const context = await contextStorage.get(sessionId)
+  if (!context) return null
+
+  const rawStatus = ((context as any).research_status ?? 'pending') as string
+  const researchStatus = rawStatus.toLowerCase() as 'completed' | 'pending' | 'skipped' | 'failed'
+  const completedAt = (context as any).research_timestamp ?? null
+
+  return {
+    lead: {
+      email: (context.email ?? '').toString(),
+      name: (context.name ?? '').toString(),
+    },
+    company: (context as any).company_context ?? null,
+    person: (context as any).person_context ?? null,
+    research: {
+      status: researchStatus,
+      completedAt,
+      professionalProfile: normaliseResearchSection((context as any).professional_profile),
+      companyContext: normaliseResearchSection((context as any).company_context || (context as any).company_overview),
+      companyOverview: normaliseResearchSection((context as any).company_overview),
+      roleContext: normaliseResearchSection((context as any).role_context),
+      industryInsights: normaliseResearchSection((context as any).industry_insights),
+      relevantCases: normaliseResearchSection((context as any).relevant_cases),
+    }
+  }
 }
 
-function generateETag(data: unknown): string {
-  const jsonString = JSON.stringify(data)
-  return crypto.createHash('sha256').update(jsonString).digest('hex')
-}
-
-function parseIfNoneMatch(header: string | null): string[] {
-  if (!header) return []
-  return header
-    .split(',')
-    .map(v => v.trim())
-    .map(v => v.replace(/^W\//, '')) // strip weak validator prefix
-    .map(v => v.replace(/^"(.*)"$/, '$1')) // remove surrounding quotes
-}
-
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    const sessionId = searchParams.get('sessionId') || req.headers.get('x-intelligence-session-id')
+    const body = await req.json().catch(() => ({})) as { sessionId?: string }
+    const sessionId = body.sessionId?.trim()
 
-    if (!sessionId) return respond.badRequest('Missing sessionId parameter')
-
-    // Rate limiting check
-    if (!checkRateLimit(sessionId)) {
-      const state = getRateState(sessionId)
-      const retryAfterSec = Math.max(1, Math.ceil((state.resetTime - Date.now()) / 1000))
-      return new NextResponse(JSON.stringify({ ok: false, error: 'Rate limit exceeded. Please wait before retrying.' } satisfies ToolRunResult), {
-        status: 429,
-        headers: {
-          'Content-Type': 'application/json',
-          'Retry-After': String(retryAfterSec),
-          'X-RateLimit-Limit': String(RATE_LIMIT_MAX_REQUESTS),
-          'X-RateLimit-Remaining': String(state.remaining),
-          'X-RateLimit-Reset': String(state.resetTime),
-        }
-      })
+    if (!sessionId) {
+      return respond.badRequest('Missing required field: sessionId')
     }
 
-    const context = await contextStorage.get(sessionId)
-
-    // If no context exists, create default context for new session
-    let contextData = context
-    if (!context) {
-      contextData = {
-        session_id: sessionId,
-        email: '',
-        name: '',
-        role: '',
-        role_confidence: 0,
-        ai_capabilities_shown: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      // Store the default context
-      await contextStorage.store(sessionId, contextData)
+    const snapshot = await buildSnapshot(sessionId)
+    if (!snapshot) {
+      return respond.notFound(`No intelligence context found for sessionId ${sessionId}`)
     }
 
-    // Guard against null contextData
-    if (!contextData) {
-      return respond.notFound('No context');
-    }
-
-    // Return merged context snapshot
-    const snapshot = {
-      lead: { email: (contextData.email as string) || '', name: (contextData.name as string) || '' },
-      company: contextData.company_context,
-      person: contextData.person_context,
-      role: (contextData.role as string) || '',
-      roleConfidence: (contextData.role_confidence as number) || 0,
-      intent: contextData.intent_data,
-      capabilities: (contextData.ai_capabilities_shown as string[]) || []
-    }
-
-    // Generate ETag for caching
-    const etagHash = generateETag(snapshot)
-    const etag = `"${etagHash}"`
-
-    // Check If-None-Match header for 304 responses
-    const ifNoneMatchList = parseIfNoneMatch(req.headers.get('if-none-match'))
-    if (ifNoneMatchList.includes(etagHash)) {
-      const res304 = new NextResponse(null, { status: 304 })
-      res304.headers.set('ETag', etag)
-      res304.headers.set('Cache-Control', 'no-store')
-      res304.headers.set('Vary', 'If-None-Match')
-      const state304 = getRateState(sessionId)
-      res304.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX_REQUESTS))
-      res304.headers.set('X-RateLimit-Remaining', String(state304.remaining))
-      res304.headers.set('X-RateLimit-Reset', String(state304.resetTime))
-      return res304
-    }
-
-    // Back-compat: include snapshot fields at top-level
-    const response = respond.ok({ ok: true, output: snapshot, ...snapshot } as any)
-    const state200 = getRateState(sessionId)
-    response.headers.set('ETag', etag)
-    response.headers.set('Cache-Control', 'no-store')
-    response.headers.set('Vary', 'If-None-Match')
-    response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX_REQUESTS))
-    response.headers.set('X-RateLimit-Remaining', String(state200.remaining))
-    response.headers.set('X-RateLimit-Reset', String(state200.resetTime))
-    return response
-
+    return respond.ok({ success: true, context: snapshot }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('Context GET error:', error)
-    return respond.serverError('Internal server error')
+    console.error('❌ [intelligence/context] Failed to load session context', error)
+    return respond.serverError('Failed to load intelligence context')
+  }
+}
+
+export async function GET(req: NextRequest | Request) {
+  try {
+    const url = 'nextUrl' in req ? req.nextUrl : new URL(req.url)
+    const sessionId = url.searchParams.get('sessionId')?.trim()
+    if (!sessionId) {
+      return respond.badRequest('Missing required query parameter: sessionId')
+    }
+
+    const snapshot = await buildSnapshot(sessionId)
+    if (!snapshot) {
+      return respond.notFound(`No intelligence context found for sessionId ${sessionId}`)
+    }
+
+    return respond.ok({ success: true, context: snapshot }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) {
+    console.error('❌ [intelligence/context] GET failed', error)
+    return respond.serverError('Failed to load intelligence context')
   }
 }

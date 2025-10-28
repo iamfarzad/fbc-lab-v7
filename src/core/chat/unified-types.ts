@@ -26,7 +26,7 @@ import type { Message, ChatContext, ChatCapabilities } from '@/types/core'
 
 // Use canonical types for all interfaces
 export interface UnifiedChatOptions {
-  sessionId?: string
+  sessionId: string
   context?: ChatContext
   initialMessages?: Message[]
   onMessage?: (message: Message) => void

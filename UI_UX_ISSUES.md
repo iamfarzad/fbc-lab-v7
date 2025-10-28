@@ -11,6 +11,8 @@
 - **Medium**: 12 issues (Noticeable but not blocking)
 - **Low**: 12 issues (Polish & refinement)
 
+> **Legacy Note (Oct 27, 2025):** The floating ChatInterface widget and its supporting components were fully removed in favor of the dedicated `/live` experience. Historical items in this document that reference `src/components/chat/ChatInterface.tsx` (and related child components) are retained for audit history only and no longer reflect active code paths.
+
 ---
 
 ## Issue Categories
@@ -699,4 +701,3 @@
 **Audit Progress**: 36 issues documented (Day 0 nearly complete)
 **Components Audited**: ChatInterface, ChatMessages, ChatInput, ChatContainer, ChatActions, AI Elements, Navigation
 **Next Steps**: Test user flows in browser, finalize daily log, commit to branch
-

@@ -21,3 +21,7 @@ export const blobToBase64 = (blob: Blob): Promise<string> => {
     reader.readAsDataURL(blob)
   })
 }
+
+// Theme utilities for Agent UI
+export const THEME_STORAGE_KEY = 'theme-mode'
+export const THEME_MEDIA_QUERY = '(prefers-color-scheme: dark)'

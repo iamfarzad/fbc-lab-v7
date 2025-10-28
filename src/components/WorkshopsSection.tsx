@@ -3,6 +3,7 @@ import { Button } from "./ui/button"
 import { Users, Clock, Star, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
+import { CONTACT_CONFIG } from "@/config/constants"
 
 export function WorkshopsSection({ className, ...props }: ComponentProps<"section">) {
   const workshops = [
@@ -97,6 +98,9 @@ export function WorkshopsSection({ className, ...props }: ComponentProps<"sectio
               "bg-primary text-primary-foreground hover:bg-primary/90",
               "font-mono"
             )}
+            onClick={() => {
+              window.open(CONTACT_CONFIG.SCHEDULING.BOOKING_URL, '_blank')
+            }}
           >
             SCHEDULE A WORKSHOP
           </Button>

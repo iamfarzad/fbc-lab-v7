@@ -2,8 +2,7 @@
 // 🚨 DEPRECATED: This is now a compatibility shim for useUnifiedChat
 // TODO: Remove after deprecation window (2-3 days)
 
-import { useUnifiedChat } from './useUnifiedChat'
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 
 export interface IntelligenceContext {
   lead: { email: string; name: string }
@@ -30,25 +29,10 @@ export interface IntelligenceContext {
 }
 
 export function useConversationalIntelligence() {
-  // 🚨 DEPRECATED SHIM: This now uses useUnifiedChat internally
-  console.warn('⚠️ useConversationalIntelligence is DEPRECATED. Using useUnifiedChat internally.')
-
+  console.warn('⚠️ useConversationalIntelligence is DEPRECATED. This hook will be removed soon.')
   const [context, setContext] = useState<IntelligenceContext | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const lastSessionIdRef = useRef<string | null>(null)
-
-  // Use unified chat internally
-  const unifiedChat = useUnifiedChat({
-    mode: 'standard',
-    sessionId: lastSessionIdRef.current || undefined,
-    onMessage: (message: any) => {
-      // Handle incoming messages if needed
-      console.log('Unified chat message:', message)
-    }
-  } as any)
-  void unifiedChat
-
   // Multimodal state tracking
   const [activeModalities, setActiveModalities] = useState<{
     voice: boolean

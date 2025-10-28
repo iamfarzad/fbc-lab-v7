@@ -31,6 +31,8 @@ You just broke free from the 10-month loop. Here's what's now in place:
 - `src/config/README.md` - Config usage
 - `src/hooks/voice/README.md` - Voice integration guide
 
+> **Update (Oct 27, 2025):** The legacy floating ChatInterface implementation (`src/components/chat/ChatInterface.tsx` and children) has been removed. Follow `/live` and the Agent UI modules for the current chat experience. Any remaining references below are archived tasks and no longer active.
+
 ---
 
 ## ⚠️ Current State: Type Errors (EXPECTED)
@@ -326,4 +328,3 @@ A: Check `src/types/core.ts` first. If it doesn't exist, add it there (not in lo
 ---
 
 **The loop is broken. Now fix the types and move forward.** 🚀
-

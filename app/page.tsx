@@ -10,7 +10,6 @@ import {
   WorkSectionLazy, 
   WorkshopsSectionLazy
 } from "@/components/LazyComponents"
-import { ChatInterface } from "@/components/chat/ChatInterface"
 
 export default function Home() {
   return (
@@ -42,8 +41,6 @@ export default function Home() {
       </main>
       <Footer />
       
-      {/* Chat Interface with Voice Functionality */}
-      <ChatInterface />
     </div>
   )
 }

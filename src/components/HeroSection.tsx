@@ -1,6 +1,7 @@
 import { Button } from "./ui/button"
 import { cn } from "@/lib/utils"
 import { ComponentProps } from "react"
+import { CONTACT_CONFIG } from "@/config/constants"
 
 export function HeroSection({ className, ...props }: ComponentProps<"section">) {
   return (
@@ -191,6 +192,9 @@ export function HeroSection({ className, ...props }: ComponentProps<"section">) 
                 "bg-primary text-primary-foreground hover:bg-primary/90",
                 "font-sans"
               )}
+              onClick={() => {
+                window.open(CONTACT_CONFIG.SCHEDULING.BOOKING_URL, '_blank')
+              }}
             >
               BOOK A CONSULTATION
             </Button>
@@ -198,8 +202,17 @@ export function HeroSection({ className, ...props }: ComponentProps<"section">) 
               variant="outline" 
               size="lg"
               className="font-sans"
+              onClick={() => {
+                try {
+                  const params = new URLSearchParams()
+                  params.set('forceTerms', '1')
+                  window.location.href = `/live?${params.toString()}`
+                } catch {
+                  window.location.href = '/live?forceTerms=1'
+                }
+              }}
             >
-              VIEW WORKSHOPS
+              START LIVE CHAT
             </Button>
           </div>
           

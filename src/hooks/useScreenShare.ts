@@ -167,15 +167,12 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
 
   // Upload frame to backend for analysis
   const uploadToBackend = useCallback(async (
-    blob: Blob,
-    _imageData: string,
+    _blob: Blob,
+    imageData: string,
     sessionId: string,
     voiceConnectionId?: string
   ): Promise<{ analysis?: string } | null> => {
     try {
-      const formData = new FormData()
-      formData.append('screenCapture', blob, `screen-${Date.now()}.jpg`)
-
       const response = await fetch('/api/tools/screen', {
         method: 'POST',
         headers: {
@@ -184,7 +181,7 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
           ...(voiceConnectionId ? { 'x-voice-connection-id': voiceConnectionId } : {}),
         },
         body: JSON.stringify({
-          image: _imageData,
+          image: imageData,
           type: 'screen',
           context: {
             trigger: voiceConnectionId ? 'voice' : 'manual',

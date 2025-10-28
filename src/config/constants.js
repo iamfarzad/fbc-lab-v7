@@ -227,3 +227,20 @@ export const FEATURE_FLAGS = {
     REASONING_STREAMING: (process.env.NEXT_PUBLIC_FEATURE_REASONING_STREAMING || '0').toLowerCase() === '1' ||
         (process.env.NEXT_PUBLIC_FEATURE_REASONING_STREAMING || '').toLowerCase() === 'true',
 };
+
+// Agent UI Configuration (canonical)
+export const AGENT_UI_CONFIG = {
+    websocketUrl: WEBSOCKET_CONFIG.URL,
+    features: {
+        voice: true,
+        video: true,
+        screenShare: true,
+        chat: true,
+        transcripts: true,
+    },
+    reconnectAttempts: WEBSOCKET_CONFIG.MAX_RECONNECT_ATTEMPTS,
+    reconnectDelay: WEBSOCKET_CONFIG.RECONNECT_DELAY,
+    isPreConnectBufferEnabled: true,
+    agentName: 'fbc-agent',
+    model: GEMINI_MODELS.DEFAULT_VOICE,
+};

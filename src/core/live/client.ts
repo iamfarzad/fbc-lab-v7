@@ -137,7 +137,7 @@ export class LiveClientWS {
 
   stop() {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
-    this.send({ type: 'TURN_COMPLETE' })
+    // Client should not emit TURN_COMPLETE (server -> client event)
     this.send({ type: 'stop' })
   }
 
@@ -207,4 +207,23 @@ export async function connectLive(): Promise<LiveClientWS> {
   const client = new LiveClientWS()
   client.connect()
   return client
+}
+
+// Browser-global singleton to survive HMR/fast refresh in dev and avoid
+// creating multiple WebSocket connections. Always prefer this when not
+// explicitly injecting a client instance.
+declare global {
+  interface Window { __fbc_liveClient?: LiveClientWS }
+}
+
+export function getLiveClientSingleton(): LiveClientWS {
+  // Only create one instance per-window. For SSR, fall back to a new instance.
+  if (typeof window !== 'undefined') {
+    if (!window.__fbc_liveClient) {
+      window.__fbc_liveClient = new LiveClientWS()
+    }
+    return window.__fbc_liveClient
+  }
+  // Non-browser environments shouldn't leak a global; return a fresh instance
+  return new LiveClientWS()
 }

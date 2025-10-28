@@ -12,6 +12,8 @@ This plan includes **Day 0 UI/UX Audit** followed by 11 feature implementation d
 - Landing page components exist but need polish
 - **UI/UX issues present** (to be catalogued Day 0)
 
+> **Update (Oct 27, 2025):** The legacy floating ChatInterface widget under `src/components/chat/` has been retired. The `/live` voice-first interface is now the canonical chat surface. Any references to those legacy files in later sections remain for historical context only.
+
 ## Priority Order
 
 1. **Day 0**: UI/UX Audit & Issue Tracking (FOUNDATION)
@@ -154,4 +156,3 @@ grep -A 50 "Day 1:" PRODUCTION_ROADMAP.md
 # Check progress
 grep -c "^\- \[x\]" UI_UX_ISSUES.md
 ```
-

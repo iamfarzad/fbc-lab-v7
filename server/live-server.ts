@@ -265,7 +265,7 @@ import { MESSAGE_TYPES } from './message-types.js'
   }
 
   // Helper function to build Live API configuration
-  function buildLiveConfig(priorContext: string): any {
+  function buildLiveConfig(priorContext: string, voiceNameOverride?: string): any {
     console.log(`[buildLiveConfig] Building config with priorContext: ${priorContext ? 'YES' : 'NO'}`);
     
     // Always use the full system prompt, adding context if available
@@ -281,7 +281,7 @@ import { MESSAGE_TYPES } from './message-types.js'
       speechConfig: {
         voiceConfig: { 
           prebuiltVoiceConfig: { 
-            voiceName: 'Zephyr' 
+            voiceName: voiceNameOverride || VOICE_CONFIG.DEFAULT_VOICE 
           } 
         }
       },
@@ -494,7 +494,7 @@ import { MESSAGE_TYPES } from './message-types.js'
       let isOpen = false
 
       // Build Live API configuration
-      const liveConfig = buildLiveConfig(priorChatContext);
+      const liveConfig = buildLiveConfig(priorChatContext, voiceName);
 
       // Add connection timeout to prevent infinite hangs
       const connectTimeout = new Promise((_, reject) => 
@@ -585,6 +585,14 @@ import { MESSAGE_TYPES } from './message-types.js'
                         isFinal: true,
                         modality: 'voice'
                       })
+                      if (text && text.trim().length > 0) {
+                        await multimodalContextManager.addVoiceTranscript(
+                          sessionClient.sessionId,
+                          text,
+                          'user',
+                          true
+                        )
+                      }
                     } catch (err) {
                       console.warn(`[${connectionId}] Failed to track user voice turn:`, err)
                     }
@@ -655,6 +663,14 @@ import { MESSAGE_TYPES } from './message-types.js'
                         isFinal: true,
                         modality: 'voice'
                       })
+                      if (text && text.trim().length > 0) {
+                        await multimodalContextManager.addVoiceTranscript(
+                          sessionClient.sessionId,
+                          text,
+                          'assistant',
+                          true
+                        )
+                      }
                     } catch (err) {
                       console.warn(`[${connectionId}] Failed to track AI voice turn:`, err)
                     }
@@ -752,6 +768,16 @@ import { MESSAGE_TYPES } from './message-types.js'
       }
 
       console.info(`[${connectionId}] Live API session established and ready`)
+
+      // If the client WebSocket closed while we were connecting to the Live API,
+      // do not proceed. Close the Live session to avoid orphaned sessions and bail.
+      if (ws.readyState !== WebSocket.OPEN) {
+        console.warn(`[${connectionId}] Client socket closed before session ready; closing Live session`)
+        try { (session as any)?.close?.() } catch {}
+        activeSessions.delete(connectionId)
+        sessionStarting.delete(connectionId)
+        return
+      }
 
       {
         const prev = activeSessions.get(connectionId)

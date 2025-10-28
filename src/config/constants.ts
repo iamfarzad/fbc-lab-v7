@@ -198,6 +198,8 @@ export const ALLOWED_ORIGINS = (
     'https://fb-c-lab-v2.vercel.app',
     'http://localhost:3000',
     'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
   ].join(',')
 )
   .split(',')
@@ -282,4 +284,25 @@ export const FEATURE_FLAGS = {
   REASONING_STREAMING:
     (process.env.NEXT_PUBLIC_FEATURE_REASONING_STREAMING || '0').toLowerCase() === '1' ||
     (process.env.NEXT_PUBLIC_FEATURE_REASONING_STREAMING || '').toLowerCase() === 'true',
+  SHOW_VOICE_OVERLAY:
+    (process.env.NEXT_PUBLIC_FEATURE_VOICE_OVERLAY || '1').toLowerCase() === '1' ||
+    (process.env.NEXT_PUBLIC_FEATURE_VOICE_OVERLAY || '').toLowerCase() === 'true',
+  // Controls whether the primary chat experience is the dedicated /live page
+} as const
+
+// Agent UI Configuration (canonical)
+export const AGENT_UI_CONFIG = {
+  websocketUrl: WEBSOCKET_CONFIG.URL,
+  features: {
+    voice: true,
+    video: true,
+    screenShare: true,
+    chat: true,
+    transcripts: true,
+  },
+  reconnectAttempts: WEBSOCKET_CONFIG.MAX_RECONNECT_ATTEMPTS,
+  reconnectDelay: WEBSOCKET_CONFIG.RECONNECT_DELAY,
+  isPreConnectBufferEnabled: true,
+  agentName: 'fbc-agent',
+  model: GEMINI_MODELS.DEFAULT_VOICE,
 } as const

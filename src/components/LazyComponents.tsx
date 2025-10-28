@@ -9,7 +9,3 @@ export const WorkshopsSectionLazy = dynamic(
   () => import('./WorkshopsSection').then(mod => ({ default: mod.WorkshopsSection })),
   { ssr: false }
 )
-export const MultimodalChatLazy = dynamic(
-  () => import('./chat/ChatInterface').then(mod => ({ default: mod.ChatInterface })),
-  { ssr: false }
-)

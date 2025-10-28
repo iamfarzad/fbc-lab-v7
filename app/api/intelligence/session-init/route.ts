@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { respond } from '@/lib/api/response'
 import { ContextStorage } from '@/src/core/context/context-storage'

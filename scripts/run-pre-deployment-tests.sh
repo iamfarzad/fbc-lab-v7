@@ -190,11 +190,11 @@ echo -e "${BLUE}═════════════════════�
 echo -e "${BLUE}  SECTION 6: Critical File Structure${NC}"
 echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}\n"
 
-run_test "Chat Interface Component" "test -f src/components/chat/ChatInterface.tsx"
+run_test "Live Agent Session View" "test -f src/components/agent-ui/app/session-view.tsx"
 run_test "Unified Chat Route" "test -f app/api/chat/unified/route.ts"
 run_test "Webcam Tool Route" "test -f app/api/tools/webcam/route.ts"
 run_test "Live Server (Voice)" "test -f server/live-server.ts"
-run_test "Chat State Hook" "test -f src/components/chat/hooks/useChatState.ts"
+run_test "Live Page Route" "test -f app/live/page.tsx"
 
 ###############################################################################
 # Test 7: Configuration Files

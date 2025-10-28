@@ -11,10 +11,12 @@ export function Navigation({ className, ...props }: ComponentProps<"nav">) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const scrollToChat = () => {
-    // Trigger the chat widget to open
-    const chatButton = document.querySelector('[data-chat-trigger]') as HTMLElement
-    if (chatButton) {
-      chatButton.click()
+    try {
+      const params = new URLSearchParams()
+      params.set('forceTerms', '1')
+      window.location.href = `/live?${params.toString()}`
+    } catch {
+      window.location.href = '/live?forceTerms=1'
     }
   }
 

@@ -487,3 +487,224 @@ pnpm dev
 **Branch:** `multi-agent` (5 commits, 1008 lines of agent code)  
 **Status:** ✅ Ready for testing  
 **Next:** Enable flag and test discovery flow
+
+---
+
+## 🎭 Stage Visualization & Agent Transparency
+
+### **Unified Branding Principle**
+All agents present to users as **"F.B/c AI"** - never by their specialized names. Users should experience a cohesive, intelligent assistant that seamlessly transitions between capabilities rather than being aware of multiple agents switching.
+
+### **Transparency Through Metadata**
+While users see unified branding, transparency is achieved through rich metadata visualization:
+
+```typescript
+// Agent metadata flows from backend to UI components
+interface AgentMetadata {
+  agent: string;           // "Discovery Agent", "Scoring Agent", etc.
+  stage: string;           // "DISCOVERY", "SCORING", "WORKSHOP_PITCH"
+  chainOfThought: string;  // Agent's reasoning process
+  contextUsage: {          // Token/context consumption
+    usedTokens: number;
+    maxTokens: number;
+    usage: number;
+  };
+  tools: ToolUsage[];      // Tools activated by agent
+  artifacts: Artifact[];   // Charts, calendars created
+  sources: Source[];       // References used
+}
+```
+
+### **Stage Visualization Component**
+```tsx
+// Located at: /src/components/ai-elements/StageVisualization.tsx
+<StageVisualization 
+  currentStage="DISCOVERY" 
+  agentName="Discovery Agent"
+  description="Qualifying your business needs and understanding goals"
+  progress={{
+    completed: ["Goals", "Pain Points"],
+    current: "Data Infrastructure", 
+    remaining: ["Readiness", "Budget", "Success Metrics"]
+  }}
+/>
+```
+
+**Visual Design:**
+- **Progress Bar**: Shows discovery completeness (2/6 categories covered)
+- **Stage Badge**: "Discovery Phase" (user-friendly, not "Discovery Agent")  
+- **Current Focus**: "Understanding your data infrastructure"
+- **Subtle Indicator**: Small icon showing multimodal capabilities active
+
+### **User Experience Examples**
+
+#### **Discovery Phase Transparency**
+```
+┌─────────────────────────────────────────────┐
+│ F.B/c AI                              🔊 🖥️ │
+├─────────────────────────────────────────────┤
+│ Discovery Phase (2/6 complete)              │
+│ ▓▓░░░░ Understanding your business needs    │
+│                                             │
+│ "So you mentioned manual data entry is      │  
+│  taking up 3 FTEs. Where does your         │
+│  customer data live right now?"             │
+│                                             │
+│💭 Reasoning: Need to understand data       │
+│    infrastructure before proposing         │
+│    automation solutions                     │
+└─────────────────────────────────────────────┘
+```
+
+#### **Transition Transparency**  
+```
+┌─────────────────────────────────────────────┐
+│ F.B/c AI                              🔊 🖥️ │
+├─────────────────────────────────────────────┤
+│ Analysis Phase                              │
+│ ▓▓▓▓▓▓ Evaluating solution fit             │
+│                                             │
+│ 📊 Lead Analysis Complete                   │
+│ • Role: Manager (10 pts)                    │
+│ • Company: Mid-market (15 pts)              │
+│ • Discovery: 4/6 categories (15 pts)       │
+│ • Workshop Fit: 85% | Consulting: 40%      │
+│                                             │
+│ "Based on what you've shared, I think       │
+│  our workshop approach would be perfect..." │
+└─────────────────────────────────────────────┘
+```
+
+### **AI Elements Integration**
+
+The `/src/components/ai-elements/` directory contains specialized UI components that visualize agent metadata:
+
+#### **Context Component** 
+Shows token usage and multimodal context integration
+```tsx
+<Context 
+  tokenUsage="2,341 / 8,192 tokens"
+  modalitiesActive={["voice", "screen"]}
+  contextSources={["conversation", "screen_analysis", "voice_transcript"]}
+/>
+```
+
+#### **ChainOfThought Component**
+Reveals agent reasoning (expandable/collapsible)
+```tsx
+<ChainOfThought reasoning="User mentioned 3 FTEs on data entry. This indicates manual process pain. Need to quantify time investment before proposing automation ROI." />
+```
+
+#### **Tool Component**
+Shows when agents activate capabilities
+```tsx
+<Tool 
+  name="create_chart" 
+  status="generating"
+  description="Creating ROI projection chart"
+/>
+```
+
+#### **Artifact Component**  
+Displays agent-generated content
+```tsx
+<Artifact 
+  type="chart"
+  title="Data Entry Automation ROI"
+  data={chartData}
+  generated_by="Workshop Sales Agent"
+/>
+```
+
+### **Stage Descriptions (User-Friendly)**
+
+Instead of technical agent names, show business value:
+
+| Technical Stage | User-Friendly Display | Description |
+|----------------|----------------------|-------------|
+| `DISCOVERY` | **Discovery Phase** | "Understanding your business needs and goals" |
+| `SCORING` | **Analysis Phase** | "Evaluating solution fit for your situation" |
+| `WORKSHOP_PITCH` | **Solution Design** | "Designing training approach for your team" |
+| `CONSULTING_PITCH` | **Custom Solution** | "Architecting enterprise AI implementation" |
+| `CLOSING` | **Proposal Finalization** | "Addressing questions and finalizing details" |
+| `SUMMARY` | **Conversation Summary** | "Preparing your personalized AI strategy report" |
+
+### **Metadata Flow Architecture**
+
+```typescript
+// 1. Agent generates response with metadata
+const response = {
+  content: "Based on your Excel dashboard...",
+  metadata: {
+    agent: "Workshop Sales Agent",
+    stage: "WORKSHOP_PITCH", 
+    chainOfThought: "User showed manual Excel process. Workshop targets exactly this use case.",
+    contextUsage: { usedTokens: 1205, maxTokens: 8192 },
+    tools: [{ name: "create_chart", status: "pending" }]
+  }
+}
+
+// 2. Unified chat API preserves metadata
+POST /api/chat/unified
+Headers: { "x-session-id": "session-123" }
+
+// 3. Frontend receives structured metadata
+const { message, metadata } = await response.json()
+
+// 4. LiveChatMessages.tsx renders ai-elements
+{metadata.agent && (
+  <StageVisualization 
+    stage={metadata.stage}
+    agent={metadata.agent}
+    description={getStageDescription(metadata.stage)}
+  />
+)}
+{metadata.chainOfThought && (
+  <ChainOfThought reasoning={metadata.chainOfThought} />
+)}
+```
+
+### **Benefits of This Approach**
+
+✅ **Unified Experience**: Users interact with "F.B/c AI", not fragmented agents  
+✅ **Full Transparency**: All agent decisions/reasoning visible via UI components  
+✅ **Progress Clarity**: Users understand what phase they're in and why  
+✅ **Trust Building**: Seeing the "thinking" process builds confidence  
+✅ **Debugging**: Developers can trace agent behavior through metadata  
+✅ **Optimization**: Clear metrics on which agents/stages convert best
+
+### **Implementation Status**
+
+- ✅ **Backend**: Agent metadata generation implemented
+- ✅ **API**: Metadata preservation through unified chat endpoint  
+- ✅ **Components**: AI elements library created (`/src/components/ai-elements/`)
+- ⚠️ **Integration**: Stage visualization component needs creation
+- ⚠️ **Rendering**: Agent/stage metadata not fully rendered in `LiveChatMessages.tsx`
+- ⚠️ **Session Coordination**: Voice and chat need unified `sessionId` for context sharing
+
+### **Next Steps for Full Transparency**
+
+1. **Create Stage Visualization Component**
+   ```bash
+   # Create the missing component
+   touch /src/components/ai-elements/StageVisualization.tsx
+   ```
+
+2. **Update LiveChatMessages.tsx**
+   ```tsx
+   // Add stage/agent rendering alongside existing metadata
+   {metadata.stage && metadata.agent && (
+     <StageVisualization 
+       stage={metadata.stage}
+       agent={metadata.agent} 
+       description={getStageDescription(metadata.stage)}
+     />
+   )}
+   ```
+
+3. **Fix Session ID Coordination**
+   - Ensure voice and chat share same `sessionId`
+   - Fix multimodal context integration
+   - Complete webcam analysis storage
+
+**The goal**: Users experience seamless F.B/c AI while having full visibility into the sophisticated multi-agent orchestration happening behind the scenes.

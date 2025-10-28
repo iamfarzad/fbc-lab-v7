@@ -536,7 +536,23 @@ export async function POST(req: NextRequest) {
     if (!body) {
       return respond.badRequest('Missing request body.')
     }
-    const { messages: rawMessages, context, stream = true } = body
+    const { messages: rawMessages, context: rawContext, stream = true } = body
+
+    const headerSessionId = req.headers.get('x-session-id')?.trim()
+    const rawContextNormalized = rawContext ?? {}
+    const contextSessionId =
+      typeof rawContextNormalized.sessionId === 'string'
+        ? rawContextNormalized.sessionId.trim()
+        : ''
+    const resolvedSessionId = contextSessionId || headerSessionId || ''
+    if (!resolvedSessionId) {
+      console.warn(`[UNIFIED_AI_SDK] ⚠️ Missing sessionId for request ${reqId}; defaulting to 'anonymous'`)
+    }
+    const sessionId = resolvedSessionId || 'anonymous'
+    const context: ChatContext = {
+      ...rawContextNormalized,
+      sessionId,
+    }
 
     if (!Array.isArray(rawMessages) || rawMessages.length === 0) {
       return respond.badRequest('At least one message is required.')
@@ -550,13 +566,14 @@ export async function POST(req: NextRequest) {
     // CHECK: Message limit (cost protection)
     const limitCheckStart = Date.now()
     const { usageLimiter } = await import('@/src/lib/usage-limits')
-    const limitCheck = await usageLimiter.checkLimit(context?.sessionId || '', 'message')
+    const limiterSessionKey = sessionId === 'anonymous' ? '' : sessionId
+    const limitCheck = await usageLimiter.checkLimit(limiterSessionKey, 'message')
     if (!limitCheck.allowed) {
       return respond.error(limitCheck.reason || 'Rate limit reached', 429, 'RATE_LIMITED', { limit_reached: true })
     }
     
     // Track message usage
-    await usageLimiter.trackUsage(context?.sessionId || '', 'message')
+    await usageLimiter.trackUsage(limiterSessionKey, 'message')
     timings.limitCheck = Date.now() - limitCheckStart
     console.log(`⏱️  [PERF] Limit check: ${timings.limitCheck}ms`)
 
@@ -684,9 +701,9 @@ If conversationFlow.recommendedNext is null, you have enough information - offer
 
     // Add voice context if available
     const voiceContextStart = Date.now()
-    if (context?.sessionId) {
+    if (sessionId !== 'anonymous') {
       try {
-        const voiceTranscripts = await multimodalContextManager.getVoiceTranscripts(context.sessionId, 3)
+        const voiceTranscripts = await multimodalContextManager.getVoiceTranscripts(sessionId, 3)
         if (voiceTranscripts.length > 0) {
           systemPrompt += `\n\nRECENT VOICE CONTEXT:\n${voiceTranscripts.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`
         }
@@ -762,23 +779,23 @@ Response style: Be concise, actionable, and data-driven.`
     let researchMetadata: Record<string, any> | null = null
     
     // Only run research if triggered
-    if (researchTrigger.shouldResearch && context?.sessionId) {
+    if (researchTrigger.shouldResearch && sessionId !== 'anonymous') {
       // Update last research turn for throttling
       if (conversationFlow) {
         conversationFlow.lastResearchTurn = currentTurn;
       }
       try {
         // CHECK: Research limit (cost protection)
-        const researchLimitCheck = await usageLimiter.checkLimit(context.sessionId, 'research')
+        const researchLimitCheck = await usageLimiter.checkLimit(sessionId, 'research')
         if (!researchLimitCheck.allowed) {
           console.warn(`⚠️ Research limit reached: ${researchLimitCheck.reason}`)
           // Continue without research
         } else {
           // Track research usage
-          await usageLimiter.trackUsage(context.sessionId, 'research')
+          await usageLimiter.trackUsage(sessionId, 'research')
           
           // Get current context for research
-          const currentContext = await contextStorage.get(context.sessionId)
+          const currentContext = await contextStorage.get(sessionId)
           const researchContext = {
             email: currentContext?.email,
             company: (currentContext?.company_context as any)?.name,
@@ -867,9 +884,9 @@ Citations: ${researchResult.allCitations.length} sources processed
 
     // Add multimodal context from conversation history
     const multimodalContextStart = Date.now()
-    if (context?.sessionId) {
+    if (sessionId !== 'anonymous') {
       try {
-        const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(context.sessionId, true, false)
+        const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(sessionId, true, true)
 
         if (multimodalContext.multimodalContext.hasRecentImages) {
           systemPrompt += '\n\n' + multimodalContext.systemPrompt
@@ -924,7 +941,7 @@ Citations: ${researchResult.allCitations.length} sources processed
       try {
         // Build agent context
         const agentContext: AgentContext = {
-          sessionId: context?.sessionId || 'anonymous',
+          sessionId,
           intelligenceContext: context?.intelligenceContext as any,
           conversationFlow: conversationFlow as any,
           // mode removed - transport determined by connection type
@@ -1013,7 +1030,7 @@ Citations: ${researchResult.allCitations.length} sources processed
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(completionData)}\n\n`))
               try {
                 logJsonl('chat', 'assistant_message', {
-                  sessionId: context?.sessionId || 'anonymous',
+                  sessionId,
                   reqId,
                   agent: agentResult.agent,
                   content: agentResult.output,
@@ -1024,18 +1041,18 @@ Citations: ${researchResult.allCitations.length} sources processed
               }
 
               // Track conversation turns for export
-              if (context?.sessionId) {
+              if (sessionId !== 'anonymous') {
                 try {
                   const lastUserMessage = messages[messages.length - 1]
                   if (lastUserMessage?.role === 'user') {
-                    await multimodalContextManager.addConversationTurn(context.sessionId, {
+                    await multimodalContextManager.addConversationTurn(sessionId, {
                       role: 'user',
                       text: lastUserMessage.content,
                       isFinal: true,
                       modality: 'text'
                     })
                   }
-                  await multimodalContextManager.addConversationTurn(context.sessionId, {
+                  await multimodalContextManager.addConversationTurn(sessionId, {
                     role: 'agent',
                     text: agentResult.output,
                     isFinal: true,
@@ -1064,7 +1081,7 @@ Citations: ${researchResult.allCitations.length} sources processed
             'x-fbc-endpoint': 'unified-multi-agent',
             'x-request-id': reqId,
             'X-Chat-Mode': 'multimodal',
-            'X-Session-Id': context?.sessionId || 'anonymous',
+            'X-Session-Id': sessionId,
             'X-Agent-Used': agentResult.agent,
             'X-Funnel-Stage': agentResult.metadata?.stage || 'unknown'
           }
@@ -1299,29 +1316,29 @@ Citations: ${researchResult.allCitations.length} sources processed
             const completionEvent = `data: ${JSON.stringify(completionData)}\n\n`
             controller.enqueue(encoder.encode(completionEvent))
             try {
-              logJsonl('chat', 'assistant_message', {
-                sessionId: context?.sessionId || 'anonymous',
-                reqId,
-                content: cleanedContent,
-                metadata: completionData.metadata,
-              })
+            logJsonl('chat', 'assistant_message', {
+              sessionId,
+              reqId,
+              content: cleanedContent,
+              metadata: completionData.metadata,
+            })
             } catch (logErr) {
               console.warn('[UNIFIED_AI_SDK] Failed to log assistant message:', logErr)
             }
 
             // Track conversation turns for export
-            if (context?.sessionId) {
+            if (sessionId !== 'anonymous') {
               try {
                 const lastUserMessage = messages[messages.length - 1]
                 if (lastUserMessage?.role === 'user') {
-                  await multimodalContextManager.addConversationTurn(context.sessionId, {
+                  await multimodalContextManager.addConversationTurn(sessionId, {
                     role: 'user',
                     text: lastUserMessage.content,
                     isFinal: true,
                     modality: 'text'
                   })
                 }
-                await multimodalContextManager.addConversationTurn(context.sessionId, {
+                await multimodalContextManager.addConversationTurn(sessionId, {
                   role: 'agent',
                   text: cleanedContent,
                   isFinal: true,
@@ -1349,7 +1366,7 @@ Citations: ${researchResult.allCitations.length} sources processed
           'x-fbc-endpoint': 'unified-ai-sdk',
           'x-request-id': reqId,
           'X-Chat-Mode': 'multimodal',
-          'X-Session-Id': context?.sessionId || 'anonymous',
+          'X-Session-Id': sessionId,
               'X-Enhanced-Research': researchMetadata && !researchHasError ? 'true' : 'false'
             }
           })
@@ -1445,7 +1462,7 @@ Citations: ${researchResult.allCitations.length} sources processed
 
       try {
         logJsonl('chat', 'assistant_message', {
-          sessionId: context?.sessionId || 'anonymous',
+          sessionId,
           reqId,
           content: result.text,
           metadata: responsePayload.metadata,
@@ -1455,18 +1472,18 @@ Citations: ${researchResult.allCitations.length} sources processed
       }
 
       // Track conversation turns for export
-      if (context?.sessionId) {
+      if (sessionId !== 'anonymous') {
         try {
           const lastUserMessage = messages[messages.length - 1]
           if (lastUserMessage?.role === 'user') {
-            await multimodalContextManager.addConversationTurn(context.sessionId, {
+            await multimodalContextManager.addConversationTurn(sessionId, {
               role: 'user',
               text: lastUserMessage.content,
               isFinal: true,
               modality: 'text'
             })
           }
-          await multimodalContextManager.addConversationTurn(context.sessionId, {
+          await multimodalContextManager.addConversationTurn(sessionId, {
             role: 'agent',
             text: result.text,
             isFinal: true,

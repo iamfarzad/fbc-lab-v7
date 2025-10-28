@@ -10,7 +10,6 @@ import {
 import {
   UNIFIED_CHAT_STORE_ID,
   syncUnifiedChatStoreState,
-  resetUnifiedChatStore
 } from '@/core/chat/state/unified-chat-store'
 
 interface StreamRunOptions {
@@ -55,16 +54,27 @@ function normaliseStreamMessage(
   }
 }
 
-export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatReturn {
+export function useUnifiedChat(options: UnifiedChatOptions): UnifiedChatReturn {
+  const sessionId = options.sessionId?.trim()
+  if (!sessionId) {
+    throw new Error('useUnifiedChat requires a sessionId')
+  }
+
   const [messages, setMessages] = useState<UnifiedMessage[]>(options.initialMessages ?? [])
   const [isLoading, setIsLoading] = useState(false)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-  const [chatContextState, setChatContextState] = useState<UnifiedContext>(options.context ?? {})
+  const [chatContextState, setChatContextState] = useState<UnifiedContext>({
+    ...(options.context ?? {}),
+    sessionId,
+  })
 
   const abortControllerRef = useRef<AbortController | null>(null)
   const messagesRef = useRef<UnifiedMessage[]>(options.initialMessages ?? [])
-  const chatContextRef = useRef<UnifiedContext>(options.context ?? {})
+  const chatContextRef = useRef<UnifiedContext>({
+    ...(options.context ?? {}),
+    sessionId,
+  })
 
   useEffect(() => {
     messagesRef.current = messages
@@ -138,7 +148,10 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
 
       const request: UnifiedChatRequest = {
         messages: requestMessages,
-        context: chatContextRef.current,
+        context: {
+          ...chatContextRef.current,
+          sessionId,
+        },
         // mode removed - transport determined by connection type (HTTP)
         stream: true
       }
@@ -149,7 +162,7 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
         headers: {
           'Content-Type': 'application/json',
           'x-request-id': reqId,
-          'x-session-id': options.sessionId || 'anonymous'
+          'x-session-id': sessionId
         },
         body: JSON.stringify(request),
         signal: controller.signal
@@ -353,9 +366,13 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
           changed = true
         }
       }
+      if (next.sessionId !== sessionId) {
+        next.sessionId = sessionId
+        changed = true
+      }
       return changed ? next : prev
     })
-  }, [])
+  }, [sessionId])
 
   const regenerate = useCallback(async () => {
     const current = messagesRef.current
@@ -454,18 +471,18 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
     }
 
     lastContextRef.current = serialized
-    setChatContextState(prev => ({ ...prev, ...options.context! }))
-  }, [options.context])
+    setChatContextState(prev => ({ ...prev, ...options.context!, sessionId }))
+  }, [options.context, sessionId])
 
   // Separate state and actions for stable syncing
   const stateSyncData = useMemo(() => ({
-    id: options.sessionId || 'unified-session',
+    id: sessionId,
     messages,
     error: error ?? null,
     status: chatStatus,
     context: chatContextState,
   }), [
-    options.sessionId,
+    sessionId,
     messages,
     error,
     chatStatus,
@@ -517,7 +534,8 @@ export function useUnifiedChat(options: UnifiedChatOptions = {}): UnifiedChatRet
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
-    resetUnifiedChatStore(UNIFIED_CHAT_STORE_ID)
+    // Do not reset the global store on unmount to avoid dev Strict Mode flicker
+    // and unintended transcript clearing when multiple instances mount.
   }, [])
 
   return {

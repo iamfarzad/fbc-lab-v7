@@ -3,14 +3,18 @@ import { useRealtimeVoice, type UseRealtimeVoiceOptions } from '@/hooks/useRealt
 import type { VoiceContextUpdate } from '@/hooks/useRealtimeVoice'
 import type { LiveClientWS } from '@/core/live/client'
 import type { AttachmentUploadResponse } from '@/types/attachments'
+import { useLiveApiContext } from '@/hooks/LiveApiProvider'
 
 export type UseLiveApiOptions = UseRealtimeVoiceOptions & {
   liveClient?: LiveClientWS
+  sessionId?: string
 }
 
 export function useLiveApi(options: UseLiveApiOptions = {}) {
-  // Delegate all real-time responsibilities to the proven hook (which now uses LiveClientWS)
-  const realtime = useRealtimeVoice(options)
+  // ALL hooks must be called first - React rules requirement
+  const shared = useLiveApiContext()
+  const { sessionId, ...realtimeOptions } = options
+  const realtime = useRealtimeVoice({ ...realtimeOptions, sessionId })
 
   // One-shot: Explicit screen analysis (HTTP)
   const sendScreenShareMessage = useCallback(
@@ -122,6 +126,10 @@ export function useLiveApi(options: UseLiveApiOptions = {}) {
     },
     [options?.liveClient, realtime]
   )
+
+  // If a LiveApiProvider is mounted above, use the shared instance so all components
+  // observe the same voice session state and audio streams.
+  if (shared) return shared
 
   return {
     // Real-time (WebSocket) — pass-through
