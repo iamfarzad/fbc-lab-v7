@@ -1,12 +1,19 @@
 'use client';
 
 import { type HTMLAttributes, useCallback, useState } from 'react';
-import { ChatTextIcon, PhoneDisconnectIcon, MicrophoneIcon, CameraIcon, MonitorIcon, PaperclipIcon, DownloadSimpleIcon, CalendarBlankIcon } from '@phosphor-icons/react/dist/ssr';
+import { ChatTextIcon, PhoneDisconnectIcon, MicrophoneIcon, CameraIcon, MonitorIcon, PaperclipIcon, DownloadSimpleIcon, CalendarBlankIcon, PlusIcon } from '@phosphor-icons/react/dist/ssr';
 import { useSession } from '@/components/agent-ui/app/session-context';
 import { Button } from '@/components/agent-ui/livekit/button';
 import { Toggle } from '@/components/agent-ui/livekit/toggle';
 import { cn } from '@/lib/utils';
 import { ChatInput } from './chat-input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAgentUIAdapter } from '@/hooks/useAgentUIAdapter';
 import { useLiveApi } from '@/hooks/useLiveApi';
 import { CONTACT_CONFIG } from '@/config/constants'
@@ -253,7 +260,7 @@ export function AgentControlBar({
             <ChatTextIcon weight="bold" />
           </Toggle>
 
-          {/* File Upload */}
+          {/* Hidden File Input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -262,37 +269,35 @@ export function AgentControlBar({
             className="hidden"
             onChange={handleFileChange}
           />
-          <Toggle
-            size="icon"
-            variant="secondary"
-            aria-label="Upload files"
-            pressed={false}
-            onPressedChange={handleFileButtonClick}
-          >
-            <PaperclipIcon weight="bold" />
-          </Toggle>
 
-          {/* Export Summary */}
-          <Toggle
-            size="icon"
-            variant="secondary"
-            aria-label="Export summary PDF"
-            pressed={false}
-            onPressedChange={handleExportSummary}
-          >
-            <DownloadSimpleIcon weight="bold" />
-          </Toggle>
-
-          {/* Schedule Call */}
-          <Toggle
-            size="icon"
-            variant="secondary"
-            aria-label="Schedule a call"
-            pressed={false}
-            onPressedChange={handleSchedule}
-          >
-            <CalendarBlankIcon weight="bold" />
-          </Toggle>
+          {/* Actions Dropdown Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Toggle
+                size="icon"
+                variant="secondary"
+                aria-label="More actions"
+                pressed={false}
+              >
+                <PlusIcon weight="bold" />
+              </Toggle>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={handleFileButtonClick} className="cursor-pointer">
+                <PaperclipIcon className="mr-2 h-4 w-4" />
+                Upload files
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportSummary} className="cursor-pointer">
+                <DownloadSimpleIcon className="mr-2 h-4 w-4" />
+                Export summary PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSchedule} className="cursor-pointer">
+                <CalendarBlankIcon className="mr-2 h-4 w-4" />
+                Schedule a call
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Disconnect */}

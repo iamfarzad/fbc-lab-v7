@@ -39,6 +39,7 @@ import {
   ContextReasoningUsage,
   ContextContentFooter,
 } from "@/components/ai-elements/sources/context";
+import { StageVisualization } from "@/components/ai-elements/sources/stage-visualization";
 import { SummaryArtifact } from "@/components/chat/artifacts";
 
 interface LiveChatMessagesProps {
@@ -51,40 +52,56 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
     <div className={className}>
       {messages.map((m) => {
         const from = m.role;
-        const meta = m.metadata || {};
+        const meta = m.metadata || {} as any;
         return (
           <MessageView key={m.id} from={from}>
             <MessageAvatar />
             <MessageContent>
               {/* Context usage / cost banner (if available) */}
-              {FEATURE_FLAGS.SHOW_USAGE_CARD && meta.contextUsage && (
-                <div className="mb-1 flex items-center gap-1">
-                  <Context
-                    usedTokens={meta.contextUsage.usedTokens}
-                    maxTokens={meta.contextUsage.maxTokens}
-                    usage={{
-                      // Map to LanguageModelUsage shape expected by Context components
-                      inputTokens: (meta.usage as any)?.promptTokens ?? 0,
-                      outputTokens: (meta.usage as any)?.completionTokens ?? 0,
-                      totalTokens:
-                        (meta.usage as any)?.totalTokens ??
-                        (((meta.usage as any)?.promptTokens ?? 0) + ((meta.usage as any)?.completionTokens ?? 0)),
-                      reasoningTokens: (meta.usage as any)?.reasoningTokens ?? 0,
-                      cachedInputTokens: (meta.usage as any)?.cachedInputTokens ?? 0,
-                    }}
-                    modelId={meta.contextUsage.modelId as any}
-                  >
-                    <ContextTrigger />
-                    <ContextContent>
-                      <ContextContentHeader />
-                      <ContextContentBody>
-                        <ContextInputUsage />
-                        <ContextOutputUsage />
-                        <ContextReasoningUsage />
-                      </ContextContentBody>
-                      <ContextContentFooter />
-                    </ContextContent>
-                  </Context>
+              {(() => {
+                if (!FEATURE_FLAGS.SHOW_USAGE_CARD || !meta.contextUsage || typeof meta.contextUsage !== 'object') {
+                  return null;
+                }
+                
+                return (
+                  <div className="mb-1 flex items-center gap-1">
+                    <Context
+                      usedTokens={(meta.contextUsage as any).usedTokens}
+                      maxTokens={(meta.contextUsage as any).maxTokens}
+                      usage={{
+                        // Map to LanguageModelUsage shape expected by Context components
+                        inputTokens: (meta.usage as any)?.promptTokens ?? 0,
+                        outputTokens: (meta.usage as any)?.completionTokens ?? 0,
+                        totalTokens:
+                          (meta.usage as any)?.totalTokens ??
+                          (((meta.usage as any)?.promptTokens ?? 0) + ((meta.usage as any)?.completionTokens ?? 0)),
+                        reasoningTokens: (meta.usage as any)?.reasoningTokens ?? 0,
+                        cachedInputTokens: (meta.usage as any)?.cachedInputTokens ?? 0,
+                      }}
+                      modelId={(meta.contextUsage as any).modelId}
+                    >
+                      <ContextTrigger />
+                      <ContextContent>
+                        <ContextContentHeader />
+                        <ContextContentBody>
+                          <ContextInputUsage />
+                          <ContextOutputUsage />
+                          <ContextReasoningUsage />
+                        </ContextContentBody>
+                        <ContextContentFooter />
+                      </ContextContent>
+                    </Context>
+                  </div>
+                );
+              })()}
+
+              {/* Stage visualization (if agent metadata is available) */}
+              {meta.agent && meta.stage && (
+                <div className="mb-2">
+                  <StageVisualization 
+                    currentStage={String(meta.stage)}
+                    agent={meta.agent}
+                  />
                 </div>
               )}
 
@@ -134,7 +151,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 <ChainOfThought>
                   <ChainOfThoughtHeader>Research Process</ChainOfThoughtHeader>
                   <ChainOfThoughtContent>
-                    {meta.chainOfThought.steps.map((step, idx) => (
+                    {meta.chainOfThought.steps.map((step: any, idx: number) => (
                       <ChainOfThoughtStep
                         key={idx}
                         label={step.label}
@@ -150,7 +167,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 <Sources>
                   <SourcesTrigger count={meta.sources.length} />
                   <SourcesContent>
-                    {meta.sources.map((s) => (
+                    {meta.sources.map((s: any) => (
                       <Source key={s.id} href={s.url} title={s.title} />
                     ))}
                   </SourcesContent>
@@ -158,7 +175,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
               )}
 
               {Array.isArray(meta.codeBlocks) &&
-                meta.codeBlocks.map((b) => (
+                meta.codeBlocks.map((b: any) => (
                   <CodeBlock
                     key={b.id}
                     code={b.code}
@@ -168,7 +185,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 ))}
 
               {Array.isArray(meta.artifacts) &&
-                meta.artifacts.map((a) => {
+                meta.artifacts.map((a: any) => {
                   const artifactTitle = a.title || a.type;
                   if (a.type === "summary") {
                     const sessionId =
@@ -211,7 +228,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 })}
 
               {Array.isArray(meta.tools) &&
-                meta.tools.map((t) => {
+                meta.tools.map((t: any) => {
                   const mapped = mapToolState(t.state);
                   const outputText = serializeToText(t.output, 'LiveChatMessages-tool-output');
                   

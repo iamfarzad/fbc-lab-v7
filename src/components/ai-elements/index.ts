@@ -36,6 +36,7 @@ export * from './content/web-preview'
 export * from './sources/sources'
 export * from './sources/inline-citation'
 export * from './sources/context'
+export * from './sources/stage-visualization'
 
 // Tool Visualization
 export * from './tools/tool'

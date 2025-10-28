@@ -79,7 +79,7 @@ export function ChatInput({
           disabled={!chatOpen}
           placeholder="Type something..."
           onChange={(e) => setMessage(e.target.value)}
-          className="h-8 flex-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-8 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm [.monochrome_&]:rounded-none [.monochrome_&]:font-mono [.monochrome_&]:shadow-none"
         />
         <Button
           size="icon"

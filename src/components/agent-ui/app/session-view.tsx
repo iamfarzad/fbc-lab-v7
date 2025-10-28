@@ -21,7 +21,6 @@ import { useLiveApi } from '@/hooks/useLiveApi'
 import { useUnifiedChat } from '@/hooks/useUnifiedChat'
 import { ChainOfThought, ChainOfThoughtContent, ChainOfThoughtHeader, ChainOfThoughtStep } from '@/components/ai-elements/reasoning/chain-of-thought';
 import { Sources, SourcesContent, SourcesTrigger, Source } from '@/components/ai-elements/sources/sources';
-import { Response } from '@/components/ai-elements/core/response';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
 
@@ -83,9 +82,14 @@ interface SessionViewProps extends React.ComponentProps<'section'> {
   hasAcceptedTerms: boolean;
   researchStatus: 'idle' | 'loading' | 'ready' | 'skipped' | 'error';
   researchInsights?: SessionInsights | null;
+  intelligenceContext?: {
+    company?: { name?: string; domain?: string; industry?: string; size?: string };
+    person?: { fullName?: string; role?: string };
+  } | null;
   showWelcomeBanner?: boolean;
   onDismissWelcome?: () => void;
   leadName?: string;
+  leadEmail?: string;
   companyName?: string;
 }
 
@@ -94,9 +98,11 @@ export const SessionView = ({
   hasAcceptedTerms,
   researchStatus,
   researchInsights,
+  intelligenceContext,
   showWelcomeBanner,
   onDismissWelcome,
   leadName,
+  leadEmail,
   companyName,
   ...props
 }: SessionViewProps) => {
@@ -105,7 +111,25 @@ export const SessionView = ({
   const { sessionId, isSessionActive } = useSession();
   
   // Single source of truth for chat messages
-  const chat = useUnifiedChat({ sessionId });
+  const chat = useUnifiedChat({ 
+    sessionId, 
+    context: intelligenceContext ? { 
+      intelligenceContext: {
+        lead: { 
+          name: leadName || '', 
+          email: leadEmail || ''
+        },
+        company: intelligenceContext.company ? {
+          name: intelligenceContext.company.name || '',
+          industry: intelligenceContext.company.industry,
+          size: intelligenceContext.company.size
+        } : undefined,
+        person: intelligenceContext.person ? {
+          role: intelligenceContext.person.role || intelligenceContext.person.fullName,
+        } : undefined
+      }
+    } : undefined 
+  });
   const messages = chat.messages;
 
   // Inject a single welcome message once research is ready
@@ -219,11 +243,11 @@ export const SessionView = ({
         <div className="pointer-events-auto absolute right-3 top-4 z-[60] w-[240px] rounded-2xl border bg-card/90 p-3 shadow-lg backdrop-blur">
           <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
             <Loader2 className="size-3.5 animate-spin" />
-            <Response className="inline">Tailoring your briefing…</Response>
+            <span>Tailoring your briefing…</span>
           </div>
-          <Response className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 text-[11px] text-muted-foreground">
             Pulling public records, team info, and recent updates so we can hit the ground running.
-          </Response>
+          </p>
         </div>
       );
     }
@@ -231,10 +255,10 @@ export const SessionView = ({
     if (researchStatus === 'skipped') {
       return (
         <div className="pointer-events-auto absolute right-3 top-4 z-[60] w-[240px] rounded-2xl border border-dashed bg-card/80 p-3 text-[11px] shadow-md backdrop-blur">
-          <Response className="font-medium text-foreground">Limited briefing</Response>
-          <Response className="mt-1 text-muted-foreground">
+          <span className="font-medium text-foreground">Limited briefing</span>
+          <p className="mt-1 text-muted-foreground">
             Using the details you provided. Share a business email next time for deeper research.
-          </Response>
+          </p>
         </div>
       );
     }
@@ -257,9 +281,9 @@ export const SessionView = ({
               </ChainOfThoughtContent>
             </ChainOfThought>
             {researchInsights.summary && (
-              <Response className="mt-2 text-[11px] text-muted-foreground whitespace-pre-line">
+              <p className="mt-2 text-[11px] text-muted-foreground whitespace-pre-line">
                 {researchInsights.summary}
-              </Response>
+              </p>
             )}
           </div>
           {researchInsights.sources.length > 0 && (
@@ -270,7 +294,7 @@ export const SessionView = ({
                   <div key={source.id} className="flex flex-col">
                     <Source href={source.url} title={source.title} />
                     {source.description && (
-                      <Response className="pl-5 text-[10px] text-muted-foreground">{source.description}</Response>
+                      <p className="pl-5 text-[10px] text-muted-foreground">{source.description}</p>
                     )}
                   </div>
                 ))}

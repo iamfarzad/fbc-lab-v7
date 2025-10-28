@@ -542,13 +542,13 @@ export function AdminDashboard() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h4 className="font-semibold">{conv.name ?? 'Anonymous'}</h4>
-                      <Response className="text-sm text-muted-foreground">{conv.email ?? 'No email'}</Response>
+                      <p className="text-sm text-muted-foreground">{conv.email ?? 'No email'}</p>
                       {conv.summary && (
-                        <Response className="mt-2 text-sm">{conv.summary}</Response>
+                        <p className="mt-2 text-sm">{conv.summary}</p>
                       )}
-                      <Response className="mt-2 text-xs text-muted-foreground">
+                      <p className="mt-2 text-xs text-muted-foreground">
                         {new Date(conv.createdAt).toLocaleString()}
-                      </Response>
+                      </p>
                     </div>
                     {conv.leadScore !== null && (
                       <Badge variant={conv.leadScore >= 7 ? 'default' : 'secondary'}>

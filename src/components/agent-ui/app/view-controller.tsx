@@ -175,7 +175,9 @@ export function ViewController({ forceTermsReset }: { forceTermsReset?: boolean 
       hasAcceptedTerms={hasAcceptedTerms}
       researchStatus={researchStatus}
       researchInsights={insights}
+      intelligenceContext={currentContext}
       leadName={firstName}
+      leadEmail={email}
       companyName={companyName}
       showWelcomeBanner={showWelcomeBanner && hasAcceptedTerms}
       onDismissWelcome={() => setShowWelcomeBanner(false)}

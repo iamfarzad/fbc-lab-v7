@@ -685,7 +685,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
             playerPlaying: audioPlayerRef.current.playing,
             contextState: audioPlayerRef.current.contextState
           });
-          setAudioContextState(audioPlayerRef.current.contextState ?? 'unknown')
+          setAudioContextState(audioPlayerRef.current.contextState as 'suspended' | 'running' | 'closed' | 'unknown')
         } catch (err) {
           console.error('❌ [RealtimeVoice] Failed to add audio chunk to player', {
             error: err instanceof Error ? err.message : String(err),

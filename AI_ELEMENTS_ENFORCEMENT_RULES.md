@@ -1,187 +1,269 @@
-# AI Elements Text Rendering Enforcement Rules
+# AI Elements Text Rendering Guidelines
 
-## 🔴 CRITICAL RULE: AI-Elements Only Policy
+## 🎯 CORE PRINCIPLE: Use AI Elements for Structured Content Only
 
-**ALL text content in this application MUST use ai-elements components for rendering. No exceptions.**
+**AI Elements are for structured message content, NOT all text in the application.**
 
-## ❌ Forbidden Patterns
+Based on [official Vercel AI SDK patterns](https://ai-sdk.dev/elements/examples/chatbot).
 
-### Never Use Basic HTML for Text Content
+## ✅ Use AI Elements For (Structured Content)
+
+### Message Content and AI Responses
 ```typescript
-// ❌ FORBIDDEN - Basic HTML tags for message/chat content
-<p>{message}</p>
-<div>{content}</div>
-<span>{text}</span>
+// ✅ CORRECT - Actual chat messages
+<MessageContent>
+  <Response>{messageText}</Response>
+</MessageContent>
 
-// ✅ REQUIRED - ai-elements components
-<Response>{content}</Response>
-<MessageContent><Response>{content}</Response></MessageContent>
+// ✅ CORRECT - AI-generated structured content
+<Sources>
+  <SourcesTrigger count={sources.length} />
+  <SourcesContent>
+    {sources.map(source => <Source {...source} />)}
+  </SourcesContent>
+</Sources>
 ```
 
-### Never Create Direct Text Rendering Components
+### AI-Generated Content Components
 ```typescript
-// ❌ FORBIDDEN - Custom text rendering
-export function MyTextComponent({ text }) {
-  return <div className="text-sm">{text}</div>
-}
+// ✅ CORRECT - Reasoning, sources, tools
+<Reasoning duration={duration}>
+  <ReasoningTrigger />
+  <ReasoningContent>{reasoningText}</ReasoningContent>
+</Reasoning>
 
-// ✅ REQUIRED - Use ai-elements with custom styling
-export function MyTextComponent({ text }) {
-  return (
-    <MessageContent className="text-sm">
-      <Response>{text}</Response>
-    </MessageContent>
-  )
-}
+<Tools>
+  <Tool name="search">
+    <ToolContent>{toolOutput}</ToolContent>
+  </Tool>
+</Tools>
 ```
 
-### Never Bypass AI-Elements for "Simple" Text
-```typescript
-// ❌ FORBIDDEN - Even simple text must use ai-elements
-{isLoading ? "Loading..." : <Response>{content}</Response>}
+## ❌ Use Basic HTML For (UI Elements)
 
-// ✅ REQUIRED - All text through ai-elements
-{isLoading ? <Response>Loading...</Response> : <Response>{content}</Response>}
+### Button Text and Labels
+```typescript
+// ✅ CORRECT - Basic HTML for UI chrome
+<button className="text-sm text-muted-foreground">
+  Chain of Thought
+</button>
+
+// ❌ WRONG - Over-application of ai-elements
+<button>
+  <Response>Chain of Thought</Response>
+</button>
 ```
 
-## ✅ Required Usage Patterns
+### Status Indicators and Loading Messages
+```typescript
+// ✅ CORRECT - Basic HTML for status/loading
+<div className="flex gap-2 text-sm text-muted-foreground">
+  Searching for profiles...
+</div>
 
-### 1. Basic Message Content
+<div className="w-full p-4">
+  Thought for 4 seconds
+</div>
+
+// ❌ WRONG - Over-application of ai-elements
+<Response>Searching for profiles...</Response>
+<Response>Thought for 4 seconds</Response>
+```
+
+### Form Elements and Labels
+```typescript
+// ✅ CORRECT - Basic HTML for forms and labels
+<input placeholder="Type something..." />
+<label htmlFor="email">Email Address</label>
+<span className="font-medium">You:</span>
+
+// ❌ WRONG - Over-application of ai-elements
+<Response>Type something...</Response>
+<Response>Email Address</Response>
+<Response>You:</Response>
+```
+
+## 📋 Decision Framework
+
+When deciding whether to use ai-elements or basic HTML, ask:
+
+1. **Is this structured AI-generated content?** → Use ai-elements
+2. **Is this part of a chat message?** → Use ai-elements  
+3. **Is this reasoning, sources, or tool output?** → Use ai-elements
+4. **Is this UI chrome, buttons, labels, or status text?** → Use basic HTML
+
+## ✅ Correct Usage Patterns
+
+### 1. Chat Message Content
 ```typescript
 import { Response } from "@/components/ai-elements/core/response";
-
-// For simple text content
-<Response>{messageText}</Response>
-```
-
-### 2. Structured Message Display
-```typescript
 import { MessageContent } from "@/components/ai-elements/core/message";
-import { Response } from "@/components/ai-elements/core/response";
 
-<MessageContent variant="contained">
-  <Response>{messageContent}</Response>
+// For actual chat messages
+<MessageContent>
+  <Response>{messageText}</Response>
 </MessageContent>
 ```
 
-### 3. Complex Content with Styling
+### 2. AI-Generated Structured Content
 ```typescript
-<MessageContent className="custom-styling">
-  <Response className="preserve-whitespace">{complexContent}</Response>
-</MessageContent>
+// Citations and sources
+<Response className="text-[12px] font-medium">{citation.title}</Response>
+
+// Tool outputs
+<ToolContent>
+  {serializeToText(toolOutput, 'tool-output')}
+</ToolContent>
+```
+
+### 3. UI Elements (Basic HTML)
+```typescript
+// Status messages
+<span className="text-muted-foreground">Processing...</span>
+
+// Button text
+<button className="flex items-center gap-2">
+  Chain of Thought
+</button>
+
+// Form labels
+<label htmlFor="input">Enter message</label>
 ```
 
 ### 4. Using Text Utilities
 ```typescript
 import { serializeToText, shouldRenderContent } from "@/lib/text-utils";
 
+// Only for structured content serialization
 {shouldRenderContent(content) && (
   <Response>{serializeToText(content, 'component-name')}</Response>
 )}
 ```
 
-## 🏗️ Unified Text Rendering Architecture
+## 🏗️ Architecture Overview
 
-### Core Components
-- **`Response`** - Main text content renderer (supports markdown, rich content)
-- **`MessageContent`** - Container for message content with variants
-- **`MessageAvatar`** - Avatar component for message senders
-- **Text Utilities** - `src/lib/text-utils.ts` for content processing
+### AI Elements Components (Structured Content)
+- **`Response`** - Main text content renderer for messages (supports markdown, rich content)
+- **`MessageContent`** - Container for message content with variants  
+- **`Sources`** - Citations and reference display
+- **`Reasoning`** - AI reasoning and thought process display
+- **`Tools`** - Tool inputs, outputs, and results
+- **`Artifacts`** - Structured AI-generated content
 
-### Component Hierarchy
-```
-Message (container)
-├── MessageAvatar (sender info)
-└── MessageContent (content wrapper)
-    ├── Response (main text content)
-    ├── Artifact (structured content)
-    ├── Sources (citations/references)
-    ├── Reasoning (AI reasoning display)
-    └── Tools (tool outputs)
-```
+### Basic HTML Elements (UI Chrome)
+- **Standard HTML tags** - `<p>`, `<div>`, `<span>`, `<button>`, `<label>`, etc.
+- **Form elements** - `<input>`, `<textarea>`, `<select>`, etc.
+- **Navigation** - `<nav>`, `<a>`, menu items, etc.
+- **Status indicators** - Loading messages, error states, notifications
 
-### Styling System
-- **Global Styles**: `src/components/ai-elements/theme-overrides.css`
-- **Variants**: Use `variant` props on components
-- **Custom Classes**: Apply via `className` prop while preserving ai-elements structure
+### Text Processing Utilities
+- **`src/lib/text-utils.ts`** - Centralized text serialization and processing
+- **`serializeToText()`** - Convert objects to display strings
+- **`shouldRenderContent()`** - Check if content should be rendered
 
 ## 📋 Development Checklist
 
 Before creating any text-displaying component:
 
-- [ ] Does this display text content? → Use ai-elements
-- [ ] Is this a message or chat content? → Use `MessageContent` + `Response`
-- [ ] Do I need custom styling? → Use `className` with ai-elements components  
-- [ ] Do I need text processing? → Use utilities from `src/lib/text-utils.ts`
-- [ ] Is this complex content? → Check for specialized ai-elements (Artifact, Sources, etc.)
+- [ ] Is this structured AI content? → Use ai-elements (`Response`, `Sources`, etc.)
+- [ ] Is this a chat message? → Use `MessageContent` + `Response`
+- [ ] Is this UI chrome (buttons, labels, status)? → Use basic HTML
+- [ ] Do I need object serialization? → Use `serializeToText()` from `text-utils.ts`
+- [ ] Is this a loading/status message? → Use basic HTML with appropriate semantic tags
 
-## 🚨 Code Review Requirements
+## 🚨 Code Review Guidelines
 
-### Automatic Rejections
-- Any PR introducing basic HTML tags (`<p>`, `<div>`, `<span>`) for text content
-- Custom text rendering components that bypass ai-elements
-- Duplicate text serialization logic (use `text-utils.ts`)
+### Avoid These Patterns
+- Using `Response` for button text, form labels, or status messages
+- Using basic HTML for actual chat message content
+- Duplicate text serialization logic (use centralized `text-utils.ts`)
+- Mixing ai-elements and basic HTML within the same content block unnecessarily
 
-### Required Approvals
-- All text-displaying components must use ai-elements
-- Custom styling must preserve ai-elements structure
-- New text utilities must be added to `text-utils.ts`
+### Encourage These Patterns
+- AI elements for structured message content and AI-generated data
+- Basic HTML for UI chrome, navigation, and form elements
+- Consistent use of text utilities for object serialization
+- Clear separation between structured content and interface elements
 
 ## 🛠️ Migration Guide
 
-### When You Find Violations
-1. **Identify the violation** (basic HTML, custom text rendering)
-2. **Import ai-elements components** (`Response`, `MessageContent`, etc.)
-3. **Replace with proper ai-elements structure**
-4. **Preserve existing styling** via `className` props
-5. **Use text utilities** for content processing
-6. **Test thoroughly** - ensure no regression
-
-### Example Migration
+### Over-Applied AI Elements → Basic HTML
 ```typescript
-// ❌ Before (violation)
+// ❌ Over-application (fix this)
+<Response>Loading...</Response>
+<Response>You:</Response>
+<button><Response>Submit</Response></button>
+
+// ✅ Correct basic HTML
+<span>Loading...</span>
+<span>You:</span>
+<button>Submit</button>
+```
+
+### Basic HTML → AI Elements (for message content)
+```typescript
+// ❌ Using basic HTML for message content
 <div className="chat-message">
-  <span className="user-name">{user.name}:</span>
-  <p className="message-text">{message.content}</p>
+  <p>{message.content}</p>
 </div>
 
-// ✅ After (compliant)
+// ✅ Use ai-elements for structured content
 <MessageContent className="chat-message">
-  <span className="user-name">{user.name}:</span>
-  <Response className="message-text">{message.content}</Response>
+  <Response>{message.content}</Response>
 </MessageContent>
+```
+
+### Mixed Content Example
+```typescript
+// ✅ Proper separation
+<div className="chat-container">
+  <span className="timestamp">{timestamp}</span>  {/* UI chrome */}
+  <MessageContent>
+    <Response>{messageContent}</Response>  {/* Structured content */}
+  </MessageContent>
+  <button className="retry-btn">Retry</button>  {/* UI chrome */}
+</div>
 ```
 
 ## 📚 Reference Documentation
 
-- **AI Elements Index**: `src/components/ai-elements/index.ts`
+- **Official Patterns**: [AI SDK Elements Examples](https://ai-sdk.dev/elements/examples/chatbot)
+- **Pattern Analysis**: `AI_ELEMENTS_OFFICIAL_PATTERNS.md`
+- **Over-Application Audit**: `AI_ELEMENTS_OVER_APPLICATION_AUDIT.md`
 - **Text Utilities**: `src/lib/text-utils.ts`
-- **Theme Overrides**: `src/components/ai-elements/theme-overrides.css`
-- **Migration Analysis**: `AI_ELEMENTS_MIGRATION_ANALYSIS.md`
+- **AI Elements Index**: `src/components/ai-elements/index.ts`
 
-## 🎯 Benefits of This Architecture
+## 🎯 Benefits of Proper Usage
 
-- ✅ **Consistent Theming** - All text uses unified styling system
-- ✅ **Rich Content Support** - Automatic markdown, citations, reasoning
-- ✅ **Maintainable Code** - Single source of truth for text rendering
-- ✅ **Accessibility** - Built-in ARIA support and keyboard navigation
-- ✅ **Performance** - Optimized rendering with proper memoization
-- ✅ **Extensibility** - Easy to add new text features globally
+- ✅ **Aligned with Official Patterns** - Follows Vercel's implementation
+- ✅ **Reduced Complexity** - No over-engineering of simple UI elements
+- ✅ **Better Performance** - Basic HTML is faster for static content
+- ✅ **Clearer Architecture** - Clear separation of concerns
+- ✅ **Maintainable Code** - Easier to understand and modify
+- ✅ **Proper Semantics** - Right tool for the right job
 
 ## 🔧 Troubleshooting
 
-### Common Issues
-1. **Type Errors** - Ensure proper imports from `@/components/ai-elements/`
-2. **Styling Issues** - Check if custom classes conflict with ai-elements CSS
-3. **Content Not Rendering** - Use `shouldRenderContent()` utility
-4. **Serialization Errors** - Use `serializeToText()` for complex objects
+### When to Use AI Elements
+- Actual chat message content
+- Citations, sources, references
+- AI reasoning and thought processes
+- Tool outputs and results
+- Artifacts and structured AI content
 
-### Getting Help
-- Check existing ai-elements usage in `LiveChatMessages.tsx`
-- Review `text-utils.ts` for content processing functions  
-- Consult `theme-overrides.css` for styling patterns
-- Test changes with `pnpm type-check` and `pnpm lint`
+### When to Use Basic HTML
+- Button text and labels
+- Form inputs and placeholders
+- Status messages and loading states
+- Navigation and UI chrome
+- Error messages and notifications
+
+### Common Migration Issues
+1. **Over-application** - Check if you're wrapping UI elements unnecessarily
+2. **Under-application** - Ensure message content uses ai-elements
+3. **Mixed patterns** - Be consistent within the same content area
+4. **Styling conflicts** - Preserve existing classes during migration
 
 ---
 
-**Remember: This is not optional. ALL text content MUST use ai-elements. No exceptions.**
+**Follow the official AI SDK patterns: AI Elements for structured content, basic HTML for UI elements.**
