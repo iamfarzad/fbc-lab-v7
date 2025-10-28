@@ -119,9 +119,9 @@ const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
     return <ShimmerLoader state="thinking" variant="inline" />;
   }
   if (duration === undefined) {
-    return <p>Thought for a few seconds</p>;
+    return "Thought for a few seconds";
   }
-  return <p>Thought for {duration} seconds</p>;
+  return `Thought for ${duration} seconds`;
 };
 
 export const ReasoningTrigger = memo(
