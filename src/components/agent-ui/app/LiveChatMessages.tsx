@@ -1,7 +1,9 @@
 "use client";
 
 import { Message as MessageView, MessageAvatar, MessageContent } from "@/components/ai-elements/core/message";
+import { Response } from "@/components/ai-elements/core/response";
 import { Artifact, ArtifactContent, ArtifactHeader, ArtifactTitle } from "@/components/ai-elements/content/artifact";
+import { serializeToText, mapToolState, shouldRenderContent } from "@/lib/text-utils";
 import { Sources, SourcesContent, SourcesTrigger, Source } from "@/components/ai-elements/sources/sources";
 import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning/reasoning";
 import { ChainOfThought, ChainOfThoughtContent, ChainOfThoughtHeader, ChainOfThoughtStep } from "@/components/ai-elements/reasoning/chain-of-thought";
@@ -86,7 +88,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 </div>
               )}
 
-              {m.content && <p>{m.content}</p>}
+              {shouldRenderContent(m.content) && <Response>{serializeToText(m.content, 'LiveChatMessages-content')}</Response>}
 
               {/* Inline citations */}
               {Array.isArray(meta.inlineCitations) && meta.inlineCitations.length > 0 && (
@@ -214,23 +216,9 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
 
               {Array.isArray(meta.tools) &&
                 meta.tools.map((t) => {
-                  const stateMap: Record<string, 'input-streaming' | 'input-available' | 'output-available' | 'output-error'> = {
-                    running: 'input-available',
-                    complete: 'output-available',
-                    error: 'output-error',
-                  };
-                  const mapped = stateMap[t.state] ?? 'output-available';
-                  const outputText = (() => {
-                    if (t.output == null) return ''
-                    if (typeof t.output === 'string') return t.output
-                    if (typeof t.output === 'number' || typeof t.output === 'boolean') return String(t.output)
-                    try {
-                      return JSON.stringify(t.output, null, 2)
-                    } catch (error) {
-                      console.warn('[LiveChatMessages] Failed to serialise tool output', error)
-                      return '[unserialisable output]'
-                    }
-                  })()
+                  const mapped = mapToolState(t.state);
+                  const outputText = serializeToText(t.output, 'LiveChatMessages-tool-output');
+                  
                   return (
                     <Tool key={t.name}>
                       <ToolHeader type={t.type as any} state={mapped} />

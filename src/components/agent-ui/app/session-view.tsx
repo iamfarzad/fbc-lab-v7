@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
-import { ChatTranscript } from '@/components/agent-ui/app/chat-transcript';
+import { motion, AnimatePresence } from 'motion/react';
+import { LiveChatMessages } from '@/components/agent-ui/app/LiveChatMessages';
 import { PreConnectMessage } from '@/components/agent-ui/app/preconnect-message';
 import { LiveCaptions } from '@/components/agent-ui/app/live-captions';
 import { TileLayout } from '@/components/agent-ui/app/tile-layout';
@@ -291,14 +291,26 @@ export const SessionView = ({
       <div className={cn('fixed inset-0 grid grid-cols-1 grid-rows-1', isMinimized && 'pointer-events-none')}>
         <Fade top className="absolute inset-x-4 top-0 h-40" />
         <ScrollArea className="px-4 pt-40 pb-[150px] md:px-6 md:pb-[180px]">
-          <ChatTranscript
-            hidden={isMinimized}
-            messages={messages}
-            className={cn(
-              'mx-auto space-y-3 transition-opacity duration-300 ease-out',
-              isExpanded ? 'max-w-3xl md:max-w-4xl' : 'max-w-2xl'
+          <AnimatePresence>
+            {!isMinimized && (
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0 },
+                  visible: { opacity: 1 },
+                }}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className={cn(
+                  'mx-auto space-y-3 transition-opacity duration-300 ease-out',
+                  isExpanded ? 'max-w-3xl md:max-w-4xl' : 'max-w-2xl'
+                )}
+              >
+                <LiveChatMessages messages={messages} />
+              </motion.div>
             )}
-          />
+          </AnimatePresence>
         </ScrollArea>
       </div>
 

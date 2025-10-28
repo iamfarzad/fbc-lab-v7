@@ -1,5 +1,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
+import { MessageContent } from "@/components/ai-elements/core/message";
+import { Response } from "@/components/ai-elements/core/response";
 
 export interface ChatEntryProps extends React.HTMLAttributes<HTMLLIElement> {
   /** The locale to use for the timestamp. */
@@ -48,14 +50,15 @@ export const ChatEntry = ({
           {time.toLocaleTimeString(locale, { timeStyle: 'short' })}
         </span>
       </header>
-      <span
+      <MessageContent 
+        variant="contained"
         className={cn(
           'max-w-4/5 rounded-[20px]',
           messageOrigin === 'local' ? 'bg-muted ml-auto p-2' : 'mr-auto'
         )}
       >
-        {message}
-      </span>
+        <Response>{message}</Response>
+      </MessageContent>
     </li>
   );
 };

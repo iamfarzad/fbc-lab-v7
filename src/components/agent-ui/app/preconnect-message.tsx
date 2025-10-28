@@ -4,8 +4,10 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { Message } from '@/types/core';
 import { ShimmerText } from '@/components/agent-ui/livekit/shimmer-text';
 import { cn } from '@/lib/utils';
+import { MessageContent } from "@/components/ai-elements/core/message";
+import { Response } from "@/components/ai-elements/core/response";
 
-const MotionMessage = motion.create('p');
+const MotionMessage = motion.create('div');
 
 const VIEW_MOTION_PROPS = {
   variants: {
@@ -39,9 +41,11 @@ export function PreConnectMessage({ className, messages = [] }: PreConnectMessag
           aria-hidden={messages.length > 0}
           className={cn('pointer-events-none text-center', className)}
         >
-          <ShimmerText className="text-sm font-semibold">
-            Agent is listening, ask it a question
-          </ShimmerText>
+          <MessageContent>
+            <ShimmerText className="text-sm font-semibold">
+              <Response>Agent is listening, ask it a question</Response>
+            </ShimmerText>
+          </MessageContent>
         </MotionMessage>
       )}
     </AnimatePresence>

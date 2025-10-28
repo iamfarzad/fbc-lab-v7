@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { Message as ChatMessage } from '@/types/core'
+import { MessageContent } from "@/components/ai-elements/core/message";
+import { Response } from "@/components/ai-elements/core/response";
 import {
   Brain,
   Download,
@@ -477,7 +479,9 @@ export function AdminDashboard() {
                 <div className="mb-1 text-xs font-semibold opacity-70">
                   {msg.role === 'user' ? 'You' : 'F.B/c AI'}
                 </div>
-                <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
+                <MessageContent>
+                  <Response className="whitespace-pre-wrap text-sm">{msg.content}</Response>
+                </MessageContent>
               </div>
             ))}
             
