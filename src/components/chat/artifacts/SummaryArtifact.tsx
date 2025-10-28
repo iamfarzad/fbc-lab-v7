@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Download, Mail, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
+import { Response } from '@/components/ai-elements/core/response';
 
 interface SummaryArtifactProps {
   content: string;
@@ -124,7 +125,7 @@ export function SummaryArtifact({
             <AlertTriangle className="h-4 w-4 text-orange-600" />
             <AlertTitle className="text-orange-900">Privacy & Data Retention</AlertTitle>
             <AlertDescription className="text-orange-800 space-y-2">
-              <p>{gdprNotice.message}</p>
+              <Response>{gdprNotice.message}</Response>
               
               <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
                 <div>

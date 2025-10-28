@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AudioPlayer } from '@/lib/audio';
+import { AudioRecorder } from '@/lib/audio-recorder';
 import { WEBSOCKET_CONFIG } from '@/config/constants';
 import type { LiveServerEvent } from '@/core/live/types'
 import { LiveClientWS, getLiveClientSingleton } from '@/core/live/client'
@@ -92,11 +93,10 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
     chunkHandlerRef.current = opts?.onChunk ?? null;
 
     if (!audioWorkletRecorderRef.current) {
-      // TODO: Implement proper AudioRecorder or use MediaRecorder
-      const recorder = null; // Temporarily disabled
-      // recorder.on('data', handleWorkletData);
-      // recorder.on('error', handleWorkletError);
-      // recorder.on('stop', () => setIsRecording(false));
+      const recorder = new AudioRecorder();
+      recorder.on('data', handleWorkletData);
+      recorder.on('error', handleWorkletError);
+      recorder.on('stop', () => setIsRecording(false));
       audioWorkletRecorderRef.current = recorder;
     }
 
