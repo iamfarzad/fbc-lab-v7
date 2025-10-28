@@ -22,6 +22,12 @@ type MediaRecorderVoiceResult = {
 const DEFAULT_SERVER_SAMPLE_RATE = 24000;
 const SAMPLE_RATE_PATTERN = /rate=(\d+)/i;
 
+const VERBOSE_VOICE_LOGS = process.env.NEXT_PUBLIC_VOICE_VERBOSE_LOGS === 'true';
+const debugLog = (...args: Parameters<typeof console.log>) => {
+  if (!VERBOSE_VOICE_LOGS) return;
+  console.log(...args);
+};
+
 const extractSampleRate = (mimeType?: string): number | undefined => {
   if (!mimeType) return undefined;
   const match = SAMPLE_RATE_PATTERN.exec(mimeType);
@@ -250,7 +256,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   useEffect(() => {
     // Create AudioPlayer on mount to ensure it persists across voice turns
     audioPlayerRef.current = new AudioPlayer(DEFAULT_SERVER_SAMPLE_RATE);
-    console.log('🎵 [RealtimeVoice] AudioPlayer created on mount', { 
+    debugLog('🎵 [RealtimeVoice] AudioPlayer created on mount', { 
       sampleRate: DEFAULT_SERVER_SAMPLE_RATE 
     });
     try {
@@ -261,7 +267,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     // Proactively resume audio context on user interaction
     const resumeAudio = async () => {
       if (audioPlayerRef.current?.contextState === 'suspended') {
-        console.log('🔊 [RealtimeVoice] Proactively resuming AudioContext');
+        debugLog('🔊 [RealtimeVoice] Proactively resuming AudioContext');
         await audioPlayerRef.current.resume();
         setAudioContextState(audioPlayerRef.current.contextState ?? 'unknown')
       }
@@ -386,7 +392,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, []);
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
-    console.log('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
+    debugLog('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
     lastStartOptsRef.current = opts ?? {};
     
     // If socket isn't ready yet, attempt a quick connect-and-wait before failing
@@ -421,7 +427,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     }
 
     try {
-      console.log('🎤 [RealtimeVoice] Starting session - setting processing state');
+      debugLog('🎤 [RealtimeVoice] Starting session - setting processing state');
       setIsProcessing(true);
       callbacksRef.current?.onSessionStateChange?.({
         active: false,
@@ -430,39 +436,39 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         isProcessing: true,
       });
 
-      console.log('🎤 [RealtimeVoice] Sending start message');
+      debugLog('🎤 [RealtimeVoice] Sending start message');
       startInFlightRef.current = true;
       liveRef.current?.start({
         languageCode: opts?.languageCode,
         voiceName: opts?.voiceName,
         sessionId: opts?.sessionId,
       });
-      console.log('🎤 [RealtimeVoice] Start message sent successfully; preparing microphone');
+      debugLog('🎤 [RealtimeVoice] Start message sent successfully; preparing microphone');
 
       if (sessionTimeoutRef.current) {
         clearTimeout(sessionTimeoutRef.current);
         sessionTimeoutRef.current = null;
       }
 
-      console.log('🎤 [RealtimeVoice] Requesting microphone permission...');
+      debugLog('🎤 [RealtimeVoice] Requesting microphone permission...');
       
       // Resume audio context on user interaction (required by browser policy)
       if (audioPlayerRef.current?.contextState === 'suspended') {
-        console.log('🔊 [RealtimeVoice] Resuming AudioContext for user interaction');
+        debugLog('🔊 [RealtimeVoice] Resuming AudioContext for user interaction');
         await audioPlayerRef.current.resume();
         setAudioContextState(audioPlayerRef.current.contextState ?? 'unknown')
       }
       
       await startRecording({ onChunk: handleRecorderChunk });
       isRecordingRef.current = true;
-      console.log('🎤 [RealtimeVoice] Microphone permission granted and recording started');
+      debugLog('🎤 [RealtimeVoice] Microphone permission granted and recording started');
       if (!isSessionActiveRef.current) {
-        console.log('🎤 [RealtimeVoice] Awaiting session activation while buffering audio chunks');
+        debugLog('🎤 [RealtimeVoice] Awaiting session activation while buffering audio chunks');
       }
       
       // Set timeout to handle case where server never responds
       sessionTimeoutRef.current = setTimeout(() => {
-        console.log('🎤 [RealtimeVoice] Session timeout check:', {
+        debugLog('🎤 [RealtimeVoice] Session timeout check:', {
           isSessionActive: isSessionActiveRef.current,
           hasSession: session !== null,
           isRecording
@@ -478,7 +484,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         void stopRecording();
         startInFlightRef.current = false;
       } else {
-        console.log('🎤 [RealtimeVoice] Session timeout check passed - session is active');
+        debugLog('🎤 [RealtimeVoice] Session timeout check passed - session is active');
       }
     }, 10000); // 10 second timeout
   } catch (err) {
@@ -557,7 +563,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         startInFlightRef.current = false;
         // Clear audio queue on session close
         audioPlayerRef.current?.clear();
-        console.log('🧹 [RealtimeVoice] Audio player cleared for session restart', {
+        debugLog('🧹 [RealtimeVoice] Audio player cleared for session restart', {
           playerExists: !!audioPlayerRef.current,
           willAutoRestart: isRecordingRef.current
         });
@@ -572,7 +578,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         // Auto-restart session for continuous conversation if user is still in voice mode
         // This prevents the need to manually click the voice button after each response
         if (isRecordingRef.current) {
-          console.log('🔄 [RealtimeVoice] Auto-restarting session for continuous conversation');
+          debugLog('🔄 [RealtimeVoice] Auto-restarting session for continuous conversation');
           setTimeout(() => {
             if (isRecordingRef.current && !isSessionActiveRef.current) {
               startSession();
@@ -627,7 +633,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         const approxBytes = Math.max(0, Math.floor((audioData.length * 3) / 4) - padding);
         const turnCount = modelReplies.length;
         
-        console.log('🎧 [RealtimeVoice] Audio event received', {
+        debugLog('🎧 [RealtimeVoice] Audio event received', {
           base64Length: audioData.length,
           approxBytes,
           mimeType: event.payload.mimeType ?? 'not-specified',
@@ -671,7 +677,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
         try {
           audioPlayerRef.current.addBase64PCM16(audioData);
-          console.log('✅ [RealtimeVoice] Audio chunk successfully added to player', {
+          debugLog('✅ [RealtimeVoice] Audio chunk successfully added to player', {
             turnCount,
             playerPlaying: audioPlayerRef.current.playing,
             contextState: audioPlayerRef.current.contextState
@@ -695,13 +701,13 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       }
       case 'interrupted': {
         // User interrupted AI - clear audio queue immediately
-        console.log('🔇 User interrupted AI - clearing audio queue')
+        debugLog('🔇 User interrupted AI - clearing audio queue')
         audioPlayerRef.current?.clear();
         callbacks?.onInterrupted?.();
         break;
       }
       case 'setup_complete': {
-        console.log('✅ Voice session setup complete')
+        debugLog('✅ Voice session setup complete')
         // Fallback: In rare dev/HMR race conditions, we may receive setup_complete
         // before a formal session_started. If a start is in-flight and UI is
         // still inactive, flip to active so controls/rendering proceed. The
@@ -732,17 +738,17 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
       case 'tool_call': {
-        console.log('🛠️ Tool call received:', event.payload)
+        debugLog('🛠️ Tool call received:', event.payload)
         callbacks?.onToolCall?.(event.payload);
         break;
       }
       case 'tool_result': {
-        console.log('🛠️ Tool result received:', event.payload)
+        debugLog('🛠️ Tool result received:', event.payload)
         callbacks?.onToolResult?.(event.payload);
         break;
       }
       case 'tool_call_cancellation': {
-        console.log('🛠️ Tool call cancelled')
+        debugLog('🛠️ Tool call cancelled')
         break;
       }
       case 'turn_complete': {
@@ -775,7 +781,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
 
   const connectWebSocket = useCallback(() => {
-    console.log('🔌 [RealtimeVoice] connectWebSocket called', { serverUrl, hasLiveRef: !!liveRef.current });
+    debugLog('🔌 [RealtimeVoice] connectWebSocket called', { serverUrl, hasLiveRef: !!liveRef.current });
     if (!serverUrl) {
       console.warn('🔌 [RealtimeVoice] No serverUrl, skipping connect');
       return;
@@ -815,7 +821,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           // If a start was requested but the previous socket died before session_started,
           // retry start automatically on reconnect.
           if (!isSessionActiveRef.current && lastStartOptsRef.current && !startInFlightRef.current) {
-            console.log('🎤 [RealtimeVoice] Reconnected before session started — retrying start');
+            debugLog('🎤 [RealtimeVoice] Reconnected before session started — retrying start');
             startInFlightRef.current = true;
             try {
               client.start(lastStartOptsRef.current);
@@ -866,12 +872,14 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
 
   const stopSession = useCallback(async () => {
-    console.log('🎤 [RealtimeVoice] stopSession called', {
+    debugLog('🎤 [RealtimeVoice] stopSession called', {
       isSessionActive,
       isRecording,
       isProcessing
     });
-    console.trace('🎤 [RealtimeVoice] stopSession call stack:');
+    if (VERBOSE_VOICE_LOGS) {
+      console.trace('🎤 [RealtimeVoice] stopSession call stack:');
+    }
     
     if (!isSessionActive && !isRecording && !isProcessing) {
       return;

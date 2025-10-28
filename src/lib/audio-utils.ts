@@ -9,6 +9,14 @@ type GetAudioContextOptions = AudioContextOptions & {
 
 const map: Map<string, AudioContext> = new Map();
 
+const parseBooleanEnv = (value: string | undefined, fallback: boolean): boolean => {
+  if (typeof value !== 'string') return fallback;
+  const normalised = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalised)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalised)) return false;
+  return fallback;
+};
+
 export const audioContext: (
   options?: GetAudioContextOptions
 ) => Promise<AudioContext> = (() => {
@@ -243,13 +251,15 @@ export function mixToMono(buffer: AudioBuffer): Float32Array {
  * Standard audio constraints for getUserMedia
  * Optimized for voice capture at 16kHz mono with noise reduction
  */
+const DEFAULT_DSP_STATE = parseBooleanEnv(process.env.NEXT_PUBLIC_VOICE_DSP_DEFAULT, false);
+
 export const STANDARD_AUDIO_CONSTRAINTS = {
   channelCount: 1,
-  sampleRate: 16000,
+  sampleRate: 24000,
   sampleSize: 16,
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
+  echoCancellation: parseBooleanEnv(process.env.NEXT_PUBLIC_VOICE_ECHO_CANCELLATION, DEFAULT_DSP_STATE),
+  noiseSuppression: parseBooleanEnv(process.env.NEXT_PUBLIC_VOICE_NOISE_SUPPRESSION, DEFAULT_DSP_STATE),
+  autoGainControl: parseBooleanEnv(process.env.NEXT_PUBLIC_VOICE_AUTO_GAIN, DEFAULT_DSP_STATE),
 } as const;
 
 // ============================================================================

@@ -20,32 +20,10 @@
         if (this.bufferIndex >= this.bufferSize) {
           // Convert Float32 (-1.0 to 1.0) to Int16 (-32768 to 32767)
           const int16Buffer = new Int16Array(this.bufferSize);
-      // Optimized audio processing to reduce crackling and improve voice quality
-      let last = 0;
-      // Much less aggressive noise gate - allow more quiet speech through
-      const gate = 0.001; // ~-60 dB (very gentle, preserves quiet speech)
-      const hp = 0.999;   // lighter high-pass filtering to preserve voice quality
-      
+      // Minimal processing path to avoid artifacts: clamp and quantize only
       for (let j = 0; j < this.bufferSize; j++) {
-        let s = Math.max(-1, Math.min(1, this.buffer[j]));
-        
-        // 1) Very gentle noise gate - only silence extremely quiet audio
-        if (Math.abs(s) < gate) {
-          s = 0;
-        } else {
-          // 2) Gentle DC removal (high-pass) - only for non-silent audio
-          const hpOut = s - last + hp * (last || 0);
-          last = s;
-          s = Math.max(-1, Math.min(1, hpOut));
-        }
-        
-        // 3) Soft clipping to prevent harsh distortion
-        if (s > 0.95) {
-          s = 0.95 + (s - 0.95) * 0.1; // Soft limiting
-        } else if (s < -0.95) {
-          s = -0.95 + (s + 0.95) * 0.1; // Soft limiting
-        }
-        
+        let s = this.buffer[j];
+        if (s > 1) s = 1; else if (s < -1) s = -1;
         int16Buffer[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
       }
           

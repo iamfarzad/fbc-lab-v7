@@ -6,6 +6,12 @@
 import { EventEmitter } from 'events';
 import { arrayBufferToBase64, STANDARD_AUDIO_CONSTRAINTS } from './audio-utils';
 
+const VERBOSE_AUDIO_LOGS = process.env.NEXT_PUBLIC_VOICE_VERBOSE_LOGS === 'true';
+const debugLog = (...args: Parameters<typeof console.log>) => {
+  if (!VERBOSE_AUDIO_LOGS) return;
+  console.log(...args);
+};
+
 export interface AudioRecorderEvents {
   data: (base64: string) => void;
   error: (error: Error) => void;
@@ -32,27 +38,9 @@ const INLINE_AUDIO_WORKLET_SOURCE = `class AudioProcessor extends AudioWorkletPr
 
         if (this.bufferIndex >= this.bufferSize) {
           const int16Buffer = new Int16Array(this.bufferSize);
-          let last = 0;
-          const gate = 0.001;
-          const hp = 0.999;
-
           for (let j = 0; j < this.bufferSize; j++) {
-            let s = Math.max(-1, Math.min(1, this.buffer[j]));
-
-            if (Math.abs(s) < gate) {
-              s = 0;
-            } else {
-              const hpOut = s - last + hp * (last || 0);
-              last = s;
-              s = Math.max(-1, Math.min(1, hpOut));
-            }
-
-            if (s > 0.95) {
-              s = 0.95 + (s - 0.95) * 0.1;
-            } else if (s < -0.95) {
-              s = -0.95 + (s + 0.95) * 0.1;
-            }
-
+            let s = this.buffer[j];
+            if (s > 1) s = 1; else if (s < -1) s = -1;
             int16Buffer[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
           }
 
@@ -129,50 +117,50 @@ export class AudioRecorder extends EventEmitter {
 
   async start(): Promise<void> {
     try {
-      console.log('🎤 [AudioRecorder] Starting continuous audio capture...');
+      debugLog('🎤 [AudioRecorder] Starting continuous audio capture...');
       
       // Get microphone access
-      console.log('🎤 [AudioRecorder] Requesting microphone access...');
+      debugLog('🎤 [AudioRecorder] Requesting microphone access...');
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: STANDARD_AUDIO_CONSTRAINTS
       });
-      console.log('🎤 [AudioRecorder] Microphone access granted');
+      debugLog('🎤 [AudioRecorder] Microphone access granted');
 
       // Create audio context targeting 24kHz to align with Live API playback
-      console.log('🎤 [AudioRecorder] Creating audio context...');
+      debugLog('🎤 [AudioRecorder] Creating audio context...');
       this.audioContext = new AudioContext({ sampleRate: 24000 });
-      console.log('🎤 [AudioRecorder] Audio context created');
+      debugLog('🎤 [AudioRecorder] Audio context created');
       try {
         await this.audioContext.resume();
       } catch {
         // Some browsers may reject resume when already running; ignore
       }
-      console.log('🎤 [AudioRecorder] Requested sample rate: 24000');
-      console.log('🎤 [AudioRecorder] Actual sample rate:', this.audioContext.sampleRate);
+      debugLog('🎤 [AudioRecorder] Requested sample rate: 24000');
+      debugLog('🎤 [AudioRecorder] Actual sample rate:', this.audioContext.sampleRate);
       this.actualSampleRate = this.audioContext.sampleRate ?? 16000;
       
       if (this.audioContext.sampleRate !== 24000) {
         console.warn('⚠️ [AudioRecorder] Hardware did not honor 24kHz request! Using:', this.audioContext.sampleRate);
         console.warn('⚠️ [AudioRecorder] Audio may be resampled by the browser');
       } else {
-        console.log('✅ [AudioRecorder] Sample rate verified: 24kHz');
+        debugLog('✅ [AudioRecorder] Sample rate verified: 24kHz');
       }
       
       // Create source
-      console.log('🎤 [AudioRecorder] Creating media stream source...');
+      debugLog('🎤 [AudioRecorder] Creating media stream source...');
       this.source = this.audioContext.createMediaStreamSource(this.stream);
-      console.log('🎤 [AudioRecorder] Media stream source created');
+      debugLog('🎤 [AudioRecorder] Media stream source created');
       
       let captureNode: AudioNode | null = null;
 
       if (this.audioContext.audioWorklet) {
-        console.log('🎤 [AudioRecorder] Loading audio worklet module...');
+        debugLog('🎤 [AudioRecorder] Loading audio worklet module...');
         try {
           await loadAudioProcessorModule(this.audioContext);
-          console.log('🎤 [AudioRecorder] Audio worklet module loaded');
-          console.log('🎤 [AudioRecorder] Creating audio worklet node...');
+          debugLog('🎤 [AudioRecorder] Audio worklet module loaded');
+          debugLog('🎤 [AudioRecorder] Creating audio worklet node...');
           this.recordingWorklet = new AudioWorkletNode(this.audioContext, 'audio-processor');
-          console.log('🎤 [AudioRecorder] Audio worklet node created');
+          debugLog('🎤 [AudioRecorder] Audio worklet node created');
 
           this.recordingWorklet.port.onmessage = (event) => {
             if (event.data.type !== 'audioData') return;
@@ -181,8 +169,8 @@ export class AudioRecorder extends EventEmitter {
             if (payload && payload.int16arrayBuffer instanceof ArrayBuffer) {
               const arrayBuffer = payload.int16arrayBuffer as ArrayBuffer;
               const base64 = arrayBufferToBase64(arrayBuffer);
-              if (Math.random() < 0.02) {
-                console.log('🎤 [AudioRecorder] Sending audio chunk:', {
+              if (VERBOSE_AUDIO_LOGS && Math.random() < 0.02) {
+                debugLog('🎤 [AudioRecorder] Sending audio chunk:', {
                   declaredRate: this.actualSampleRate,
                   actualContextRate: this.audioContext?.sampleRate,
                   pcm16BufferSize: arrayBuffer.byteLength,
@@ -219,7 +207,7 @@ export class AudioRecorder extends EventEmitter {
 
       if (!captureNode) {
         this.legacyProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
-        console.log('🎤 [AudioRecorder] ScriptProcessorNode fallback initialized');
+        debugLog('🎤 [AudioRecorder] ScriptProcessorNode fallback initialized');
         this.legacyProcessor.onaudioprocess = (event) => {
           const input = event.inputBuffer?.getChannelData(0);
           if (!input || input.length === 0) {
@@ -248,17 +236,17 @@ export class AudioRecorder extends EventEmitter {
         throw new Error('Unable to initialize audio capture node');
       }
 
-      console.log('🎤 [AudioRecorder] Connecting audio nodes...');
+      debugLog('🎤 [AudioRecorder] Connecting audio nodes...');
       this.source.connect(captureNode);
 
       if (captureNode === this.legacyProcessor && this.audioContext) {
         this.legacyProcessor.connect(this.audioContext.destination);
       }
-      console.log('🎤 [AudioRecorder] Audio nodes connected');
+      debugLog('🎤 [AudioRecorder] Audio nodes connected');
       
       this.isActive = true;
       this.emit('start');
-      console.log('🎤 [AudioRecorder] Continuous audio capture started successfully');
+      debugLog('🎤 [AudioRecorder] Continuous audio capture started successfully');
       
     } catch (error) {
       console.error('🎤 [AudioRecorder] Failed to start audio capture:', error);
@@ -269,10 +257,10 @@ export class AudioRecorder extends EventEmitter {
 
   stop(): void {
     if (!this.isActive) {
-      console.log('🎤 [AudioRecorder] Stop called but already inactive - ignoring duplicate stop');
+      debugLog('🎤 [AudioRecorder] Stop called but already inactive - ignoring duplicate stop');
       return;
     }
-    console.log('🎤 [AudioRecorder] Stopping audio capture');
+    debugLog('🎤 [AudioRecorder] Stopping audio capture');
     console.trace('🎤 [AudioRecorder] Stop call stack:');
     this.cleanup();
     this.isActive = false;

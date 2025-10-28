@@ -67,8 +67,6 @@
     "scripts/test-enhancements.ts",
     // Exclude legacy test files that are not currently used
     "src/hooks/useRoom.ts",
-    "src/hooks/useChatMessages.ts", 
-    "src/hooks/useDebug.ts",
     "src/components/agent-ui/AgentInterface.tsx",
     "src/components/livekit/LiveKitRoom.tsx",
     "app/livekit-demo/**"

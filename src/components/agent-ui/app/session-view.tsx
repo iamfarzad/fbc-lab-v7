@@ -11,7 +11,6 @@ import {
   type ControlBarControls,
 } from '@/components/agent-ui/livekit/agent-control-bar/agent-control-bar';
 import { useConnectionTimeout } from '@/components/agent-ui/hooks/useConnectionTimout';
-import { useDebugMode } from '@/components/agent-ui/hooks/useDebug';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
 import { AGENT_UI_CONFIG, FEATURE_FLAGS } from '@/config/constants';
@@ -27,7 +26,6 @@ import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
 
 const MotionBottom = motion.create('div');
 
-const IN_DEVELOPMENT = process.env.NODE_ENV !== 'production';
 const BOTTOM_VIEW_MOTION_PROPS = {
   variants: {
     visible: {
@@ -102,13 +100,44 @@ export const SessionView = ({
   ...props
 }: SessionViewProps) => {
   useConnectionTimeout(200_000);
-  useDebugMode({ enabled: IN_DEVELOPMENT });
 
   const { sessionId, isSessionActive } = useSession();
   
   // Single source of truth for chat messages
   const chat = useUnifiedChat({ sessionId });
   const messages = chat.messages;
+
+  // Inject a single welcome message once research is ready
+  const hasSentWelcomeRef = React.useRef(false)
+  React.useEffect(() => {
+    if (!hasAcceptedTerms) return
+    if (!researchInsights) return
+    if (researchStatus !== 'ready' && researchStatus !== 'skipped') return
+    if (hasSentWelcomeRef.current) return
+
+    const steps = (researchInsights.chainOfThought || []).map(s => ({
+      label: s.label,
+      description: s.description,
+      status: s.status,
+    }))
+    const sources = researchInsights.sources || []
+    const greetingName = (leadName || '').split(/\s+/)[0] || leadName || 'there'
+    const company = companyName || 'your team'
+
+    chat.addMessage({
+      role: 'assistant',
+      content: `Welcome ${greetingName}! I've pulled a quick brief on ${company}. Ask me anything—or say "What did you find out about me?" to review the sources.`,
+      timestamp: new Date(),
+      metadata: {
+        type: 'text',
+        sources,
+        chainOfThought: { steps },
+        reasoning: researchInsights.summary,
+      },
+    })
+
+    hasSentWelcomeRef.current = true
+  }, [hasAcceptedTerms, researchInsights, researchStatus, chat, leadName, companyName])
 
   const live = useLiveApi();
   // Shared media hook instances for both layout and controls to stay in sync
@@ -138,11 +167,19 @@ export const SessionView = ({
 
   // Chat panel states: minimized | normal | expanded
   type ChatPanelState = 'minimized' | 'normal' | 'expanded'
-  const [chatState, setChatState] = useState<ChatPanelState>(() => {
-    if (typeof window === 'undefined') return 'normal'
-    const saved = window.localStorage.getItem('fbc-live-chat-state') as ChatPanelState | null
-    return saved === 'minimized' || saved === 'expanded' || saved === 'normal' ? saved : 'normal'
-  })
+  const [chatState, setChatState] = useState<ChatPanelState>('normal')
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const saved = window.localStorage.getItem('fbc-live-chat-state') as ChatPanelState | null
+      if (saved === 'minimized' || saved === 'expanded' || saved === 'normal') {
+        setChatState(saved)
+      }
+    } catch {
+      // ignore hydration/localStorage access issues; default state is 'normal'
+    }
+  }, [])
   useEffect(() => {
     try { window.localStorage.setItem('fbc-live-chat-state', chatState) } catch {}
   }, [chatState])

@@ -1,7 +1,10 @@
 import { base64PCM16ToFloat32 } from '@/lib/audio-utils'
 
-// Debug flag - set to false to disable verbose logging
-const DEBUG_AUDIO = true
+const DEBUG_AUDIO = process.env.NEXT_PUBLIC_VOICE_VERBOSE_LOGS === 'true'
+const debugLog = (...args: Parameters<typeof console.log>) => {
+  if (!DEBUG_AUDIO) return
+  console.log(...args)
+}
 
 // Unified audio player - Google's schedule-ahead buffering pattern
 export class AudioPlayer {
@@ -41,7 +44,7 @@ export class AudioPlayer {
       const shouldForceRestart = wasQueueEmpty && !this.isPlaying && this.ctx
       if (shouldForceRestart) {
         if (DEBUG_AUDIO) {
-          console.log('🔄 [AudioPlayer] Forcing playback restart (queue was empty)')
+          debugLog('🔄 [AudioPlayer] Forcing playback restart (queue was empty)')
         }
       }
 
@@ -50,7 +53,7 @@ export class AudioPlayer {
         const chunkDurationMs = (float32.length / this.sampleRate) * 1000
         const timeSinceLastChunk = this.lastChunkTime > 0 ? now - this.lastChunkTime : 0
         
-        console.log('🔊 [AudioPlayer] Chunk received', {
+        debugLog('🔊 [AudioPlayer] Chunk received', {
           queue: this.queue.length,
           samples: float32.length,
           durationMs: chunkDurationMs.toFixed(1),
@@ -68,7 +71,7 @@ export class AudioPlayer {
       // Ensure context is valid and running before scheduling
       if (!this.ctx || this.ctx.state === 'closed') {
         if (DEBUG_AUDIO) {
-          console.log('🎵 [AudioPlayer] Recreating AudioContext (was closed/missing)')
+          debugLog('🎵 [AudioPlayer] Recreating AudioContext (was closed/missing)')
         }
         this.ensureContext()
       }
@@ -76,7 +79,7 @@ export class AudioPlayer {
       // Resume context if suspended (common after user interaction gaps)
       if (this.ctx && this.ctx.state === 'suspended') {
         if (DEBUG_AUDIO) {
-          console.log('🔊 [AudioPlayer] Resuming suspended AudioContext')
+          debugLog('🔊 [AudioPlayer] Resuming suspended AudioContext')
         }
         this.ctx.resume().catch(err => {
           console.warn('[AudioPlayer] Failed to resume AudioContext:', err)
@@ -88,7 +91,7 @@ export class AudioPlayer {
         // Google's pattern: Add initial buffer delay
         this.scheduledTime = this.ctx!.currentTime + this.initialBufferTime
         if (DEBUG_AUDIO) {
-          console.log('🎵 [AudioPlayer] Starting playback with initial buffer', {
+          debugLog('🎵 [AudioPlayer] Starting playback with initial buffer', {
             initialDelay: (this.initialBufferTime * 1000).toFixed(0) + 'ms',
             scheduleAhead: (this.scheduleAheadTime * 1000).toFixed(0) + 'ms',
             contextState: this.ctx!.state,
@@ -157,7 +160,7 @@ export class AudioPlayer {
 
       if (DEBUG_AUDIO) {
         const aheadMs = (startAt - this.ctx.currentTime) * 1000
-        console.log('⏱️ [AudioPlayer] Scheduled chunk', {
+        debugLog('⏱️ [AudioPlayer] Scheduled chunk', {
           startAt: startAt.toFixed(3) + 's',
           ahead: aheadMs.toFixed(0) + 'ms',
           duration: (buffer.duration * 1000).toFixed(1) + 'ms',
@@ -184,7 +187,7 @@ export class AudioPlayer {
         } else {
           this.isPlaying = false
           if (DEBUG_AUDIO) {
-            console.log('📭 [AudioPlayer] Queue empty, stopping playback')
+            debugLog('📭 [AudioPlayer] Queue empty, stopping playback')
           }
         }
       }, 100)
@@ -193,7 +196,7 @@ export class AudioPlayer {
 
   clear() {
     if (DEBUG_AUDIO && this.queue.length > 0) {
-      console.log('🗑️ [AudioPlayer] Clearing queue', { 
+      debugLog('🗑️ [AudioPlayer] Clearing queue', { 
         chunksDropped: this.queue.length,
         wasPlaying: this.isPlaying 
       })
@@ -212,7 +215,7 @@ export class AudioPlayer {
     this.lastChunkTime = 0
     
     if (DEBUG_AUDIO) {
-      console.log('✅ [AudioPlayer] State fully reset for next turn')
+      debugLog('✅ [AudioPlayer] State fully reset for next turn')
     }
   }
 
@@ -221,7 +224,7 @@ export class AudioPlayer {
     if (this.sampleRate === sampleRate) return
     
     if (DEBUG_AUDIO) {
-      console.log('🔄 [AudioPlayer] Sample rate changed', {
+      debugLog('🔄 [AudioPlayer] Sample rate changed', {
         from: this.sampleRate,
         to: sampleRate,
         queueCleared: this.queue.length
@@ -291,7 +294,7 @@ export class AudioPlayer {
     this.scheduledTime = this.ctx.currentTime
 
     if (DEBUG_AUDIO) {
-      console.log('🎵 [AudioPlayer] AudioContext initialized', {
+      debugLog('🎵 [AudioPlayer] AudioContext initialized', {
         requestedRate: this.sampleRate,
         actualRate: this.ctx.sampleRate,
         mismatch: this.ctx.sampleRate !== this.sampleRate,

@@ -1,5 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { useStore } from 'zustand'
+import { useMemo } from 'react'
 
 import type { UnifiedMessage, UnifiedContext } from '@/core/chat/unified-types'
 
@@ -81,15 +82,25 @@ export function useUnifiedChatMessageCount(storeId: string = UNIFIED_CHAT_STORE_
 
 export function useUnifiedChatActions(storeId: string = UNIFIED_CHAT_STORE_ID) {
   const store = getOrCreateStore(storeId)
-  return useStore(store, state => ({
-    sendMessage: state.sendMessage,
-    regenerate: state.regenerate,
-    stop: state.stop,
-    resumeStream: state.resumeStream,
-    addToolResult: state.addToolResult,
-    setMessages: state.setMessages,
-    clearError: state.clearError
-  }))
+  // Select each action independently to avoid unstable selector objects
+  const sendMessage = useStore(store, s => s.sendMessage)
+  const regenerate = useStore(store, s => s.regenerate)
+  const stop = useStore(store, s => s.stop)
+  const resumeStream = useStore(store, s => s.resumeStream)
+  const addToolResult = useStore(store, s => s.addToolResult)
+  const setMessages = useStore(store, s => s.setMessages)
+  const clearError = useStore(store, s => s.clearError)
+
+  // Memoize the combined object so identity is stable across renders
+  return useMemo(() => ({
+    sendMessage,
+    regenerate,
+    stop,
+    resumeStream,
+    addToolResult,
+    setMessages,
+    clearError
+  }), [sendMessage, regenerate, stop, resumeStream, addToolResult, setMessages, clearError])
 }
 
 export function useUnifiedChatSelector<T>(
@@ -99,4 +110,3 @@ export function useUnifiedChatSelector<T>(
   const store = getOrCreateStore(storeId)
   return useStore(store, selector)
 }
-

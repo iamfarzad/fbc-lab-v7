@@ -9,19 +9,42 @@ interface AgentUIInterfaceProps {
 }
 
 export function AgentUIInterface({ sessionId: providedSessionId, forceTermsReset }: AgentUIInterfaceProps = {}) {
-  // Generate or retrieve sessionId
-  const [sessionId] = useState(() => 
-    providedSessionId ?? 
-    (typeof window !== 'undefined' ? localStorage.getItem('fbc-session-id') : null) ?? 
-    crypto.randomUUID()
-  );
-  
-  // Store sessionId for future sessions
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Resolve session id after hydrate to keep server/client markup aligned
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('fbc-session-id', sessionId);
+    // Prefer an explicit id from the query string, then any stored value, then generate
+    const resolved = (() => {
+      if (providedSessionId && providedSessionId.trim().length > 0) {
+        return providedSessionId.trim();
+      }
+      try {
+        const stored = localStorage.getItem('fbc-session-id');
+        if (stored) return stored;
+      } catch {
+        // ignore storage access issues
+      }
+      try {
+        return crypto.randomUUID();
+      } catch {
+        // As a final fallback, derive a timestamp-based id so chat can still function
+        return `session-${Date.now()}`;
+      }
+    })();
+
+    setSessionId(resolved);
+
+    try {
+      localStorage.setItem('fbc-session-id', resolved);
+    } catch {
+      // Storage writes can fail in private mode; continue without persisting
     }
-  }, [sessionId]);
+  }, [providedSessionId]);
+
+  if (!sessionId) {
+    // Render a stable shell so SSR markup matches the first client pass
+    return <div className="h-screen w-screen bg-background" />;
+  }
 
   return (
     <div className="h-screen w-screen bg-background">
