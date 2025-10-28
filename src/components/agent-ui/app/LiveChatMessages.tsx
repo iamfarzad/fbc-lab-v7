@@ -122,14 +122,15 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 </InlineCitation>
               )}
 
-              {meta.reasoning && (
+              {/* Internal reasoning hidden from users - only show in dev mode */}
+              {process.env.NODE_ENV === 'development' && meta.reasoning && (
                 <Reasoning>
                   <ReasoningTrigger />
                   <ReasoningContent>{meta.reasoning}</ReasoningContent>
                 </Reasoning>
               )}
 
-              {meta.chainOfThought && (
+              {process.env.NODE_ENV === 'development' && meta.chainOfThought && (
                 <ChainOfThought>
                   <ChainOfThoughtHeader>Thinking Process</ChainOfThoughtHeader>
                   <ChainOfThoughtContent>
@@ -173,10 +174,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                     const sessionId =
                       (a.metadata?.sessionId as string | undefined) ??
                       (meta as any)?.sessionId;
-                    const summaryContent =
-                      typeof a.content === "string"
-                        ? a.content
-                        : JSON.stringify(a.content, null, 2);
+                    const summaryContent = serializeToText(a.content, 'artifact-summary-content');
                     if (sessionId && typeof summaryContent === "string") {
                       return (
                         <SummaryArtifact
@@ -206,9 +204,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                         <ArtifactTitle>{artifactTitle}</ArtifactTitle>
                       </ArtifactHeader>
                       <ArtifactContent>
-                        {typeof a.content === "string"
-                          ? a.content
-                          : JSON.stringify(a.content, null, 2)}
+                        <Response>{serializeToText(a.content, 'artifact-content')}</Response>
                       </ArtifactContent>
                     </Artifact>
                   );

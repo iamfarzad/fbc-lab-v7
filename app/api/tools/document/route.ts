@@ -34,16 +34,14 @@ const cachedAnalyzeDocument = createCachedFunction(
           role: 'user',
           parts: [
             { 
-              text: `Analyze this document for business insights and key information. 
+              text: `Extract and summarize the content from this document accurately. 
               Document: ${filename} (${mimeType})
               
               Provide:
-              1. A comprehensive analysis of the content
-              2. A brief summary (2-3 sentences)
-              3. Key insights relevant to business consulting
-              4. Any action items or recommendations
-              
-              Focus on practical business value and consulting opportunities.`
+              1. Document type and main topic/purpose
+              2. Key content and information present
+              3. A factual summary (2-3 sentences) 
+              4. Notable data, metrics, or specific details mentioned`
             },
             { inlineData: { data: content, mimeType } }
           ]

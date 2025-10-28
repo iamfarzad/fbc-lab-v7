@@ -7,6 +7,7 @@ import {
   ChatState
 } from '@/types/chat-enhanced';
 import type { Message, Source, CodeBlock, MessageMetadata } from '@/types/core';
+import { serializeToText } from '@/lib/text-utils';
 
 const defaultConfig: AIElementConfig = {
   showReasoning: true,
@@ -134,7 +135,7 @@ export function useAIElements(initialConfig: Partial<AIElementConfig> = {}) {
       ...extracted,
       artifacts: extracted.artifacts?.map(artifact => ({
         ...artifact,
-        content: typeof artifact.content === 'object' ? JSON.stringify(artifact.content) : artifact.content
+        content: serializeToText(artifact.content, 'ai-elements-artifact')
       }))
     } : undefined;
     

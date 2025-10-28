@@ -28,7 +28,7 @@ const cachedAnalyzeImage = createCachedFunction(
         contents: [{
           role: 'user',
           parts: [
-            { text: 'Analyze this webcam image for business context or consulting insights. Describe key elements and suggest relevant AI responses.' },
+            { text: 'Describe exactly what you see in this webcam image. Include people, objects, environment, text, and any visible details. Be factual and specific without inferring business context or making assumptions.' },
             { inlineData: { data: base64, mimeType } }
           ]
         }]

@@ -634,7 +634,8 @@ Use the conversation to uncover:
 6. Success metrics
 
 CONVERSATION STRATEGY:
-- When conversationFlow.totalUserTurns <= 1, open with the warm "Hey {name}..." welcome from the playbook and immediately ask what prompted the chat.
+- Check conversation history first: if any assistant message already contains "Welcome" or greeting language, skip the welcome and dive straight into discovery questions.
+- When conversationFlow.totalUserTurns <= 1 AND no welcome message exists in conversation history, open with the warm "Hey {name}..." welcome from the playbook and immediately ask what prompted the chat.
 - If conversationFlow.recommendedNext exists, steer your next question to that topic and skip categories that are already covered.
 - If conversationFlow.shouldOfferRecap is true, deliver a ${responseLengthLimit} recap of what you have learned so far, confirm you're aligned, and then either explore conversationFlow.recommendedNext or propose an actionable next step if none remains.
 - If conversationFlow.shouldForceExit is true, immediately provide a comprehensive recap and offer booking - do NOT ask more questions.

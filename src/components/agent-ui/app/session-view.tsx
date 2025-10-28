@@ -303,10 +303,10 @@ export const SessionView = ({
                 animate="visible"
                 exit="hidden"
                 transition={{ duration: 0.3, ease: 'easeOut' }}
-                className={cn(
-                  'mx-auto space-y-3 transition-opacity duration-300 ease-out',
-                  isExpanded ? 'max-w-3xl md:max-w-4xl' : 'max-w-2xl'
-                )}
+            className={cn(
+              'mx-auto space-y-3 transition-opacity duration-300 ease-out',
+              isExpanded ? 'max-w-3xl md:max-w-4xl' : 'max-w-2xl'
+            )}
               >
                 <LiveChatMessages messages={messages} />
               </motion.div>

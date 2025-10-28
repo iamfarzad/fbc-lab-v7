@@ -32,7 +32,7 @@ const cachedAnalyzeImage = createCachedFunction(
           role: 'user',
           parts: [
             { 
-              text: 'Analyze this image for business context or consulting insights. Describe key elements and suggest relevant AI responses.' 
+              text: 'Describe exactly what you see in this image. Include objects, people, text, colors, setting, and any visible details. Be factual and specific without inferring business context or making assumptions.'
             },
             { inlineData: { data: base64, mimeType } }
           ]

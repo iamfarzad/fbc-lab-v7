@@ -53,7 +53,7 @@ const cachedAnalyzeUrl = createCachedFunction(
         contents: [{
           role: 'user',
           parts: [{
-            text: `Analyze this web page content for business insights and key information.
+            text: `Extract and summarize the content from this web page accurately.
             
             URL: ${url}
             Title: ${title}
@@ -63,12 +63,9 @@ const cachedAnalyzeUrl = createCachedFunction(
             ${html.substring(0, 8000)}
             
             Provide:
-            1. A comprehensive analysis of the content
-            2. Key business insights and opportunities
-            3. Technical observations
-            4. Recommendations for consulting engagement
-            
-            Focus on practical business value and consulting opportunities.`
+            1. What type of website/page this is and its main purpose
+            2. Key content, information, and data present
+            3. Notable features, sections, or functionality mentioned`
           }]
         }]
       })

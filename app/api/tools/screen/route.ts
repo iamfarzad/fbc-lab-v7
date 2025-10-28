@@ -88,6 +88,20 @@ export async function POST(req: NextRequest) {
 
     if (!image) return respond.badRequest('No image data provided')
 
+    // Validate image data format and size
+    if (!image.startsWith('data:image/')) {
+      return respond.badRequest('Invalid image format - must be base64 data URL')
+    }
+    
+    const base64Data = image.split(',')[1]
+    if (!base64Data || base64Data.length < 100) {
+      return respond.badRequest('Invalid or corrupted image data')
+    }
+    
+    // Check reasonable size limits (10MB max)
+    if (image.length > 10 * 1024 * 1024) {
+      return respond.badRequest('Image too large - maximum 10MB supported')
+    }
 
     estimatedTokens = 3000 // Fixed value for image analysis
     const modelSelection = selectModelForFeature('image_analysis', 0, true)
@@ -105,15 +119,21 @@ export async function POST(req: NextRequest) {
     let analysisResult = ''
 
     try {
-      // 🔍 ENHANCED SCREEN ANALYSIS PROMPT
-      let analysisPrompt = 'Analyze this screen for business insights'
+      // 🔍 OBJECTIVE SCREEN ANALYSIS PROMPT - Fixed hallucination bug
+      let analysisPrompt = `Describe exactly what you see on this screen. Include:
+- What application, website, or interface is displayed
+- Specific text, headings, and content visible
+- UI elements, buttons, and layout structure  
+- Any data, numbers, charts, or metrics shown
+- Colors, branding, or visual elements
+Be factual and specific. Do not infer business context or make assumptions beyond what is literally visible.`
 
       if (context?.prompt) {
-        analysisPrompt += ` with focus on: ${context.prompt}`
+        analysisPrompt += `\n\nAdditional focus: ${context.prompt}`
       }
 
       if (context?.trigger === 'manual') {
-        analysisPrompt += '. Provide detailed manual analysis.'
+        analysisPrompt += '\n\nProvide detailed manual analysis of what is visible.'
       }
 
       const optimizedConfig = createOptimizedConfig('analysis', { maxOutputTokens: 1024, temperature: 0.3, topP: 0.8, topK: 40 })
@@ -153,14 +173,17 @@ export async function POST(req: NextRequest) {
         if (capability === 'screenshot') await recordCapabilityUsed(String(sessionId), 'screenShare', { alias: true })
 
 
-        // Add visual analysis to multimodal context
-        await multimodalContextManager.addVisualAnalysis(
-          String(sessionId),
-          analysisResult,
-          type === 'document' ? 'upload' : 'screen',
-          image.length,
-          image
-        )
+        // Add visual analysis to multimodal context with contamination protection
+        const sanitizedAnalysis = analysisResult?.trim()
+        if (sanitizedAnalysis && sanitizedAnalysis.length > 10 && !sanitizedAnalysis.includes('I cannot')) {
+          await multimodalContextManager.addVisualAnalysis(
+            String(sessionId),
+            sanitizedAnalysis,
+            type === 'document' ? 'upload' : 'screen',
+            image.length,
+            image
+          )
+        }
       } catch {
         // Context enrichment is best-effort; ignore downstream errors
       }
