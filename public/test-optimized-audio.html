@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimized Audio Recorder Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .start { background: #4CAF50; color: white; }
+        .stop { background: #f44336; color: white; }
+        .test { background: #2196F3; color: white; }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #333;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .metric {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #ccc;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎤 Optimized Audio Recorder Test</h1>
+    <p>Testing the new optimized audio recorder with reduced latency and improved quality.</p>
+    
+    <div class="controls">
+        <button id="startBtn" class="start">Start Recording</button>
+        <button id="stopBtn" class="stop" disabled>Stop Recording</button>
+        <button id="testBtn" class="test">Generate Test Audio</button>
+    </div>
+    
+    <div class="status" id="status">
+        Status: Ready to test optimized audio recording
+    </div>
+    
+    <div class="metrics">
+        <div class="metric">
+            <div class="metric-value" id="chunkRate">0</div>
+            <div class="metric-label">Chunks/Second</div>
+        </div>
+        <div class="metric">
+            <div class="metric-value" id="bufferSize">0</div>
+            <div class="metric-label">Buffer Size (samples)</div>
+        </div>
+        <div class="metric">
+            <div class="metric-value" id="latency">0</div>
+            <div class="metric-label">Latency (ms)</div>
+        </div>
+        <div class="metric">
+            <div class="metric-value" id="totalChunks">0</div>
+            <div class="metric-label">Total Chunks</div>
+        </div>
+    </div>
+    
+    <h3>Audio Quality Improvements:</h3>
+    <ul>
+        <li>✅ Reduced buffer size from 4096 to 1024 samples (4x lower latency)</li>
+        <li>✅ Increased chunk frequency from ~4 to ~15 chunks/second</li>
+        <li>✅ Simplified AudioWorklet processing pipeline</li>
+        <li>✅ Removed external file dependency and fallback complexity</li>
+        <li>✅ Optimized Float32 to Int16 conversion</li>
+        <li>✅ Minimal processing overhead</li>
+    </ul>
+
+    <script>
+        // Optimized AudioWorklet implementation (matching the new audio-recorder.ts)
+        const OPTIMIZED_AUDIO_WORKLET_SOURCE = `class AudioProcessor extends AudioWorkletProcessor {
+          constructor() {
+            super();
+            // Reduced buffer size: 1024 samples = 64ms at 16kHz
+            // This provides ~15 chunks/second for better responsiveness
+            this.bufferSize = 1024;
+            this.buffer = new Float32Array(this.bufferSize);
+            this.bufferIndex = 0;
+          }
+
+          process(inputs) {
+            const input = inputs[0];
+            if (input.length > 0) {
+              const inputChannel = input[0];
+              
+              // Direct processing without intermediate buffering when possible
+              for (let i = 0; i < inputChannel.length; i++) {
+                this.buffer[this.bufferIndex] = inputChannel[i];
+                this.bufferIndex++;
+                
+                if (this.bufferIndex >= this.bufferSize) {
+                  // Optimized Float32 to Int16 conversion with minimal processing
+                  const int16Buffer = new Int16Array(this.bufferSize);
+                  for (let j = 0; j < this.bufferSize; j++) {
+                    const sample = this.buffer[j];
+                    // Fast clamping and conversion
+                    const clamped = Math.max(-1, Math.min(1, sample));
+                    int16Buffer[j] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF;
+                  }
+                  
+                  // Send immediately without delay
+                  this.port.postMessage({
+                    type: 'audioData',
+                    data: int16Buffer.buffer
+                  });
+                  
+                  this.bufferIndex = 0;
+                }
+              }
+            }
+            
+            return true; // Keep processor alive
+          }
+        }
+
+        registerProcessor('audio-processor', AudioProcessor);
+        `;
+
+        class OptimizedAudioRecorder {
+            constructor() {
+                this.audioContext = null;
+                this.source = null;
+                this.recordingWorklet = null;
+                this.stream = null;
+                this.isActive = false;
+                this.chunkCount = 0;
+                this.firstChunkTime = null;
+                this.lastChunkTime = null;
+            }
+
+            async start() {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            channelCount: 1,
+                            sampleRate: 16000,
+                            sampleSize: 16,
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false,
+                        }
+                    });
+
+                    this.audioContext = new AudioContext({ sampleRate: 16000 });
+                    await this.audioContext.resume();
+
+                    this.source = this.audioContext.createMediaStreamSource(this.stream);
+
+                    if (this.audioContext.audioWorklet) {
+                        const blob = new Blob([OPTIMIZED_AUDIO_WORKLET_SOURCE], { type: 'application/javascript' });
+                        const url = URL.createObjectURL(blob);
+
+                        try {
+                            await this.audioContext.audioWorklet.addModule(url);
+                            this.recordingWorklet = new AudioWorkletNode(this.audioContext, 'audio-processor');
+                            
+                            this.recordingWorklet.port.onmessage = (event) => {
+                                if (event.data.type === 'audioData') {
+                                    this.handleAudioData(event.data.data);
+                                }
+                            };
+
+                            this.source.connect(this.recordingWorklet);
+                            this.isActive = true;
+                            updateStatus('Recording with optimized AudioWorklet ✅');
+                        } finally {
+                            URL.revokeObjectURL(url);
+                        }
+                    }
+                } catch (error) {
+                    updateStatus('Error: ' + error.message);
+                }
+            }
+
+            handleAudioData(arrayBuffer) {
+                this.chunkCount++;
+                const now = Date.now();
+                
+                if (!this.firstChunkTime) {
+                    this.firstChunkTime = now;
+                }
+                this.lastChunkTime = now;
+
+                // Update metrics
+                const bufferSize = arrayBuffer.byteLength / 2; // 16-bit samples
+                const latency = 64; // 1024 samples / 16000 Hz * 1000 = 64ms
+                
+                document.getElementById('bufferSize').textContent = bufferSize;
+                document.getElementById('latency').textContent = latency;
+                document.getElementById('totalChunks').textContent = this.chunkCount;
+
+                // Calculate chunks per second
+                if (this.firstChunkTime && this.lastChunkTime && this.lastChunkTime > this.firstChunkTime) {
+                    const duration = (this.lastChunkTime - this.firstChunkTime) / 1000;
+                    const chunkRate = this.chunkCount / duration;
+                    document.getElementById('chunkRate').textContent = chunkRate.toFixed(1);
+                }
+            }
+
+            stop() {
+                if (this.recordingWorklet) {
+                    this.recordingWorklet.disconnect();
+                    this.recordingWorklet = null;
+                }
+                if (this.source) {
+                    this.source.disconnect();
+                    this.source = null;
+                }
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                this.isActive = false;
+                updateStatus('Recording stopped');
+            }
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = 'Status: ' + message;
+        }
+
+        function generateTestAudio() {
+            updateStatus('Generating test audio signal...');
+            
+            // Create a simple test tone to verify audio quality
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const duration = 2; // 2 seconds
+            const sampleRate = 16000;
+            const frequency = 440; // A4 note
+            
+            const buffer = audioContext.createBuffer(1, duration * sampleRate, sampleRate);
+            const channel = buffer.getChannelData(0);
+            
+            for (let i = 0; i < channel.length; i++) {
+                channel[i] = Math.sin(2 * Math.PI * frequency * i / sampleRate) * 0.3;
+            }
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start();
+            
+            updateStatus('Playing 440Hz test tone for 2 seconds... 🎵');
+        }
+
+        const recorder = new OptimizedAudioRecorder();
+        
+        document.getElementById('startBtn').addEventListener('click', async () => {
+            await recorder.start();
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+        });
+        
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            recorder.stop();
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        });
+        
+        document.getElementById('testBtn').addEventListener('click', generateTestAudio);
+    </script>
+</body>
+</html>

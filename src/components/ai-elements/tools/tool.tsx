@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { ToolUIPart } from "ai";
+import { serializeToText } from "@/lib/text-utils";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
@@ -115,7 +116,7 @@ export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
       Parameters
     </h4>
     <div className="rounded-md bg-muted/30">
-      <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
+      <CodeBlock code={serializeToText(input, 'tool-input')} language="json" />
     </div>
   </div>
 );
@@ -139,7 +140,7 @@ export const ToolOutput = ({
 
   if (typeof output === "object") {
     Output = (
-      <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />
+      <CodeBlock code={serializeToText(output, 'tool-output')} language="json" />
     );
   } else if (typeof output === "string") {
     Output = <CodeBlock code={output} language="json" />;

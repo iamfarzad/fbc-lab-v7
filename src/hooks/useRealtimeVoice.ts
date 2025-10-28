@@ -675,7 +675,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         if (audioPlayerRef.current.contextState === 'suspended') {
           console.warn('🔊 [RealtimeVoice] AudioContext is suspended, attempting to resume');
           await audioPlayerRef.current.resume();
-          setAudioContextState(audioPlayerRef.current.contextState ?? 'unknown')
+          setAudioContextState(audioPlayerRef.current.contextState as 'suspended' | 'running' | 'closed' | 'unknown')
         }
 
         try {

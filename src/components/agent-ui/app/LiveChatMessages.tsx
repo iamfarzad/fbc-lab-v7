@@ -122,17 +122,17 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 </InlineCitation>
               )}
 
-              {/* Internal reasoning hidden from users - only show in dev mode */}
-              {process.env.NODE_ENV === 'development' && meta.reasoning && (
+              {/* AI Elements reasoning components - designed to show AI thinking to users */}
+              {meta.reasoning && (
                 <Reasoning>
                   <ReasoningTrigger />
                   <ReasoningContent>{meta.reasoning}</ReasoningContent>
                 </Reasoning>
               )}
 
-              {process.env.NODE_ENV === 'development' && meta.chainOfThought && (
+              {meta.chainOfThought && (
                 <ChainOfThought>
-                  <ChainOfThoughtHeader>Thinking Process</ChainOfThoughtHeader>
+                  <ChainOfThoughtHeader>Research Process</ChainOfThoughtHeader>
                   <ChainOfThoughtContent>
                     {meta.chainOfThought.steps.map((step, idx) => (
                       <ChainOfThoughtStep
