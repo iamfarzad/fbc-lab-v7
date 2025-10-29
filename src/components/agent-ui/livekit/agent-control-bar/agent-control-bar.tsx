@@ -21,6 +21,12 @@ import { toast } from 'sonner'
 import { useRef } from 'react'
 import { VoiceIcon } from '@/components/ui/voice-button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 // useSession already imported above
 
 export interface ControlBarControls {
@@ -209,151 +215,217 @@ export function AgentControlBar({
         />
       )}
 
-      <div className="flex gap-2">
-        <div className="flex grow gap-2">
-          {/* Toggle Microphone */}
-          {visibleControls.microphone && (
-            <Toggle
-              size="icon"
-              variant="secondary"
-              aria-label="Toggle microphone"
-              pressed={liveApi.isRecording}
-              onPressedChange={() => adapter.toggleMicrophone()}
-              className={cn(
-                'transition-all duration-200',
-                liveApi.isRecording && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
-              )}
-            >
-              <VoiceIcon 
-                size={16} 
-                isActive={liveApi.isRecording} 
-                isProcessing={false}
-              />
-            </Toggle>
-          )}
-
-          {/* Toggle Camera */}
-          {visibleControls.camera && (
-            <Toggle
-              size="icon"
-              variant="secondary"
-              aria-label="Toggle camera"
-              pressed={camera.isActive}
-              onPressedChange={() => {
-                if (camera.isActive) camera.stopCamera(); else void camera.startCamera();
-              }}
-              className={cn(
-                'transition-all duration-200',
-                camera.isActive && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
-              )}
-            >
-              <CameraIcon weight="bold" />
-            </Toggle>
-          )}
-
-          {/* Toggle Screen Share */}
-          {visibleControls.screenShare && (
-            <Toggle
-              size="icon"
-              variant="secondary"
-              aria-label="Toggle screen share"
-              pressed={screenShare.isActive}
-              onPressedChange={() => {
-                if (screenShare.isActive) screenShare.stopScreenShare(); else void screenShare.startScreenShare();
-              }}
-              className={cn(
-                'transition-all duration-200',
-                screenShare.isActive && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
-              )}
-            >
-              <MonitorIcon weight="bold" />
-            </Toggle>
-          )}
-
-          {/* Toggle Transcript */}
-          <Toggle
-            size="icon"
-            variant="secondary"
-            aria-label="Toggle transcript"
-            pressed={chatState ? chatState !== 'minimized' : chatOpenInternal}
-            onPressedChange={handleToggleTranscript}
-            className={cn(
-              'transition-all duration-200',
-              (chatState ? chatState !== 'minimized' : chatOpenInternal) && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+      <TooltipProvider>
+        <div className="flex gap-2">
+          <div className="flex grow gap-2">
+            {/* Toggle Microphone */}
+            {visibleControls.microphone && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Toggle
+                    size="icon"
+                    variant="secondary"
+                    aria-label="Toggle microphone"
+                    pressed={liveApi.isRecording}
+                    onPressedChange={() => adapter.toggleMicrophone()}
+                    className={cn(
+                      'transition-all duration-200',
+                      liveApi.isRecording && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+                    )}
+                  >
+                    <VoiceIcon 
+                      size={16} 
+                      isActive={liveApi.isRecording} 
+                      isProcessing={false}
+                    />
+                  </Toggle>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {liveApi.isRecording ? 'Unmute microphone' : 'Mute microphone'}
+                </TooltipContent>
+              </Tooltip>
             )}
-          >
-            <ChatTextIcon weight="bold" />
-          </Toggle>
 
-          {/* Hidden File Input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,application/pdf,text/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-
-          {/* Actions Dropdown Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Toggle
-                size="icon"
-                variant="secondary"
-                aria-label="More actions"
-                pressed={false}
-                className="transition-all duration-200"
-              >
-                <PlusIcon weight="bold" />
-              </Toggle>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={handleFileButtonClick} className="cursor-pointer">
-                <PaperclipIcon className="mr-2 h-4 w-4" />
-                Upload files
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportSummary} className="cursor-pointer">
-                <DownloadSimpleIcon className="mr-2 h-4 w-4" />
-                Export summary PDF
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSchedule} className="cursor-pointer">
-                <CalendarBlankIcon className="mr-2 h-4 w-4" />
-                Schedule a call
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        {/* Disconnect */}
-        {visibleControls.leave && (
-          <Button
-            variant="destructive"
-            onClick={handleDisconnect}
-            disabled={!isSessionActive}
-            className={cn(
-              'transition-all duration-200',
-              'hover:scale-[1.02] active:scale-[0.98]',
-              'shadow-sm hover:shadow-md',
-              'relative overflow-hidden p-0',
-              !isSessionActive && 'opacity-50 cursor-not-allowed'
+            {/* Toggle Camera */}
+            {visibleControls.camera && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Toggle
+                    size="icon"
+                    variant="secondary"
+                    aria-label="Toggle camera"
+                    pressed={camera.isActive}
+                    onPressedChange={() => {
+                      if (camera.isActive) camera.stopCamera(); else void camera.startCamera();
+                    }}
+                    className={cn(
+                      'transition-all duration-200',
+                      camera.isActive && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+                    )}
+                  >
+                    <CameraIcon weight="bold" />
+                  </Toggle>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {camera.isActive ? 'Turn off camera' : 'Turn on camera'}
+                </TooltipContent>
+              </Tooltip>
             )}
-            style={{ width: '548px', height: '80px' }}
-          >
-            <LiveWaveform
-              mode="scrolling"
-              active={true}
-              height={80}
-              barWidth={3}
-              barGap={2}
-              barColor="currentColor"
-              fadeEdges={true}
-              className="block h-full w-full"
+
+            {/* Toggle Screen Share */}
+            {visibleControls.screenShare && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Toggle
+                    size="icon"
+                    variant="secondary"
+                    aria-label="Toggle screen share"
+                    pressed={screenShare.isActive}
+                    onPressedChange={() => {
+                      if (screenShare.isActive) screenShare.stopScreenShare(); else void screenShare.startScreenShare();
+                    }}
+                    className={cn(
+                      'transition-all duration-200',
+                      screenShare.isActive && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+                    )}
+                  >
+                    <MonitorIcon weight="bold" />
+                  </Toggle>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {screenShare.isActive ? 'Stop screen share' : 'Share screen'}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Toggle Transcript */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Toggle
+                  size="icon"
+                  variant="secondary"
+                  aria-label="Toggle transcript"
+                  pressed={chatState ? chatState !== 'minimized' : chatOpenInternal}
+                  onPressedChange={handleToggleTranscript}
+                  className={cn(
+                    'transition-all duration-200',
+                    (chatState ? chatState !== 'minimized' : chatOpenInternal) && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+                  )}
+                >
+                  <ChatTextIcon weight="bold" />
+                </Toggle>
+              </TooltipTrigger>
+              <TooltipContent>
+                {(chatState ? chatState !== 'minimized' : chatOpenInternal) ? 'Hide transcript' : 'Show transcript'}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Hidden File Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,application/pdf,text/*"
+              className="hidden"
+              onChange={handleFileChange}
             />
+
+            {/* Actions Dropdown Menu */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Toggle
+                      size="icon"
+                      variant="secondary"
+                      aria-label="More actions"
+                      pressed={false}
+                      className="transition-all duration-200"
+                    >
+                      <PlusIcon weight="bold" />
+                    </Toggle>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleFileButtonClick} className="cursor-pointer">
+                      <PaperclipIcon className="mr-2 h-4 w-4" />
+                      Upload files
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportSummary} className="cursor-pointer">
+                      <DownloadSimpleIcon className="mr-2 h-4 w-4" />
+                      Export summary PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSchedule} className="cursor-pointer">
+                      <CalendarBlankIcon className="mr-2 h-4 w-4" />
+                      Schedule a call
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TooltipTrigger>
+              <TooltipContent>
+                More actions
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Disconnect */}
+          {visibleControls.leave && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="destructive"
+                  onClick={handleDisconnect}
+                  disabled={!isSessionActive}
+                  className={cn(
+                    'transition-all duration-200',
+                    'hover:scale-[1.02] active:scale-[0.98]',
+                    'shadow-sm hover:shadow-md',
+                    'relative overflow-hidden p-0',
+                    'h-8 w-[120px] md:h-10 md:w-[200px]',
+                    !isSessionActive && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+            <div className={cn(
+              "flex h-full items-center gap-2 rounded-md py-1",
+              "bg-foreground/5 text-foreground/70",
+              "relative w-full"
+            )}>
+              <div className="h-full flex-1">
+                <div className="relative flex h-full w-full shrink-0 items-center justify-center overflow-hidden rounded-sm">
+                  <LiveWaveform
+                    mode="scrolling"
+                    active={isSessionActive}
+                    height={20}
+                    barWidth={3}
+                    barGap={1}
+                    barRadius={4}
+                    barColor="currentColor"
+                    fadeEdges={true}
+                    fadeWidth={24}
+                    className={cn(
+                      "h-full w-full transition-opacity duration-300",
+                      !isSessionActive && "opacity-0"
+                    )}
+                  />
+                  {!isSessionActive && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-foreground/50 text-[10px] font-medium">
+                        Start Recording
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isSessionActive ? 'End call' : 'Start session'}
+            </TooltipContent>
+          </Tooltip>
         )}
-      </div>
+        </div>
+      </TooltipProvider>
     </div>
   );
 }
