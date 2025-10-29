@@ -2,6 +2,8 @@ import { vercelCache } from '@/lib/vercel-cache'
 import { getSupabaseService } from '@/src/lib/supabase'
 import { MultimodalContext, ConversationEntry, AudioEntry, VisualEntry, UploadEntry } from './context-types'
 import { createInitialContext } from './multimodal-context'
+import { redisQueue } from '../queue/redis-queue'
+import { JobType } from '../queue/job-types'
 
 interface WALEntry {
   id: string
@@ -47,15 +49,28 @@ class WriteAheadLog {
       }
     }
 
-    // 2. Add to pending queue
+    // 2. Add to pending queue (in-memory for recovery)
     const pending = this.pendingWrites.get(sessionId) || []
     pending.push(entry)
     this.pendingWrites.set(sessionId, pending)
 
-    // 3. Try background sync to Supabase (non-blocking)
-    this.backgroundSync(sessionId).catch(err =>
-      console.error('Background WAL sync failed:', err)
-    )
+    // 3. Enqueue job for background sync to Supabase via Redis queue
+    redisQueue.enqueue(JobType.WAL_SYNC, {
+      sessionId: entry.sessionId,
+      entryId: entry.id,
+      operation: entry.operation,
+      payload: entry.payload,
+      timestamp: entry.timestamp
+    }, {
+      priority: 'medium',
+      maxAttempts: 3
+    }).catch(err => {
+      console.error('Failed to enqueue WAL sync job (non-fatal):', err)
+      // Fallback to old fire-and-forget method if queue fails
+      this.backgroundSync(sessionId).catch(fallbackErr =>
+        console.error('Background WAL sync fallback failed:', fallbackErr)
+      )
+    })
   }
 
   private async backgroundSync(sessionId: string): Promise<void> {
