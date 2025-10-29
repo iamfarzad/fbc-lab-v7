@@ -1,7 +1,7 @@
 'use client';
 
 import { type HTMLAttributes, useCallback, useState } from 'react';
-import { ChatTextIcon, PhoneDisconnectIcon, MicrophoneIcon, CameraIcon, MonitorIcon, PaperclipIcon, DownloadSimpleIcon, CalendarBlankIcon, PlusIcon } from '@phosphor-icons/react/dist/ssr';
+import { ChatTextIcon, CameraIcon, MonitorIcon, PaperclipIcon, DownloadSimpleIcon, CalendarBlankIcon, PlusIcon } from '@phosphor-icons/react/dist/ssr';
 import { useSession } from '@/components/agent-ui/app/session-context';
 import { Button } from '@/components/agent-ui/livekit/button';
 import { Toggle } from '@/components/agent-ui/livekit/toggle';
@@ -19,6 +19,8 @@ import { useLiveApi } from '@/hooks/useLiveApi';
 import { CONTACT_CONFIG } from '@/config/constants'
 import { toast } from 'sonner'
 import { useRef } from 'react'
+import { VoiceIcon } from '@/components/ui/voice-button';
+import { LiveWaveform } from '@/components/ui/live-waveform';
 // useSession already imported above
 
 export interface ControlBarControls {
@@ -190,7 +192,10 @@ export function AgentControlBar({
     <div
       aria-label="Voice assistant controls"
       className={cn(
-        'bg-background border-input/50 dark:border-muted flex flex-col rounded-[31px] border p-3 drop-shadow-md/3',
+        'bg-background/95 backdrop-blur-sm border-input/50 dark:border-muted/50',
+        'flex flex-col rounded-3xl border p-3',
+        'shadow-lg shadow-black/5 dark:shadow-black/20',
+        'transition-shadow duration-200 hover:shadow-xl hover:shadow-black/10',
         className
       )}
       {...props}
@@ -204,8 +209,8 @@ export function AgentControlBar({
         />
       )}
 
-      <div className="flex gap-1">
-        <div className="flex grow gap-1">
+      <div className="flex gap-2">
+        <div className="flex grow gap-2">
           {/* Toggle Microphone */}
           {visibleControls.microphone && (
             <Toggle
@@ -214,8 +219,16 @@ export function AgentControlBar({
               aria-label="Toggle microphone"
               pressed={liveApi.isRecording}
               onPressedChange={() => adapter.toggleMicrophone()}
+              className={cn(
+                'transition-all duration-200',
+                liveApi.isRecording && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+              )}
             >
-              <MicrophoneIcon weight="bold" />
+              <VoiceIcon 
+                size={16} 
+                isActive={liveApi.isRecording} 
+                isProcessing={false}
+              />
             </Toggle>
           )}
 
@@ -229,6 +242,10 @@ export function AgentControlBar({
               onPressedChange={() => {
                 if (camera.isActive) camera.stopCamera(); else void camera.startCamera();
               }}
+              className={cn(
+                'transition-all duration-200',
+                camera.isActive && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+              )}
             >
               <CameraIcon weight="bold" />
             </Toggle>
@@ -244,6 +261,10 @@ export function AgentControlBar({
               onPressedChange={() => {
                 if (screenShare.isActive) screenShare.stopScreenShare(); else void screenShare.startScreenShare();
               }}
+              className={cn(
+                'transition-all duration-200',
+                screenShare.isActive && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+              )}
             >
               <MonitorIcon weight="bold" />
             </Toggle>
@@ -256,6 +277,10 @@ export function AgentControlBar({
             aria-label="Toggle transcript"
             pressed={chatState ? chatState !== 'minimized' : chatOpenInternal}
             onPressedChange={handleToggleTranscript}
+            className={cn(
+              'transition-all duration-200',
+              (chatState ? chatState !== 'minimized' : chatOpenInternal) && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+            )}
           >
             <ChatTextIcon weight="bold" />
           </Toggle>
@@ -278,6 +303,7 @@ export function AgentControlBar({
                 variant="secondary"
                 aria-label="More actions"
                 pressed={false}
+                className="transition-all duration-200"
               >
                 <PlusIcon weight="bold" />
               </Toggle>
@@ -306,11 +332,25 @@ export function AgentControlBar({
             variant="destructive"
             onClick={handleDisconnect}
             disabled={!isSessionActive}
-            className="font-mono"
+            className={cn(
+              'transition-all duration-200',
+              'hover:scale-[1.02] active:scale-[0.98]',
+              'shadow-sm hover:shadow-md',
+              'relative overflow-hidden p-0',
+              !isSessionActive && 'opacity-50 cursor-not-allowed'
+            )}
+            style={{ width: '548px', height: '80px' }}
           >
-            <PhoneDisconnectIcon weight="bold" />
-            <span className="hidden md:inline">END CALL</span>
-            <span className="inline md:hidden">END</span>
+            <LiveWaveform
+              mode="scrolling"
+              active={true}
+              height={80}
+              barWidth={3}
+              barGap={2}
+              barColor="currentColor"
+              fadeEdges={true}
+              className="block h-full w-full"
+            />
           </Button>
         )}
       </div>

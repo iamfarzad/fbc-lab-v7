@@ -74,7 +74,11 @@ function useInlineRecorder(options: { targetSampleRate?: number } = {}) {
 
   const handleWorkletError = useCallback((err: Error) => {
     console.error('🎤 [InlineRecorder] AudioWorklet error:', err);
-    setError(err.message);
+    if (err.name === 'NotAllowedError') {
+      setError('Microphone permission denied. Please grant access in browser settings.');
+    } else {
+      setError(err.message);
+    }
   }, []);
 
   const startRecording = useCallback(async (opts?: { onChunk?: (chunk: MediaRecorderVoiceResult) => void }) => {
@@ -398,34 +402,43 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     debugLog('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
     lastStartOptsRef.current = opts ?? {};
     
-    // If socket isn't ready yet, attempt a quick connect-and-wait before failing
+    // If socket isn't ready yet, attempt to connect with retries
     if (!isSocketReady || !liveRef.current) {
-      try {
-        liveRef.current?.connect()
-        const ok = await new Promise<boolean>((resolve) => {
-          let settled = false
-          const timeout = setTimeout(() => { if (!settled) { settled = true; resolve(false) } }, 2000)
-          const off = liveRef.current?.on('open', () => {
-            if (!settled) { 
-              settled = true
-              clearTimeout(timeout)
-              if (off) off()
-              resolve(true)
-            }
-          })
-        })
-        if (!ok) {
-          const message = 'Voice server not ready'
-          console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after wait:', { isSocketReady, serverUrl })
-          setError(message)
-          callbacksRef.current?.onError?.(message)
-          return
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          liveRef.current?.connect();
+          const ok = await new Promise<boolean>((resolve) => {
+            let settled = false;
+            const timeout = setTimeout(() => {
+              if (!settled) {
+                settled = true;
+                resolve(false);
+              }
+            }, 2000);
+            const off = liveRef.current?.on('open', () => {
+              if (!settled) {
+                settled = true;
+                clearTimeout(timeout);
+                if (off) off();
+                resolve(true);
+              }
+            });
+          });
+          if (ok) break;
+        } catch {}
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
         }
-      } catch {
-        const message = 'Voice server not ready'
-        setError(message)
-        callbacksRef.current?.onError?.(message)
-        return
+      }
+      if (!isSocketReady) {
+        const message = 'Voice server not ready after retries';
+        console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after retries:', { attempts, isSocketReady, serverUrl });
+        setError(message);
+        callbacksRef.current?.onError?.(message);
+        return;
       }
     }
 

@@ -13,7 +13,7 @@ export type VoiceButtonState =
   | "success"
   | "error";
 
-const VoiceIcon = ({
+export const VoiceIcon = ({
   size = 16,
   isActive = false,
   isProcessing = false,
