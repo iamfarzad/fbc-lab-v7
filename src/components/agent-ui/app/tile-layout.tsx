@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { useCamera } from '@/hooks/useCamera'
 import { useScreenShare } from '@/hooks/useScreenShare'
 import { useLiveApi } from '@/hooks/useLiveApi'
-import { FbcBarVisualizer } from '@/components/agent-ui/FbcBarVisualizer'
+import { FbcMatrixVisualizer } from '@/components/agent-ui/FbcMatrixVisualizer'
 
 const MotionContainer = motion.create('div');
 
@@ -127,12 +127,12 @@ export function TileLayout({ chatOpen, camera, screen }: TileLayoutProps) {
                     delay: animationDelay,
                   }}
                   className={cn(
-                    'bg-background aspect-square h-[90px] rounded-md border border-transparent transition-[border,drop-shadow]',
+                    'bg-background aspect-square h-[90px] rounded-md border border-transparent transition-[border,drop-shadow] overflow-hidden',
                     chatOpen && 'border-input/50 drop-shadow-lg/10 delay-200'
                   )}
                 >
-                  <div className="flex h-full items-center justify-center">
-                    <FbcBarVisualizer barCount={5} />
+                  <div className="flex h-full w-full items-center justify-center overflow-hidden">
+                    <FbcMatrixVisualizer variant="expanded" />
                   </div>
                 </MotionContainer>
               )}

@@ -1,10 +1,10 @@
 'use client';
 
 import {
-  BarVisualizer,
   type TrackReferenceOrPlaceholder,
   useTrackToggle,
 } from '@livekit/components-react';
+import { FbcMatrixVisualizer } from '@/components/agent-ui/FbcMatrixVisualizer';
 import { TrackDeviceSelect } from '@/components/agent-ui/livekit/agent-control-bar/track-device-select';
 import { TrackToggle } from '@/components/agent-ui/livekit/agent-control-bar/track-toggle';
 import { cn } from '@/lib/utils';
@@ -47,20 +47,9 @@ export function TrackSelector({
         className="peer/track group/track has-[.audiovisualizer]:w-auto has-[~_button]:rounded-r-none has-[~_button]:pr-2 has-[~_button]:pl-3"
       >
         {audioTrackRef && (
-          <BarVisualizer
-            barCount={3}
-            options={{ minHeight: 5 }}
-            trackRef={audioTrackRef}
-            className="audiovisualizer flex h-6 w-auto items-center justify-center gap-0.5"
-          >
-            <span
-              className={cn([
-                'h-full w-0.5 origin-center rounded-2xl',
-                'group-data-[state=on]/track:bg-foreground group-data-[state=off]/track:bg-destructive',
-                'data-lk-muted:bg-muted',
-              ])}
-            />
-          </BarVisualizer>
+          <div className="audiovisualizer flex h-6 w-auto items-center justify-center gap-0.5 overflow-hidden">
+            <FbcMatrixVisualizer variant="minimized" />
+          </div>
         )}
       </TrackToggle>
       <hr className="bg-border peer-data-[state=off]/track:bg-destructive/20 relative z-10 -mr-px hidden h-4 w-px border-none has-[~_button]:block" />
