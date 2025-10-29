@@ -35,6 +35,10 @@ import { MESSAGE_TYPES } from './message-types.js'
   // Turn completion timeout configuration
   const TURN_COMPLETION_TIMEOUT_MS = 3000; // 3 seconds of silence = turn complete
 
+  // Logging configuration
+  const DEBUG_MODE = process.env.WEBSOCKET_DEBUG === 'true'
+  const AUDIO_LOG_INTERVAL = 50 // Log audio stats every N chunks to reduce spam
+
   // Helper function to send turn completion and clear timer
   function sendTurnComplete(connectionId: string, client: ActiveSessionRecord, reason: string) {
     console.info(`[${connectionId}] 🔄 Sending turn_complete (reason: ${reason})`);
@@ -60,7 +64,10 @@ import { MESSAGE_TYPES } from './message-types.js'
       sendTurnComplete(connectionId, client, 'timeout_silence');
     }, TURN_COMPLETION_TIMEOUT_MS);
     
-    console.log(`[${connectionId}] ⏰ Turn completion timer reset (${TURN_COMPLETION_TIMEOUT_MS}ms timeout)`);
+    // Only log timer reset in debug mode (too verbose otherwise)
+    if (DEBUG_MODE) {
+      console.log(`[${connectionId}] ⏰ Turn completion timer reset (${TURN_COMPLETION_TIMEOUT_MS}ms timeout)`);
+    }
   }
 
   const decodeRawMessage = (raw: RawData): string => {
@@ -207,6 +214,7 @@ import { MESSAGE_TYPES } from './message-types.js'
     logger?: SessionLogger;
     turnCompletionTimer?: ReturnType<typeof setTimeout>;
     lastAudioActivity?: number;
+    audioChunkCount?: number; // Track audio chunks for periodic logging
   };
 
   // Store active Live API sessions
@@ -824,22 +832,31 @@ import { MESSAGE_TYPES } from './message-types.js'
       }
 
       try {
+        // Track audio chunk count for periodic logging
+        client.audioChunkCount = (client.audioChunkCount || 0) + 1
+        
         client.logger?.log('audio_chunk', { direction: 'client_to_server', bytes: approxBytes, mimeType })
         
         // Update last audio activity time and reset turn completion timer
         client.lastAudioActivity = Date.now();
         resetTurnCompletionTimer(connectionId, client);
         
-        // Debug: log available session methods
-        console.log(`[${connectionId}] Session methods:`, {
-          hasSendRealtimeInput: typeof client.session.sendRealtimeInput,
-          hasSend: typeof client.session.send,
-          sessionKeys: Object.keys(client.session),
-        })
+        // Only log session methods in debug mode (too verbose)
+        if (DEBUG_MODE) {
+          console.log(`[${connectionId}] Session methods:`, {
+            hasSendRealtimeInput: typeof client.session.sendRealtimeInput,
+            hasSend: typeof client.session.send,
+            sessionKeys: Object.keys(client.session),
+          })
+        }
         
         if (typeof client.session.sendRealtimeInput === 'function') {
           await client.session.sendRealtimeInput({ media: { mimeType, data: audioData } })
-          console.info(`[${connectionId}] ✅ Audio sent via sendRealtimeInput (${audioData.length} chars, ${mimeType})`)
+          
+          // Log audio stats periodically instead of every chunk
+          if (DEBUG_MODE || client.audioChunkCount % AUDIO_LOG_INTERVAL === 0) {
+            console.info(`[${connectionId}] ✅ Audio chunks processed: ${client.audioChunkCount} (${audioData.length} chars, ${mimeType})`)
+          }
         } else {
           console.error(`[${connectionId}] ❌ sendRealtimeInput method not available on session`) 
           safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.ERROR, payload: { message: 'Live session cannot accept audio (no sendRealtimeInput method)' } }))
@@ -919,22 +936,19 @@ import { MESSAGE_TYPES } from './message-types.js'
       
       try {
         const rawString = decodeRawMessage(message)
-        console.info(`[${connectionId}] 📨 RAW MESSAGE RECEIVED:`, {
-          messageType: typeof message,
-          messageSize: Buffer.isBuffer(message) ? message.length : 'unknown',
-          rawStringLength: rawString?.length || 0,
-          rawStringPreview: rawString?.substring(0, 100) || 'null'
-        });
-        
         const parsedMessage = rawString ? JSON.parse(rawString) : { type: 'unknown' }
         const messageType = String(parsedMessage?.type || 'unknown');
-        console.info(`[${connectionId}] 📋 PARSED MESSAGE:`, {
-          type: messageType,
-          hasPayload: !!parsedMessage.payload,
-          fullMessage: JSON.stringify(parsedMessage)
-        });
         
-        console.info(`[${connectionId}] Received message type: ${messageType}`);
+        // Only log raw/parsed messages in debug mode (too verbose for production)
+        // Consolidated single log instead of 3 separate logs (per duplicate prevention rules)
+        if (DEBUG_MODE) {
+          console.info(`[${connectionId}] 📨 ${messageType.toUpperCase()}:`, {
+            rawSize: Buffer.isBuffer(message) ? message.length : 'unknown',
+            payloadSize: rawString?.length || 0,
+            hasPayload: !!parsedMessage.payload,
+            preview: rawString?.substring(0, 100) || 'null'
+          });
+        }
         switch (parsedMessage.type) {
           case MESSAGE_TYPES.START:
             console.info(`[${connectionId}] Handling start message`);
@@ -949,7 +963,7 @@ import { MESSAGE_TYPES } from './message-types.js'
             break;
           }
           case MESSAGE_TYPES.USER_AUDIO:
-            console.info(`[${connectionId}] Handling user_audio message`);
+            // No redundant log - switch case already shows we're handling user_audio
             await handleUserMessage(connectionId, ws, parsedMessage.payload);
             break;
           case MESSAGE_TYPES.TOOL_RESULT: {
