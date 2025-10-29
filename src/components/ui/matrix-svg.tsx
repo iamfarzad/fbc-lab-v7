@@ -154,168 +154,48 @@ export const digits: Frame[] = [
 ]
 
 // Rotating spinner animation (7×7, 12 frames)
-export const loader: Frame[] = [
-  // Frame 1 - top
-  [
-    [0, 0, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 2 - top-right
-  [
-    [0, 0, 0, 1, 1, 1, 0],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 3 - right-top
-  [
-    [0, 0, 0, 0, 1, 1, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 4 - right
-  [
-    [0, 0, 0, 0, 0, 1, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 5 - right-bottom
-  [
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 6 - bottom-right
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 0, 1],
-  ],
-  // Frame 7 - bottom
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [1, 1, 1, 0, 0, 0, 0],
-  ],
-  // Frame 8 - bottom-left
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 1, 1, 0, 0, 0, 0],
-  ],
-  // Frame 9 - left-bottom
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 1, 0, 0, 0, 0, 0],
-  ],
-  // Frame 10 - left
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 11 - left-top
-  [
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 12 - top-left
-  [
-    [1, 1, 1, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-]
+export const loader: Frame[] = Array.from({ length: 12 }, (_, i) => {
+  const frame: Frame = Array(7)
+    .fill(null)
+    .map(() => Array(7).fill(0))
+  const angle = (i / 12) * Math.PI * 2
+  const cx = 3
+  const cy = 3
+  const radius = 2.5
+
+  for (let d = 0; d < 3; d++) {
+    const a = angle + (d * Math.PI) / 6
+    const x = Math.round(cx + Math.cos(a) * radius)
+    const y = Math.round(cy + Math.sin(a) * radius)
+    if (x >= 0 && x < 7 && y >= 0 && y < 7) {
+      frame[y][x] = 1 - d * 0.3
+    }
+  }
+
+  return frame
+})
 
 // Expanding pulse effect (7×7, 16 frames)
-export const pulse: Frame[] = [
-  // Frame 1 - center dot
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 2 - small cross
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 1, 1, 1, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Frame 3 - small diamond
-  [
-    [0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 1, 1, 1, 0, 0],
-    [0, 1, 1, 1, 1, 1, 0],
-    [0, 0, 1, 1, 1, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0],
-  ],
-  // Add more frames expanding to full grid and fading
-  ...Array(13).fill(null).map((_, index) => {
-    const frame: Frame = Array(7).fill(null).map(() => Array(7).fill(1))
-    const fadeProgress = index / 13
-    return frame.map((row) => row.map((cell) => cell * (1 - fadeProgress)))
-  }),
-]
+export const pulse: Frame[] = Array.from({ length: 16 }, (_, i) => {
+  const frame: Frame = Array(7)
+    .fill(null)
+    .map(() => Array(7).fill(0))
+  const progress = i / 16
+  const radius = progress * 4
+  const cx = 3
+  const cy = 3
+
+  for (let y = 0; y < 7; y++) {
+    for (let x = 0; x < 7; x++) {
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+      if (Math.abs(dist - radius) < 1) {
+        frame[y][x] = 1 - progress
+      }
+    }
+  }
+
+  return frame
+})
 
 // Smooth sine wave animation (7×7, 24 frames)
 export const wave: Frame[] = Array.from({ length: 24 }, (_, frameIndex) => {
@@ -399,17 +279,17 @@ export const MatrixSVG = React.forwardRef<HTMLDivElement, MatrixSVGProps>(({
   size = 4,
   gap = 1,
   palette = {
-    on: 'hsl(var(--primary))',
-    off: 'hsl(var(--muted))',
+    on: 'currentColor',
+    off: 'hsl(var(--muted-foreground))',
   },
   brightness = 1,
-  ariaLabel = 'Matrix display',
+  ariaLabel,
   onFrame,
   mode = 'default',
   levels = [],
   voiceState,
   audioData,
-  className,
+  className = '',
   ...props
 }, ref) => {
   const [currentFrame, setCurrentFrame] = useState(0)
@@ -493,68 +373,31 @@ export const MatrixSVG = React.forwardRef<HTMLDivElement, MatrixSVGProps>(({
 
   // Animation loop with RAF accumulator
   useEffect(() => {
-    if (!frames || !autoplay || mode === 'vu' || mode === 'voice-state') {
-      // For voice-state, we still animate through frames (loader, pulse, wave, snake, fbcPatterns)
+    // Get frames to animate (from props or voice-state)
+    const getFramesToAnimate = (): Frame[] | null => {
       if (mode === 'voice-state' && voiceState) {
-        const animate = (time: number) => {
-          if (lastTimeRef.current === 0) {
-            lastTimeRef.current = time
-          }
-
-          const delta = time - lastTimeRef.current
-          lastTimeRef.current = time
-          accumulatorRef.current += delta
-
-          const frameDuration = 1000 / fps
-
-          if (accumulatorRef.current >= frameDuration) {
-            accumulatorRef.current -= frameDuration
-            
-            let selectedFrames: Frame[] | undefined
-            switch (voiceState) {
-              case 'connecting':
-                selectedFrames = loader
-                break
-              case 'initializing':
-                selectedFrames = pulse
-                break
-              case 'speaking':
-                selectedFrames = wave
-                break
-              case 'thinking':
-                selectedFrames = snake
-                break
-              case 'idle':
-                selectedFrames = Object.values(fbcPatterns).map(p => p as Frame)
-                break
-            }
-
-            if (selectedFrames && selectedFrames.length > 0) {
-              setCurrentFrame((prev) => {
-                const next = (prev + 1) % selectedFrames.length
-                if (next === 0 && !loop) {
-                  return prev
-                }
-                onFrame?.(next)
-                return next
-              })
-            }
-
-            rafRef.current = requestAnimationFrame(animate)
-          } else {
-            rafRef.current = requestAnimationFrame(animate)
-          }
-        }
-
-        rafRef.current = requestAnimationFrame(animate)
-        return () => {
-          if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current)
-          }
-          lastTimeRef.current = 0
-          accumulatorRef.current = 0
+        switch (voiceState) {
+          case 'connecting':
+            return loader
+          case 'initializing':
+            return pulse
+          case 'speaking':
+            return wave
+          case 'thinking':
+            return snake
+          case 'idle':
+            return Object.values(fbcPatterns).map(p => p as Frame)
+          case 'listening':
+            return null // VU meter is handled separately
+          default:
+            return null
         }
       }
+      return frames || null
+    }
+
+    const framesToAnimate = getFramesToAnimate()
+    if (!framesToAnimate || !autoplay || mode === 'vu' || (mode === 'voice-state' && voiceState === 'listening')) {
       return
     }
 
@@ -572,7 +415,7 @@ export const MatrixSVG = React.forwardRef<HTMLDivElement, MatrixSVGProps>(({
       if (accumulatorRef.current >= frameDuration) {
         accumulatorRef.current -= frameDuration
         setCurrentFrame((prev) => {
-          const next = (prev + 1) % frames.length
+          const next = (prev + 1) % framesToAnimate.length
           if (next === 0 && !loop) {
             return prev
           }
@@ -612,20 +455,20 @@ export const MatrixSVG = React.forwardRef<HTMLDivElement, MatrixSVGProps>(({
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        style={{ display: 'block', maxWidth: '100%' }}
+        style={{ display: 'block' }}
       >
         {displayPattern.map((row: number[], rowIndex: number) =>
           row.map((cellBrightness: number, colIndex: number) => {
-            const x = colIndex * (size + gap) + size / 2
-            const y = rowIndex * (size + gap) + size / 2
-            const opacity = Math.max(0, Math.min(1, cellBrightness * brightness))
+            const x = colIndex * (size + gap)
+            const y = rowIndex * (size + gap)
+            const opacity = cellBrightness * brightness
             const color = opacity > 0.1 ? palette.on : palette.off
 
             return (
               <circle
                 key={`${rowIndex}-${colIndex}`}
-                cx={x}
-                cy={y}
+                cx={x + size / 2}
+                cy={y + size / 2}
                 r={size / 2}
                 fill={color}
                 opacity={opacity}
