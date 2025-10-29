@@ -1,3 +1,22 @@
+/**
+ * EXPERIMENTAL: Workflow Engine
+ * 
+ * This is a test/experimental workflow engine for YAML-based workflow execution.
+ * It is NOT used in production code.
+ * 
+ * Current status:
+ * - Used only in test scripts (scripts/test-workflow*.ts)
+ * - Commented out in API routes
+ * - Different architecture from production orchestrator.ts
+ * 
+ * Production routing uses: src/core/agents/orchestrator.ts
+ * 
+ * This file is kept for:
+ * - Testing workflow concepts
+ * - Future experimentation
+ * - YAML-based workflow definition research
+ */
+
 import { GEMINI_MODELS } from '@/config/constants'
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
