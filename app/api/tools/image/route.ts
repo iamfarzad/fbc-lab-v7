@@ -5,7 +5,7 @@ import { createCachedFunction, CACHE_TTL } from '@/src/lib/ai-cache'
 import { GEMINI_MODELS } from '@/config/constants'
 import { getResolvedGeminiApiKey } from '@/config/env'
 import { logJsonl } from '@/src/lib/jsonl-logger'
-import { createHash } from 'crypto'
+import { generateImageHash } from '@/lib/image-utils'
 import { multimodalContextManager } from '@/core/context/multimodal-context'
 
 // Create a cached function for image analysis (30 min TTL)
@@ -53,10 +53,6 @@ const cachedAnalyzeImage = createCachedFunction(
   }
 )
 
-// Generate a consistent hash for image content
-function generateImageHash(buffer: Buffer): string {
-  return createHash('sha256').update(buffer).digest('hex').substring(0, 16)
-}
 
 export async function POST(req: NextRequest) {
   try {

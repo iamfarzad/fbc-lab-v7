@@ -881,7 +881,11 @@ Citations: ${researchResult.allCitations.length} sources processed
     const multimodalContextStart = Date.now()
     if (sessionId !== 'anonymous') {
       try {
-        const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(sessionId, true, true)
+        // Get latest user message for semantic search
+        const latestUserMessage = messages.filter(m => m.role === 'user').pop()
+        const query = latestUserMessage?.content ? String(latestUserMessage.content) : undefined
+        
+        const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(sessionId, true, true, query)
 
         if (multimodalContext.multimodalContext.hasRecentImages) {
           systemPrompt += '\n\n' + multimodalContext.systemPrompt

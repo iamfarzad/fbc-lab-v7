@@ -7,6 +7,7 @@ import { getResolvedGeminiApiKey } from '@/config/env'
 import { logJsonl } from '@/src/lib/jsonl-logger'
 import { createHash } from 'crypto'
 import { multimodalContextManager } from '@/core/context/multimodal-context'
+import { canCrawl } from '@/lib/robots-validator'
 
 // Create a cached function for URL analysis (2 hour TTL)
 const cachedAnalyzeUrl = createCachedFunction(
@@ -21,10 +22,32 @@ const cachedAnalyzeUrl = createCachedFunction(
     }
 
     try {
+      // Check robots.txt before fetching
+      const userAgent = 'Mozilla/5.0 (compatible; F.B/c AI Bot/1.0)'
+      const crawlCheck = await canCrawl(url, userAgent)
+
+      if (!crawlCheck.allowed) {
+        const blockViolations = process.env.BLOCK_ROBOTS_VIOLATIONS === 'true'
+        
+        // Log the violation
+        console.warn(`⚠️ [Robots.txt] ${crawlCheck.reason} for ${url}`)
+        logJsonl('url', 'robots_violation', {
+          url,
+          reason: crawlCheck.reason,
+          blocked: blockViolations
+        })
+
+        // Block if strict mode enabled
+        if (blockViolations) {
+          throw new Error(`Access denied by robots.txt: ${crawlCheck.reason}`)
+        }
+        // Otherwise, warn but proceed
+      }
+
       // Fetch the URL content
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; F.B/c AI Bot/1.0)'
+          'User-Agent': userAgent
         }
       })
 
