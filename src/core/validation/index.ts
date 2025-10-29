@@ -160,6 +160,9 @@ export function validateRequest<T extends z.ZodSchema>(
 // TYPE EXPORTS
 // ============================================================================
 
+// NOTE: ChatMessage from validation schema (Zod inference) is different from
+// canonical Message type from @/types/core. Use this only for API validation.
+// For component types, use Message from @/types/core.
 export type ChatMessage = z.infer<typeof chatMessageSchema>
 export type ChatRequest = z.infer<typeof chatRequestSchema>
 export type LeadCaptureInput = z.infer<typeof leadCaptureSchema>

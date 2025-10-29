@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { cn } from "@/lib/utils";
 import { useLiveApi } from "@/hooks/useLiveApi";
 
@@ -15,22 +14,18 @@ export function LiveCaptions({ className }: { className?: string }) {
   if (!userText && !assistantText) return null;
 
   return (
-    <div className={cn("pointer-events-none w-full", className)}>
-      <div className="mx-auto max-w-2xl space-y-1 px-2">
+    <div className={cn("pointer-events-none w-full z-10", className)}>
+      <div className="mx-auto max-w-2xl space-y-2 px-2">
         {userText && (
-          <div className="bg-primary/10 text-primary border-primary/30 pointer-events-auto inline-block max-w-full rounded-md border text-[12px]">
-            <div className="px-2 py-1">
-              <span className="font-medium mr-1">You:</span>
-              <span className="opacity-90">{userText}</span>
-            </div>
+          <div className="bg-primary text-primary-foreground shadow-lg pointer-events-auto inline-block max-w-full rounded-lg border-2 border-primary/50 px-3 py-1.5 text-sm font-medium">
+            <span className="mr-2 opacity-80">You:</span>
+            <span>{userText}</span>
           </div>
         )}
         {assistantText && (
-          <div className="bg-muted/60 text-foreground/90 border-muted/50 pointer-events-auto inline-block max-w-full rounded-md border text-[12px]">
-            <div className="px-2 py-1">
-              <span className="font-medium mr-1">Assistant:</span>
-              <span className="opacity-90">{assistantText}</span>
-            </div>
+          <div className="bg-card text-foreground shadow-lg border-2 border-foreground/20 pointer-events-auto inline-block max-w-full rounded-lg px-3 py-1.5 text-sm font-medium">
+            <span className="mr-2 opacity-80">Assistant:</span>
+            <span>{assistantText}</span>
           </div>
         )}
       </div>

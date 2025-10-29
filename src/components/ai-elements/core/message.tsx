@@ -37,6 +37,7 @@ const messageContentVariants = cva(
           "group-[.is-user]:max-w-[75%]",
           "group-[.is-assistant]:max-w-[75%]",
           "group-[.is-assistant]:text-foreground",
+          "bg-transparent", // Explicitly prevent any background overlay
         ],
       },
     },

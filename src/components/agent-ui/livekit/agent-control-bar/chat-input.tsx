@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { PaperPlaneRightIcon, SpinnerIcon } from '@phosphor-icons/react/dist/ssr';
+import { ArrowRight, SpinnerIcon } from '@phosphor-icons/react/dist/ssr';
 import { Button } from '@/components/agent-ui/livekit/button';
+import { cn } from '@/lib/utils';
 
 const MOTION_PROPS = {
   variants: {
@@ -79,7 +80,7 @@ export function ChatInput({
           disabled={!chatOpen}
           placeholder="Type something..."
           onChange={(e) => setMessage(e.target.value)}
-          className="flex h-8 flex-1 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm [.monochrome_&]:rounded-none [.monochrome_&]:font-mono [.monochrome_&]:shadow-none"
+          className="flex h-8 flex-1 bg-transparent px-3 py-1 text-base transition-colors placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm [.monochrome_&]:font-mono"
         />
         <Button
           size="icon"
@@ -87,12 +88,17 @@ export function ChatInput({
           disabled={isDisabled}
           variant={isDisabled ? 'secondary' : 'primary'}
           title={isSending ? 'Sending...' : 'Send'}
-          className="self-start"
+          className={cn(
+            "self-start",
+            // High contrast for dark backgrounds
+            !isDisabled && "bg-primary text-white hover:bg-primary/90 shadow-md hover:shadow-lg",
+            isDisabled && "bg-muted/30 text-muted-foreground"
+          )}
         >
           {isSending ? (
             <SpinnerIcon className="animate-spin" weight="bold" />
           ) : (
-            <PaperPlaneRightIcon weight="bold" />
+            <ArrowRight weight="bold" />
           )}
         </Button>
       </form>

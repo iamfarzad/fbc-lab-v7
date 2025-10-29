@@ -689,6 +689,13 @@ import { MESSAGE_TYPES } from './message-types.js'
               // Text + audio parts
               if (serverContent.modelTurn?.parts) {
                 for (const part of serverContent.modelTurn.parts) {
+                  // Skip internal thoughts - these are not meant for the user
+                  if (part.thought === true) {
+                    console.log(`[${connectionId}] [MODEL THOUGHT] Skipping internal thought:`, part.text?.substring(0, 100));
+                    activeSessions.get(connectionId)?.logger?.log('model_thought_skipped', { textPreview: part.text?.substring(0, 100) })
+                    continue;
+                  }
+                  
                   if (part.text) {
                     console.log(`[${connectionId}] [MODEL TEXT] Received text:`, part.text);
                     safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.TEXT, payload: { content: part.text } }));

@@ -448,20 +448,28 @@ export const MatrixSVG = React.forwardRef<HTMLDivElement, MatrixSVGProps>(({
       role="img"
       aria-label={ariaLabel}
       aria-live={frames ? 'polite' : undefined}
-      className={cn('inline-block', className)}
+      className={cn('inline-flex items-center justify-center', className)}
+      style={{ maxWidth: '100%', maxHeight: '100%' }}
       {...props}
     >
       <svg
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
-        style={{ display: 'block' }}
+        style={{ 
+          display: 'block', 
+          width: '100%',
+          height: '100%',
+          maxWidth: `${width}px`,
+          maxHeight: `${height}px`
+        }}
+        preserveAspectRatio="xMidYMid meet"
       >
         {displayPattern.map((row: number[], rowIndex: number) =>
           row.map((cellBrightness: number, colIndex: number) => {
             const x = colIndex * (size + gap)
             const y = rowIndex * (size + gap)
-            const opacity = cellBrightness * brightness
+            const opacity = Math.max(0, Math.min(1, cellBrightness * brightness))
             const color = opacity > 0.1 ? palette.on : palette.off
 
             return (

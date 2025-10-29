@@ -12,7 +12,8 @@
 }
 
 .ai-elements-message--assistant {
-  @apply bg-muted border-l-4 border-l-accent;
+  @apply border-l-4 border-l-accent;
+  /* Background removed - using flat variant which should be transparent */
 }
 
 .ai-elements-response {

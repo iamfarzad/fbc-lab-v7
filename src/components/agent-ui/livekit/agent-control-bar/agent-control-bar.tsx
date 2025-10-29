@@ -91,24 +91,22 @@ export function AgentControlBar({
     }
   };
 
-  const nextChatState = useCallback((state: ChatPanelState): ChatPanelState => {
-    return state === 'minimized' ? 'normal' : state === 'normal' ? 'expanded' : 'minimized'
-  }, [])
-
-  const handleToggleTranscript = useCallback(() => {
+  const handleToggleTranscript = useCallback((pressed: boolean) => {
     if (chatState && onChatStateChange) {
-      const next = nextChatState(chatState)
+      // Use the pressed value from Radix UI directly
+      // pressed=true -> show transcript (normal if minimized, otherwise keep current)
+      // pressed=false -> minimize
+      const next = pressed 
+        ? (chatState === 'minimized' ? 'normal' : chatState)
+        : 'minimized'
       onChatStateChange(next)
-      onChatOpenChange?.(next !== 'minimized')
+      onChatOpenChange?.(pressed)
     } else {
       // Fallback to boolean toggle
-      setChatOpenInternal((prev) => {
-        const nextOpen = !prev
-        onChatOpenChange?.(nextOpen)
-        return nextOpen
-      })
+      setChatOpenInternal(pressed)
+      onChatOpenChange?.(pressed)
     }
-  }, [chatState, onChatStateChange, onChatOpenChange, nextChatState])
+  }, [chatState, onChatStateChange, onChatOpenChange])
 
   const handleDisconnect = useCallback(async () => {
     endSession();
@@ -281,8 +279,17 @@ export function AgentControlBar({
                     variant="secondary"
                     aria-label="Toggle screen share"
                     pressed={screenShare.isActive}
-                    onPressedChange={() => {
-                      if (screenShare.isActive) screenShare.stopScreenShare(); else void screenShare.startScreenShare();
+                    onPressedChange={async (pressed) => {
+                      if (pressed) {
+                        try {
+                          await screenShare.startScreenShare()
+                        } catch (err) {
+                          // Error already handled and displayed via toast in useScreenShare hook
+                          console.error('Screen share start failed:', err)
+                        }
+                      } else {
+                        screenShare.stopScreenShare()
+                      }
                     }}
                     className={cn(
                       'transition-all duration-200',
@@ -381,49 +388,53 @@ export function AgentControlBar({
                     'hover:scale-[1.02] active:scale-[0.98]',
                     'shadow-sm hover:shadow-md',
                     'relative overflow-hidden p-0',
-                    'h-8 w-[120px] md:h-10 md:w-[200px]',
+                    'h-8 w-[120px] min-w-[100px] max-w-[200px] sm:w-[140px] md:h-10 md:w-[160px] lg:w-[200px]',
                     !isSessionActive && 'opacity-50 cursor-not-allowed'
                   )}
                 >
-            <div className={cn(
-              "flex h-full items-center gap-2 rounded-md py-1",
-              "bg-foreground/5 text-foreground/70",
-              "relative w-full"
-            )}>
-              <div className="h-full flex-1">
-                <div className="relative flex h-full w-full shrink-0 items-center justify-center overflow-hidden rounded-sm">
-                  <LiveWaveform
-                    mode="scrolling"
-                    active={isSessionActive}
-                    height={20}
-                    barWidth={3}
-                    barGap={1}
-                    barRadius={4}
-                    barColor="currentColor"
-                    fadeEdges={true}
-                    fadeWidth={24}
-                    className={cn(
-                      "h-full w-full transition-opacity duration-300",
-                      !isSessionActive && "opacity-0"
-                    )}
-                  />
-                  {!isSessionActive && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-foreground/50 text-[10px] font-medium">
-                        Start Recording
-                      </span>
+                  {/* Button content container */}
+                  <div className={cn(
+                    'flex h-full items-center justify-center rounded-md py-1 px-2',
+                    'bg-foreground/5 text-foreground',
+                    'w-full'
+                  )}>
+                    {/* Waveform container */}
+                    <div className="relative h-full w-full flex-1 overflow-hidden rounded-sm">
+                      <LiveWaveform
+                        mode="scrolling"
+                        active={isSessionActive}
+                        height={20}
+                        barWidth={3}
+                        barGap={1}
+                        barRadius={4}
+                        barColor="hsl(var(--primary))" // Use primary color for better visibility
+                        fadeEdges={true}
+                        fadeWidth={16} // Reduced fade for more visible bars
+                        sensitivity={1.5} // More responsive to audio
+                        smoothingTimeConstant={0.5} // Faster response
+                        className={cn(
+                          'h-full w-full transition-opacity duration-300',
+                          !isSessionActive && 'opacity-0'
+                        )}
+                      />
+                      
+                      {/* Idle state text overlay */}
+                      {!isSessionActive && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-foreground/50 text-[10px] font-medium">
+                            Start Recording
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isSessionActive ? 'End call' : 'Start session'}
-            </TooltipContent>
-          </Tooltip>
-        )}
+                  </div>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isSessionActive ? 'End call' : 'Start session'}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </TooltipProvider>
     </div>

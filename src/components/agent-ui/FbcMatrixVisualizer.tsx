@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useLiveApi } from '@/hooks/useLiveApi'
 import { VoiceMatrix, type VoiceState } from '@/components/ui/VoiceMatrix'
 import { cn } from '@/lib/utils'
@@ -20,46 +20,50 @@ export function FbcMatrixVisualizer({
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const rafRef = useRef<number | null>(null)
   const audioCtxRef = useRef<AudioContext | null>(null)
+  const smoothedDataRef = useRef<Uint8Array | null>(null)
 
-  // Determine voice state
-  const getVoiceState = (): VoiceState => {
+  // Determine voice state with smooth transitions
+  const voiceState = useMemo((): VoiceState => {
     if (!isSocketReady) return 'connecting'
     if (isProcessing) return 'thinking'
     if (isRecording) return 'listening'
     if (isSessionActive) return 'speaking'
     return 'idle'
-  }
+  }, [isSocketReady, isProcessing, isRecording, isSessionActive])
 
-  const voiceState = getVoiceState()
-
-  // Context-aware dimensions based on usage
-  const getDimensions = () => {
+  // Optimized dimensions for better visual quality
+  const { rows, cols, size } = useMemo(() => {
     switch (variant) {
       case 'minimized':
-        // Small compact version for control bar (fits in ~24px height)
-        return { rows: 3, cols: 8, size: 2 }
+        return { rows: 4, cols: 12, size: 2 }
       case 'expanded':
-        // Medium version for tile layout (fits in ~90px container)
-        return { rows: 6, cols: 16, size: 3 }
+        // Higher resolution for smoother animation
+        return { rows: 10, cols: 24, size: 3 }
       case 'fullscreen':
-        // High-resolution version for full-screen display
         return { rows: 24, cols: 64, size: 4 }
       default:
-        return { rows: 6, cols: 16, size: 3 }
+        return { rows: 10, cols: 24, size: 3 }
     }
-  }
+  }, [variant])
 
-  const { rows, cols, size } = getDimensions()
-
+  // Audio processing with better smoothing
   useEffect(() => {
-    // If we have a mic stream, attach analyser
-    if (!micStream) return
+    if (!micStream) {
+      setAudioData(null)
+      return
+    }
     
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioContextClass) {
+        throw new Error('AudioContext not supported')
+      }
+      const ctx = new AudioContextClass()
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 512 // Increased for better frequency resolution matching 64 columns
-      analyser.smoothingTimeConstant = 0.6
+      // Higher FFT size for better frequency resolution
+      analyser.fftSize = 1024
+      // Lower smoothing for more responsive visualization
+      analyser.smoothingTimeConstant = 0.3
       const source = ctx.createMediaStreamSource(micStream)
       source.connect(analyser)
 
@@ -67,16 +71,31 @@ export function FbcMatrixVisualizer({
       analyserRef.current = analyser
       sourceRef.current = source
 
-      const data = new Uint8Array(analyser.frequencyBinCount)
+      const bufferLength = analyser.frequencyBinCount
+      const data = new Uint8Array(bufferLength)
+      smoothedDataRef.current = new Uint8Array(bufferLength)
+
+      // Smooth audio processing loop at 60fps
       const tick = () => {
-        if (!analyserRef.current) return
+        if (!analyserRef.current || !smoothedDataRef.current) return
+        
         analyserRef.current.getByteFrequencyData(data)
-        setAudioData(new Uint8Array(data))
+        
+        // Apply exponential smoothing for fluid motion
+        const smoothingFactor = 0.15
+        for (let i = 0; i < bufferLength; i++) {
+          const current = data[i] || 0
+          const previous = smoothedDataRef.current[i] || 0
+          smoothedDataRef.current[i] = previous + (current - previous) * smoothingFactor
+        }
+        
+        setAudioData(new Uint8Array(smoothedDataRef.current))
         rafRef.current = requestAnimationFrame(tick)
       }
       rafRef.current = requestAnimationFrame(tick)
     } catch (error) {
-      console.warn('[FbcMatrixVisualizer] Falling back to simple animation, analyser setup failed', error)
+      console.warn('[FbcMatrixVisualizer] Audio analyser setup failed', error)
+      setAudioData(null)
     }
     
     return () => {
@@ -84,31 +103,33 @@ export function FbcMatrixVisualizer({
         cancelAnimationFrame(rafRef.current)
       }
       try { sourceRef.current?.disconnect() }
-      catch (error) {
-        console.warn('[FbcMatrixVisualizer] Failed to disconnect source', error)
+      catch {
+        // Ignore cleanup errors
       }
       try { analyserRef.current?.disconnect() }
-      catch (error) {
-        console.warn('[FbcMatrixVisualizer] Failed to disconnect analyser', error)
+      catch {
+        // Ignore cleanup errors
       }
       try { audioCtxRef.current?.close() }
-      catch (error) {
-        console.warn('[FbcMatrixVisualizer] Failed to close AudioContext', error)
+      catch {
+        // Ignore cleanup errors
       }
       analyserRef.current = null
       sourceRef.current = null
       audioCtxRef.current = null
+      smoothedDataRef.current = null
     }
   }, [micStream])
 
   return (
     <div 
-      className={cn('flex items-center justify-center overflow-hidden', className)} 
-      aria-label="Voice activity"
-      style={{
-        maxWidth: '100%',
-        maxHeight: '100%',
-      }}
+      className={cn(
+        'flex items-center justify-center overflow-hidden w-full h-full',
+        'transition-opacity duration-300',
+        className
+      )}
+      role="img"
+      aria-label={`Voice activity: ${voiceState}`}
     >
       <VoiceMatrix
         voiceState={voiceState}
@@ -117,7 +138,7 @@ export function FbcMatrixVisualizer({
         rows={rows}
         cols={cols}
         size={size}
-        useSVG={true} // Use SVG for crisp rendering at all sizes
+        useSVG={true}
       />
     </div>
   )

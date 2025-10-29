@@ -105,6 +105,32 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
     setError(null)
 
     try {
+      // Pre-checks before requesting screen share
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+        const msg = 'Screen sharing is not supported in this browser'
+        setError(msg)
+        setIsInitializing(false)
+        toast.error(msg)
+        throw new Error(msg)
+      }
+
+      if (!navigator.mediaDevices.getDisplayMedia) {
+        const msg = 'Screen sharing API is not available. Please use a modern browser.'
+        setError(msg)
+        setIsInitializing(false)
+        toast.error(msg)
+        throw new Error(msg)
+      }
+
+      // Check if we're in a secure context (required for getDisplayMedia)
+      if (!window.isSecureContext) {
+        const msg = 'Screen sharing requires a secure connection (HTTPS). Please access this page via HTTPS.'
+        setError(msg)
+        setIsInitializing(false)
+        toast.error(msg)
+        throw new Error(msg)
+      }
+
       // Stop existing stream if any
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop())
@@ -139,12 +165,31 @@ export function useScreenShare(options: UseScreenShareOptions = {}) {
 
       return mediaStream
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to access screen share'
+      let message = 'Unable to access screen share'
+      
+      if (err instanceof Error) {
+        const errorName = err.name || ''
+        const errorMessage = err.message || ''
+        
+        // Provide user-friendly error messages
+        if (errorName === 'NotAllowedError' || errorMessage.toLowerCase().includes('permission')) {
+          message = 'Screen sharing permission was denied. Please allow screen sharing in your browser settings and try again.'
+        } else if (errorName === 'NotSupportedError' || errorMessage.toLowerCase().includes('not supported')) {
+          message = 'Screen sharing is not supported in this browser or environment.'
+        } else if (errorName === 'NotFoundError' || errorMessage.toLowerCase().includes('not found')) {
+          message = 'No screen sharing source available. Please check your system settings.'
+        } else if (errorName === 'AbortError' || errorMessage.toLowerCase().includes('abort')) {
+          message = 'Screen sharing request was cancelled.'
+        } else {
+          message = errorMessage || message
+        }
+      }
       
       setError(message)
       setIsActive(false)
       setIsInitializing(false)
       toast.error(message)
+      console.error('🖥️ [useScreenShare] Screen share error:', err)
       throw err
     }
   }, [isInitializing, stopScreenShare])
