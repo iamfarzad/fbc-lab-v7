@@ -107,7 +107,6 @@ export const GEMINI_MODELS = {
   
   // LEGACY: For backward compatibility (deprecated models)
   PRO: 'gemini-2.5-pro',
-  FLASH_LEGACY: 'gemini-2.5-flash',                 // Deprecated Dec 9, 2025
   FLASH_EXP: 'gemini-2.0-flash-exp',                // Old experimental
   
   // DEFAULTS: What each use case should use

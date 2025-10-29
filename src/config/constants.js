@@ -86,7 +86,6 @@ export const GEMINI_MODELS = {
     AUDIO_2025_09: 'gemini-2.5-flash-native-audio-preview-09-2025', // OFFICIAL: Only model supporting Live API + native audio
     // LEGACY: For backward compatibility (deprecated models)
     PRO: 'gemini-2.5-pro',
-    FLASH_LEGACY: 'gemini-2.5-flash', // Deprecated Dec 9, 2025
     FLASH_EXP: 'gemini-2.0-flash-exp', // Old experimental
     // DEFAULTS: What each use case should use
     DEFAULT_CHAT: 'gemini-flash-latest', // Auto-updates to best

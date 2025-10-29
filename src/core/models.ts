@@ -21,14 +21,6 @@ export interface ModelConfig {
 }
 
 export const AVAILABLE_MODELS: Record<string, ModelConfig> = {
-  [GEMINI_MODELS.FLASH_LEGACY]: {
-    name: GEMINI_MODELS.FLASH_LEGACY,
-    contextWindow: 1048576,
-    maxOutputTokens: 8192,
-    inputCostPerToken: 0.000000075, // $0.075 per 1M tokens
-    outputCostPerToken: 0.0000003, // $0.3 per 1M tokens
-    capabilities: ['chat', 'image_analysis', 'screenshot_analysis', 'document_analysis', 'voice_transcription']
-  },
   [GEMINI_MODELS.PRO]: {
     name: GEMINI_MODELS.PRO,
     contextWindow: 2097152,
