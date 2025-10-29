@@ -6,6 +6,24 @@ import { walLog } from './write-ahead-log'
 import { summarizeConversationWindow, shouldSummarize, extractSummaries } from './context-summarizer'
 import { detectPII, shouldRedact, redactPII } from '@/core/security/pii-detector'
 import { auditLog } from '@/core/security/audit-logger'
+import {
+  extractEntities,
+  extractTopics,
+  analyzeSentiment,
+  calculateComplexity,
+  calculateBusinessValue,
+  calculatePriority,
+  mergeEntities,
+  mergeTopics,
+  type ExtractedEntity,
+  type ExtractedTopic,
+  type Sentiment,
+  type Priority,
+  type Complexity,
+  type BusinessValue
+} from './context-intelligence'
+import { embedTexts } from '@/core/embeddings/gemini'
+import { queryTopK, upsertEmbeddings } from '@/core/embeddings/query'
 
 const WAL_ENABLED = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL &&
@@ -218,6 +236,26 @@ export class MultimodalContextManager {
     // Estimate tokens (rough approximation)
     context.metadata.totalTokens += Math.ceil(processedContent.length / 4)
 
+    // Generate and store embedding for semantic search (if enabled)
+    if (process.env.EMBEDDINGS_ENABLED === 'true' && processedContent.length > 20) {
+      // Batch embedding generation (async, non-blocking)
+      embedTexts([processedContent], 1536)
+        .then(async (vectors) => {
+          if (vectors && vectors.length > 0 && vectors[0]) {
+            try {
+              await upsertEmbeddings(sessionId, 'conversation', [processedContent], [vectors[0]])
+              console.log(`✅ Embedding stored for conversation entry: ${entry.id.substring(0, 8)}...`)
+            } catch (embedError) {
+              console.warn('Failed to store embedding (non-fatal):', embedError)
+            }
+          }
+        })
+        .catch((embedError) => {
+          // Non-fatal - embedding generation failures shouldn't block message saving
+          console.warn('Embedding generation failed (non-fatal):', embedError)
+        })
+    }
+
     await this.saveContext(sessionId, context)
   }
 
@@ -264,6 +302,25 @@ export class MultimodalContextManager {
 
     // Estimate tokens
     context.metadata.totalTokens += Math.ceil(transcription.length / 4)
+
+    // Generate and store embedding for semantic search (if enabled)
+    if (process.env.EMBEDDINGS_ENABLED === 'true' && transcription.length > 20) {
+      // Batch embedding generation (async, non-blocking)
+      embedTexts([transcription], 1536)
+        .then(async (vectors) => {
+          if (vectors && vectors.length > 0 && vectors[0]) {
+            try {
+              await upsertEmbeddings(sessionId, 'conversation', [transcription], [vectors[0]])
+              console.log(`✅ Embedding stored for voice transcript: ${convEntry.id.substring(0, 8)}...`)
+            } catch (embedError) {
+              console.warn('Failed to store embedding (non-fatal):', embedError)
+            }
+          }
+        })
+        .catch((embedError) => {
+          console.warn('Embedding generation failed (non-fatal):', embedError)
+        })
+    }
 
     await this.saveContext(sessionId, context)
     // Action logged
@@ -599,6 +656,76 @@ export class MultimodalContextManager {
     return asAudioEntries(context.audioContext).slice(-limit)
   }
 
+  /**
+   * Get semantically relevant context from past conversations using vector search
+   * @param sessionId - Session ID
+   * @param query - Search query (current message or question)
+   * @param limit - Maximum number of results to return (default: 5)
+   * @returns Array of relevant conversation entries with similarity scores
+   */
+  async getSemanticContext(sessionId: string, query: string, limit: number = 5): Promise<Array<ConversationEntry & { similarity?: number }>> {
+    // Check if embeddings are enabled
+    if (process.env.EMBEDDINGS_ENABLED !== 'true') {
+      return []
+    }
+
+    try {
+      // Generate embedding for the query
+      const queryVectors = await embedTexts([query], 1536)
+      if (!queryVectors || queryVectors.length === 0 || !queryVectors[0]) {
+        return []
+      }
+
+      // Search for similar conversations
+      const results = await queryTopK(sessionId, queryVectors[0], limit)
+      if (!results || results.length === 0) {
+        return []
+      }
+
+      // Map results to conversation entries
+      // Handle both new format (similarity) and old format (distance) for backward compatibility
+      const semanticEntries: Array<ConversationEntry & { similarity?: number }> = results.map((result: any) => {
+        // Convert distance to similarity if needed (backward compatibility)
+        // similarity = 1 - distance (for cosine similarity, distance 0 = similarity 1)
+        let similarity: number | undefined = result.similarity
+        if (similarity === undefined && typeof result.distance === 'number') {
+          similarity = 1 - result.distance
+          console.warn(`⚠️ [Embeddings] RPC returned 'distance' instead of 'similarity'. Converted: ${result.distance} → ${similarity}`)
+        }
+        
+        // Default values for missing fields
+        const kind = result.kind || 'conversation'
+        const createdAt = result.created_at || new Date().toISOString()
+        
+        if (!result.kind) {
+          console.warn(`⚠️ [Embeddings] Missing 'kind' field in result, defaulting to 'conversation'`)
+        }
+        if (!result.created_at) {
+          console.warn(`⚠️ [Embeddings] Missing 'created_at' field in result, using current timestamp`)
+        }
+        
+        return {
+          id: result.id || crypto.randomUUID(),
+          timestamp: createdAt,
+          modality: 'text',
+          content: result.text || '',
+          metadata: {
+            similarity,
+            kind,
+            semantic: true // Flag to indicate this came from semantic search
+          },
+          similarity
+        }
+      })
+
+      return semanticEntries
+    } catch (error) {
+      console.warn('Semantic context retrieval failed (non-fatal):', error)
+      // Return empty array on error - semantic search is enhancement, not critical
+      return []
+    }
+  }
+
   async getContextSummary(sessionId: string): Promise<{
     totalMessages: number
     modalitiesUsed: string[]
@@ -683,7 +810,7 @@ export class MultimodalContextManager {
   }
 
   // Method to prepare context for AI chat
-  async prepareChatContext(sessionId: string, includeVisual: boolean = true, includeAudio: boolean = false): Promise<{
+  async prepareChatContext(sessionId: string, includeVisual: boolean = true, includeAudio: boolean = false, query?: string): Promise<{
     systemPrompt: string
     contextData: any
     multimodalContext: {
@@ -696,8 +823,27 @@ export class MultimodalContextManager {
   }> {
     const context = await this.getConversationContext(sessionId, includeVisual, includeAudio)
 
+    // Get semantically relevant context if query provided and embeddings enabled
+    let semanticContext: Array<ConversationEntry & { similarity?: number }> = []
+    if (query && process.env.EMBEDDINGS_ENABLED === 'true') {
+      try {
+        semanticContext = await this.getSemanticContext(sessionId, query, 5)
+      } catch (error) {
+        console.warn('Failed to retrieve semantic context (non-fatal):', error)
+      }
+    }
+
     // Build system prompt with multimodal context
     let systemPrompt = GEMINI_CONFIG.SYSTEM_PROMPT
+
+    // Add semantically relevant context if available
+    if (semanticContext.length > 0) {
+      systemPrompt += "\n\nSEMANTICALLY RELEVANT PAST CONTEXT:\n"
+      semanticContext.forEach((entry, i) => {
+        const similarity = entry.similarity ? ` (similarity: ${(entry.similarity * 100).toFixed(1)}%)` : ''
+        systemPrompt += `${i + 1}. ${entry.content.substring(0, 300)}${entry.content.length > 300 ? '...' : ''}${similarity}\n`
+      })
+    }
 
     // Extract conversation summaries (for long conversations)
     const summaries = extractSummaries(context.conversationHistory)
@@ -869,6 +1015,199 @@ export class MultimodalContextManager {
   // Get all active sessions (for monitoring)
   getActiveSessions(): string[] {
     return Array.from(this.activeContexts.keys())
+  }
+
+  /**
+   * Extract entities from conversation history
+   * Extracted from AdvancedContextManager - preserves entity extraction capability
+   */
+  async extractEntitiesFromContext(sessionId: string): Promise<ExtractedEntity[]> {
+    const context = await this.getContext(sessionId)
+    if (!context) return []
+
+    const allContent = context.conversationHistory
+      .map(entry => entry.content)
+      .join(' ')
+
+    const entities = extractEntities(allContent)
+
+    // Merge duplicates
+    return mergeEntities(entities)
+  }
+
+  /**
+   * Extract topics from conversation history with categorization
+   * Enhanced version from AdvancedContextManager - better than simple regex
+   */
+  async extractTopicsFromContext(sessionId: string): Promise<ExtractedTopic[]> {
+    const context = await this.getContext(sessionId)
+    if (!context) return []
+
+    const allContent = context.conversationHistory
+      .map(entry => entry.content)
+      .join(' ')
+
+    const topics = extractTopics(allContent)
+
+    // Merge duplicates
+    return mergeTopics(topics)
+  }
+
+  /**
+   * Analyze sentiment of conversation
+   * Extracted from AdvancedContextManager
+   */
+  async analyzeConversationSentiment(sessionId: string): Promise<Sentiment> {
+    const context = await this.getContext(sessionId)
+    if (!context || context.conversationHistory.length === 0) return 'neutral'
+
+    // Filter for user messages (where speaker is 'user' or not set, indicating user input)
+    const userMessages = context.conversationHistory.filter(entry => {
+      const speaker = entry.metadata.speaker
+      return !speaker || speaker === 'user'
+    })
+
+    if (userMessages.length === 0) return 'neutral'
+
+    const allContent = userMessages
+      .map(entry => entry.content)
+      .join(' ')
+
+    return analyzeSentiment(allContent)
+  }
+
+  /**
+   * Calculate conversation complexity, business value, and priority
+   * Extracted from AdvancedContextManager
+   */
+  async analyzeConversationMetrics(sessionId: string): Promise<{
+    complexity: Complexity
+    businessValue: BusinessValue
+    priority: Priority
+    entityCount: number
+    topicCount: number
+    avgMessageLength: number
+  }> {
+    const context = await this.getContext(sessionId)
+    if (!context) {
+      return {
+        complexity: 'simple',
+        businessValue: 'low',
+        priority: 'low',
+        entityCount: 0,
+        topicCount: 0,
+        avgMessageLength: 0
+      }
+    }
+
+    const entities = await this.extractEntitiesFromContext(sessionId)
+    const topics = await this.extractTopicsFromContext(sessionId)
+    const entityCount = entities.length
+    const topicCount = topics.length
+
+    const avgMessageLength = context.conversationHistory.length > 0
+      ? context.conversationHistory.reduce((sum, entry) => sum + entry.content.length, 0) / context.conversationHistory.length
+      : 0
+
+    const complexity = calculateComplexity(entityCount, topicCount, avgMessageLength)
+
+    const businessEntities = entities.filter(e => e.type === 'organization' || e.type === 'email').length
+    const businessTopics = topics.filter(t => t.category === 'business').length
+    const businessValue = calculateBusinessValue(businessEntities, businessTopics)
+
+    const priority = calculatePriority(businessValue, complexity)
+
+    return {
+      complexity,
+      businessValue,
+      priority,
+      entityCount,
+      topicCount,
+      avgMessageLength
+    }
+  }
+
+  /**
+   * Get conversation summary with intelligence metadata
+   * Enhanced version that includes entities, topics, sentiment, and metrics
+   */
+  async getIntelligentContextSummary(sessionId: string): Promise<string | null> {
+    const context = await this.getContext(sessionId)
+    if (!context) return null
+
+    const [entities, topics, sentiment, metrics] = await Promise.all([
+      this.extractEntitiesFromContext(sessionId),
+      this.extractTopicsFromContext(sessionId),
+      this.analyzeConversationSentiment(sessionId),
+      this.analyzeConversationMetrics(sessionId)
+    ])
+
+    const entitySummary = entities.length > 0
+      ? `Discussed ${entities.length} entities including: ${entities.slice(0, 3).map(e => e.value).join(', ')}`
+      : 'No specific entities discussed'
+
+    const topicSummary = topics.length > 0
+      ? `Covered ${topics.length} topics: ${topics.slice(0, 3).map(t => t.name).join(', ')}`
+      : 'General conversation'
+
+    const metricsSummary = `Priority: ${metrics.priority}, Complexity: ${metrics.complexity}, Business Value: ${metrics.businessValue}, Sentiment: ${sentiment}`
+
+    return `${entitySummary}. ${topicSummary}. ${metricsSummary}.`
+  }
+
+  /**
+   * Merge multiple session contexts (useful for cross-session analysis)
+   * Extracted from AdvancedContextManager
+   */
+  async mergeSessionContexts(sessionIds: string[]): Promise<{
+    mergedEntities: ExtractedEntity[]
+    mergedTopics: ExtractedTopic[]
+    combinedSentiment: Sentiment
+    combinedPriority: Priority
+    totalMessages: number
+  } | null> {
+    const contexts = await Promise.all(
+      sessionIds.map(id => this.getContext(id))
+    )
+
+    const validContexts = contexts.filter((ctx): ctx is MultimodalContext => ctx !== null)
+    if (validContexts.length === 0) return null
+
+    const allEntities = await Promise.all(
+      validContexts.map(ctx => this.extractEntitiesFromContext(ctx.sessionId))
+    )
+    const mergedEntities = mergeEntities(allEntities.flat())
+
+    const allTopics = await Promise.all(
+      validContexts.map(ctx => this.extractTopicsFromContext(ctx.sessionId))
+    )
+    const mergedTopics = mergeTopics(allTopics.flat())
+
+    const sentiments = await Promise.all(
+      validContexts.map(ctx => this.analyzeConversationSentiment(ctx.sessionId))
+    )
+    const combinedSentiment: Sentiment = sentiments.filter(s => s === 'positive').length > sentiments.filter(s => s === 'negative').length
+      ? 'positive'
+      : sentiments.filter(s => s === 'negative').length > sentiments.filter(s => s === 'positive').length
+      ? 'negative'
+      : 'neutral'
+
+    const priorities = await Promise.all(
+      validContexts.map(ctx => this.analyzeConversationMetrics(ctx.sessionId))
+    )
+    const priorityScores = { low: 1, medium: 2, high: 3 }
+    const avgPriorityScore = priorities.reduce((sum, m) => sum + priorityScores[m.priority], 0) / priorities.length
+    const combinedPriority: Priority = avgPriorityScore >= 2.5 ? 'high' : avgPriorityScore >= 1.5 ? 'medium' : 'low'
+
+    const totalMessages = validContexts.reduce((sum, ctx) => sum + ctx.conversationHistory.length, 0)
+
+    return {
+      mergedEntities,
+      mergedTopics,
+      combinedSentiment,
+      combinedPriority,
+      totalMessages
+    }
   }
 }
 
