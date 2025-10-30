@@ -70,7 +70,7 @@ export class AudioRecorder extends EventEmitter {
   private recordingWorklet: AudioWorkletNode | null = null;
   private stream: MediaStream | null = null;
   private isActive = false;
-  private actualSampleRate = 16000;
+  private actualSampleRate = 24000;
 
   constructor() {
     super();
