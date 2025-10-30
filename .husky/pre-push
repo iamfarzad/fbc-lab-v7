@@ -1,12 +1,36 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-# Only run on push to main
-branch=$(git rev-parse --abbrev-ref HEAD)
+# Local voice smoke test (optional). Set WS_URL if not default.
+WS_URL="${WS_URL:-ws://localhost:3001}"
 
-if [ "$branch" = "main" ]; then
-  echo "🚀 Pushing to main - running pre-deployment checks..."
-  ./scripts/pre-deploy-check.sh
-else
-  echo "✅ Not pushing to main - skipping pre-deployment checks"
+echo "🔊 Voice smoke test..."
+WS_URL="$WS_URL" pnpm -s voice:test || {
+  echo "❌ Voice smoke failed"; exit 1;
+}
+
+#!/usr/bin/env sh
+
+echo "🔍 Checking for hardcoded secrets in commits..."
+if git diff origin/main..HEAD --name-only | xargs grep -l "AIza\|sk-" 2>/dev/null; then
+  echo "❌ Found hardcoded API keys in commits to be pushed!"
+  echo "   Use environment variables instead"
+  exit 1
 fi
+
+echo "🔍 Checking for hardcoded URLs..."
+if git diff origin/main..HEAD | grep -E "wss?://.*fly.dev|ws://localhost:[0-9]{4}" | grep -v "WEBSOCKET_CONFIG" | grep -v "^-"; then
+  echo "⚠️  Warning: Found hardcoded URLs in commits"
+  echo "   Consider using WEBSOCKET_CONFIG.URL from @/config/constants"
+  echo "   Continuing anyway..."
+fi
+
+echo "🔍 Checking for hardcoded model names..."
+if git diff origin/main..HEAD | grep -E "gemini-[0-9]\.[0-9]-[a-z-]+" | grep -v "GEMINI_MODELS" | grep -v "^-" | grep -v "constants.ts"; then
+  echo "⚠️  Warning: Found hardcoded Gemini model names"
+  echo "   Consider using GEMINI_MODELS from @/config/constants"
+  echo "   Continuing anyway..."
+fi
+
+echo "✅ Push checks passed"
+
