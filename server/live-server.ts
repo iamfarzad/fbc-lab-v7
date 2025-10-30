@@ -638,11 +638,10 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
               media: { mimeType: 'image/jpeg', data: base64Data } 
             });
           }
-          // Then send text context
+          // Then send text context - Gemini Live expects raw text, not base64 for text
           const textContext = `[${modality} context]: ${snap.analysis}`
-          const textBase64 = Buffer.from(textContext).toString('base64')
           await client.session.sendRealtimeInput({ 
-            media: { mimeType: 'text/plain', data: textBase64 }
+            media: { text: textContext }
           });
         } else {
           throw new Error('sendRealtimeInput not available');
@@ -857,11 +856,10 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
                                 media: { mimeType: 'image/jpeg', data: base64Data } 
                               });
                             }
-                            // Then send text context
+                            // Then send text context - Gemini Live expects raw text, not base64 for text
                             const textContext = `Visual context: ${snap.analysis.substring(0, 200)}`
-                            const textBase64 = Buffer.from(textContext).toString('base64')
                             await clientRec.session.sendRealtimeInput({ 
-                              media: { mimeType: 'text/plain', data: textBase64 }
+                              media: { text: textContext }
                             });
                           } else {
                             throw new Error('sendRealtimeInput not available');
