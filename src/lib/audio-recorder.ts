@@ -38,11 +38,13 @@ const CRISP_AUDIO_WORKLET = `class AudioProcessor extends AudioWorkletProcessor 
         this.bufferIndex++;
         
         if (this.bufferIndex >= this.bufferSize) {
-          // Proven Float32 to Int16 conversion
+          // Proven Float32 to Int16 conversion with clamping
           const int16Buffer = new Int16Array(this.bufferSize);
           for (let j = 0; j < this.bufferSize; j++) {
-            const sample = this.buffer[j];
-            int16Buffer[j] = sample * 32767;
+            const s = this.buffer[j];
+            // Clamp to [-1, 1] range to prevent distortion
+            const clampedSample = Math.max(-1, Math.min(1, s));
+            int16Buffer[j] = clampedSample < 0 ? clampedSample * 0x8000 : clampedSample * 0x7FFF;
           }
           
           this.port.postMessage({
