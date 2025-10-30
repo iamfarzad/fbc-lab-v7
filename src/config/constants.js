@@ -227,6 +227,40 @@ export const FEATURE_FLAGS = {
         (process.env.NEXT_PUBLIC_FEATURE_REASONING_STREAMING || '').toLowerCase() === 'true',
 };
 
+// Agent Stage Configuration - User-friendly stage descriptions
+export const AGENT_STAGE_CONFIG = {
+    DISCOVERY: {
+        label: "Discovery",
+        description: "Understanding your business needs and goals",
+        order: 1
+    },
+    SCORING: {
+        label: "Analysis",
+        description: "Evaluating solution fit for your situation",
+        order: 2
+    },
+    WORKSHOP_PITCH: {
+        label: "Workshop Solution",
+        description: "Designing training approach for your team",
+        order: 3
+    },
+    CONSULTING_PITCH: {
+        label: "Custom Solution",
+        description: "Architecting enterprise AI implementation",
+        order: 3
+    },
+    CLOSING: {
+        label: "Proposal",
+        description: "Finalizing next steps and addressing questions",
+        order: 4
+    },
+    SUMMARY: {
+        label: "Summary",
+        description: "Preparing your personalized strategy report",
+        order: 5
+    }
+};
+
 // Agent UI Configuration (canonical)
 export const AGENT_UI_CONFIG = {
     websocketUrl: WEBSOCKET_CONFIG.URL,
