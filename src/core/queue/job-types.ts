@@ -31,6 +31,8 @@ export enum JobType {
   GENERATE_PDF = 'generate_pdf',
   SEND_EMAIL = 'send_email',
   PROCESS_EMBEDDING = 'process_embedding',
+  RETRY_AGENT_PERSISTENCE = 'retry-agent-persistence',
+  AGENT_ANALYTICS = 'agent-analytics',
 }
 
 interface WalSyncPayload {

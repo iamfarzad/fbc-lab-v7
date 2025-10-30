@@ -288,6 +288,82 @@ export class ContextStorage {
       throw error
     }
   }
+
+  /**
+   * Update with optimistic locking to prevent race conditions
+   * Uses version field to detect concurrent writes
+   */
+  async updateWithVersionCheck(
+    sessionId: string,
+    payload: Partial<DatabaseConversationContext>,
+    options: { attempts: number; backoff: number; signal?: AbortSignal }
+  ): Promise<void> {
+    let attempt = 0
+    
+    while (attempt < options.attempts) {
+      if (options.signal?.aborted) {
+        throw new Error('AbortError')
+      }
+      
+      try {
+        // Get current version
+        const current = await this.get(sessionId)
+        const currentVersion = current?.version || 0
+        
+        const dataToStore = {
+          session_id: sessionId,
+          email: payload.email || current?.email || 'unknown@example.com',
+          ...payload,
+          version: currentVersion + 1,
+          updated_at: new Date().toISOString()
+        }
+        
+        if (this.supabase) {
+          // Optimistic locking query - only update if version matches
+          const { data, error } = await this.supabase
+            .from('conversation_contexts')
+            .update(dataToStore)
+            .eq('session_id', sessionId)
+            .eq('version', currentVersion)
+            .select()
+          
+          if (error) {
+            throw error
+          }
+          
+          if (!data || data.length === 0) {
+            // Version mismatch - retry
+            throw new Error('VersionConflict')
+          }
+          
+          // Update in-memory cache
+          this.inMemoryStorage.set(sessionId, data[0] as DatabaseConversationContext)
+          this.cacheTimestamps.set(sessionId, Date.now())
+          
+          return // Success
+        } else {
+          // Fallback to in-memory (no version check in memory)
+          const existing = this.inMemoryStorage.get(sessionId)
+          this.inMemoryStorage.set(sessionId, {
+            ...existing,
+            ...dataToStore
+          } as DatabaseConversationContext)
+          this.cacheTimestamps.set(sessionId, Date.now())
+          return
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === 'VersionConflict' && attempt < options.attempts - 1) {
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, options.backoff * Math.pow(2, attempt)))
+          attempt++
+          continue
+        }
+        throw error
+      }
+    }
+    
+    throw new Error('Max version check attempts exceeded')
+  }
 }
 
 // Export singleton instance for backward compatibility

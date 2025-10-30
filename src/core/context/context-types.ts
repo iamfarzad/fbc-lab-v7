@@ -167,4 +167,13 @@ export interface DatabaseConversationContext {
   lastWebcamAnalysis?: string
   multimodal_context?: Json | null
   tool_outputs?: Json | null
+  
+  // Agent tracking fields (NEW)
+  version?: number
+  last_agent?: string | null
+  last_stage?: string | null
+  event_id?: string | null
+  analytics_pending?: boolean | null
+  conversation_flow?: Json | null
+  intelligence_context?: Json | null
 }

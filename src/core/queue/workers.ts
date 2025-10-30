@@ -1,6 +1,34 @@
 import { getSupabaseService } from '@/src/lib/supabase'
 import { JobType } from './job-types'
 import { redisQueue } from './redis-queue'
+import { vercelCache } from '@/lib/vercel-cache'
+
+const MAX_RETRIES = 5
+const DEAD_LETTER_QUEUE = 'dead-letter-agent-persistence'
+
+/**
+ * Check if an event has already been processed (for idempotency)
+ */
+async function checkEventProcessed(eventId: string): Promise<boolean> {
+  try {
+    const key = `processed-event:${eventId}`
+    const exists = await vercelCache.get('processed-events', key)
+    return !!exists
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Mark an event as processed (for idempotency)
+ */
+async function markEventProcessed(eventId: string): Promise<void> {
+  const key = `processed-event:${eventId}`
+  await vercelCache.set('processed-events', key, { processedAt: Date.now() }, {
+    ttl: 604800, // 7 days
+    tags: ['processed-events']
+  })
+}
 
 /**
  * Register all job handlers
@@ -52,6 +80,118 @@ export function registerWorkers(): void {
     // TODO: Implement background embedding processing
     console.log('Embedding processing job received:', payload)
     throw new Error('Embedding processing not yet implemented')
+  })
+
+  // Retry Agent Persistence Worker
+  redisQueue.registerHandler(JobType.RETRY_AGENT_PERSISTENCE, async (payload: any) => {
+    const { sessionId, eventId, data, retryCount } = payload
+    
+    // Check if already processed (idempotency)
+    const processed = await checkEventProcessed(eventId)
+    if (processed) {
+      console.log(`✅ Event already processed: ${eventId}`)
+      return
+    }
+    
+    if (retryCount >= MAX_RETRIES) {
+      console.error(`❌ Max retries (${MAX_RETRIES}) reached for ${sessionId}/${eventId}`)
+      
+      // Move to dead letter queue for human review
+      await redisQueue.enqueue(DEAD_LETTER_QUEUE, {
+        ...payload,
+        failedAt: Date.now(),
+        reason: 'max_retries_exceeded'
+      }, { priority: 'high' })
+      
+      // Track dead letter metric
+      console.error(`[METRIC] dead_letter session=${sessionId} event=${eventId} reason=max_retries_exceeded`)
+      return
+    }
+    
+    try {
+      const { ContextStorage } = await import('../context/context-storage')
+      const storage = new ContextStorage()
+      
+      // Attempt with version check
+      await storage.updateWithVersionCheck(sessionId, data, {
+        attempts: 2,
+        backoff: 100
+      })
+      
+      console.log(`✅ Retry ${retryCount + 1} successful for ${sessionId}/${eventId}`)
+      
+      // Mark event as processed in Redis
+      await markEventProcessed(eventId)
+      
+      // Clear fallback from Redis
+      await vercelCache.delete('agent-fallback', `${sessionId}:${eventId}`)
+      
+      // Clear analytics_pending flag
+      await storage.update(sessionId, { analytics_pending: false })
+      
+    } catch (error) {
+      console.error(`Retry ${retryCount + 1} failed for ${eventId}:`, error)
+      
+      // Calculate exponential backoff (max 5 minutes)
+      const delay = Math.min(Math.pow(2, retryCount + 1) * 1000, 300000)
+      
+      // Re-queue with incremented retry count
+      await redisQueue.enqueue(JobType.RETRY_AGENT_PERSISTENCE, {
+        ...payload,
+        retryCount: retryCount + 1,
+        lastError: error instanceof Error ? error.message : 'Unknown error'
+      }, {
+        priority: 'high',
+        delay
+      })
+      
+      // Track retry queued metric
+      console.log(`[METRIC] retry_queued session=${sessionId} event=${eventId} attempt=${retryCount + 1}`)
+    }
+  })
+
+  // Agent Analytics Worker
+  redisQueue.registerHandler(JobType.AGENT_ANALYTICS, async (payload: any) => {
+    const { sessionId, eventId, agent, stage, timestamp, leadScore, fitScore, multimodalUsed, hasEmail } = payload
+    
+    try {
+      // Log to analytics (could be Supabase audit_log or external service)
+      const supabase = getSupabaseService()
+      if (supabase) {
+        // Try to log to audit_log if table exists
+        const { error } = await supabase.from('audit_log').insert({
+          event: 'agent_executed',
+          session_id: sessionId,
+          metadata: {
+            eventId,
+            agent,
+            stage,
+            timestamp,
+            leadScore,
+            fitScore,
+            multimodalUsed,
+            hasEmail
+          },
+          created_at: new Date().toISOString()
+        }).catch(() => {
+          // Table might not exist, that's ok
+          return { error: null }
+        })
+        
+        if (error) {
+          console.warn('Failed to log to audit_log (non-fatal):', error)
+        }
+      }
+      
+      // Also mark analytics as complete in context
+      const { ContextStorage } = await import('../context/context-storage')
+      const storage = new ContextStorage()
+      await storage.update(sessionId, { analytics_pending: false })
+      
+      console.log(`📊 Analytics logged: ${agent} at ${stage} for session ${sessionId}`)
+    } catch (error) {
+      console.error('Analytics logging failed (non-fatal):', error)
+    }
   })
 }
 

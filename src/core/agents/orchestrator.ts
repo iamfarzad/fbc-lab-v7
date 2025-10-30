@@ -255,6 +255,22 @@ export async function routeToAgent({
       multimodalUsed: multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio || false
     }
 
+    // PERSIST AGENT RESULTS (NEW)
+    if (context.sessionId && context.sessionId !== 'anonymous') {
+      try {
+        const { agentPersistence } = await import('./agent-persistence')
+        await agentPersistence.persistAgentResult(
+          context.sessionId,
+          result,
+          enhancedContext
+        )
+        console.log(`✅ Agent result persisted: ${result.agent}`)
+      } catch (error) {
+        console.error('Agent persistence error (non-fatal):', error)
+        // Continue - don't block user experience
+      }
+    }
+
     return result
 
   } catch (error) {
