@@ -3,6 +3,7 @@ import { streamText } from 'ai'
 import { z } from 'zod'
 import type { AgentContext, ChatMessage } from './types'
 import { GEMINI_MODELS } from '@/config/constants'
+import { toolExecutor } from '../tools/tool-executor'
 
 /**
  * Consulting Sales Agent - Pitches custom AI consulting
@@ -66,14 +67,63 @@ STYLE: Executive-level, ROI-focused, direct`
           label: z.string(),
           value: z.number()
         }))
-      })
+      }),
+      execute: async (args: { title: string; data: Array<{ label: string; value: number }> }) => {
+        const result = await toolExecutor.execute({
+          toolName: 'create_chart',
+          sessionId: context.sessionId || 'anonymous',
+          agent: 'Consulting Sales Agent',
+          inputs: args,
+          handler: async () => {
+            // Tool logic: Create chart visualization
+            return {
+              type: 'chart',
+              title: args.title,
+              data: args.data,
+              rendered: true
+            }
+          },
+          cacheable: false // Charts are dynamic
+        })
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Chart creation failed')
+        }
+        
+        return result.data
+      }
     },
     create_calendar_widget: {
       description: 'Embed calendar booking for strategy call with Farzad',
       parameters: z.object({
         title: z.string(),
         description: z.string().optional()
-      })
+      }),
+      execute: async (args: { title: string; description?: string }) => {
+        const result = await toolExecutor.execute({
+          toolName: 'create_calendar_widget',
+          sessionId: context.sessionId || 'anonymous',
+          agent: 'Consulting Sales Agent',
+          inputs: args,
+          handler: async () => {
+            // Tool logic: Create calendar widget
+            return {
+              type: 'calendar_widget',
+              title: args.title,
+              description: args.description,
+              url: 'https://cal.com/farzad/strategy-call',
+              rendered: true
+            }
+          },
+          cacheable: false // Calendar widgets are dynamic
+        })
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Calendar widget creation failed')
+        }
+        
+        return result.data
+      }
     }
   }
 

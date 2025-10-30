@@ -26,7 +26,7 @@ import {
 import { Actions, Action } from "@/components/ai-elements/interactive/actions";
 import { Task, TaskTrigger, TaskContent, TaskItem, TaskItemFile } from "@/components/ai-elements/reasoning/task";
 import { WebPreview } from "@/components/ai-elements/content/web-preview";
-import type { Message as MessageType } from "@/types/core";
+import type { Message as MessageType, MessageMetadata } from "@/types/core";
 import { FEATURE_FLAGS } from '@/config/constants'
 import {
   Context,
@@ -49,10 +49,10 @@ interface LiveChatMessagesProps {
 
 export function LiveChatMessages({ messages, className }: LiveChatMessagesProps) {
   return (
-    <div className={className}>
+    <div className={className} data-testid="live-chat-messages">
       {messages.map((m) => {
         const from = m.role;
-        const meta = m.metadata || {} as any;
+        const meta = (m.metadata ?? {}) as Partial<MessageMetadata>;
         return (
           <MessageView key={m.id} from={from}>
             <MessageAvatar />
@@ -66,8 +66,8 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 return (
                   <div className="mb-1 flex items-center gap-1">
                     <Context
-                      usedTokens={(meta.contextUsage as any).usedTokens}
-                      maxTokens={(meta.contextUsage as any).maxTokens}
+                      usedTokens={meta.contextUsage?.usedTokens ?? 0}
+                      maxTokens={meta.contextUsage?.maxTokens ?? 0}
                       usage={{
                         // Map to LanguageModelUsage shape expected by Context components
                         inputTokens: (meta.usage as any)?.promptTokens ?? 0,
@@ -78,7 +78,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                         reasoningTokens: (meta.usage as any)?.reasoningTokens ?? 0,
                         cachedInputTokens: (meta.usage as any)?.cachedInputTokens ?? 0,
                       }}
-                      modelId={(meta.contextUsage as any).modelId}
+                      modelId={meta.contextUsage?.modelId ?? ''}
                     >
                       <ContextTrigger />
                       <ContextContent>
@@ -96,10 +96,10 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
               })()}
 
               {/* Stage visualization (if agent metadata is available) */}
-              {meta.agent && meta.stage && (
+              {meta.agent && (meta as any).stage && (
                 <div className="mb-2">
                   <StageVisualization 
-                    currentStage={String(meta.stage)}
+                    currentStage={String((meta as any).stage)}
                     agent={meta.agent}
                   />
                 </div>
@@ -113,7 +113,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                   <InlineCitationText>See citations</InlineCitationText>
                   <InlineCitationCard>
                     <InlineCitationCardTrigger
-                      sources={meta.inlineCitations.map((c:any)=>c.url).filter(Boolean)}
+                      sources={meta.inlineCitations.map((c)=>c.url).filter(Boolean)}
                     />
                     <InlineCitationCardBody>
                       <InlineCitationCarousel>
@@ -123,10 +123,10 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                           <InlineCitationCarouselNext />
                         </InlineCitationCarouselHeader>
                         <InlineCitationCarouselContent>
-                          {meta.inlineCitations.map((c:any, idx:number) => (
+                          {meta.inlineCitations.map((c, idx:number) => (
                             <InlineCitationCarouselItem key={idx}>
                               <Response className="text-[12px] font-medium">{c.title || c.url}</Response>
-                              <a className="text-[11px] text-blue-600 underline" href={c.url} target="_blank" rel="noreferrer">
+                              <a className="text-[11px] text-primary underline" href={c.url} target="_blank" rel="noreferrer">
                                 {c.url}
                               </a>
                               {c.text && <Response className="text-[11px] text-muted-foreground mt-1">{c.text}</Response>}
@@ -151,7 +151,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 <ChainOfThought>
                   <ChainOfThoughtHeader>Research Process</ChainOfThoughtHeader>
                   <ChainOfThoughtContent>
-                    {meta.chainOfThought.steps.map((step: any, idx: number) => (
+                    {meta.chainOfThought.steps.map((step, idx: number) => (
                       <ChainOfThoughtStep
                         key={idx}
                         label={step.label}
@@ -167,7 +167,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 <Sources>
                   <SourcesTrigger count={meta.sources.length} />
                   <SourcesContent>
-                    {meta.sources.map((s: any) => (
+                    {meta.sources.map((s) => (
                       <Source key={s.id} href={s.url} title={s.title} />
                     ))}
                   </SourcesContent>
@@ -175,7 +175,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
               )}
 
               {Array.isArray(meta.codeBlocks) &&
-                meta.codeBlocks.map((b: any) => (
+                meta.codeBlocks.map((b) => (
                   <CodeBlock
                     key={b.id}
                     code={b.code}
@@ -185,7 +185,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 ))}
 
               {Array.isArray(meta.artifacts) &&
-                meta.artifacts.map((a: any) => {
+                meta.artifacts.map((a) => {
                   const artifactTitle = a.title || a.type;
                   if (a.type === "summary") {
                     const sessionId =
@@ -198,10 +198,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                           key={a.id}
                           content={summaryContent}
                           sessionId={sessionId}
-                          leadEmail={
-                            (a.metadata?.leadEmail as string | undefined) ??
-                            (meta as any)?.leadEmail
-                          }
+                          leadEmail={(a.metadata?.leadEmail as string | undefined) ?? (meta as any)?.leadEmail}
                           gdprNotice={a.metadata?.gdprNotice as
                             | {
                                 message: string;
@@ -228,7 +225,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 })}
 
               {Array.isArray(meta.tools) &&
-                meta.tools.map((t: any) => {
+                meta.tools.map((t) => {
                   const mapped = mapToolState(t.state);
                   const outputText = serializeToText(t.output, 'LiveChatMessages-tool-output');
                   
@@ -243,9 +240,9 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                 })}
 
               {/* Tasks */}
-              {Array.isArray(meta.tasks) && meta.tasks.length > 0 && (
+              {Array.isArray(meta.tasks) && meta.tasks.length>0 && (
                 <div className="mt-1 space-y-1">
-                  {meta.tasks.map((task:any, idx:number) => (
+                  {meta.tasks.map((task, idx:number) => (
                     <Task key={idx}>
                       <TaskTrigger title={task.title} />
                       <TaskContent>
@@ -254,7 +251,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                         )}
                         {Array.isArray(task.files) && task.files.length>0 && (
                           <div className="flex flex-wrap gap-1">
-                            {task.files.map((f:any, i:number) => (
+                            {task.files.map((f, i:number) => (
                               <TaskItemFile key={i}>{f.name}</TaskItemFile>
                             ))}
                           </div>
@@ -274,7 +271,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
                       {meta.webPreview.description && (
                         <Response className="text-muted-foreground">{meta.webPreview.description}</Response>
                       )}
-                      <a className="text-blue-600 underline" href={meta.webPreview.url} target="_blank" rel="noreferrer">
+                      <a className="text-primary underline" href={meta.webPreview.url} target="_blank" rel="noreferrer">
                         {meta.webPreview.url}
                       </a>
                     </div>
@@ -285,8 +282,13 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
               {/* Images */}
               {Array.isArray(meta.images) && meta.images.length>0 && (
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  {meta.images.map((img:any, idx:number) => (
-                    <img key={idx} src={img.url} alt={img.alt || ''} className="rounded-md border" />
+                  {meta.images.map((img, idx:number) => (
+                    <img 
+                      key={idx} 
+                      src={img.base64 ? `data:${img.mediaType};base64,${img.base64}` : ''} 
+                      alt={img.alt || ''} 
+                      className="rounded-md border" 
+                    />
                   ))}
                 </div>
               )}
@@ -294,7 +296,7 @@ export function LiveChatMessages({ messages, className }: LiveChatMessagesProps)
               {/* Actions */}
               {Array.isArray(meta.actions) && meta.actions.length>0 && (
                 <Actions className="mt-2">
-                  {meta.actions.map((a:any, idx:number) => (
+                  {meta.actions.map((a, idx:number) => (
                     <Action key={idx} title={a.tooltip} aria-label={a.label}>
                       {a.label}
                     </Action>

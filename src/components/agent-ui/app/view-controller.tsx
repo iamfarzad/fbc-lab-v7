@@ -138,9 +138,18 @@ export function ViewController({ forceTermsReset }: { forceTermsReset?: boolean 
   const firstName = leadName.split(/\s+/)[0] || leadName;
   const companyName = (currentContext?.company as any)?.name || (email?.split('@')[1] || 'your team');
 
+  const hasStartedRef = useRef(false);
   useEffect(() => {
-    if (hasAcceptedTerms && !isSessionActive) {
-      startSession().catch((err) => console.warn('Failed to auto-start session', err));
+    if (hasAcceptedTerms && !isSessionActive && !hasStartedRef.current) {
+      hasStartedRef.current = true;
+      startSession().catch((err) => {
+        console.warn('Failed to auto-start session', err);
+        hasStartedRef.current = false; // Reset on error so we can retry
+      });
+    }
+    // Reset flag when terms are not accepted
+    if (!hasAcceptedTerms) {
+      hasStartedRef.current = false;
     }
   }, [hasAcceptedTerms, isSessionActive, startSession]);
 

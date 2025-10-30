@@ -2,7 +2,17 @@ import { getSupabaseService } from '@/src/lib/supabase'
 
 export interface AuditEvent {
   sessionId: string
-  event: 'pii_detected' | 'context_archived' | 'pdf_generated' | 'data_deleted' | 'wal_recovery' | 'redis_failure'
+  event: 
+    | 'pii_detected' 
+    | 'context_archived' 
+    | 'pdf_generated' 
+    | 'data_deleted' 
+    | 'wal_recovery' 
+    | 'redis_failure'
+    | 'agent_routed'          // NEW
+    | 'agent_stage_transition' // NEW
+    | 'agent_execution'        // NEW
+    | 'tool_executed'          // NEW
   details: Record<string, any>
   timestamp?: string
 }
@@ -31,7 +41,7 @@ class AuditLogger {
         console.error('Audit log insert failed:', error)
         // Don't throw - audit failure shouldn't break operations
       } else {
-        console.log(`📋 Audit logged: ${event.event} for ${event.sessionId}`)
+        console.log(`Audit logged: ${event.event} for ${event.sessionId}`)
       }
     } catch (err) {
       console.error('Audit logger error:', err)
@@ -102,6 +112,114 @@ class AuditLogger {
       sessionId,
       event: 'redis_failure',
       details: { operation, error }
+    })
+  }
+
+  /**
+   * Log agent routing decision
+   */
+  async logAgentRouted(
+    sessionId: string,
+    agent: string,
+    stage: string,
+    trigger: string,
+    metadata: {
+      previousStage?: string
+      conversationFlow?: any
+      intelligenceContext?: any
+      routingReason?: string
+    }
+  ): Promise<void> {
+    await this.log({
+      sessionId,
+      event: 'agent_routed',
+      details: {
+        agent,
+        stage,
+        trigger,
+        ...metadata
+      }
+    })
+  }
+
+  /**
+   * Log stage transition
+   */
+  async logStageTransition(
+    sessionId: string,
+    fromStage: string,
+    toStage: string,
+    reason: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.log({
+      sessionId,
+      event: 'agent_stage_transition',
+      details: {
+        fromStage,
+        toStage,
+        reason,
+        ...metadata
+      }
+    })
+  }
+
+  /**
+   * Log agent execution with performance metrics
+   */
+  async logAgentExecution(
+    sessionId: string,
+    agent: string,
+    stage: string,
+    performance: {
+      startTime: number
+      endTime: number
+      duration: number
+      success: boolean
+      error?: string
+    },
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    await this.log({
+      sessionId,
+      event: 'agent_execution',
+      details: {
+        agent,
+        stage,
+        performance,
+        ...metadata
+      }
+    })
+  }
+
+  /**
+   * Log tool execution with performance metrics
+   */
+  async logToolExecution(
+    sessionId: string,
+    toolName: string,
+    agent: string,
+    performance: {
+      duration: number
+      success: boolean
+      error?: string
+    },
+    metadata: {
+      inputs?: any
+      outputs?: any
+      cached?: boolean
+      attempt?: number
+    }
+  ): Promise<void> {
+    await this.log({
+      sessionId,
+      event: 'tool_executed',
+      details: {
+        toolName,
+        agent,
+        performance,
+        ...metadata
+      }
     })
   }
 }

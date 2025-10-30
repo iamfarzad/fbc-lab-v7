@@ -13,6 +13,19 @@ import { adminAgent } from './admin-agent'
 import { retargetingAgent } from './retargeting-agent'
 
 /**
+ * Structured logging helper (currently unused)
+ */
+// function logOrchestrator(level: 'info' | 'warn' | 'error', message: string, meta?: Record<string, any>) {
+//   const prefix = `[Orchestrator] ${level.toUpperCase()}`
+//   
+//   if (meta) {
+//     console.log(`${prefix}: ${message}`, meta)
+//   } else {
+//     console.log(`${prefix}: ${message}`)
+//   }
+// }
+
+/**
  * Multi-Agent Orchestrator - Routes conversations to specialized agents
  * 
  * Uses funnel stage determination to select the right agent
@@ -154,8 +167,36 @@ export async function routeToAgent({
     stage
   }
 
+  // NEW: Log routing decision
+  console.log(`[Orchestrator] Routing to ${stage} agent (trigger: ${trigger})`)
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AGENT_AUDIT === 'true') {
+    try {
+      const { auditLog } = await import('../security/audit-logger')
+      await auditLog.logAgentRouted(
+        context.sessionId || 'anonymous',
+        `${stage}_agent`,
+        stage,
+        trigger,
+        {
+          conversationFlow: context.conversationFlow,
+          intelligenceContext: {
+            leadScore: context.intelligenceContext?.leadScore,
+            fitScore: context.intelligenceContext?.fitScore,
+            hasEmail: Boolean(context.intelligenceContext?.email)
+          },
+          routingReason: `Determined via determineFunnelStage based on ${
+            context.conversationFlow ? 'conversation flow' : 'default logic'
+          }`
+        }
+      )
+    } catch (err) {
+      console.warn('Agent routing audit log failed (non-fatal):', err)
+    }
+  }
+
   // Route to appropriate agent
   let result: AgentResult
+  const startTime = Date.now()
 
   try {
     switch (stage) {
@@ -264,16 +305,62 @@ export async function routeToAgent({
           result,
           enhancedContext
         )
-        console.log(`✅ Agent result persisted: ${result.agent}`)
+        console.log(`Agent result persisted: ${result.agent}`)
         
         // NEW: Update context with enhanced flow for next turn
         if (result.metadata?.enhancedConversationFlow) {
           context.conversationFlow = result.metadata.enhancedConversationFlow
           enhancedContext.conversationFlow = result.metadata.enhancedConversationFlow
         }
+
+        // NEW: Log performance metrics
+        const endTime = Date.now()
+        const duration = endTime - startTime
+        console.log(`[Orchestrator] ${result.agent} executed in ${duration}ms`)
+        
+        if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AGENT_AUDIT === 'true') {
+          const { auditLog } = await import('../security/audit-logger')
+          await auditLog.logAgentExecution(
+            context.sessionId,
+            result.agent,
+            result.metadata?.stage || stage,
+            {
+              startTime,
+              endTime,
+              duration,
+              success: true
+            },
+            {
+              multimodalUsed: result.metadata?.multimodalUsed,
+              toolsUsed: result.metadata?.tools?.length || 0,
+              outputLength: result.output.length
+            }
+          )
+        }
       } catch (error) {
         console.error('Agent persistence error (non-fatal):', error)
-        // Continue - don't block user experience
+        
+        // NEW: Log execution failure
+        const endTime = Date.now()
+        if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AGENT_AUDIT === 'true') {
+          try {
+            const { auditLog } = await import('../security/audit-logger')
+            await auditLog.logAgentExecution(
+              context.sessionId || 'anonymous',
+              result?.agent || 'unknown',
+              stage,
+              {
+                startTime,
+                endTime,
+                duration: endTime - startTime,
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            )
+          } catch (auditErr) {
+            console.warn('Agent execution audit log failed:', auditErr)
+          }
+        }
       }
     }
 
@@ -311,8 +398,14 @@ function determineFunnelStage({
   trigger?: string
   override?: FunnelStage
 }): FunnelStage {
+  // Store previous stage for transition logging
+  const previousStage = intelligenceContext?.currentStage || 'NONE'
+  
   // Override takes precedence
-  if (override) return override;
+  if (override) {
+    console.log(`[Stage] Override: ${previousStage} → ${override}`)
+    return override
+  }
   // Admin queries
   if (trigger === 'admin') return 'ADMIN'
 
@@ -327,35 +420,63 @@ function determineFunnelStage({
 
   // Discovery phase - if less than 4 categories covered
   if (!conversationFlow || Object.values(conversationFlow.covered).filter(Boolean).length < 4) {
-    return 'DISCOVERY'
+    const newStage = 'DISCOVERY'
+    if (newStage !== previousStage) {
+      console.log(`[Stage] Transition: ${previousStage} → ${newStage}`)
+    }
+    return newStage
   }
 
   // Scoring phase - 4+ categories covered, but no fit score yet
   if (!intelligenceContext?.fitScore) {
-    return 'SCORING'
+    const newStage = 'SCORING'
+    if (newStage !== previousStage) {
+      console.log(`[Stage] Transition: ${previousStage} → ${newStage}`)
+    }
+    return newStage
   }
 
   // Closing phase - pitch delivered but no booking (check this FIRST)
   if (intelligenceContext.pitchDelivered && !intelligenceContext.calendarBooked) {
-    return 'CLOSING'
+    const newStage = 'CLOSING'
+    if (newStage !== previousStage) {
+      console.log(`[Stage] Transition: ${previousStage} → ${newStage}`)
+    }
+    return newStage
   }
 
   // Sales pitch phase - fit determined
   const { workshop, consulting } = intelligenceContext.fitScore
   if (workshop > consulting && workshop > 0.7) {
-    return 'WORKSHOP_PITCH'
+    const newStage = 'WORKSHOP_PITCH'
+    if (newStage !== previousStage) {
+      console.log(`[Stage] Transition: ${previousStage} → ${newStage}`)
+    }
+    return newStage
   }
   if (consulting > workshop && consulting > 0.7) {
-    return 'CONSULTING_PITCH'
+    const newStage = 'CONSULTING_PITCH'
+    if (newStage !== previousStage) {
+      console.log(`[Stage] Transition: ${previousStage} → ${newStage}`)
+    }
+    return newStage
   }
 
   // If fit scores are low or equal, stay in discovery
   if (workshop < 0.7 && consulting < 0.7) {
-    return 'DISCOVERY'
+    const newStage = 'DISCOVERY'
+    if (newStage !== previousStage) {
+      console.log(`[Stage] Transition: ${previousStage} → ${newStage}`)
+    }
+    return newStage
   }
 
   // Default back to discovery
-  return 'DISCOVERY'
+  const newStage = 'DISCOVERY'
+  if (newStage !== previousStage) {
+    console.log(`[Stage] Transition: ${previousStage} → ${newStage}`)
+  }
+  return newStage
 }
 
 /**

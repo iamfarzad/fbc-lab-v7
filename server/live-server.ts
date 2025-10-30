@@ -370,7 +370,26 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
         }))
       }
 
-      console.log(`[${connectionId}] ✅ Voice synced to orchestrator: ${agentResult.agent} (${agentResult.metadata?.stage})`)
+      console.log(`[${connectionId}] Voice synced to orchestrator: ${agentResult.agent} (${agentResult.metadata?.stage})`)
+
+      // NEW: Log to audit if enabled
+      if (process.env.ENABLE_AGENT_AUDIT === 'true') {
+        try {
+          const { auditLog } = await import('../src/core/security/audit-logger.js')
+          await auditLog.logAgentRouted(
+            sessionId,
+            agentResult.agent,
+            agentResult.metadata?.stage || 'UNKNOWN',
+            'voice',
+            {
+              previousStage: undefined,
+              routingReason: `Voice sync at turn ${client.userTurnCount} with ${messages.length} messages`
+            }
+          )
+        } catch (err) {
+          console.warn('Voice orchestrator audit log failed (non-fatal):', err)
+        }
+      }
     } catch (error) {
       console.error(`[${connectionId}] Voice orchestrator sync failed:`, error)
       // Non-fatal - don't interrupt voice session

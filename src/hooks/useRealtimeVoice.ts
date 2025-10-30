@@ -408,7 +408,18 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, []);
 
   const startSession = useCallback(async (opts?: { languageCode?: string; voiceName?: string; sessionId?: string }) => {
+    // Prevent duplicate calls
+    if (startInFlightRef.current) {
+      debugLog('🎤 [RealtimeVoice] startSession already in progress, skipping');
+      return;
+    }
+    if (isSessionActiveRef.current) {
+      debugLog('🎤 [RealtimeVoice] Session already active, skipping');
+      return;
+    }
+    
     debugLog('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
+    startInFlightRef.current = true;
     lastStartOptsRef.current = opts ?? {};
     
     // If socket isn't ready yet, attempt to connect with retries
@@ -449,6 +460,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after retries:', { attempts, isSocketReady, serverUrl });
         setError(message);
         callbacksRef.current?.onError?.(message);
+        startInFlightRef.current = false; // Reset flag so we can retry
         return;
       }
     }

@@ -3,6 +3,7 @@ import { streamText } from 'ai'
 import { z } from 'zod'
 import type { AgentContext, ChatMessage } from './types'
 import { GEMINI_MODELS } from '@/config/constants'
+import { toolExecutor } from '../tools/tool-executor'
 
 /**
  * Workshop Sales Agent - Pitches in-person AI workshops
@@ -65,14 +66,61 @@ STYLE: Conversational, no fluff, focus on value`
           label: z.string(),
           value: z.number()
         }))
-      })
+      }),
+      execute: async (args: { title: string; data: Array<{ label: string; value: number }> }) => {
+        const result = await toolExecutor.execute({
+          toolName: 'create_chart',
+          sessionId: context.sessionId || 'anonymous',
+          agent: 'Workshop Sales Agent',
+          inputs: args,
+          handler: async () => {
+            return {
+              type: 'chart',
+              title: args.title,
+              data: args.data,
+              rendered: true
+            }
+          },
+          cacheable: false
+        })
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Chart creation failed')
+        }
+        
+        return result.data
+      }
     },
     create_calendar_widget: {
       description: 'Embed calendar booking widget when lead shows interest',
       parameters: z.object({
         title: z.string(),
         description: z.string().optional()
-      })
+      }),
+      execute: async (args: { title: string; description?: string }) => {
+        const result = await toolExecutor.execute({
+          toolName: 'create_calendar_widget',
+          sessionId: context.sessionId || 'anonymous',
+          agent: 'Workshop Sales Agent',
+          inputs: args,
+          handler: async () => {
+            return {
+              type: 'calendar_widget',
+              title: args.title,
+              description: args.description,
+              url: 'https://cal.com/farzad/workshop-inquiry',
+              rendered: true
+            }
+          },
+          cacheable: false
+        })
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Calendar widget creation failed')
+        }
+        
+        return result.data
+      }
     }
   }
 

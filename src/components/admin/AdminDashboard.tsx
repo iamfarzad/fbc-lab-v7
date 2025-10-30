@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import type { Message as ChatMessage } from '@/types/core'
 import { MessageContent } from "@/components/ai-elements/core/message";
 import { Response } from "@/components/ai-elements/core/response";
+import { AgentAnalyticsPanel } from "./AgentAnalyticsPanel";
 import {
   Brain,
   Download,
@@ -580,6 +581,8 @@ export function AdminDashboard() {
         return renderAdminChat()
       case 'conversations':
         return renderConversations()
+      case 'analytics':
+        return <AgentAnalyticsPanel />
       default:
         return (
           <Card>
