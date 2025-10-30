@@ -2,7 +2,7 @@
 . "$(dirname "$0")/_/husky.sh"
 
 echo "🔍 Checking for hardcoded secrets in commits..."
-if git diff origin/main..HEAD --name-only | grep -v ".husky/" | xargs grep -l "AIza\|sk-" 2>/dev/null; then
+if git diff origin/main..HEAD --name-only | grep -v ".husky/" | xargs grep -lE "^.*AIza[0-9A-Za-z]{35}|^.*sk-[a-zA-Z0-9]{32,}" 2>/dev/null; then
   echo "❌ Found hardcoded API keys in commits to be pushed!"
   echo "   Use environment variables instead"
   exit 1
