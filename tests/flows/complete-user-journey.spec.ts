@@ -463,10 +463,10 @@ test.describe('Complete User Journey', () => {
       const objectionResponse = await chat.getLastMessage()
       const objectionText = (objectionResponse || '').toLowerCase()
       // Closer response check (optional - AI may not use closer in all cases)
-      objectionText.includes('understand') ||
-      objectionText.includes('address') ||
-      objectionText.includes('clarify') ||
-      objectionText.includes('concern')
+        objectionText.includes('understand') ||
+        objectionText.includes('address') ||
+        objectionText.includes('clarify') ||
+        objectionText.includes('concern')
       
       // Closer may or may not activate depending on conversation flow
       expect(objectionResponse).toBeTruthy()
