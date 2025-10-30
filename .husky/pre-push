@@ -3,10 +3,13 @@
 
 echo "🔍 Checking for hardcoded secrets in commits..."
 FILES=$(git diff origin/main..HEAD --name-only | grep -v ".husky/")
-if [ -n "$FILES" ] && echo "$FILES" | xargs grep -lE "^.*AIza[0-9A-Za-z]{35}|^.*sk-[a-zA-Z0-9]{32,}" 2>/dev/null; then
-  echo "❌ Found hardcoded API keys in commits to be pushed!"
-  echo "   Use environment variables instead"
-  exit 1
+if [ -n "$FILES" ]; then
+  MATCHES=$(echo "$FILES" | xargs grep -lE "^.*AIza[0-9A-Za-z]{35}|^.*sk-[a-zA-Z0-9]{32,}" 2>/dev/null || true)
+  if [ -n "$MATCHES" ]; then
+    echo "❌ Found hardcoded API keys in commits to be pushed!"
+    echo "   Use environment variables instead"
+    exit 1
+  fi
 fi
 
 echo "🔍 Checking for hardcoded URLs..."
