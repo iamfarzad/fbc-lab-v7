@@ -10,7 +10,9 @@ const customJestConfig = {
     // Stub ESM-only KV client in tests to avoid transform issues
     '^@vercel/kv$': '<rootDir>/tests/mocks/vercel-kv.ts',
     // Mock AI SDK to avoid network calls in unit tests
-    '^ai$': '<rootDir>/tests/mocks/ai.ts'
+    '^ai$': '<rootDir>/tests/mocks/ai.ts',
+    // Mock ESM-only Google GenAI client to avoid ESM transform of node_modules
+    '^@google/genai$': '<rootDir>/__mocks__/@google/genai.ts'
   },
   testEnvironment: 'jest-environment-jsdom',
   collectCoverageFrom: [

@@ -16,3 +16,16 @@ for (const [key, value] of Object.entries(requiredEnvFallbacks)) {
     process.env[key] = value
   }
 }
+
+// Silence noisy Supabase placeholder warnings in tests
+const originalConsoleWarn = console.warn
+console.warn = (...args) => {
+  const msg = String(args[0] ?? '')
+  if (
+    msg.includes('Supabase not configured - using placeholder. Data persistence disabled.') ||
+    msg.includes('Supabase not configured - using placeholder. WAL logging disabled.')
+  ) {
+    return
+  }
+  originalConsoleWarn(...args)
+}
