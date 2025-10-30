@@ -262,6 +262,34 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const isRecordingRef = useRef(false);
   const lastStartOptsRef = useRef<{ languageCode?: string; voiceName?: string; sessionId?: string } | null>(null);
   const startInFlightRef = useRef(false);
+  
+  // Refs to prevent handleServerEvent/startSession/stopSession from changing on runtime state updates
+  const isSessionActiveStateRef = useRef(isSessionActive);
+  const isProcessingStateRef = useRef(isProcessing);
+  const modelRepliesRef = useRef(modelReplies);
+  const sessionStateRef = useRef(session);
+  const isSocketReadyRef = useRef(isSocketReady);
+  const isRecordingStateRef = useRef(isRecording);
+  
+  // Sync refs with state (these don't cause re-renders)
+  useEffect(() => {
+    isSessionActiveStateRef.current = isSessionActive;
+  }, [isSessionActive]);
+  useEffect(() => {
+    isProcessingStateRef.current = isProcessing;
+  }, [isProcessing]);
+  useEffect(() => {
+    modelRepliesRef.current = modelReplies;
+  }, [modelReplies]);
+  useEffect(() => {
+    sessionStateRef.current = session;
+  }, [session]);
+  useEffect(() => {
+    isSocketReadyRef.current = isSocketReady;
+  }, [isSocketReady]);
+  useEffect(() => {
+    isRecordingStateRef.current = isRecording;
+  }, [isRecording]);
 
   useEffect(() => {
     callbacksRef.current = options;
@@ -330,12 +358,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   }, []);
 
   const sendRealtimeInput = useCallback((chunks: Array<{ mimeType: string; data: string }>) => {
-    if (!session?.connectionId || !isSessionActive) {
+    if (!sessionStateRef.current?.connectionId || !isSessionActiveStateRef.current) {
       console.warn('Cannot send realtime input - no active session');
       return;
     }
     liveRef.current?.sendRealtimeInput(chunks);
-  }, [session?.connectionId, isSessionActive]);
+  }, []);
 
   // --- Dev diagnostics helpers ---
   const sineToPCM16Base64 = useCallback((frequency = 440, durationMs = 320, sampleRate = 16000) => {
@@ -391,10 +419,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     callbacksRef.current?.onSessionStateChange?.({
       active: false,
       connectionId: connectionIdRef.current,
-      mock: session?.mock ?? false,
+      mock: sessionStateRef.current?.mock ?? false,
       isProcessing: false,
     });
-  }, [resetRecording, session]);
+  }, [resetRecording]);
 
   const handleRecorderChunk = useCallback((chunk: MediaRecorderVoiceResult) => {
     if (!chunk?.base64) return;
@@ -418,12 +446,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       return;
     }
     
-    debugLog('🎤 [RealtimeVoice] startSession called', { isSocketReady, connectionId: connectionIdRef.current, opts });
+    debugLog('🎤 [RealtimeVoice] startSession called', { isSocketReady: isSocketReadyRef.current, connectionId: connectionIdRef.current, opts });
     startInFlightRef.current = true;
     lastStartOptsRef.current = opts ?? {};
     
     // If socket isn't ready yet, attempt to connect with retries
-    if (!isSocketReady || !liveRef.current) {
+    if (!isSocketReadyRef.current || !liveRef.current) {
       let attempts = 0;
       const maxAttempts = 3;
       while (attempts < maxAttempts) {
@@ -455,9 +483,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
         }
       }
-      if (!isSocketReady) {
+      if (!isSocketReadyRef.current) {
         const message = 'Voice server not ready after retries';
-        console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after retries:', { attempts, isSocketReady, serverUrl });
+        console.error('🎤 [RealtimeVoice] Cannot start session - server not ready after retries:', { attempts, isSocketReady: isSocketReadyRef.current, serverUrl });
         setError(message);
         callbacksRef.current?.onError?.(message);
         startInFlightRef.current = false; // Reset flag so we can retry
@@ -471,7 +499,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       callbacksRef.current?.onSessionStateChange?.({
         active: false,
         connectionId: connectionIdRef.current,
-        mock: session?.mock ?? false,
+        mock: sessionStateRef.current?.mock ?? false,
         isProcessing: true,
       });
 
@@ -509,12 +537,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       sessionTimeoutRef.current = setTimeout(() => {
         debugLog('🎤 [RealtimeVoice] Session timeout check:', {
           isSessionActive: isSessionActiveRef.current,
-          hasSession: Boolean(session),
-          isRecording
+          hasSession: Boolean(sessionStateRef.current),
+          isRecording: isRecordingStateRef.current
         });
         
         // Only timeout if session truly didn't start
-      if (!isSessionActiveRef.current && !session) {
+      if (!isSessionActiveRef.current && !sessionStateRef.current) {
         const timeoutMsg = 'Voice session failed to start - server did not respond in time';
         console.error('🎤 [RealtimeVoice] Session timeout triggered');
         setError(timeoutMsg);
@@ -541,7 +569,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       await resetRecording();
       startInFlightRef.current = false;
     }
-  }, [handleRecorderChunk, isSocketReady, session, startRecording, resetRecording, serverUrl, isRecording, stopRecording]);
+  }, [handleRecorderChunk, startRecording, resetRecording, serverUrl, stopRecording]);
 
   const handleServerEvent = useCallback(async (event: LiveServerEvent) => {
     const callbacks = callbacksRef.current;
@@ -610,7 +638,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         callbacks?.onSessionStateChange?.({
           active: false,
           connectionId: connectionIdRef.current,
-          mock: session?.mock ?? false,
+          mock: sessionStateRef.current?.mock ?? false,
           isProcessing: false,
         });
         
@@ -676,7 +704,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         // Enhanced logging for audio pipeline debugging
         const padding = audioData.endsWith('==') ? 2 : audioData.endsWith('=') ? 1 : 0;
         const approxBytes = Math.max(0, Math.floor((audioData.length * 3) / 4) - padding);
-        const turnCount = modelReplies.length;
+        const turnCount = modelRepliesRef.current.length;
         
         debugLog('🎧 [RealtimeVoice] Audio event received', {
           base64Length: audioData.length,
@@ -829,7 +857,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         callbacks?.onSessionStateChange?.({
           active: true,  // Keep session active
           connectionId: connectionIdRef.current,
-          mock: session?.mock ?? false,
+          mock: sessionStateRef.current?.mock ?? false,
           isProcessing: false,
         });
         callbacks?.onTurnComplete?.();
@@ -844,7 +872,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         break;
       }
     }
-  }, [recorderProcessing, resetRecording, session, modelReplies.length, isSessionActive, isProcessing, startSession]);
+  }, [recorderProcessing, resetRecording]);
 
 
   const connectWebSocket = useCallback(() => {
@@ -941,15 +969,15 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
 
   const stopSession = useCallback(async () => {
     debugLog('🎤 [RealtimeVoice] stopSession called', {
-      isSessionActive,
-      isRecording,
-      isProcessing
+      isSessionActive: isSessionActiveStateRef.current,
+      isRecording: isRecordingStateRef.current,
+      isProcessing: isProcessingStateRef.current
     });
     if (VERBOSE_VOICE_LOGS) {
       console.trace('🎤 [RealtimeVoice] stopSession call stack:');
     }
     
-    if (!isSessionActive && !isRecording && !isProcessing) {
+    if (!isSessionActiveStateRef.current && !isRecordingStateRef.current && !isProcessingStateRef.current) {
       return;
     }
 
@@ -958,7 +986,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       callbacksRef.current?.onSessionStateChange?.({
         active: false,
         connectionId: connectionIdRef.current,
-        mock: session?.mock ?? false,
+        mock: sessionStateRef.current?.mock ?? false,
         isProcessing: true,
       });
 
@@ -981,12 +1009,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       setIsProcessing(false);
       callbacksRef.current?.onError?.(message);
     }
-  }, [isSessionActive, isRecording, isProcessing, session, stopRecording]);
+  }, [stopRecording]);
 
   // Microphone controls without ending the session
   const pauseMicrophone = useCallback(async () => {
     try {
-      if (isRecording) {
+      if (isRecordingStateRef.current) {
         await stopRecording();
         isRecordingRef.current = false;
       }
@@ -995,11 +1023,11 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       setError(message);
       callbacksRef.current?.onError?.(message);
     }
-  }, [isRecording, stopRecording]);
+  }, [stopRecording]);
 
   const resumeMicrophone = useCallback(async () => {
     try {
-      if (!isRecording) {
+      if (!isRecordingStateRef.current) {
         await startRecording({ onChunk: handleRecorderChunk });
         isRecordingRef.current = true;
       }
@@ -1008,7 +1036,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       setError(message);
       callbacksRef.current?.onError?.(message);
     }
-  }, [isRecording, startRecording, handleRecorderChunk]);
+  }, [startRecording, handleRecorderChunk]);
 
   useEffect(() => {
     connectWebSocket();
