@@ -13,6 +13,7 @@ import { SessionLogger } from './session-logger'
 import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG, ALLOWED_ORIGINS } from '../src/config/constants.js'
 import { MESSAGE_TYPES } from './message-types.js'
 import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
+import { getResolvedGeminiApiKey } from '../src/config/env.js'
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -20,6 +21,15 @@ import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
   // Load .env.local first (if exists), then fallback to .env
   dotenv.config({ path: path.join(__dirname, '.env.local') });
   dotenv.config({ path: path.join(__dirname, '.env') });
+  
+  // CRITICAL: Resolve and normalize Gemini API key for orchestrator agents
+  // This ensures @ai-sdk/google can find the API key when agents are called
+  try {
+    getResolvedGeminiApiKey()
+    console.log(`✅ Gemini API key resolved and normalized for agents`)
+  } catch (err) {
+    console.error(`❌ Failed to resolve Gemini API key:`, err)
+  }
 
   // Use PORT for Fly.io compatibility, fallback to 3001 for local development
   const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
