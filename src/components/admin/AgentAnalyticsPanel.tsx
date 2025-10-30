@@ -27,14 +27,28 @@ export function AgentAnalyticsPanel() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/admin/analytics?range=${range}`)
+      const response = await fetch(`/api/admin/analytics?range=${range}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch analytics')
+        const errorText = await response.text().catch(() => 'Unknown error')
+        throw new Error(`Failed to fetch analytics: ${response.status} ${errorText}`)
       }
+      
       const result = await response.json() as AnalyticsData
       setData(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      // Only show error if it's not a connection refused (server might be starting)
+      if (!errorMessage.includes('ERR_CONNECTION_REFUSED') && !errorMessage.includes('Failed to fetch')) {
+        setError(errorMessage)
+      } else {
+        setError('Analytics service temporarily unavailable. Please check server status.')
+      }
     } finally {
       setLoading(false)
     }

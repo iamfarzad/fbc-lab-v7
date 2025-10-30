@@ -34,8 +34,9 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
     console.error(`❌ Failed to resolve Gemini API key:`, err)
   }
 
-  // Use PORT for Fly.io compatibility, fallback to 3001 for local development
-  const PORT = process.env.PORT || process.env.LIVE_SERVER_PORT || 3001;
+  // Prioritize LIVE_SERVER_PORT for WebSocket server (when set explicitly)
+  // Fallback to PORT for Fly.io compatibility, then default to 3001
+  const PORT = process.env.LIVE_SERVER_PORT || process.env.PORT || 3001;
   console.log(`🔧 Environment check: PORT=${process.env.PORT}, LIVE_SERVER_PORT=${process.env.LIVE_SERVER_PORT}, Using: ${PORT}`);
 
   // Voice & Language Utilities

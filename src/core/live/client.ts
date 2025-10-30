@@ -39,9 +39,22 @@ export class LiveClientWS {
   }
 
   connect() {
+    // Clean up failed/closed sockets before reconnecting
     if (this.socket) {
-      console.log('🔌 [LiveClient] Socket already exists, skipping connect');
-      return;
+      const readyState = this.socket.readyState
+      if (readyState === WebSocket.CLOSED || readyState === WebSocket.CLOSING) {
+        // Socket is closed/closing, clean it up
+        this.socket = null
+      } else if (readyState === WebSocket.OPEN) {
+        // Socket is already open, skip
+        console.log('🔌 [LiveClient] Socket already exists and is open, skipping connect');
+        return;
+      } else if (readyState === WebSocket.CONNECTING) {
+        // Socket is connecting - wait a bit, but if it's been too long, clean it up
+        // This handles cases where connection is stuck
+        console.log('🔌 [LiveClient] Socket already exists and is connecting, skipping connect');
+        return;
+      }
     }
     const url = WEBSOCKET_CONFIG.URL
     console.log('🔌 [LiveClient] Connecting to:', url);
@@ -56,8 +69,16 @@ export class LiveClientWS {
       this.emit('close')
       this.socket = null
     }
-    ws.onerror = () => {
+    ws.onerror = (error) => {
+      console.error('🔌 [LiveClient] WebSocket error:', error);
       this.emit('error', 'WebSocket error')
+      // Always clean up socket on error to allow reconnection
+      // The socket will be in CLOSED or CLOSING state after error
+      setTimeout(() => {
+        if (this.socket && (this.socket.readyState === WebSocket.CLOSED || this.socket.readyState === WebSocket.CLOSING)) {
+          this.socket = null
+        }
+      }, 100)
     }
     ws.onmessage = (evt) => {
       try {

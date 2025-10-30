@@ -253,11 +253,48 @@ export function AdminDashboard() {
       })
 
       if (response.ok) {
-        const data = await response.json()
+        // Parse SSE stream (not JSON)
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+        let accumulatedContent = ''
+        let buffer = ''
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const dataText = line.slice(6).trim()
+                if (dataText && dataText !== '[DONE]') {
+                  try {
+                    const parsed = JSON.parse(dataText)
+                    // Skip meta events and flow updates
+                    if (parsed.type === 'meta' || parsed.type === 'flow_update') {
+                      continue
+                    }
+                    // Accumulate content from streaming chunks
+                    if (parsed.content && typeof parsed.content === 'string') {
+                      accumulatedContent = parsed.content
+                    }
+                  } catch {
+                    // Ignore parse errors for non-JSON lines
+                  }
+                }
+              }
+            }
+          }
+        }
+
         const assistantMessage: ChatMessage = { 
           id: crypto.randomUUID(),
           role: 'assistant', 
-          content: data.content || data.message || 'Response received',
+          content: accumulatedContent || 'Response received',
           timestamp: new Date()
         }
         setChatMessages(prev => [...prev, assistantMessage])

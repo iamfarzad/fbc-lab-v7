@@ -967,10 +967,16 @@ Citations: ${researchResult.allCitations.length} sources processed
         // Route to appropriate agent
         // Note: AIDevtools UI component in ChatInterface already tracks this
         const routingStart = Date.now()
+        // Determine trigger: admin query takes precedence
+        const trigger = isAdminQuery ? 'admin' : (context?.voiceActive ? 'voice' : 'chat')
+        // If admin query, set stage to ADMIN to bypass funnel logic
+        if (isAdminQuery && agentContext) {
+          agentContext.stage = 'ADMIN'
+        }
         const agentResult = await routeToAgent({
           messages: aiMessages,
           context: agentContext,
-          trigger: context?.voiceActive ? 'voice' : 'chat'
+          trigger
         })
         timings.agentRouting = Date.now() - routingStart
         console.log(`⏱️  [PERF] Agent routing: ${timings.agentRouting}ms`)
