@@ -880,6 +880,17 @@ export class MultimodalContextManager {
       })
     }
 
+    if (multimodalContext.hasRecentAudio && includeAudio) {
+      systemPrompt += `\n\nRecent voice conversation (${context.audioContext.length} entries):`
+      const recentAudio = context.audioContext.slice(-10) // Last 10 voice entries
+      recentAudio.forEach((audio) => {
+        const role = audio.type === 'voice_input' ? 'user' : 'assistant'
+        const transcript = audio.data?.transcript || '[Voice input]'
+        systemPrompt += `\n${role}: ${transcript.substring(0, 200)}${transcript.length > 200 ? '...' : ''}`
+      })
+      systemPrompt += '\nNote: User may continue this conversation via voice or text.'
+    }
+
     return {
       systemPrompt,
       contextData: context,

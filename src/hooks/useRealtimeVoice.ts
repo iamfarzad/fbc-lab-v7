@@ -209,6 +209,7 @@ export interface UseRealtimeVoiceOptions {
   onToolCall?: (toolCall: any) => void;
   onToolResult?: (result: any) => void;
   onError?: (message: string) => void;
+  onConversationFlowUpdate?: (flow: any) => void;
   liveClient?: LiveClientType;
   sessionId?: string;
 }
@@ -225,6 +226,14 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
   const [outputIsFinal, setOutputIsFinal] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [audioContextState, setAudioContextState] = useState<'suspended' | 'running' | 'closed' | 'unknown'>('unknown');
+  const [agentStatus, setAgentStatus] = useState<{
+    visible: boolean
+    message: string
+    stage?: string
+  }>({
+    visible: false,
+    message: ''
+  });
 
   const {
     startRecording,
@@ -769,6 +778,28 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         debugLog('🛠️ Tool call cancelled')
         break;
       }
+      case 'stage_update': {
+        const { stage, agent, flow } = event.payload || {}
+        console.log(`🎯 Agent stage update: ${agent} (${stage})`)
+        
+        // Update conversation flow if provided (via callback)
+        if (flow && callbacks?.onConversationFlowUpdate) {
+          callbacks.onConversationFlowUpdate(flow)
+        }
+        
+        // Show subtle notification
+        setAgentStatus({
+          visible: true,
+          message: 'F.B/c AI is analyzing...',
+          stage
+        })
+        
+        // Auto-hide after 2 seconds
+        setTimeout(() => {
+          setAgentStatus(prev => ({ ...prev, visible: false }))
+        }, 2000)
+        break;
+      }
       case 'turn_complete': {
         setIsProcessing(false);
         // Clear transcripts when turn completes
@@ -880,7 +911,8 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         client.on('setup_complete', () => handleServerEvent({ type: 'setup_complete', payload: { setupComplete: true } })),
         client.on('interrupted', () => handleServerEvent({ type: 'interrupted', payload: { interrupted: true } })),
         client.on('tool_call', (p) => handleServerEvent({ type: 'tool_call', payload: p } as any)),
-        client.on('tool_result', (p) => handleServerEvent({ type: 'tool_result', payload: p } as any))
+        client.on('tool_result', (p) => handleServerEvent({ type: 'tool_result', payload: p } as any)),
+        client.on('stage_update', (p) => handleServerEvent({ type: 'stage_update', payload: p } as any))
       );
       hasBoundListenersRef.current = true;
     }
@@ -1008,6 +1040,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     isVoiceSupported,
     micStream,
     audioContextState,
+    agentStatus,
     resumeAudioContext: async () => {
       try {
         if (audioPlayerRef.current && audioPlayerRef.current.contextState === 'suspended') {

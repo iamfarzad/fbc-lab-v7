@@ -313,6 +313,19 @@ export const SessionView = ({
     <section className="bg-background relative z-10 h-full w-full overflow-hidden" {...props}>
       {insightsPanel}
       {termsOverlay}
+      {/* Agent Status Indicator */}
+      {live.agentStatus?.visible && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none">
+          <div className="bg-primary/90 text-primary-foreground px-4 py-2 rounded-full shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+              <span className="text-sm font-medium">
+                {live.agentStatus.message}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Chat Transcript */}
       <div className={cn('fixed inset-0 grid grid-cols-1 grid-rows-1', isMinimized && 'pointer-events-none')}>
         <Fade top className="absolute inset-x-4 top-0 h-40" />

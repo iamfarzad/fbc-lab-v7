@@ -14,6 +14,16 @@ export async function POST(request: Request) {
       return respond.badRequest('Missing sessionId');
     }
 
+    // CRITICAL: Archive conversation context before PDF generation (ensures all data is persisted)
+    console.log('📦 Archiving conversation context before PDF generation...')
+    try {
+      await multimodalContextManager.archiveConversation(sessionId)
+      console.log('✅ Conversation context archived')
+    } catch (archiveError) {
+      console.warn('⚠️ Archive failed (non-fatal):', archiveError)
+      // Continue - PDF can still use current data
+    }
+
     // Flush WAL to ensure all pending writes are synced
     console.log('🔄 Flushing WAL before PDF generation...')
     await walLog.flushSession(sessionId)

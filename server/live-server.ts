@@ -12,7 +12,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { SessionLogger } from './session-logger'
 import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG, ALLOWED_ORIGINS } from '../src/config/constants.js'
 import { MESSAGE_TYPES } from './message-types.js'
-// import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js' // Removed for simplified config
+import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -199,23 +199,26 @@ import { MESSAGE_TYPES } from './message-types.js'
     lastPersisted?: number;
   };
 
-  type ActiveSessionRecord = {
-    ws: WebSocket;
-    session: any;
-    sessionId?: string; // Client session ID for context management
-    latestContext: {
-      screen?: Snapshot;
-      webcam?: Snapshot;
-    };
-    injectionTimers?: {
-      screen?: ReturnType<typeof setTimeout>;
-      webcam?: ReturnType<typeof setTimeout>;
-    };
-    logger?: SessionLogger;
-    turnCompletionTimer?: ReturnType<typeof setTimeout>;
-    lastAudioActivity?: number;
-    audioChunkCount?: number; // Track audio chunks for periodic logging
+type ActiveSessionRecord = {
+  ws: WebSocket;
+  session: any;
+  sessionId?: string; // Client session ID for context management
+  latestContext: {
+    screen?: Snapshot;
+    webcam?: Snapshot;
   };
+  injectionTimers?: {
+    screen?: ReturnType<typeof setTimeout>;
+    webcam?: ReturnType<typeof setTimeout>;
+  };
+  logger?: SessionLogger;
+  turnCompletionTimer?: ReturnType<typeof setTimeout>;
+  lastAudioActivity?: number;
+  audioChunkCount?: number; // Track audio chunks for periodic logging
+  userTurnCount?: number; // NEW: track turns for milestone triggers
+  lastTurnCompleteAt?: number; // Prevent double-counting turnComplete events
+  lastAssistantText?: string; // Track last assistant response for context saving
+};
 
   // Store active Live API sessions
   const activeSessions = new Map<string, ActiveSessionRecord>();
@@ -240,11 +243,12 @@ import { MESSAGE_TYPES } from './message-types.js'
 
   // Helper function to load conversation history
   async function loadConversationHistory(sessionId: string, connectionId: string): Promise<string> {
-    if (!sessionId) return '';
+    if (!sessionId || sessionId === 'anonymous') return '';
     
     try {
       const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
-      const recentConversation = await multimodalContextManager.getConversationHistory(sessionId, 6)
+      // Load more messages (20 instead of 6) to give voice better context
+      const recentConversation = await multimodalContextManager.getConversationHistory(sessionId, 20)
 
       if (recentConversation.length > 0) {
         const formatted = recentConversation
@@ -258,18 +262,106 @@ import { MESSAGE_TYPES } from './message-types.js'
                   ? 'user'
                   : 'assistant'
             const trimmed = entry.content.trim().replace(/\s+/g, ' ')
-            const truncated = trimmed.length > 220 ? `${trimmed.slice(0, 217).trimEnd()}...` : trimmed
-            return `${speaker}: ${truncated}`
+            // Don't truncate - include full context for voice
+            return `${speaker}: ${trimmed}`
           })
           .join('\n')
 
-        return `\n\nRECENT TEXT CHAT (latest first shown last):\n${formatted}`
+        return `\n\nRECENT CONVERSATION HISTORY (latest first shown last):\n${formatted}`
       }
     } catch (err) {
       console.warn(`[${connectionId}] Failed to load conversation history for voice session:`, err)
     }
     
     return '';
+  }
+
+  // Helper function to sync voice conversation to orchestrator
+  async function syncVoiceToOrchestrator(
+    sessionId: string,
+    connectionId: string,
+    client: ActiveSessionRecord
+  ): Promise<void> {
+    if (!sessionId || sessionId === 'anonymous') return
+
+    try {
+      // Load conversation history from multimodalContext
+      const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+      
+      // Get conversation history (last 20 messages)
+      const conversationHistory = await multimodalContextManager.getConversationHistory(sessionId, 20)
+      
+      // Build chat messages array from conversation history
+      const messages = conversationHistory
+        .filter((entry: any) => {
+          const speaker = entry.metadata?.speaker || (entry.modality === 'text' ? 'user' : 'assistant')
+          return speaker === 'user' || speaker === 'assistant' || speaker === 'model'
+        })
+        .map((entry: any) => {
+          const speaker = entry.metadata?.speaker || (entry.modality === 'text' ? 'user' : 'assistant')
+          return {
+            role: (speaker === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: entry.content || ''
+          }
+        })
+
+      if (messages.length === 0) return
+
+      // Get database context for email, flow, and intelligence
+      const { ContextStorage } = await import('../src/core/context/context-storage.js')
+      const storage = new ContextStorage()
+      const dbContext = await storage.get(sessionId)
+
+      // CRITICAL FIX: Load conversationFlow from database for stage determination
+      const persistedFlow = dbContext?.conversation_flow || undefined
+
+      // Build agent context
+      const agentContext = {
+        sessionId,
+        conversationFlow: persistedFlow, // Use persisted flow from DB
+        intelligenceContext: dbContext?.intelligence_context || undefined,
+        voiceActive: true
+      } as any
+
+      console.log(`[${connectionId}] 📊 Voice sync - Loaded conversationFlow:`, {
+        hasPersistedFlow: !!persistedFlow,
+        coveredCount: persistedFlow && typeof persistedFlow === 'object' && 'covered' in persistedFlow && persistedFlow.covered ? Object.values(persistedFlow.covered).filter(Boolean).length : 0,
+        recommendedNext: persistedFlow && typeof persistedFlow === 'object' && 'recommendedNext' in persistedFlow ? persistedFlow.recommendedNext : undefined
+      })
+
+      // Route through orchestrator
+      const { routeToAgent } = await import('../src/core/agents/orchestrator.js')
+      // Convert messages to proper Message[] format with id and timestamp
+      const formattedMessages = messages.map((msg) => ({
+        id: crypto.randomUUID(),
+        timestamp: new Date(),
+        role: msg.role,
+        content: msg.content
+      }))
+      
+      const agentResult = await routeToAgent({
+        messages: formattedMessages,
+        context: agentContext,
+        trigger: 'voice'
+      })
+
+      // Send stage update to client (non-blocking)
+      if (agentResult.metadata?.stage) {
+        safeSend(client.ws, JSON.stringify({
+          type: MESSAGE_TYPES.STAGE_UPDATE,
+          payload: {
+            stage: agentResult.metadata.stage,
+            agent: agentResult.agent,
+            flow: agentResult.metadata.enhancedConversationFlow
+          }
+        }))
+      }
+
+      console.log(`[${connectionId}] ✅ Voice synced to orchestrator: ${agentResult.agent} (${agentResult.metadata?.stage})`)
+    } catch (error) {
+      console.error(`[${connectionId}] Voice orchestrator sync failed:`, error)
+      // Non-fatal - don't interrupt voice session
+    }
   }
 
   // Helper function to build Live API configuration
@@ -367,8 +459,12 @@ import { MESSAGE_TYPES } from './message-types.js'
     
     const liveConfig: any = {
       responseModalities: ["AUDIO"],
-      inputAudioTranscription: {},
-      outputAudioTranscription: {},
+      inputAudioTranscription: {
+        model: "gemini-2.5-flash-native-audio-preview-09-2025"
+      },
+      outputAudioTranscription: {
+        model: "gemini-2.5-flash-native-audio-preview-09-2025"
+      },
       speechConfig: {
         voiceConfig: { 
           prebuiltVoiceConfig: { 
@@ -376,7 +472,8 @@ import { MESSAGE_TYPES } from './message-types.js'
           } 
         }
       },
-      systemInstruction: fullInstruction
+      systemInstruction: fullInstruction,
+      tools: [{ functionDeclarations: LIVE_FUNCTION_DECLARATIONS }]
     };
     
     console.log(`[buildLiveConfig] Final config:`, {
@@ -635,12 +732,17 @@ import { MESSAGE_TYPES } from './message-types.js'
               }
 
               const serverContent = message?.serverContent;
-              if (!serverContent) return;
+              if (!serverContent) {
+                // Log what we received if no serverContent
+                console.log(`[${connectionId}] [NO SERVER CONTENT] Message keys:`, Object.keys(message || {}));
+                return;
+              }
 
-              // Log server content structure for debugging
-              console.log(`[${connectionId}] [SERVER CONTENT] Full structure:`, JSON.stringify(serverContent, null, 2));
-              console.log(`[${connectionId}] [SERVER CONTENT] Has modelTurn?:`, !!serverContent.modelTurn);
-              console.log(`[${connectionId}] [SERVER CONTENT] Model turn parts:`, serverContent.modelTurn?.parts);
+              // Log server content structure for debugging (only key info, not full JSON)
+              const hasModelTurn = !!serverContent.modelTurn;
+              const partsCount = serverContent.modelTurn?.parts?.length || 0;
+              const hasAudioParts = serverContent.modelTurn?.parts?.some((p: any) => p.inlineData?.data) || false;
+              console.log(`[${connectionId}] [SERVER CONTENT] hasModelTurn: ${hasModelTurn}, parts: ${partsCount}, hasAudio: ${hasAudioParts}`);
               
               if (serverContent.modelTurn) {
                 console.log(`[${connectionId}] [MODEL TURN] Exists!`, {
@@ -681,6 +783,19 @@ import { MESSAGE_TYPES } from './message-types.js'
                           'user',
                           true
                         )
+                      }
+
+                      // NEW: Track turn count and trigger orchestrator sync
+                      sessionClient.userTurnCount = (sessionClient.userTurnCount || 0) + 1
+                      const turnCount = sessionClient.userTurnCount
+                      
+                      // Sync at milestones: 3, 8, 13, 18, etc.
+                      if (turnCount === 3 || (turnCount > 3 && (turnCount - 3) % 5 === 0)) {
+                        console.log(`[${connectionId}] Milestone reached (turn ${turnCount}), syncing to orchestrator...`)
+                        
+                        // Non-blocking - don't await
+                        syncVoiceToOrchestrator(sessionClient.sessionId, connectionId, sessionClient)
+                          .catch(err => console.error('Background orchestrator sync failed:', err))
                       }
                     } catch (err) {
                       console.warn(`[${connectionId}] Failed to track user voice turn:`, err)
@@ -783,10 +898,19 @@ import { MESSAGE_TYPES } from './message-types.js'
                     activeSessions.get(connectionId)?.logger?.log('model_text', { text: part.text })
                   }
                   if (part.inlineData?.data) {
-                    console.log(`[${connectionId}] [MODEL AUDIO] Received audio chunk! Size:`, (part.inlineData.data?.length || 0) * 0.75, 'bytes');
                     const audioBase64 = part.inlineData.data;
+                    const audioBytes = Math.floor((audioBase64.length || 0) * 0.75);
+                    console.log(`[${connectionId}] 🔊 [MODEL AUDIO] Received audio chunk! Size: ${audioBytes} bytes, base64Length: ${audioBase64.length}`);
+                    
+                    // Forward audio to client
                     safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.AUDIO, payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' } }));
-                    activeSessions.get(connectionId)?.logger?.log('audio_chunk', { direction: 'server_to_client', bytes: (audioBase64?.length || 0) * 0.75, mimeType: 'audio/pcm;rate=24000' })
+                    activeSessions.get(connectionId)?.logger?.log('audio_chunk', { direction: 'server_to_client', bytes: audioBytes, mimeType: 'audio/pcm;rate=24000' });
+                    
+                    // Log success
+                    console.log(`[${connectionId}] ✅ Audio chunk forwarded to client via WebSocket`);
+                  } else if (part.inlineData) {
+                    // Has inlineData but no data field - log structure for debugging
+                    console.log(`[${connectionId}] ⚠️ [MODEL PART] Has inlineData but no data field. Keys:`, Object.keys(part.inlineData || {}));
                   }
                 }
               }
@@ -800,6 +924,55 @@ import { MESSAGE_TYPES } from './message-types.js'
                   clearTimeout(client.turnCompletionTimer);
                   client.turnCompletionTimer = undefined;
                   console.info(`[${connectionId}] 🔄 Cleared turn completion timer (received from Live API)`);
+                }
+
+                // Track conversation turn for milestone sync and context saving (since inputTranscription isn't available)
+                // Each turnComplete means the model finished responding to a user turn
+                if (client?.sessionId && !client.lastTurnCompleteAt) {
+                  // Only count once per turn (prevent double-counting)
+                  client.lastTurnCompleteAt = Date.now();
+                  
+                  try {
+                    // Save user voice turn (even without transcript) - mark as voice input
+                    // This ensures chat can see voice conversations happened
+                    const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+                    await multimodalContextManager.addConversationTurn(client.sessionId, {
+                      role: 'user',
+                      text: '[Voice input - transcript unavailable]', // Placeholder since Gemini doesn't send inputTranscription
+                      isFinal: true,
+                      modality: 'voice'
+                    })
+                    await multimodalContextManager.addVoiceTranscript(
+                      client.sessionId,
+                      '[Voice input - transcript unavailable]',
+                      'user',
+                      true
+                    )
+                    
+                    // Increment turn count
+                    client.userTurnCount = (client.userTurnCount || 0) + 1
+                    const turnCount = client.userTurnCount
+                    
+                    console.log(`[${connectionId}] 🔢 Voice turn completed (turn ${turnCount})`)
+                    
+                    // Sync at milestones: 3, 8, 13, 18, etc.
+                    if (turnCount === 3 || (turnCount > 3 && (turnCount - 3) % 5 === 0)) {
+                      console.log(`[${connectionId}] 🎯 Milestone reached (turn ${turnCount}), syncing to orchestrator...`)
+                      
+                      // Non-blocking - don't await
+                      syncVoiceToOrchestrator(client.sessionId, connectionId, client)
+                        .catch(err => console.error(`[${connectionId}] Background orchestrator sync failed:`, err))
+                    }
+                  } catch (err) {
+                    console.warn(`[${connectionId}] Failed to track voice turn completion:`, err)
+                  }
+                  
+                  // Reset after 2 seconds to allow next turn to be tracked
+                  setTimeout(() => {
+                    if (client) {
+                      client.lastTurnCompleteAt = undefined
+                    }
+                  }, 2000)
                 }
               }
             } catch (err) {
@@ -993,6 +1166,13 @@ import { MESSAGE_TYPES } from './message-types.js'
           console.error(`[${connectionId}] ❌ Failed to archive on disconnect:`, err)
           // Non-fatal - continue with cleanup
         }
+      }
+
+      // NEW: Final orchestrator sync before closing
+      if (client.sessionId && client.userTurnCount && client.userTurnCount > 0) {
+        console.log(`[${connectionId}] Final orchestrator sync before session end...`)
+        await syncVoiceToOrchestrator(client.sessionId, connectionId, client)
+          .catch(err => console.error('Final orchestrator sync failed:', err))
       }
 
       try { client.session?.close?.() } catch (error) {

@@ -22,6 +22,7 @@ export const MESSAGE_TYPES = {
   TOOL_CALL: 'tool_call',
   ERROR: 'error',
   HEARTBEAT: 'heartbeat',
+  STAGE_UPDATE: 'stage_update', // NEW
 } as const;
 
 export type MessageType = typeof MESSAGE_TYPES[keyof typeof MESSAGE_TYPES];

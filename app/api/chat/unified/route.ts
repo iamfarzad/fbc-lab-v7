@@ -114,6 +114,8 @@ interface ChatRequestBody {
 interface MultimodalContextResult {
   multimodalContext: {
     hasRecentImages: boolean
+    hasRecentAudio: boolean
+    hasRecentUploads: boolean
   }
   systemPrompt: string
 }
@@ -887,7 +889,10 @@ Citations: ${researchResult.allCitations.length} sources processed
         
         const multimodalContext: MultimodalContextResult = await multimodalContextManager.prepareChatContext(sessionId, true, true, query)
 
-        if (multimodalContext.multimodalContext.hasRecentImages) {
+        // Always add multimodal context if available (images OR audio OR uploads)
+        if (multimodalContext.multimodalContext.hasRecentImages || 
+            multimodalContext.multimodalContext.hasRecentAudio ||
+            multimodalContext.multimodalContext.hasRecentUploads) {
           systemPrompt += '\n\n' + multimodalContext.systemPrompt
         }
       } catch (error) {
@@ -939,13 +944,25 @@ Citations: ${researchResult.allCitations.length} sources processed
       
       try {
         // Build agent context
+        // CRITICAL FIX: Load conversationFlow from database before stage determination
+        const dbContext = sessionId && sessionId !== 'anonymous' 
+          ? await contextStorage.get(sessionId) 
+          : null
+        const persistedFlow = dbContext?.conversation_flow || conversationFlow
+        
         const agentContext: AgentContext = {
           sessionId,
           intelligenceContext: context?.intelligenceContext as any,
-          conversationFlow: conversationFlow as any,
+          conversationFlow: persistedFlow as any, // Use persisted flow from DB if available
           // mode removed - transport determined by connection type
           voiceActive: context?.voiceActive || false
         }
+
+        console.log(`📊 [Multi-Agent] Loaded conversationFlow from DB:`, {
+          hasPersistedFlow: !!dbContext?.conversation_flow,
+          coveredCount: persistedFlow && typeof persistedFlow === 'object' && 'covered' in persistedFlow && persistedFlow.covered ? Object.values(persistedFlow.covered).filter(Boolean).length : 0,
+          recommendedNext: persistedFlow && typeof persistedFlow === 'object' && 'recommendedNext' in persistedFlow ? persistedFlow.recommendedNext : undefined
+        })
 
         // Route to appropriate agent
         // Note: AIDevtools UI component in ChatInterface already tracks this

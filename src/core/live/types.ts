@@ -14,6 +14,7 @@ export type LiveServerEvent =
   | { type: 'tool_call'; payload: any }
   | { type: 'tool_result'; payload: any }
   | { type: 'tool_call_cancellation'; payload: any }
+  | { type: 'stage_update'; payload: { stage: string; agent: string; flow?: any } }
   | { type: 'error'; payload: { message: string; detail?: unknown } }
 
 export type LiveClientEventMap = {
@@ -32,5 +33,6 @@ export type LiveClientEventMap = {
   interrupted: () => void
   tool_call: (payload: any) => void
   tool_result: (payload: any) => void
+  stage_update: (payload: { stage: string; agent: string; flow?: any }) => void
 }
 

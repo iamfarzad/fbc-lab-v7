@@ -115,6 +115,9 @@ export class LiveClientWS {
       case 'tool_result':
         this.emit('tool_result', msg.payload)
         break
+      case 'stage_update':
+        this.emit('stage_update', msg.payload)
+        break
       case 'error':
         this.emit('error', msg.payload.message)
         break
