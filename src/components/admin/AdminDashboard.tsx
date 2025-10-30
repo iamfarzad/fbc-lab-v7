@@ -12,6 +12,8 @@ import type { Message as ChatMessage } from '@/types/core'
 import { MessageContent } from "@/components/ai-elements/core/message";
 import { Response } from "@/components/ai-elements/core/response";
 import { AgentAnalyticsPanel } from "./AgentAnalyticsPanel";
+import { AdminChatPanel } from './AdminChatPanel'
+import { SystemHealthPanel } from './SystemHealthPanel'
 import {
   Brain,
   Download,
@@ -123,6 +125,7 @@ export function AdminDashboard() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [isChatRailOpen, setIsChatRailOpen] = useState(true)
   
   // API Tester state
   const [selectedEndpoint, setSelectedEndpoint] = useState(API_ENDPOINTS[0].endpoints[0])
@@ -620,6 +623,8 @@ export function AdminDashboard() {
         return renderConversations()
       case 'analytics':
         return <AgentAnalyticsPanel />
+      case 'system-health':
+        return <SystemHealthPanel />
       default:
         return (
           <Card>
@@ -642,6 +647,9 @@ export function AdminDashboard() {
                 <p className="mt-1 text-muted-foreground">System overview and management</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsChatRailOpen(v => !v)}>
+                  {isChatRailOpen ? 'Hide Chat' : 'Show Chat'}
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => {
                   if (activeSection === 'overview') void fetchStats()
                   if (activeSection === 'conversations') void fetchConversations()
@@ -703,7 +711,16 @@ export function AdminDashboard() {
               })}
             </nav>
           </header>
-          <div className="p-6">{renderSection()}</div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px,1fr]">
+              <div className={cn(isChatRailOpen ? 'block' : 'hidden', 'lg:block')}>
+                <AdminChatPanel collapsed={!isChatRailOpen} onToggle={() => setIsChatRailOpen(v => !v)} />
+              </div>
+              <div>
+                {renderSection()}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
