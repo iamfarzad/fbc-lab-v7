@@ -54,6 +54,12 @@ next-env.d.ts
 /tests/**/*.png
 /tests/**/*.webp
 
+# Local audio fixtures (avoid committing large binaries)
+voice_test/**
+tests/fixtures/**/*.wav
+tests/fixtures/**/*.m4a
+!tests/fixtures/**/.gitkeep
+
 # Server
 /server/node_modules
 /server/dist
