@@ -4,7 +4,7 @@ import {
   type TrackReferenceOrPlaceholder,
   useTrackToggle,
 } from '@livekit/components-react';
-import { FbcMatrixVisualizer } from '@/components/agent-ui/FbcMatrixVisualizer';
+import { FbcOrbVisualizer } from '@/components/agent-ui/FbcOrbVisualizer';
 import { TrackDeviceSelect } from '@/components/agent-ui/livekit/agent-control-bar/track-device-select';
 import { TrackToggle } from '@/components/agent-ui/livekit/agent-control-bar/track-toggle';
 import { cn } from '@/lib/utils';
@@ -48,7 +48,7 @@ export function TrackSelector({
       >
         {audioTrackRef && (
           <div className="audiovisualizer flex h-6 w-auto items-center justify-center gap-0.5 overflow-hidden">
-            <FbcMatrixVisualizer variant="minimized" />
+            <FbcOrbVisualizer rows={6} cols={10} size={2} gap={0.5} />
           </div>
         )}
       </TrackToggle>
