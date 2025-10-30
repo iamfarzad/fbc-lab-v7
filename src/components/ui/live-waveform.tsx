@@ -1,4 +1,4 @@
-import { useEffect, useRef, type HTMLAttributes } from "react"
+import { useEffect, useRef, type HTMLAttributes, type ButtonHTMLAttributes } from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -22,6 +22,8 @@ export type LiveWaveformProps = HTMLAttributes<HTMLDivElement> & {
   onError?: (error: Error) => void
   onStreamReady?: (stream: MediaStream) => void
   onStreamEnd?: () => void
+  asButton?: boolean
+  buttonProps?: ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 export const LiveWaveform = ({
@@ -528,29 +530,52 @@ export const LiveWaveform = ({
     mode,
   ])
 
+  const ariaLabel =
+    active ? "Live audio waveform" : processing ? "Processing audio" : "Audio waveform idle"
+
+  if (props.asButton) {
+    const { className: buttonClassName, ...restButton } = props.buttonProps || {}
+    return (
+      <button
+        type="button"
+        className={cn(
+          // 44px min touch target height, pill button, focus ring
+          "relative inline-flex h-11 w-full items-center justify-center rounded-3xl bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          buttonClassName
+        )}
+        aria-label={ariaLabel}
+        {...restButton}
+      >
+        <div
+          className={cn("relative h-full w-full", className)}
+          ref={containerRef}
+          style={{ height: heightStyle }}
+          role="img"
+          aria-hidden={true}
+        >
+          {!active && !processing && (
+            <div className="border-muted-foreground/20 absolute top-1/2 right-0 left-0 -translate-y-1/2 border-t-2 border-dotted" />
+          )}
+          <canvas className="block h-full w-full" ref={canvasRef} aria-hidden="true" />
+        </div>
+        <span className="sr-only">{ariaLabel}</span>
+      </button>
+    )
+  }
+
   return (
     <div
       className={cn("relative h-full w-full", className)}
       ref={containerRef}
       style={{ height: heightStyle }}
-      aria-label={
-        active
-          ? "Live audio waveform"
-          : processing
-            ? "Processing audio"
-            : "Audio waveform idle"
-      }
+      aria-label={ariaLabel}
       role="img"
       {...props}
     >
       {!active && !processing && (
         <div className="border-muted-foreground/20 absolute top-1/2 right-0 left-0 -translate-y-1/2 border-t-2 border-dotted" />
       )}
-      <canvas
-        className="block h-full w-full"
-        ref={canvasRef}
-        aria-hidden="true"
-      />
+      <canvas className="block h-full w-full" ref={canvasRef} aria-hidden="true" />
     </div>
   )
 }
