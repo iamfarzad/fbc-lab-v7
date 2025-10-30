@@ -55,7 +55,10 @@
     "logs:errors": "tsx scripts/tail-logs.ts --level=error",
     "logs:test": "tsx scripts/test-logging.ts",
     "logs:test-enhancements": "tsx scripts/test-enhancements.ts",
-    "dev:with-logs": "concurrently \"pnpm dev:all\" \"pnpm logs:start\" \"pnpm logs\""
+    "dev:with-logs": "concurrently \"pnpm dev:all\" \"pnpm logs:start\" \"pnpm logs\"",
+    "voice:fixture:update": "ffmpeg -y -i \"/Users/farzad/fbc_lab_v7/voice_test/New Recording 8.m4a\" -ar 16000 -ac 1 -sample_fmt s16 voice_test/voice-turn-1.wav",
+    "voice:test": "pnpm tsx scripts/test-voice-file.ts voice_test/voice-turn-1.wav",
+    "voice:test:multi": "pnpm tsx scripts/test-voice-file.ts voice_test/voice-turn-1.wav voice_test/voice-turn-2.wav"
   },
   "dependencies": {
     "@ai-sdk-tools/agents": "0.1.0-beta.1",
