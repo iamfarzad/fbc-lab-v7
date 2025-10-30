@@ -697,6 +697,16 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
       const requestedVoice = typeof payload?.voiceName === 'string' ? payload.voiceName : undefined
       const voiceName = requestedVoice || VOICE_CONFIG.BY_LANG[lang as keyof typeof VOICE_CONFIG.BY_LANG] || VOICE_CONFIG.DEFAULT_VOICE
       const sessionId = typeof payload?.sessionId === 'string' ? payload.sessionId.trim() : ''
+      
+      // DEBUG: Log voice selection for production debugging
+      console.info(`[${connectionId}] Voice selection:`, {
+        requestedLang,
+        lang,
+        requestedVoice,
+        selectedVoice: voiceName,
+        defaultVoice: VOICE_CONFIG.DEFAULT_VOICE,
+        byLangFallback: VOICE_CONFIG.BY_LANG[lang as keyof typeof VOICE_CONFIG.BY_LANG]
+      });
 
       const priorChatContext = await loadConversationHistory(sessionId, connectionId);
 

@@ -15,6 +15,16 @@ export function FBCAudioBridge() {
   // When a final user transcript lands, send only the newest final line
   useEffect(() => {
     const transcript = liveApi.transcript?.trim();
+    
+    // DEBUG: Log transcript state for debugging production issues
+    if (transcript && transcript !== lastSentLineRef.current) {
+      console.log('[FBCAudioBridge] Transcript received:', {
+        hasTranscript: Boolean(transcript),
+        transcriptLength: transcript?.length || 0,
+        hasSendMessage: typeof sendMessage === 'function'
+      });
+    }
+    
     if (!transcript) return;
 
     // Heuristic: treat each final utterance as a line; forward only the newest line
@@ -24,8 +34,11 @@ export function FBCAudioBridge() {
     if (lastLine === lastSentLineRef.current) return;
 
     if (typeof sendMessage === 'function') {
+      console.log('[FBCAudioBridge] Forwarding transcript to unified chat:', lastLine);
       lastSentLineRef.current = lastLine;
       void sendMessage(lastLine);
+    } else {
+      console.warn('[FBCAudioBridge] sendMessage not available, transcript not forwarded:', lastLine);
     }
   }, [liveApi.transcript, sendMessage]);
 

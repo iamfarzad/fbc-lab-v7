@@ -628,6 +628,12 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
       }
       case 'input_transcript': {
         const isFinal = event.payload.isFinal === true
+        // DEBUG: Log transcript events for production debugging
+        console.log('[useRealtimeVoice] input_transcript event:', {
+          isFinal,
+          textLength: event.payload.text?.length || 0,
+          textPreview: event.payload.text?.substring(0, 50)
+        });
         if (isFinal) {
           setTranscript((prev) => (prev ? `${prev}\n${event.payload.text}` : event.payload.text));
           setPartialTranscript('');
