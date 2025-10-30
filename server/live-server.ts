@@ -17,10 +17,13 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
+  
+  // Get project root (parent of server directory)
+  const projectRoot = path.resolve(__dirname, '..');
 
-  // Load .env.local first (if exists), then fallback to .env
-  dotenv.config({ path: path.join(__dirname, '.env.local') });
-  dotenv.config({ path: path.join(__dirname, '.env') });
+  // Load .env.local first (if exists), then fallback to .env from project root
+  dotenv.config({ path: path.join(projectRoot, '.env.local') });
+  dotenv.config({ path: path.join(projectRoot, '.env') });
   
   // CRITICAL: Resolve and normalize Gemini API key for orchestrator agents
   // This ensures @ai-sdk/google can find the API key when agents are called
