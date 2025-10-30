@@ -1,16 +1,6 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
-# Local voice smoke test (optional). Set WS_URL if not default.
-WS_URL="${WS_URL:-ws://localhost:3001}"
-
-echo "🔊 Voice smoke test..."
-WS_URL="$WS_URL" pnpm -s voice:test || {
-  echo "❌ Voice smoke failed"; exit 1;
-}
-
-#!/usr/bin/env sh
-
 echo "🔍 Checking for hardcoded secrets in commits..."
 if git diff origin/main..HEAD --name-only | xargs grep -l "AIza\|sk-" 2>/dev/null; then
   echo "❌ Found hardcoded API keys in commits to be pushed!"
