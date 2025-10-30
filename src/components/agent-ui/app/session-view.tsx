@@ -238,7 +238,8 @@ export const SessionView = ({
       );
     }
 
-    if (researchStatus === 'loading' || researchStatus === 'idle') {
+    // Hide spinner when agent is actively listening/ready to avoid confusion
+    if ((researchStatus === 'loading' || researchStatus === 'idle') && !isSessionActive) {
       return (
         <div className="pointer-events-auto absolute right-3 top-4 z-[60] w-[240px] rounded-2xl border bg-card/90 p-3 shadow-lg backdrop-blur">
           <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">

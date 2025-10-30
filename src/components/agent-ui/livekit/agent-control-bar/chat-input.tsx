@@ -53,19 +53,22 @@ export function ChatInput({
     }
   };
 
+  // Show input when agent is available, even if chat panel isn't "open"
+  const shouldShow = chatOpen || isAgentAvailable
+
   const isDisabled = isSending || !isAgentAvailable || message.trim().length === 0;
 
   useEffect(() => {
-    if (chatOpen && isAgentAvailable) return;
+    if (shouldShow && isAgentAvailable) return;
     // when not disabled refocus on input
     inputRef.current?.focus();
-  }, [chatOpen, isAgentAvailable]);
+  }, [shouldShow, isAgentAvailable]);
 
   return (
     <motion.div
-      inert={!chatOpen}
+      inert={!shouldShow}
       {...MOTION_PROPS}
-      animate={chatOpen ? 'visible' : 'hidden'}
+      animate={shouldShow ? 'visible' : 'hidden'}
       className="border-input/50 flex w-full items-start overflow-hidden border-b"
     >
       <form
@@ -77,7 +80,7 @@ export function ChatInput({
           ref={inputRef}
           type="text"
           value={message}
-          disabled={!chatOpen}
+          disabled={!shouldShow}
           placeholder="Type something..."
           onChange={(e) => setMessage(e.target.value)}
           className="flex h-8 flex-1 bg-transparent px-3 py-1 text-base transition-colors placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm [.monochrome_&]:font-mono"

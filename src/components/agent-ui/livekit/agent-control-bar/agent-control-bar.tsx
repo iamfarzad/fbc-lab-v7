@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { useRef } from 'react'
 import { VoiceIcon } from '@/components/ui/voice-button';
 import { LiveWaveform } from '@/components/ui/live-waveform';
+import { isScreenShareSupported } from '@/utils/platform';
 import {
   Tooltip,
   TooltipContent,
@@ -183,7 +184,8 @@ export function AgentControlBar({
   const visibleControls = {
     leave: controls?.leave ?? true,
     microphone: controls?.microphone ?? true,
-    screenShare: controls?.screenShare ?? true,
+    // Hide screen share on iOS Safari (getDisplayMedia not supported)
+    screenShare: (controls?.screenShare ?? true) && isScreenShareSupported(),
     camera: controls?.camera ?? true,
     chat: controls?.chat ?? true,
   };
@@ -388,14 +390,15 @@ export function AgentControlBar({
                     'hover:scale-[1.02] active:scale-[0.98]',
                     'shadow-sm hover:shadow-md',
                     'relative overflow-hidden p-0',
-                    'h-8 w-[120px] min-w-[100px] max-w-[200px] sm:w-[140px] md:h-10 md:w-[160px] lg:w-[200px]',
+                    'h-8 w-[80px] min-w-[70px] max-w-[120px] sm:w-[90px] md:w-[100px] lg:w-[110px]',
                     !isSessionActive && 'opacity-50 cursor-not-allowed'
                   )}
                 >
-                  {/* Button content container */}
+                  {/* Button content container - dark background for visibility */}
                   <div className={cn(
                     'flex h-full items-center justify-center rounded-md py-1 px-2',
-                    'bg-foreground/5 text-foreground',
+                    'bg-foreground/10 dark:bg-muted/80 border border-border/50',
+                    'text-foreground dark:text-card-foreground',
                     'w-full'
                   )}>
                     {/* Waveform container */}
@@ -407,10 +410,10 @@ export function AgentControlBar({
                         barWidth={3}
                         barGap={1}
                         barRadius={4}
-                        barColor="hsl(var(--primary))" // Use primary color for better visibility
+                        barColor="hsl(var(--accent))" // Use accent (bright orange) for better visibility
                         fadeEdges={true}
-                        fadeWidth={16} // Reduced fade for more visible bars
-                        sensitivity={1.5} // More responsive to audio
+                        fadeWidth={10} // Further reduced fade for more visible bars
+                        sensitivity={1.8} // More responsive to audio
                         smoothingTimeConstant={0.5} // Faster response
                         className={cn(
                           'h-full w-full transition-opacity duration-300',
@@ -421,20 +424,20 @@ export function AgentControlBar({
                       {/* Idle state text overlay */}
                       {!isSessionActive && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-foreground/50 text-[10px] font-medium">
+                          <span className="text-card-foreground dark:text-foreground text-xs font-medium">
                             Start Recording
                           </span>
                         </div>
                       )}
                     </div>
                   </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {isSessionActive ? 'End call' : 'Start session'}
-              </TooltipContent>
-            </Tooltip>
-          )}
+          </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isSessionActive ? 'End call' : 'Start session'}
+            </TooltipContent>
+          </Tooltip>
+        )}
         </div>
       </TooltipProvider>
     </div>

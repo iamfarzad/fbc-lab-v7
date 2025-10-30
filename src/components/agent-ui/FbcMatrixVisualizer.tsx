@@ -31,18 +31,18 @@ export function FbcMatrixVisualizer({
     return 'idle'
   }, [isSocketReady, isProcessing, isRecording, isSessionActive])
 
-  // Optimized dimensions for better visual quality
+  // Optimized dimensions for better visual quality - smaller dots, higher resolution
   const { rows, cols, size } = useMemo(() => {
     switch (variant) {
       case 'minimized':
         return { rows: 4, cols: 12, size: 2 }
       case 'expanded':
-        // Higher resolution for smoother animation
-        return { rows: 10, cols: 24, size: 3 }
+        // Higher resolution with smaller dots for smoother, more dynamic animation
+        return { rows: 12, cols: 28, size: 2 }
       case 'fullscreen':
         return { rows: 24, cols: 64, size: 4 }
       default:
-        return { rows: 10, cols: 24, size: 3 }
+        return { rows: 12, cols: 28, size: 2 }
     }
   }, [variant])
 
@@ -62,8 +62,8 @@ export function FbcMatrixVisualizer({
       const analyser = ctx.createAnalyser()
       // Higher FFT size for better frequency resolution
       analyser.fftSize = 1024
-      // Lower smoothing for more responsive visualization
-      analyser.smoothingTimeConstant = 0.3
+      // Lower smoothing for more responsive visualization (faster response to AI states)
+      analyser.smoothingTimeConstant = 0.2
       const source = ctx.createMediaStreamSource(micStream)
       source.connect(analyser)
 
@@ -81,8 +81,8 @@ export function FbcMatrixVisualizer({
         
         analyserRef.current.getByteFrequencyData(data)
         
-        // Apply exponential smoothing for fluid motion
-        const smoothingFactor = 0.15
+        // Apply exponential smoothing for fluid motion - higher factor for more dynamic response
+        const smoothingFactor = 0.2
         for (let i = 0; i < bufferLength; i++) {
           const current = data[i] || 0
           const previous = smoothedDataRef.current[i] || 0
@@ -131,15 +131,15 @@ export function FbcMatrixVisualizer({
       role="img"
       aria-label={`Voice activity: ${voiceState}`}
     >
-      <VoiceMatrix
-        voiceState={voiceState}
-        audioData={audioData || undefined}
-        variant="voice"
-        rows={rows}
-        cols={cols}
-        size={size}
+        <VoiceMatrix
+          voiceState={voiceState}
+          audioData={audioData || undefined}
+          variant="voice"
+          rows={rows}
+          cols={cols}
+          size={size}
         useSVG={true}
-      />
+        />
     </div>
   )
 }
