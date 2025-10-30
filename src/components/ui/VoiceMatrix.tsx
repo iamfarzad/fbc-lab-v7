@@ -22,8 +22,8 @@ interface VoiceMatrixProps {
 // Voice-specific themes with improved contrast
 const VOICE_THEMES = {
   voice: {
-    on: 'hsl(var(--primary))', // Full opacity for maximum visibility
-    off: 'hsl(var(--muted-foreground) / 0.2)' // Slightly more visible for better contrast
+    on: 'hsl(var(--accent))', // Use bright orange accent for maximum visibility
+    off: 'hsl(var(--muted-foreground) / 0.15)' // Reduced opacity for better contrast
   },
   agents: {
     on: 'hsl(var(--accent))',
@@ -66,10 +66,10 @@ export const VoiceMatrix = React.forwardRef<HTMLDivElement, VoiceMatrixProps>(({
         audioData={audioData}
         size={size}
         palette={palette}
-        brightness={variant === 'voice' ? 1.1 : 1.0} // Slight brightness boost
+        brightness={variant === 'voice' ? 1.3 : 1.0} // Increased brightness for better visibility
         className={cn(
           'transition-all duration-300 ease-out', // Smoother transitions
-          variant === 'voice' && 'drop-shadow-[0_0_12px_hsl(var(--primary)/0.4)]',
+          variant === 'voice' && 'drop-shadow-[0_0_16px_hsl(var(--accent)/0.5)]',
           variant === 'agents' && 'drop-shadow-[0_0_8px_hsl(var(--accent)/0.3)]',
           className
         )}

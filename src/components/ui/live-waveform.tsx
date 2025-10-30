@@ -442,7 +442,7 @@ export const LiveWaveform = ({
           const y = centerY - barHeight / 2
 
           ctx.fillStyle = computedBarColor
-          ctx.globalAlpha = 0.6 + value * 0.4 // Increased min opacity for better visibility
+          ctx.globalAlpha = 0.7 + value * 0.3 // Increased min opacity for better visibility
 
           if (barRadius > 0) {
             ctx.beginPath()
@@ -462,7 +462,7 @@ export const LiveWaveform = ({
           const y = centerY - barHeight / 2
 
           ctx.fillStyle = computedBarColor
-          ctx.globalAlpha = 0.6 + value * 0.4 // Increased min opacity for better visibility
+          ctx.globalAlpha = 0.7 + value * 0.3 // Increased min opacity for better visibility
 
           if (barRadius > 0) {
             ctx.beginPath()
