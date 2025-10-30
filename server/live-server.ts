@@ -199,26 +199,26 @@ import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
     lastPersisted?: number;
   };
 
-type ActiveSessionRecord = {
-  ws: WebSocket;
-  session: any;
-  sessionId?: string; // Client session ID for context management
-  latestContext: {
-    screen?: Snapshot;
-    webcam?: Snapshot;
-  };
-  injectionTimers?: {
-    screen?: ReturnType<typeof setTimeout>;
-    webcam?: ReturnType<typeof setTimeout>;
-  };
-  logger?: SessionLogger;
-  turnCompletionTimer?: ReturnType<typeof setTimeout>;
-  lastAudioActivity?: number;
-  audioChunkCount?: number; // Track audio chunks for periodic logging
-  userTurnCount?: number; // NEW: track turns for milestone triggers
+  type ActiveSessionRecord = {
+    ws: WebSocket;
+    session: any;
+    sessionId?: string; // Client session ID for context management
+    latestContext: {
+      screen?: Snapshot;
+      webcam?: Snapshot;
+    };
+    injectionTimers?: {
+      screen?: ReturnType<typeof setTimeout>;
+      webcam?: ReturnType<typeof setTimeout>;
+    };
+    logger?: SessionLogger;
+    turnCompletionTimer?: ReturnType<typeof setTimeout>;
+    lastAudioActivity?: number;
+    audioChunkCount?: number; // Track audio chunks for periodic logging
+    userTurnCount?: number; // NEW: track turns for milestone triggers
   lastTurnCompleteAt?: number; // Prevent double-counting turnComplete events
   lastAssistantText?: string; // Track last assistant response for context saving
-};
+  };
 
   // Store active Live API sessions
   const activeSessions = new Map<string, ActiveSessionRecord>();
@@ -459,12 +459,8 @@ type ActiveSessionRecord = {
     
     const liveConfig: any = {
       responseModalities: ["AUDIO"],
-      inputAudioTranscription: {
-        model: "gemini-2.5-flash-native-audio-preview-09-2025"
-      },
-      outputAudioTranscription: {
-        model: "gemini-2.5-flash-native-audio-preview-09-2025"
-      },
+      inputAudioTranscription: {},  // Enable input transcription (empty object = use default model)
+      outputAudioTranscription: {}, // Enable output transcription (empty object = use default model)
       speechConfig: {
         voiceConfig: { 
           prebuiltVoiceConfig: { 
