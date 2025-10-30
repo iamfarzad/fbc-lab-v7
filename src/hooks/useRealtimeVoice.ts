@@ -427,7 +427,9 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
             });
           });
           if (ok) break;
-        } catch {}
+        } catch (err) {
+          if (VERBOSE_VOICE_LOGS) console.debug('🔁 [RealtimeVoice] Connect attempt failed', err);
+        }
         attempts++;
         if (attempts < maxAttempts) {
           await new Promise(resolve => setTimeout(resolve, 1000 * attempts));

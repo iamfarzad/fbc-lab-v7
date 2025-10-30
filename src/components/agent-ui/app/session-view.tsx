@@ -307,7 +307,7 @@ export const SessionView = ({
     }
 
     return null;
-  }, [hasAcceptedTerms, researchStatus, researchInsights, companyName]);
+  }, [hasAcceptedTerms, researchStatus, researchInsights, companyName, isSessionActive]);
 
   return (
     <section className="bg-background relative z-10 h-full w-full overflow-hidden" {...props}>
