@@ -639,8 +639,10 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
             });
           }
           // Then send text context
+          const textContext = `[${modality} context]: ${snap.analysis}`
+          const textBase64 = Buffer.from(textContext).toString('base64')
           await client.session.sendRealtimeInput({ 
-            media: { mimeType: 'text/plain', data: `[${modality} context]: ${snap.analysis}` }
+            media: { mimeType: 'text/plain', data: textBase64 }
           });
         } else {
           throw new Error('sendRealtimeInput not available');
@@ -856,8 +858,10 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
                               });
                             }
                             // Then send text context
+                            const textContext = `Visual context: ${snap.analysis.substring(0, 200)}`
+                            const textBase64 = Buffer.from(textContext).toString('base64')
                             await clientRec.session.sendRealtimeInput({ 
-                              media: { mimeType: 'text/plain', data: `Visual context: ${snap.analysis.substring(0, 200)}` }
+                              media: { mimeType: 'text/plain', data: textBase64 }
                             });
                           } else {
                             throw new Error('sendRealtimeInput not available');

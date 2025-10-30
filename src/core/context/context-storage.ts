@@ -319,28 +319,47 @@ export class ContextStorage {
         }
         
         if (this.supabase) {
-          // Optimistic locking query - only update if version matches
-          const { data, error } = await this.supabase
-            .from('conversation_contexts')
-            .update(dataToStore)
-            .eq('session_id', sessionId)
-            .eq('version', currentVersion)
-            .select()
-          
-          if (error) {
-            throw error
+          // If no record exists, insert instead of update
+          if (!current) {
+            const { data, error } = await this.supabase
+              .from('conversation_contexts')
+              .insert(dataToStore)
+              .select()
+              .single()
+            
+            if (error) {
+              throw error
+            }
+            
+            if (data) {
+              this.inMemoryStorage.set(sessionId, data as DatabaseConversationContext)
+              this.cacheTimestamps.set(sessionId, Date.now())
+              return
+            }
+          } else {
+            // Optimistic locking query - only update if version matches
+            const { data, error } = await this.supabase
+              .from('conversation_contexts')
+              .update(dataToStore)
+              .eq('session_id', sessionId)
+              .eq('version', currentVersion)
+              .select()
+            
+            if (error) {
+              throw error
+            }
+            
+            if (!data || data.length === 0) {
+              // Version mismatch - retry
+              throw new Error('VersionConflict')
+            }
+            
+            // Update in-memory cache
+            this.inMemoryStorage.set(sessionId, data[0] as DatabaseConversationContext)
+            this.cacheTimestamps.set(sessionId, Date.now())
+            
+            return // Success
           }
-          
-          if (!data || data.length === 0) {
-            // Version mismatch - retry
-            throw new Error('VersionConflict')
-          }
-          
-          // Update in-memory cache
-          this.inMemoryStorage.set(sessionId, data[0] as DatabaseConversationContext)
-          this.cacheTimestamps.set(sessionId, Date.now())
-          
-          return // Success
         } else {
           // Fallback to in-memory (no version check in memory)
           const existing = this.inMemoryStorage.get(sessionId)
