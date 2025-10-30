@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react';
 import { LiveChatMessages } from '@/components/agent-ui/app/LiveChatMessages';
 import { PreConnectMessage } from '@/components/agent-ui/app/preconnect-message';
@@ -131,6 +132,131 @@ export const SessionView = ({
     } : undefined 
   });
   const messages = chat.messages;
+
+  // Dev-only: inject ai-elements demo messages when ?demo=ai-elements
+  const demoInjectedRef = React.useRef(false)
+  const searchParams = useSearchParams()
+  React.useEffect(() => {
+    if (demoInjectedRef.current) return
+    if (!hasAcceptedTerms) return
+    try {
+      const demoFlag = (searchParams.get('demo') || '').toLowerCase()
+      if (demoFlag !== 'ai-elements') return
+
+      // 1) Inline citations
+      chat.addMessage({
+        role: 'assistant',
+        content: 'This answer includes inline citations for key points.',
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          inlineCitations: [
+            { text: 'RFC 2606 reserved domains', url: 'https://www.rfc-editor.org/rfc/rfc2606', title: 'RFC 2606' },
+            { text: 'IANA example domains', url: 'https://www.iana.org/domains/reserved', title: 'IANA Reserved Domains' },
+          ],
+        },
+      })
+
+      // 2) Code blocks
+      chat.addMessage({
+        role: 'assistant',
+        content: 'Here is a code sample:',
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          codeBlocks: [
+            { id: 'cb-1', language: 'ts', showLineNumbers: true, code: "const greet = (name: string) => `Hello, ${name}!`\nconsole.log(greet('F.B/c'))" },
+          ],
+        },
+      })
+
+      // 3) Images (use base64 to satisfy <img src> requirement)
+      chat.addMessage({
+        role: 'assistant',
+        content: 'Related images:',
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          images: [
+            { base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO3Rz9kAAAAASUVORK5CYII=', mediaType: 'image/png', alt: '1x1 png' },
+            { base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO3Rz9kAAAAASUVORK5CYII=', mediaType: 'image/png', alt: '1x1 png' },
+          ],
+        },
+      })
+
+      // 4) (Tools & Tasks) — intentionally skipped in demo to avoid shape mismatches in ToolHeader
+
+      // 5) Context usage & Reasoning (match Context component contract)
+      chat.addMessage({
+        role: 'assistant',
+        content: 'Using provided context to tailor the response.',
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          contextUsage: { usedTokens: 123, maxTokens: 8192, usage: 123, modelId: 'gemini-2.5' },
+          usage: { promptTokens: 100, completionTokens: 23, totalTokens: 123 },
+          reasoning: 'Validated assumptions with public data before suggesting actions.',
+        },
+      })
+
+      // 6) Chain of Thought & Stage visualization
+      chat.addMessage({
+        role: 'assistant',
+        content: 'Research steps completed.',
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          chainOfThought: { steps: [
+            { label: 'Profile check', description: 'Verified name context', status: 'complete' },
+            { label: 'Company intel', description: 'Resolved example.com placeholder', status: 'complete' },
+          ] },
+          agent: 'F.B/c AI',
+          stage: 'research',
+        },
+      })
+
+      // 7) Web preview & Sources
+      chat.addMessage({
+        role: 'assistant',
+        content: 'See the official reserved domains documentation.',
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          webPreview: {
+            title: 'IANA — Reserved Domains',
+            description: 'Documentation for example.com, example.org, example.net',
+            url: 'https://www.iana.org/domains/reserved',
+          },
+          sources: [
+            { id: 's1', title: 'RFC 2606', url: 'https://www.rfc-editor.org/rfc/rfc2606' },
+            { id: 's2', title: 'IANA Reserved Domains', url: 'https://www.iana.org/domains/reserved' },
+          ],
+        },
+      })
+
+      // 8) Tools & Tasks (safe shapes for ai-elements)
+      chat.addMessage({
+        role: 'assistant',
+        content: 'Tool run finished with artifacts and tasks.',
+        timestamp: new Date(),
+        metadata: {
+          type: 'text',
+          tools: [
+            { name: 'whois', type: 'tool-whois', state: 'complete', output: { domain: 'example.com', registrar: 'IANA' } },
+            { name: 'http-fetch', type: 'tool-http-fetch', state: 'error', output: '', error: 'Timeout contacting endpoint' },
+          ],
+          tasks: [
+            { title: 'Verify domain settings', description: 'Check DNS and WHOIS', status: 'pending', files: [ { name: 'dns.txt' }, { name: 'whois.json' } ] },
+          ],
+          codeBlocks: [ { id: 'cb-2', language: 'json', showLineNumbers: false, code: '{"status":"ok"}' } ],
+        },
+      })
+
+      demoInjectedRef.current = true
+    } catch (err) {
+      console.error('[SessionView] demo injection failed', err)
+    }
+  }, [hasAcceptedTerms, searchParams, chat, companyName])
 
   // Inject a single welcome message once research is ready
   const hasSentWelcomeRef = React.useRef(false)
