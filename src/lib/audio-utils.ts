@@ -249,13 +249,13 @@ export function mixToMono(buffer: AudioBuffer): Float32Array {
 
 /**
  * Standard audio constraints for getUserMedia
- * Optimized for voice capture at 16kHz mono with noise reduction
+ * Optimized for voice capture at 24kHz mono with noise reduction (matches Gemini Live API)
  */
 const DEFAULT_DSP_STATE = parseBooleanEnv(process.env.NEXT_PUBLIC_VOICE_DSP_DEFAULT, false);
 
 export const STANDARD_AUDIO_CONSTRAINTS = {
   channelCount: 1,
-  sampleRate: 16000,
+  sampleRate: 24000,
   sampleSize: 16,
   echoCancellation: parseBooleanEnv(process.env.NEXT_PUBLIC_VOICE_ECHO_CANCELLATION, DEFAULT_DSP_STATE),
   noiseSuppression: parseBooleanEnv(process.env.NEXT_PUBLIC_VOICE_NOISE_SUPPRESSION, DEFAULT_DSP_STATE),

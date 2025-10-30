@@ -22,7 +22,7 @@ export interface AudioRecorderEvents {
 const CRISP_AUDIO_WORKLET = `class AudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    // Small buffer for crisp, responsive audio: 512 samples = 32ms at 16kHz
+    // Small buffer for crisp, responsive audio: 512 samples = ~21ms at 24kHz
     this.bufferSize = 512;
     this.buffer = new Float32Array(this.bufferSize);
     this.bufferIndex = 0;
@@ -84,13 +84,13 @@ export class AudioRecorder extends EventEmitter {
       });
       debugLog('🎤 [AudioRecorder] Microphone access granted');
       
-      // Create audio context
-      this.audioContext = new AudioContext({ sampleRate: 16000 });
+      // Create audio context targeting 24kHz to align with Gemini Live API expectations
+      this.audioContext = new AudioContext({ sampleRate: 24000 });
       await this.audioContext.resume();
-      this.actualSampleRate = this.audioContext.sampleRate ?? 16000;
+      this.actualSampleRate = this.audioContext.sampleRate ?? 24000;
       
       debugLog('🎤 [AudioRecorder] Audio context:', {
-        requested: 16000,
+        requested: 24000,
         actual: this.actualSampleRate
       });
       
