@@ -273,14 +273,97 @@ import { MESSAGE_TYPES } from './message-types.js'
   }
 
   // Helper function to build Live API configuration
-  function buildLiveConfig(priorContext: string, voiceNameOverride?: string): any {
-    console.log(`[buildLiveConfig] Building config with priorContext: ${priorContext ? 'YES' : 'NO'}`);
+  async function buildLiveConfig(
+    sessionId: string,
+    priorContext: string, 
+    voiceNameOverride?: string
+  ): Promise<any> {
+    console.log(`[buildLiveConfig] Building config for session: ${sessionId}`);
     
-    // Always use the full system prompt, adding context if available
-    const baseInstruction = GEMINI_CONFIG.SYSTEM_PROMPT;
-    const fullInstruction = priorContext 
-      ? `${baseInstruction}${priorContext}` 
-      : baseInstruction;
+    // Base system prompt from constants
+    let fullInstruction = GEMINI_CONFIG.SYSTEM_PROMPT;
+    
+    // ADD BRANDING CONSTRAINT (match chat)
+    fullInstruction += `\n\nNever identify yourself as Gemini, Google's AI, or any other AI assistant. You are F.B/c AI, created specifically for Farzad Bayat Consulting.`;
+    
+    // ADD VOICE-SPECIFIC GUIDANCE
+    fullInstruction += `\n\nVOICE MODE: Keep responses conversational and concise for voice playback. 2 sentences maximum per turn unless explicitly asked for details.`;
+    
+    // ADD PERSONALIZED CONTEXT (if sessionId available)
+    if (sessionId && sessionId !== 'anonymous') {
+      try {
+        const { ContextStorage } = await import('../src/core/context/context-storage.js');
+        const storage = new ContextStorage();
+        const sessionContext = await storage.get(sessionId);
+        
+        if (sessionContext) {
+          let personalizedContext = '\n\nPERSONALIZED CONTEXT:\n';
+          
+          if (sessionContext.name) {
+            personalizedContext += `User: ${sessionContext.name}`;
+            if (sessionContext.email) personalizedContext += ` (${sessionContext.email})`;
+            personalizedContext += '\n';
+          }
+          
+          const companyCtx = sessionContext.company_context as any;
+          if (companyCtx?.name) {
+            personalizedContext += `Company: ${companyCtx.name}\n`;
+            if (companyCtx.industry) personalizedContext += `Industry: ${companyCtx.industry}\n`;
+            if (companyCtx.size) personalizedContext += `Size: ${companyCtx.size}\n`;
+          }
+          
+          const roleInfo = sessionContext.role;
+          if (roleInfo) {
+            personalizedContext += `Role: ${roleInfo}\n`;
+          }
+          
+          // Cap personalized context at 500 chars to avoid bloat
+          if (personalizedContext.length > 500) {
+            personalizedContext = personalizedContext.substring(0, 500) + '...\n';
+          }
+          
+          fullInstruction += personalizedContext;
+        }
+      } catch (error) {
+        console.warn(`[buildLiveConfig] Failed to load personalized context:`, error);
+        // Continue without personalized context
+      }
+    }
+    
+    // ADD MULTIMODAL CONTEXT SNAPSHOT (if available)
+    if (sessionId && sessionId !== 'anonymous') {
+      try {
+        const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js');
+        const contextData = await multimodalContextManager.prepareChatContext(
+          sessionId,
+          false, // Don't include visual for initial prompt (too large)
+          false  // Don't include audio
+        );
+        
+        if (contextData.multimodalContext?.recentAnalyses?.length > 0) {
+          const recentSummary = contextData.multimodalContext.recentAnalyses
+            .slice(0, 2) // Last 2 analyses only
+            .join('; ');
+          
+          if (recentSummary.length > 0 && recentSummary.length <= 300) {
+            fullInstruction += `\n\nRECENT MULTIMODAL CONTEXT: ${recentSummary}`;
+          }
+        }
+      } catch (error) {
+        console.warn(`[buildLiveConfig] Failed to load multimodal context:`, error);
+      }
+    }
+    
+    // ADD PRIOR CHAT CONTEXT
+    if (priorContext) {
+      fullInstruction += `\n\n${priorContext}`;
+    }
+    
+    // Cap total instruction at 4000 chars to avoid token bloat
+    if (fullInstruction.length > 4000) {
+      console.warn(`[buildLiveConfig] System instruction truncated from ${fullInstruction.length} to 4000 chars`);
+      fullInstruction = fullInstruction.substring(0, 4000) + '\n\n[Context truncated for token efficiency]';
+    }
     
     const liveConfig: any = {
       responseModalities: ["AUDIO"],
@@ -297,12 +380,10 @@ import { MESSAGE_TYPES } from './message-types.js'
     };
     
     console.log(`[buildLiveConfig] Final config:`, {
-      responseModalities: liveConfig.responseModalities,
-      hasInputTranscription: !!liveConfig.inputAudioTranscription,
-      hasOutputTranscription: !!liveConfig.outputAudioTranscription,
-      hasSpeechConfig: !!liveConfig.speechConfig,
       systemInstructionLength: liveConfig.systemInstruction.length,
-      voiceName: liveConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName
+      voiceName: liveConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
+      hasPersonalizedContext: fullInstruction.includes('PERSONALIZED CONTEXT'),
+      hasMultimodalContext: fullInstruction.includes('MULTIMODAL CONTEXT')
     });
     
     return liveConfig;
@@ -501,8 +582,8 @@ import { MESSAGE_TYPES } from './message-types.js'
 
       let isOpen = false
 
-      // Build Live API configuration
-      const liveConfig = buildLiveConfig(priorChatContext, voiceName);
+      // Build Live API configuration (now async with sessionId)
+      const liveConfig = await buildLiveConfig(sessionId, priorChatContext, voiceName);
 
       // Add connection timeout to prevent infinite hangs
       const connectTimeout = new Promise((_, reject) => 

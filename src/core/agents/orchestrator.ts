@@ -265,6 +265,12 @@ export async function routeToAgent({
           enhancedContext
         )
         console.log(`✅ Agent result persisted: ${result.agent}`)
+        
+        // NEW: Update context with enhanced flow for next turn
+        if (result.metadata?.enhancedConversationFlow) {
+          context.conversationFlow = result.metadata.enhancedConversationFlow
+          enhancedContext.conversationFlow = result.metadata.enhancedConversationFlow
+        }
       } catch (error) {
         console.error('Agent persistence error (non-fatal):', error)
         // Continue - don't block user experience

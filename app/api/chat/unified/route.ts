@@ -970,6 +970,14 @@ Citations: ${researchResult.allCitations.length} sources processed
         const stream = new ReadableStream({
           async start(controller) {
             try {
+              // NEW: Send flow update if enhanced flow is available
+              const enhancedFlow = agentResult.metadata?.enhancedConversationFlow
+              if (enhancedFlow) {
+                const flowUpdateEvent = `event: flow_update\ndata: ${JSON.stringify(enhancedFlow)}\n\n`
+                controller.enqueue(encoder.encode(flowUpdateEvent))
+                console.log(`✅ [Multi-Agent] Sent enhanced flow update to client`)
+              }
+
               // Send meta event
               const metaEvent = `event: meta\ndata: ${JSON.stringify({ 
                 reqId, 

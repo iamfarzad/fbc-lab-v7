@@ -56,7 +56,9 @@ export class AgentPersistenceService {
       event_id: eventId,
       analytics_pending: true, // Track async job
       intelligence_context: this.buildIntelligenceUpdate(agentResult, context),
-      conversation_flow: this.sanitizeConversationFlow(context.conversationFlow),
+      conversation_flow: this.sanitizeConversationFlow(
+        agentResult.metadata?.enhancedConversationFlow || context.conversationFlow
+      ), // Use enhanced if available, fallback to client flow
       updated_at: new Date().toISOString()
     }
     

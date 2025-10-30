@@ -181,6 +181,13 @@ ${conversationFlow?.shouldOfferRecap
     })
   }
 
+  // NEW: Extract categories from agent's understanding and enhance flow
+  const enhancedFlow = enhanceConversationFlow(
+    conversationFlow,
+    result.text,
+    messages
+  )
+
   return {
     output: result.text,
     agent: 'Discovery Agent',
@@ -189,8 +196,9 @@ ${conversationFlow?.shouldOfferRecap
       stage: 'DISCOVERY' as FunnelStage,
       chainOfThought: { steps },
       categoriesCovered,
-      recommendedNext: conversationFlow?.recommendedNext || null,
-      multimodalUsed: multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio
+      recommendedNext: enhancedFlow?.recommendedNext || conversationFlow?.recommendedNext || null,
+      multimodalUsed: multimodalContext?.hasRecentImages || multimodalContext?.hasRecentAudio,
+      enhancedConversationFlow: enhancedFlow // NEW
     }
   }
 }
@@ -296,4 +304,194 @@ Pending: ${pending.join(', ')}
 Total user turns: ${flow.totalUserTurns || 0}
 ${flow.recommendedNext ? `Next recommended: ${flow.recommendedNext}` : 'All categories covered'}
 `
+}
+
+/**
+ * Enhance conversation flow with agent's deeper understanding
+ * Combines client-side pattern matching with agent reasoning
+ */
+function enhanceConversationFlow(
+  clientFlow: any,
+  agentResponse: string,
+  messages: ChatMessage[]
+): any {
+  // Start with client-detected flow if available
+  const enhanced: any = clientFlow ? {
+    ...clientFlow,
+    covered: { ...clientFlow.covered },
+    evidence: clientFlow.evidence ? { ...clientFlow.evidence } : {},
+    insights: clientFlow.insights ? { ...clientFlow.insights } : {},
+    coverageOrder: clientFlow.coverageOrder ? [...clientFlow.coverageOrder] : []
+  } : {
+    covered: {
+      goals: false,
+      pain: false,
+      data: false,
+      readiness: false,
+      budget: false,
+      success: false
+    },
+    evidence: {},
+    insights: {},
+    coverageOrder: [],
+    totalUserTurns: messages.filter(m => m.role === 'user').length,
+    firstUserTimestamp: null,
+    latestUserTimestamp: null,
+    shouldOfferRecap: false,
+    recommendedNext: null
+  }
+
+  // Get last user message for analysis
+  const lastUserMsg = messages.filter(m => m.role === 'user').pop()
+  const userContent = lastUserMsg?.content.toLowerCase() || ''
+  const response = agentResponse.toLowerCase()
+
+  // Enhanced detection: Goals
+  if (!enhanced.covered.goals && (
+    response.includes("your goal") ||
+    response.includes("trying to achieve") ||
+    response.includes("what are you") && (response.includes("looking") || response.includes("hoping")) ||
+    userContent.includes("want to") ||
+    userContent.includes("trying to") ||
+    userContent.includes("looking to") ||
+    userContent.includes("hoping to") ||
+    userContent.includes("aim to") ||
+    userContent.includes("plan to")
+  )) {
+    enhanced.covered.goals = true
+    if (!enhanced.evidence.goals) enhanced.evidence.goals = []
+    enhanced.evidence.goals.push(lastUserMsg?.content || '')
+  }
+
+  // Enhanced detection: Pain
+  if (!enhanced.covered.pain && (
+    response.includes("struggling") ||
+    response.includes("challenge") ||
+    response.includes("problem") ||
+    response.includes("pain point") ||
+    response.includes("frustrating") ||
+    userContent.includes("struggl") ||
+    userContent.includes("problem") ||
+    userContent.includes("issue") ||
+    userContent.includes("challenge") ||
+    userContent.includes("frustrat") ||
+    userContent.includes("bottleneck") ||
+    userContent.includes("difficult")
+  )) {
+    enhanced.covered.pain = true
+    if (!enhanced.evidence.pain) enhanced.evidence.pain = []
+    enhanced.evidence.pain.push(lastUserMsg?.content || '')
+  }
+
+  // Enhanced detection: Data
+  if (!enhanced.covered.data && (
+    response.includes("your data") ||
+    response.includes("where is") && (response.includes("data") || response.includes("information")) ||
+    response.includes("stored") ||
+    response.includes("crm") ||
+    response.includes("spreadsheet") ||
+    userContent.includes("data") ||
+    userContent.includes("spreadsheet") ||
+    userContent.includes("csv") ||
+    userContent.includes("crm") ||
+    userContent.includes("database") ||
+    userContent.includes("excel") ||
+    userContent.includes("stored") ||
+    userContent.includes("files")
+  )) {
+    enhanced.covered.data = true
+    if (!enhanced.evidence.data) enhanced.evidence.data = []
+    enhanced.evidence.data.push(lastUserMsg?.content || '')
+  }
+
+  // Enhanced detection: Readiness
+  if (!enhanced.covered.readiness && (
+    response.includes("your team") ||
+    response.includes("buy-in") ||
+    response.includes("adoption") ||
+    response.includes("change management") ||
+    response.includes("champion") ||
+    userContent.includes("team") ||
+    userContent.includes("buy-in") ||
+    userContent.includes("adopt") ||
+    userContent.includes("workflow") ||
+    userContent.includes("change") ||
+    userContent.includes("champion") ||
+    userContent.includes("stakeholder")
+  )) {
+    enhanced.covered.readiness = true
+    if (!enhanced.evidence.readiness) enhanced.evidence.readiness = []
+    enhanced.evidence.readiness.push(lastUserMsg?.content || '')
+  }
+
+  // Enhanced detection: Budget
+  if (!enhanced.covered.budget && (
+    response.includes("budget") ||
+    response.includes("investment") ||
+    response.includes("timeline") ||
+    response.includes("when") && (response.includes("need") || response.includes("start")) ||
+    response.includes("quarter") ||
+    userContent.includes("budget") ||
+    userContent.includes("cost") ||
+    userContent.includes("price") ||
+    userContent.includes("invest") ||
+    userContent.includes("spend") ||
+    userContent.includes("timeline") ||
+    userContent.includes("quarter") ||
+    userContent.includes("q1") ||
+    userContent.includes("q2") ||
+    userContent.includes("q3") ||
+    userContent.includes("q4") ||
+    userContent.includes("by ") && (userContent.includes("202") || userContent.includes("jan") || userContent.includes("feb"))
+  )) {
+    enhanced.covered.budget = true
+    if (!enhanced.evidence.budget) enhanced.evidence.budget = []
+    enhanced.evidence.budget.push(lastUserMsg?.content || '')
+  }
+
+  // Enhanced detection: Success
+  if (!enhanced.covered.success && (
+    response.includes("success") ||
+    response.includes("metric") ||
+    response.includes("measure") ||
+    response.includes("roi") ||
+    response.includes("kpi") ||
+    response.includes("outcome") ||
+    userContent.includes("success") ||
+    userContent.includes("metric") ||
+    userContent.includes("measure") ||
+    userContent.includes("roi") ||
+    userContent.includes("kpi") ||
+    userContent.includes("result") ||
+    userContent.includes("outcome") ||
+    userContent.includes("expect")
+  )) {
+    enhanced.covered.success = true
+    if (!enhanced.evidence.success) enhanced.evidence.success = []
+    enhanced.evidence.success.push(lastUserMsg?.content || '')
+  }
+
+  // Update recommendedNext based on enhanced coverage
+  const categories = ['goals', 'pain', 'data', 'readiness', 'budget', 'success']
+  const nextUncovered = categories.find(cat => !enhanced.covered[cat])
+  enhanced.recommendedNext = nextUncovered || null
+
+  // Update totals
+  enhanced.totalUserTurns = messages.filter(m => m.role === 'user').length
+  if (messages.length > 0) {
+    const userMessages = messages.filter(m => m.role === 'user')
+    if (userMessages.length > 0) {
+      const firstMsg = userMessages[0]
+      const lastMsg = userMessages[userMessages.length - 1]
+      enhanced.firstUserTimestamp = typeof firstMsg.timestamp === 'number' 
+        ? firstMsg.timestamp 
+        : new Date(firstMsg.timestamp || Date.now()).getTime()
+      enhanced.latestUserTimestamp = typeof lastMsg.timestamp === 'number'
+        ? lastMsg.timestamp
+        : new Date(lastMsg.timestamp || Date.now()).getTime()
+    }
+  }
+  enhanced.shouldOfferRecap = enhanced.totalUserTurns >= 6
+
+  return enhanced
 }
