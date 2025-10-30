@@ -13,27 +13,15 @@ import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
 import WebSocket from 'ws'
 import { WEBSOCKET_CONFIG } from '../src/config/constants.js'
+import { MESSAGE_TYPES } from '../server/message-types'
 
 const WS_URL = process.env.WS_URL || WEBSOCKET_CONFIG.URL
 const CHUNK_MS = 100 // 100ms chunks
-const BYTES_PER_MS = 32 // 16kHz mono s16le = 16000 samples/s * 2 bytes = 32000 bytes/s = 32 bytes/ms
+const SAMPLE_RATE = 24000 // Live API expects 24 kHz
+const BYTES_PER_MS = (SAMPLE_RATE * 2) / 1000 // bytes per ms at 24kHz mono s16le
 const CHUNK_SIZE = CHUNK_MS * BYTES_PER_MS
 
-const MESSAGE_TYPES = {
-  START: 'start',
-  STOP: 'stop',
-  USER_AUDIO: 'user_audio',
-  CONNECTED: 'connected',
-  START_ACK: 'start_ack',
-  SESSION_STARTED: 'session_started',
-  INPUT_TRANSCRIPT: 'input_transcript',
-  OUTPUT_TRANSCRIPT: 'output_transcript',
-  TEXT: 'text',
-  AUDIO: 'audio',
-  TURN_COMPLETE: 'turn_complete',
-  ERROR: 'error',
-  HEARTBEAT: 'heartbeat',
-} as const
+// Use canonical message types from server/message-types to avoid drift
 
 function ffmpegPcmStream(filePath: string) {
   return spawn('ffmpeg', [
@@ -42,7 +30,7 @@ function ffmpegPcmStream(filePath: string) {
     '-f', 's16le',
     '-acodec', 'pcm_s16le',
     '-ac', '1',
-    '-ar', '16000',
+    '-ar', '24000',
     'pipe:1'
   ])
 }
@@ -67,11 +55,10 @@ async function sendAudioTurn(ws: WebSocket, filePath: string): Promise<string> {
   let inputTranscript = ''
   let outputTranscript = ''
   let textOutput = ''
+  let totalStreamedMs = 0
+  let responseTimeout: NodeJS.Timeout | null = null
 
   const waitDone = new Promise<string>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error('❌ Response timeout after 30 seconds'))
-    }, 30000)
 
     ws.on('message', (data) => {
       try {
@@ -100,13 +87,13 @@ async function sendAudioTurn(ws: WebSocket, filePath: string): Promise<string> {
             break
             
           case MESSAGE_TYPES.TURN_COMPLETE:
-            clearTimeout(timeout)
+            if (responseTimeout) clearTimeout(responseTimeout)
             console.log('\n✅ Turn complete')
             resolve(outputTranscript || textOutput)
             break
             
           case MESSAGE_TYPES.ERROR:
-            clearTimeout(timeout)
+            if (responseTimeout) clearTimeout(responseTimeout)
             reject(new Error(`❌ Server error: ${msg.payload?.message || 'Unknown error'}`))
             break
         }
@@ -129,11 +116,12 @@ async function sendAudioTurn(ws: WebSocket, filePath: string): Promise<string> {
         type: MESSAGE_TYPES.USER_AUDIO,
         payload: {
           audioData: base64Audio,
-          mimeType: 'audio/pcm;rate=16000'
+          mimeType: 'audio/pcm;rate=24000'
         }
       }))
       
       chunkIndex++
+      totalStreamedMs += CHUNK_MS
       
       // Log progress every 10 chunks (1 second)
       if (chunkIndex % 10 === 0) {
@@ -151,11 +139,29 @@ async function sendAudioTurn(ws: WebSocket, filePath: string): Promise<string> {
           type: MESSAGE_TYPES.USER_AUDIO,
           payload: {
             audioData: base64Audio,
-            mimeType: 'audio/pcm;rate=16000'
+            mimeType: 'audio/pcm;rate=24000'
           }
         }))
+        totalStreamedMs += CHUNK_MS
       }
       
+      // Explicitly finalize the input buffer and request a response
+      ws.send(JSON.stringify({
+        type: MESSAGE_TYPES.REALTIME_INPUT,
+        payload: { type: 'input_audio_buffer.commit' }
+      }))
+      ws.send(JSON.stringify({
+        type: MESSAGE_TYPES.REALTIME_INPUT,
+        payload: { type: 'response.create', response: {} }
+      }))
+
+      // Dynamic timeout: total stream duration + 90s (min 60s, max 10 min)
+      const dynamicMs = Math.min(Math.max(totalStreamedMs + 90000, 60000), 10 * 60 * 1000)
+      if (responseTimeout) clearTimeout(responseTimeout)
+      responseTimeout = setTimeout(() => {
+        reject(new Error(`❌ Response timeout after ${Math.round(dynamicMs / 1000)} seconds`))
+      }, dynamicMs)
+
       console.log('\n✅ Audio sent, waiting for response...')
       resolve()
     })
