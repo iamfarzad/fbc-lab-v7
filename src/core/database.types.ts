@@ -23,6 +23,7 @@ export type Database = {
           embeddings: string
           id: string
           message_content: string
+          message_metadata: Json | null
           message_type: Database["admin"]["Enums"]["message_type_enum"]
           session_id: string
         }
@@ -34,6 +35,7 @@ export type Database = {
           embeddings: string
           id?: string
           message_content: string
+          message_metadata?: Json | null
           message_type: Database["admin"]["Enums"]["message_type_enum"]
           session_id: string
         }
@@ -45,6 +47,7 @@ export type Database = {
           embeddings?: string
           id?: string
           message_content?: string
+          message_metadata?: Json | null
           message_type?: Database["admin"]["Enums"]["message_type_enum"]
           session_id?: string
         }
@@ -54,6 +57,7 @@ export type Database = {
         Row: {
           admin_id: string
           context_summary: string | null
+          created_at: string
           id: string
           is_active: boolean
           last_activity: string
@@ -62,6 +66,7 @@ export type Database = {
         Insert: {
           admin_id: string
           context_summary?: string | null
+          created_at?: string
           id?: string
           is_active?: boolean
           last_activity?: string
@@ -70,6 +75,7 @@ export type Database = {
         Update: {
           admin_id?: string
           context_summary?: string | null
+          created_at?: string
           id?: string
           is_active?: boolean
           last_activity?: string

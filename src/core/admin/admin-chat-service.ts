@@ -12,7 +12,10 @@ type AdminSessionRow = {
   id: string;
   created_at?: string | null;
   admin_id?: string | null;
-  status?: string | null;
+  session_name?: string | null;
+  is_active?: boolean | null;
+  last_activity?: string | null;
+  context_summary?: string | null;
 };
 
 export interface AdminMessage {
@@ -58,9 +61,8 @@ export class AdminChatService {
    */
   async getOrCreateSession(sessionId: string, adminId?: string, sessionName?: string): Promise<AdminSessionRow> {
     // Check if session exists
-    // cast table names to bypass Database<> mismatch
     const { data: existingSession } = await supabaseService
-      .from('admin_sessions' as any)
+      .from('admin_sessions')
       .select('*')
       .eq('id', sessionId)
       .single()
@@ -68,7 +70,7 @@ export class AdminChatService {
     if (existingSession) {
       // Update last activity
       await supabaseService
-        .from('admin_sessions' as any)
+        .from('admin_sessions')
         .update({ last_activity: new Date().toISOString() })
         .eq('id', sessionId)
 
@@ -106,15 +108,15 @@ export class AdminChatService {
     }
 
     const { data, error } = await supabaseService
-      .from('admin_conversations' as any)
+      .from('admin_conversations')
       .insert({
-        conversation_id: message.conversationId,
+        conversation_id: message.conversationId || message.sessionId, // Use sessionId as fallback (validates FK)
         admin_id: message.adminId,
         session_id: message.sessionId,
         message_type: message.type,
         message_content: message.content,
         message_metadata: message.metadata,
-        embeddings,
+        embeddings: embeddings ? JSON.stringify(embeddings) : '[]', // Convert array to JSON string
         context_leads: message.contextLeads
       })
       .select()
@@ -145,19 +147,26 @@ export class AdminChatService {
       .limit(limit)
 
     // Generate embeddings for current message and find semantically similar messages
-    const currentEmbeddings = await this.generateEmbeddings(currentMessage)
-    const { data: similarMessages } = await supabaseService
+    let similarMessages: unknown[] = []
+    try {
+      // Note: RPC expects text query, not embedding vector
+      const { data } = await supabaseService
 
-      .rpc('search_admin_conversations', {
-        query_embedding: currentEmbeddings,
-        session_id_filter: sessionId,
-        limit_count: 5,
-        similarity_threshold: 0.7
-      })
+        .rpc('search_admin_conversations', {
+          p_query: currentMessage, // Text query
+          p_session_id: sessionId,
+          p_limit: 5,
+          p_thresh: 0.7
+        })
+      similarMessages = data || []
+    } catch (error) {
+      // Semantic search is optional - log but don't fail
+      console.warn('Semantic search failed (optional):', error)
+    }
 
     // Format messages
     const messages: AdminMessage[] = (recentMessages || []).map((msg: unknown) => {
-      const m = msg as { id?: string; session_id?: string; conversation_id?: string; admin_id?: string; message_type?: string; message_content?: string; [k: string]: unknown }
+      const m = msg as { id?: string; session_id?: string; conversation_id?: string; admin_id?: string; message_type?: string; message_content?: string; embeddings?: string; [k: string]: unknown }
       return {
         id: m.id,
         sessionId: m.session_id,
@@ -167,7 +176,7 @@ export class AdminChatService {
         content: m.message_content,
         metadata: m.message_metadata,
         contextLeads: m.context_leads,
-        embeddings: m.embeddings
+        embeddings: typeof m.embeddings === 'string' ? JSON.parse(m.embeddings) : undefined
       }
     }).reverse() // Reverse to chronological order
 
@@ -175,11 +184,14 @@ export class AdminChatService {
       const m = msg as { id?: string; session_id?: string; conversation_id?: string; admin_id?: string; message_type?: string; message_content?: string; message_metadata?: any; context_leads?: string[]; embeddings?: number[]; [k: string]: unknown }
       return {
         id: m.id,
-        sessionId: m.session_id,
+        sessionId: m.session_id || sessionId,
         conversationId: m.conversation_id,
+        adminId: m.admin_id,
         type: m.message_type as AdminMessageType,
         content: String(m.message_content ?? ''),
-        contextLeads: m.context_leads
+        metadata: m.message_metadata,
+        contextLeads: m.context_leads,
+        embeddings: typeof m.embeddings === 'string' ? JSON.parse(m.embeddings) : m.embeddings
       }
     })
 
@@ -300,30 +312,37 @@ export class AdminChatService {
     limit: number = 10,
     adminId?: string
   ): Promise<AdminMessage[]> {
-    const queryEmbeddings = await this.generateEmbeddings(query)
-
-    const { data } = await supabaseService
-
-      .rpc('search_admin_conversations', {
-        query_embedding: queryEmbeddings,
-        limit_count: limit,
-        similarity_threshold: 0.6
+    // Try semantic search, fallback to empty array if RPC doesn't exist
+    let rows: unknown[] = []
+    try {
+      const { data } = await supabaseService
+        .rpc('search_admin_conversations', {
+          p_query: query,
+          p_session_id: '', // Search all sessions
+          p_limit: limit,
+          p_thresh: 0.6
+        })
+      
+      rows = (data || []).filter((msg: unknown) => {
+        if (!adminId) return true
+        return (msg as { admin_id?: string }).admin_id === adminId
       })
-
-    const rows = (data || []).filter((msg: unknown) => {
-      if (!adminId) return true
-      return (msg as { admin_id?: string }).admin_id === adminId
-    })
+    } catch (error) {
+      console.warn('search_admin_conversations RPC failed:', error)
+    }
 
     return rows.map((msg: unknown) => {
-      const m = msg as { id?: string; session_id?: string; conversation_id?: string; admin_id?: string; message_type?: string; message_content?: string; [k: string]: unknown }
+      const m = msg as { id?: string; session_id?: string; conversation_id?: string; admin_id?: string; message_type?: string; message_content?: string; message_metadata?: any; context_leads?: string[]; embeddings?: string; [k: string]: unknown }
       return {
         id: m.id,
-        sessionId: m.session_id,
+        sessionId: m.session_id || '',
         conversationId: m.conversation_id,
+        adminId: m.admin_id,
         type: m.message_type as AdminMessageType,
-        content: m.message_content,
-        contextLeads: m.context_leads
+        content: String(m.message_content ?? ''),
+        metadata: m.message_metadata,
+        contextLeads: m.context_leads,
+        embeddings: typeof m.embeddings === 'string' ? JSON.parse(m.embeddings) : undefined
       }
     })
   }
@@ -376,6 +395,33 @@ export class AdminChatService {
       .lt('last_activity', cutoffDate.toISOString())
 
     return count || 0
+  }
+
+  /**
+   * Delete a specific admin session and all its messages
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    // Delete messages first (foreign key constraint)
+    const { error: messagesError } = await supabaseService
+      .from('admin_conversations')
+      .delete()
+      .eq('session_id', sessionId)
+
+    if (messagesError) {
+      console.error('Failed to delete admin messages:', messagesError)
+      throw messagesError
+    }
+
+    // Delete session
+    const { error: sessionError } = await supabaseService
+      .from('admin_sessions')
+      .delete()
+      .eq('id', sessionId)
+
+    if (sessionError) {
+      console.error('Failed to delete admin session:', sessionError)
+      throw sessionError
+    }
   }
 }
 
