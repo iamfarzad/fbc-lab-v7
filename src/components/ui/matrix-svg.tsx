@@ -3,9 +3,9 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { fbcPatterns } from '@/lib/elevenlabs-patterns'
+import type { VoiceState } from '@/lib/orb-patterns'
 
 export type Frame = number[][]
-export type VoiceState = 'connecting' | 'initializing' | 'listening' | 'speaking' | 'thinking' | 'idle'
 
 interface MatrixSVGProps extends React.HTMLAttributes<HTMLDivElement> {
   rows?: number

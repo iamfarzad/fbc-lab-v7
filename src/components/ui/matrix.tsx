@@ -3,10 +3,10 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 import { fbcPatterns } from '@/lib/elevenlabs-patterns'
+import type { VoiceState as OrbVoiceState } from '@/lib/orb-patterns'
 
 export type Frame = number[][]
-
-export type VoiceState = 'connecting' | 'initializing' | 'listening' | 'speaking' | 'thinking' | 'idle'
+export type VoiceState = OrbVoiceState
 
 interface MatrixProps extends React.HTMLAttributes<HTMLDivElement> {
   rows?: number;

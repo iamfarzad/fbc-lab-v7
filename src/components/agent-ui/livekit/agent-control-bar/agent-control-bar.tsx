@@ -3,7 +3,6 @@
 import { type HTMLAttributes, useCallback, useState } from 'react';
 import { ChatTextIcon, CameraIcon, MonitorIcon, PaperclipIcon, DownloadSimpleIcon, CalendarBlankIcon, PlusIcon } from '@phosphor-icons/react/dist/ssr';
 import { useSession } from '@/components/agent-ui/app/session-context';
-import { Button } from '@/components/agent-ui/livekit/button';
 import { Toggle } from '@/components/agent-ui/livekit/toggle';
 import { cn } from '@/lib/utils';
 import { ChatInput } from './chat-input';
@@ -381,37 +380,40 @@ export function AgentControlBar({
           {visibleControls.leave && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={isSessionActive ? "primary" : "default"}
+                <button
                   onClick={handleDisconnect}
                   className={cn(
+                    // Base button styles
+                    'inline-flex items-center justify-center gap-2',
+                    'rounded-full cursor-pointer',
                     'transition-all duration-200',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20',
+                    'disabled:pointer-events-none disabled:opacity-50',
+                    'relative overflow-hidden',
                     'hover:scale-[1.02] active:scale-[0.98]',
-                    'shadow-sm hover:shadow-md',
-                    'relative overflow-hidden shrink-0',
-                    'h-8 w-[90px] min-w-[80px] max-w-[130px] sm:w-[100px] md:w-[110px] lg:w-[120px]',
-                    'flex items-center justify-center px-2',
-                    // Override button variant's text-xs with larger size
-                    '!text-sm',
-                    // Brand token colors: override inactive state with muted colors
-                    !isSessionActive && 'bg-muted/80 dark:bg-muted/90 text-muted-foreground border border-border',
-                    // Active state: use primary variant + accent border
-                    isSessionActive && 'border border-accent/30'
+                    'shadow-lg hover:shadow-xl',
+                    // Responsive sizing with fixed min-width for consistent size
+                    'h-9 w-32 sm:h-10 sm:w-40',
+                    // Grok-inspired styling: white bg, black text, uppercase, red border
+                    'bg-white text-black border border-red-500',
+                    // Font styling
+                    'text-xs font-bold tracking-wider uppercase whitespace-nowrap',
+                    'font-sans'
                   )}
                 >
                   {/* Conditional rendering: waveform when voice/AI is active, text otherwise */}
                   {liveApi.isRecording || liveApi.isSessionActive ? (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center gap-2">
                       <LiveWaveform
                         stream={liveApi.micStream || undefined}
                         mode="scrolling"
                         active={liveApi.isRecording || liveApi.isSessionActive}
                         processing={liveApi.isProcessing}
                         height={20}
-                        barWidth={3}
-                        barGap={1}
-                        barRadius={4}
-                        barColor="hsl(var(--accent))"
+                        barWidth={2}
+                        barGap={0.5}
+                        barRadius={2}
+                        barColor="rgb(0,0,0)"
                         fadeEdges={false}
                         sensitivity={2.5}
                         smoothingTimeConstant={0.5}
@@ -419,11 +421,16 @@ export function AgentControlBar({
                       />
                     </div>
                   ) : (
-                    <span className="text-xs font-medium whitespace-nowrap normal-case font-mono">
-                      Start Recording
-                    </span>
+                    <>
+                      <VoiceIcon 
+                        size={16}
+                        isActive={false}
+                        isProcessing={false}
+                      />
+                      <span>SPEAK</span>
+                    </>
                   )}
-                </Button>
+                </button>
             </TooltipTrigger>
             <TooltipContent>
               {isSessionActive ? 'End call' : 'Start session'}

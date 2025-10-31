@@ -1,12 +1,12 @@
 "use client"
 
 import React from 'react'
-import { Matrix, type VoiceState as MatrixVoiceState } from './matrix'
+import { Matrix } from './matrix'
 import { MatrixSVG } from './matrix-svg'
 import { cn } from '@/lib/utils'
+import type { VoiceState } from '@/lib/orb-patterns'
 
-// Re-export VoiceState type
-export type VoiceState = MatrixVoiceState
+export type { VoiceState }
 
 interface VoiceMatrixProps {
   voiceState?: VoiceState
