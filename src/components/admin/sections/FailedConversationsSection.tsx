@@ -270,7 +270,7 @@ function FailedConversationDetails({ conversation }: { conversation: FailedConve
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="text-sm font-medium text-muted-foreground">Failed At</div>
               <div className="mt-1">
@@ -302,7 +302,7 @@ function FailedConversationDetails({ conversation }: { conversation: FailedConve
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="text-sm font-medium text-muted-foreground">Name</div>
               <div className="mt-1">{conversation.name || 'Unknown'}</div>
@@ -339,7 +339,7 @@ function FailedConversationDetails({ conversation }: { conversation: FailedConve
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="text-sm font-medium text-muted-foreground">Company</div>
                 <div className="mt-1">{researchData.companyName}</div>

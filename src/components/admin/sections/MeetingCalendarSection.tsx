@@ -219,7 +219,7 @@ export function MeetingCalendarSection() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="lead-email">Lead Email *</Label>
                         <Input
@@ -258,7 +258,7 @@ export function MeetingCalendarSection() {
                         rows={3}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="scheduled-at">Date & Time *</Label>
                         <Input
@@ -281,7 +281,7 @@ export function MeetingCalendarSection() {
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="meeting-link">Meeting Link</Label>
                         <Input

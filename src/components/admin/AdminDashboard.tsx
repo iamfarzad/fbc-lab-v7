@@ -22,6 +22,7 @@ import { InteractionAnalyticsSection } from './sections/InteractionAnalyticsSect
 import { AIPerformanceMetricsSection } from './sections/AIPerformanceMetricsSection'
 import { useAdminStats } from '@/hooks/useAdminStats'
 import { useAdminConversations } from '@/hooks/useAdminConversations'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 type NavigationItemId = 
   | 'overview'
@@ -127,13 +128,11 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="flex-1 overflow-hidden bg-background">
-            <div className="h-full overflow-hidden">
-              <div className="mx-auto h-full max-w-7xl p-4 overflow-hidden">
-                <div className="h-full overflow-hidden flex flex-col">
-                  {renderSection()}
-                </div>
+            <ScrollArea className="h-full">
+              <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+                {renderSection()}
               </div>
-            </div>
+            </ScrollArea>
           </div>
         </div>
         {/* Floating chat button/drawer */}

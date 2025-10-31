@@ -379,8 +379,8 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
           {/* Drawer */}
           <div
             className={cn(
-              "fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg transition-transform duration-300 ease-in-out",
-              "flex h-[600px]"
+              "fixed bottom-0 left-0 right-0 top-0 z-50 bg-card shadow-lg transition-transform duration-300 ease-in-out",
+              "flex h-screen"
             )}
           >
             {/* History Sidebar */}

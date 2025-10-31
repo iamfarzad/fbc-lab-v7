@@ -125,7 +125,7 @@ export function AgentAnalyticsPanel() {
       </div>
 
       {/* System Health Cards */}
-      <div className="grid gap-2 grid-cols-4 shrink-0">
+      <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 shrink-0">
         <Card>
           <CardHeader className="pb-1 pt-3 px-3">
             <CardTitle className="text-xs font-medium">Total Executions</CardTitle>
@@ -176,7 +176,7 @@ export function AgentAnalyticsPanel() {
       </div>
 
       {/* Bottom Section - Grid Layout */}
-      <div className="flex-1 grid grid-cols-3 gap-3 overflow-hidden min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3 overflow-hidden min-h-0">
         {/* Agent Breakdown */}
         <Card className="flex flex-col min-h-0">
           <CardHeader className="pb-2 pt-3 px-3 shrink-0">

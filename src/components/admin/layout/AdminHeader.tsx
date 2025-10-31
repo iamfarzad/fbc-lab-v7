@@ -20,8 +20,8 @@ export function AdminHeader({
   actions
 }: AdminHeaderProps) {
   return (
-    <header className="border-b border-border p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <header className="border-b border-border p-4 sm:p-6">
+      <div className="flex flex-col gap-2 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
           <p className="mt-1 text-muted-foreground">{subtitle}</p>
