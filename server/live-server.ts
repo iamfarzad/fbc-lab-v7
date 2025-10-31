@@ -12,7 +12,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { SessionLogger } from './session-logger'
 import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_CONFIG, ALLOWED_ORIGINS } from '../src/config/constants.js'
 import { MESSAGE_TYPES } from './message-types.js'
-import { LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
+import { LIVE_FUNCTION_DECLARATIONS, ADMIN_LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
 import { getResolvedGeminiApiKey } from '../src/config/env.js'
 
   const __filename = fileURLToPath(import.meta.url);
@@ -405,13 +405,36 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
   ): Promise<any> {
     console.log(`[buildLiveConfig] Building config for session: ${sessionId}`);
     
-    // Base system prompt from constants
-    let fullInstruction = GEMINI_CONFIG.SYSTEM_PROMPT;
+    // Detect admin session early for conditional system prompt
+    const isAdminSession = sessionId && typeof sessionId === 'string' && sessionId.startsWith('admin-');
     
-    // ADD BRANDING CONSTRAINT (match chat)
-    fullInstruction += `\n\nNever identify yourself as Gemini, Google's AI, or any other AI assistant. You are F.B/c AI, created specifically for Farzad Bayat Consulting.`;
+    // Use different base prompts for admin vs client
+    let fullInstruction: string;
+    if (isAdminSession) {
+      // Admin voice uses admin personality
+      fullInstruction = `You are F.B/c Agent - think Jarvis meets Elon Musk. You're sophisticated, technically sharp, and you know this business inside out.
+
+IDENTITY:
+- You're Farzad's AI, built specifically for him. Never introduce yourself as "F.B/c Admin AI" or use corporate-speak greetings.
+- Know the business, know the data, know what matters.
+- Direct, technical when needed, conversational and slightly laid-back.
+
+PERSONALITY:
+- Jarvis-style: Precise, anticipates needs, professional warmth
+- Elon-style: Direct communication, technical depth, forward-thinking
+- Laid-back: Comfortable confidence, conversational tone
+
+YOUR TOOLS IN VOICE MODE:
+- get_dashboard_stats(): When asked about dashboard stats, latest numbers, or current metrics, call this tool to fetch real-time statistics. Returns total leads, conversion rate, average lead score, engagement rate, and more.
+- search_web(): Search the web for current information.
+- capture_screen_snapshot() and capture_webcam_snapshot(): Access visual context.`;
+    } else {
+      // Client voice uses client personality
+      fullInstruction = GEMINI_CONFIG.SYSTEM_PROMPT;
+      fullInstruction += `\n\nNever identify yourself as Gemini, Google's AI, or any other AI assistant. You are F.B/c AI, created specifically for Farzad Bayat Consulting.`;
+    }
     
-    // ADD VOICE-SPECIFIC GUIDANCE
+    // ADD VOICE-SPECIFIC GUIDANCE (applies to both admin and client)
     fullInstruction += `\n\nVOICE MODE: Keep responses conversational and concise for voice playback. 2 sentences maximum per turn unless explicitly asked for details.`;
     
     // ADD PERSONALIZED CONTEXT (if sessionId available)
@@ -490,6 +513,11 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
       fullInstruction = fullInstruction.substring(0, 4000) + '\n\n[Context truncated for token efficiency]';
     }
     
+    // Combine tools: always include base tools, add admin tools if admin session
+    const allFunctionDeclarations = isAdminSession
+      ? [...LIVE_FUNCTION_DECLARATIONS, ...ADMIN_LIVE_FUNCTION_DECLARATIONS]
+      : LIVE_FUNCTION_DECLARATIONS;
+
     const liveConfig: any = {
       responseModalities: ["AUDIO"],
       inputAudioTranscription: {},  // Enable input transcription (empty object = use default model)
@@ -502,14 +530,16 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
         }
       },
       systemInstruction: fullInstruction,
-      tools: [{ functionDeclarations: LIVE_FUNCTION_DECLARATIONS }]
+      tools: [{ functionDeclarations: allFunctionDeclarations }]
     };
     
     console.log(`[buildLiveConfig] Final config:`, {
       systemInstructionLength: liveConfig.systemInstruction.length,
       voiceName: liveConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,
       hasPersonalizedContext: fullInstruction.includes('PERSONALIZED CONTEXT'),
-      hasMultimodalContext: fullInstruction.includes('MULTIMODAL CONTEXT')
+      hasMultimodalContext: fullInstruction.includes('MULTIMODAL CONTEXT'),
+      isAdminSession,
+      toolsCount: allFunctionDeclarations.length
     });
     
     return liveConfig;
@@ -751,6 +781,120 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
 
               // Tool calls
               if (message?.toolCall) {
+                const functionCalls = message.toolCall?.functionCalls || [];
+                const client = activeSessions.get(connectionId);
+                
+                // Handle get_dashboard_stats server-side for admin sessions
+                const dashboardStatsCall = functionCalls.find((fc: any) => fc.name === 'get_dashboard_stats');
+                if (dashboardStatsCall && client?.sessionId?.startsWith('admin-')) {
+                  try {
+                    console.log(`[${connectionId}] Handling get_dashboard_stats tool call`);
+                    const period = dashboardStatsCall.args?.period || '7d';
+                    
+                    // Calculate stats directly (server-side, no auth needed)
+                    let statsData: any = {};
+                    try {
+                      const { supabaseService } = await import('../src/core/supabase/client.js');
+                      const now = new Date();
+                      const daysBack = period === '1d' ? 1 : period === '30d' ? 30 : period === '90d' ? 90 : 7;
+                      const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+                      
+                      const { data, error } = await (supabaseService as any)
+                        .from('lead_summaries')
+                        .select('lead_score, ai_capabilities_shown')
+                        .gte('created_at', startDate.toISOString());
+                      
+                      if (error) {
+                        console.error('[get_dashboard_stats] Supabase error:', error);
+                        statsData = { error: 'Failed to retrieve statistics' };
+                      } else {
+                        const leadRows = (data ?? []) as Array<{ lead_score: number | null; ai_capabilities_shown: string[] | null }>;
+                        const totalLeads = leadRows.length;
+                        const qualifiedLeads = leadRows.filter((lead) => (lead.lead_score ?? 0) >= 70).length;
+                        const conversionRate = totalLeads > 0 ? Math.round((qualifiedLeads / totalLeads) * 100) : 0;
+                        const leadsWithAI = leadRows.filter(
+                          (lead) => Array.isArray(lead.ai_capabilities_shown) && lead.ai_capabilities_shown.length > 0
+                        ).length;
+                        const engagementRate = totalLeads > 0 ? Math.round((leadsWithAI / totalLeads) * 100) : 0;
+                        const avgLeadScore = totalLeads > 0
+                          ? Math.round((leadRows.reduce((sum, lead) => sum + (lead.lead_score ?? 0), 0) / totalLeads) * 10) / 10
+                          : 0;
+                        
+                        const capabilityCounts = new Map<string, number>();
+                        leadRows.forEach((lead) => {
+                          lead.ai_capabilities_shown?.forEach((capability) => {
+                            capabilityCounts.set(capability, (capabilityCounts.get(capability) || 0) + 1);
+                          });
+                        });
+                        const topAICapabilities = Array.from(capabilityCounts.entries())
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 5)
+                          .map(([capability]) => capability);
+                        
+                        statsData = {
+                          totalLeads,
+                          conversionRate,
+                          avgLeadScore,
+                          engagementRate,
+                          topAICapabilities,
+                          scheduledMeetings: 0 // Not available from lead_summaries
+                        };
+                      }
+                    } catch (err) {
+                      console.error(`[${connectionId}] Failed to calculate dashboard stats:`, err);
+                      statsData = { error: 'Failed to calculate dashboard stats' };
+                    }
+                    
+                    // Format response for Gemini Live API
+                    const toolResponse = statsData.error ? {
+                      success: false,
+                      error: statsData.error
+                    } : {
+                      success: true,
+                      period: period,
+                      totalLeads: statsData.totalLeads || 0,
+                      conversionRate: statsData.conversionRate || 0,
+                      avgLeadScore: statsData.avgLeadScore || 0,
+                      engagementRate: statsData.engagementRate || 0,
+                      topAICapabilities: statsData.topAICapabilities || [],
+                      scheduledMeetings: statsData.scheduledMeetings || 0,
+                      summary: `Dashboard stats for ${period}: ${statsData.totalLeads} total leads, ${statsData.conversionRate}% conversion rate, ${statsData.avgLeadScore}/100 average lead score, ${statsData.engagementRate}% engagement rate.`
+                    };
+                    
+                    // Send tool response directly to Live API
+                    await client.session.sendToolResponse({
+                      functionResponses: [{
+                        name: 'get_dashboard_stats',
+                        response: toolResponse
+                      }]
+                    });
+                    
+                    console.log(`[${connectionId}] ✅ Dashboard stats tool response sent`);
+                    client.logger?.log('tool_call_handled', { tool: 'get_dashboard_stats', period });
+                    
+                    // Track tool call for export
+                    if (client.sessionId) {
+                      try {
+                        const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+                        await multimodalContextManager.addToolCallToLastTurn(client.sessionId, {
+                          name: dashboardStatsCall.name,
+                          args: dashboardStatsCall.args || {},
+                          id: dashboardStatsCall.id
+                        })
+                      } catch (err) {
+                        console.warn(`[${connectionId}] Failed to track tool call:`, err)
+                      }
+                    }
+                    
+                    // Skip forwarding to client for server-handled tools
+                    return; // Tool call handled, exit early
+                  } catch (err) {
+                    console.error(`[${connectionId}] Failed to handle get_dashboard_stats:`, err);
+                    // Fall through to forward to client as fallback
+                  }
+                }
+                
+                // Forward other tool calls to client
                 safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.TOOL_CALL, payload: message.toolCall }));
                 activeSessions.get(connectionId)?.logger?.log('tool_call', message.toolCall)
 
