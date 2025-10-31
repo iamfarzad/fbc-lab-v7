@@ -43,7 +43,23 @@ const normalizeWebsocketUrl = (rawValue, { fallback, enforceSecure = false, }) =
     }
 };
 // WebSocket Configuration
-const IS_PROD = process.env.NODE_ENV === 'production';
+// Check if we're in production at runtime (client-side aware)
+const isProductionRuntime = () => {
+    // Server-side: use NODE_ENV
+    if (typeof window === 'undefined') {
+        return process.env.NODE_ENV === 'production';
+    }
+    // Client-side: check hostname to detect production domains
+    const hostname = window.location.hostname;
+    const isLocalhost = 
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '[::1]' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.localdomain') ||
+        hostname.includes('.local');
+    return !isLocalhost && !hostname.includes('vercel.app');
+};
 export const WEBSOCKET_CONFIG = {
     // Distinct envs for prod vs dev to avoid accidental overrides
     PRODUCTION_URL: normalizeWebsocketUrl(process.env.NEXT_PUBLIC_LIVE_SERVER_URL, {
@@ -54,8 +70,10 @@ export const WEBSOCKET_CONFIG = {
         fallback: 'ws://localhost:3001',
     }),
     get URL() {
-        if (IS_PROD)
+        // Runtime check for production
+        if (isProductionRuntime()) {
             return this.PRODUCTION_URL;
+        }
         // Prefer explicit dev URL when present
         if (process.env.NEXT_PUBLIC_LIVE_SERVER_DEV_URL)
             return this.DEVELOPMENT_URL;
