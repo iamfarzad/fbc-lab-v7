@@ -42,8 +42,10 @@ const CRISP_AUDIO_WORKLET = `class AudioProcessor extends AudioWorkletProcessor 
           const int16Buffer = new Int16Array(this.bufferSize);
           for (let j = 0; j < this.bufferSize; j++) {
             const s = this.buffer[j];
+            // Clamp to valid range [-1, 1] to prevent overflow distortion
+            const clamped = Math.max(-1, Math.min(1, s));
             // Symmetric scaling: float32Array[i] * 32768 (same as Google reference)
-            int16Buffer[j] = s * 32768;
+            int16Buffer[j] = clamped * 32768;
           }
           
           this.port.postMessage({

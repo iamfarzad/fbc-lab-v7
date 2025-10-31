@@ -16,6 +16,9 @@ export class LiveClientWS {
   private pendingStartOpts: { languageCode?: string; voiceName?: string; sessionId?: string } | null = null
   private devLogEnabled = (typeof process !== 'undefined' && (process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG === '1' || (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_CLIENT_LIVE_LOG !== '0')))
   private lastLogTime = 0
+  private connectStartTime: number | null = null
+  private connectTimeoutId: ReturnType<typeof setTimeout> | null = null
+  private readonly CONNECT_TIMEOUT_MS = 5000 // 5 seconds
 
   on<K extends keyof LiveClientEventMap>(event: K, cb: LiveClientEventMap[K]) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set())
@@ -39,6 +42,26 @@ export class LiveClientWS {
   }
 
   connect() {
+    // Force cleanup stuck CONNECTING sockets
+    if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
+      const stuck = this.connectStartTime && 
+        (Date.now() - this.connectStartTime) > this.CONNECT_TIMEOUT_MS
+      if (stuck) {
+        console.warn('🔌 [LiveClient] Connection stuck in CONNECTING, forcing cleanup');
+        try { this.socket.close() } catch { /* ignore */ }
+        this.socket = null
+        this.connectStartTime = null
+        if (this.connectTimeoutId) {
+          clearTimeout(this.connectTimeoutId)
+          this.connectTimeoutId = null
+        }
+      } else {
+        // Still connecting within timeout, skip
+        console.log('🔌 [LiveClient] Socket already exists and is connecting, skipping connect');
+        return
+      }
+    }
+
     // Clean up failed/closed sockets before reconnecting
     if (this.socket) {
       const readyState = this.socket.readyState
@@ -49,13 +72,24 @@ export class LiveClientWS {
         // Socket is already open, skip
         console.log('🔌 [LiveClient] Socket already exists and is open, skipping connect');
         return;
-      } else if (readyState === WebSocket.CONNECTING) {
-        // Socket is connecting - wait a bit, but if it's been too long, clean it up
-        // This handles cases where connection is stuck
-        console.log('🔌 [LiveClient] Socket already exists and is connecting, skipping connect');
-        return;
       }
     }
+
+    // Track connection start
+    this.connectStartTime = Date.now()
+
+    // Add timeout for stuck connections
+    this.connectTimeoutId = setTimeout(() => {
+      if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
+        console.warn('🔌 [LiveClient] Connection timeout, aborting stuck connection');
+        try { this.socket.close() } catch { /* ignore */ }
+        this.socket = null
+        this.emit('error', 'Connection timeout')
+        this.connectStartTime = null
+        this.connectTimeoutId = null
+      }
+    }, this.CONNECT_TIMEOUT_MS)
+
     const url = WEBSOCKET_CONFIG.URL
     console.log('🔌 [LiveClient] Connecting to:', url);
     const ws = new WebSocket(url)
@@ -63,22 +97,38 @@ export class LiveClientWS {
 
     ws.onopen = () => {
       console.log('🔌 [LiveClient] WebSocket opened successfully');
+      if (this.connectTimeoutId) {
+        clearTimeout(this.connectTimeoutId)
+        this.connectTimeoutId = null
+      }
+      this.connectStartTime = null
       this.emit('open')
     }
     ws.onclose = () => {
+      if (this.connectTimeoutId) {
+        clearTimeout(this.connectTimeoutId)
+        this.connectTimeoutId = null
+      }
+      this.connectStartTime = null
       this.emit('close')
       this.socket = null
     }
     ws.onerror = (error) => {
       console.error('🔌 [LiveClient] WebSocket error:', error);
       this.emit('error', 'WebSocket error')
-      // Always clean up socket on error to allow reconnection
-      // The socket will be in CLOSED or CLOSING state after error
-      setTimeout(() => {
-        if (this.socket && (this.socket.readyState === WebSocket.CLOSED || this.socket.readyState === WebSocket.CLOSING)) {
-          this.socket = null
+      // Immediately clean up socket on error to allow reconnection
+      if (this.connectTimeoutId) {
+        clearTimeout(this.connectTimeoutId)
+        this.connectTimeoutId = null
+      }
+      try {
+        if (this.socket) {
+          // Force close regardless of state
+          this.socket.close()
         }
-      }, 100)
+      } catch { /* ignore close errors */ }
+      this.socket = null
+      this.connectStartTime = null
     }
     ws.onmessage = (evt) => {
       try {
@@ -197,6 +247,11 @@ export class LiveClientWS {
   }
 
   disconnect() {
+    if (this.connectTimeoutId) {
+      clearTimeout(this.connectTimeoutId)
+      this.connectTimeoutId = null
+    }
+    this.connectStartTime = null
     try { this.socket?.close() } catch { /* ignore close errors */ }
     this.socket = null
   }
@@ -251,3 +306,4 @@ export function getLiveClientSingleton(): LiveClientWS {
   // Non-browser environments shouldn't leak a global; return a fresh instance
   return new LiveClientWS()
 }
+
