@@ -120,8 +120,7 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
     onOutputTranscript: (text, isFinal) => {
       if (isFinal) {
         setAiFinalTranscript(text)
-        // Note: We can't mutate messages state directly here, sendMessage handles it
-        void sendMessage(`[Voice Response] ${text}`)
+        // Don't send AI responses back as messages - they're already in the chat
       } else {
         setAiPartialTranscript(text)
       }
@@ -135,7 +134,11 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
   // Webcam hook and state
   const webcam = useCamera({
     sessionId,
-    onCapture: async (blob) => {
+    sendRealtimeInput: liveApi.sendRealtimeInput,
+    sendContextUpdate: liveApi.sendContextUpdate,
+    enableAutoCapture: liveApi.isSessionActive,
+    captureInterval: 3000,
+    onCapture: async (blob, _imageData) => {
       try {
         setIsWebcamLoading(true)
         // Send webcam analysis with admin header
@@ -167,13 +170,16 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
         setIsWebcamLoading(false)
       }
     },
-    captureInterval: 3000, // Capture every 3 seconds
   })
   const [isWebcamLoading, setIsWebcamLoading] = useState(false)
 
   // Screenshare hook and state
   const screenShare = useScreenShare({
     sessionId,
+    sendRealtimeInput: liveApi.sendRealtimeInput,
+    sendContextUpdate: liveApi.sendContextUpdate,
+    enableAutoCapture: liveApi.isSessionActive,
+    captureInterval: 3000,
     onCapture: async (_blob, imageData) => {
       try {
         setIsScreenShareLoading(true)
@@ -213,7 +219,6 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
         setIsScreenShareLoading(false)
       }
     },
-    captureInterval: 3000, // Capture every 3 seconds
   })
   const [isScreenShareLoading, setIsScreenShareLoading] = useState(false)
 
@@ -305,6 +310,18 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
     }
   }, [webcam])
 
+  // Webcam manual capture
+  const handleWebcamCapture = useCallback(async () => {
+    try {
+      setIsWebcamLoading(true)
+      await webcam.captureFrame()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Webcam capture error')
+    } finally {
+      setIsWebcamLoading(false)
+    }
+  }, [webcam])
+
   // Screenshare toggle
   const handleScreenShareToggle = useCallback(async () => {
     try {
@@ -312,6 +329,18 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
       await screenShare.toggleScreenShare()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Screen share error')
+    } finally {
+      setIsScreenShareLoading(false)
+    }
+  }, [screenShare])
+
+  // Screenshare manual capture
+  const handleScreenShareCapture = useCallback(async () => {
+    try {
+      setIsScreenShareLoading(true)
+      await screenShare.captureFrame()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Screen share capture error')
     } finally {
       setIsScreenShareLoading(false)
     }
@@ -667,9 +696,11 @@ export function AdminChatPanel({ className, isOpen: controlledIsOpen, onOpenChan
                       isWebcamActive={webcam.isActive}
                       onWebcamToggle={handleWebcamToggle}
                       isWebcamLoading={isWebcamLoading}
+                      onWebcamCapture={handleWebcamCapture}
                       isScreenShareActive={screenShare.isActive}
                       onScreenShareToggle={handleScreenShareToggle}
                       isScreenShareLoading={isScreenShareLoading}
+                      onScreenShareCapture={handleScreenShareCapture}
                     />
                     <PromptInputModelSelect value={selectedModel} onValueChange={setSelectedModel}>
                       <PromptInputModelSelectTrigger>

@@ -29,11 +29,13 @@ interface AdminChatActionsProps {
   isWebcamActive: boolean
   onWebcamToggle: () => void
   isWebcamLoading: boolean
+  onWebcamCapture?: () => void
   
   // Screenshare state
   isScreenShareActive: boolean
   onScreenShareToggle: () => void
   isScreenShareLoading: boolean
+  onScreenShareCapture?: () => void
   
   className?: string
 }
@@ -46,9 +48,11 @@ export function AdminChatActions({
   isWebcamActive,
   onWebcamToggle,
   isWebcamLoading,
+  onWebcamCapture,
   isScreenShareActive,
   onScreenShareToggle,
   isScreenShareLoading,
+  onScreenShareCapture,
   className,
 }: AdminChatActionsProps) {
   return (
@@ -117,6 +121,25 @@ export function AdminChatActions({
           </TooltipContent>
         </Tooltip>
 
+        {/* Webcam Manual Capture */}
+        {isWebcamActive && !isVoiceActive && onWebcamCapture && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onWebcamCapture}
+                disabled={isWebcamLoading}
+                aria-label="Capture webcam frame"
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Capture webcam frame</TooltipContent>
+          </Tooltip>
+        )}
+
         {/* Screenshare Toggle */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -139,6 +162,25 @@ export function AdminChatActions({
             {isScreenShareActive ? 'Stop screen share' : 'Start screen share'}
           </TooltipContent>
         </Tooltip>
+
+        {/* Screenshare Manual Capture */}
+        {isScreenShareActive && !isVoiceActive && onScreenShareCapture && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onScreenShareCapture}
+                disabled={isScreenShareLoading}
+                aria-label="Capture screen frame"
+              >
+                <Monitor className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Capture screen frame</TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </TooltipProvider>
   )
