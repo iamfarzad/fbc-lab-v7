@@ -342,3 +342,9 @@ export const AGENT_UI_CONFIG = {
   agentName: 'fbc-agent',
   model: GEMINI_MODELS.DEFAULT_VOICE,
 } as const
+
+// Admin Configuration
+export const ADMIN_CONFIG = {
+  ADMIN_ID: 'farzad',
+  ADMIN_EMAIL: 'farzad@bayatconsulting.com',
+} as const
