@@ -382,56 +382,48 @@ export function AgentControlBar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="destructive"
+                  variant={isSessionActive ? "primary" : "default"}
                   onClick={handleDisconnect}
-                  disabled={!isSessionActive}
                   className={cn(
                     'transition-all duration-200',
                     'hover:scale-[1.02] active:scale-[0.98]',
                     'shadow-sm hover:shadow-md',
-                    'relative overflow-hidden p-0',
-                    'h-8 w-[80px] min-w-[70px] max-w-[120px] sm:w-[90px] md:w-[100px] lg:w-[110px]',
-                    !isSessionActive && 'opacity-50 cursor-not-allowed'
+                    'relative overflow-hidden shrink-0',
+                    'h-8 w-[90px] min-w-[80px] max-w-[130px] sm:w-[100px] md:w-[110px] lg:w-[120px]',
+                    'flex items-center justify-center px-2',
+                    // Override button variant's text-xs with larger size
+                    '!text-sm',
+                    // Brand token colors: override inactive state with muted colors
+                    !isSessionActive && 'bg-muted/80 dark:bg-muted/90 text-muted-foreground border border-border',
+                    // Active state: use primary variant + accent border
+                    isSessionActive && 'border border-accent/30'
                   )}
                 >
-                  {/* Button content container - dark background for visibility */}
-                  <div className={cn(
-                    'flex h-full items-center justify-center rounded-md py-1 px-2',
-                    'bg-foreground/10 dark:bg-muted/80 border border-border/50',
-                    'text-foreground dark:text-card-foreground',
-                    'w-full'
-                  )}>
-                    {/* Waveform container */}
-                    <div className="relative h-full w-full flex-1 overflow-hidden rounded-sm">
+                  {/* Conditional rendering: waveform when voice/AI is active, text otherwise */}
+                  {liveApi.isRecording || liveApi.isSessionActive ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <LiveWaveform
+                        stream={liveApi.micStream || undefined}
                         mode="scrolling"
-                        active={isSessionActive}
+                        active={liveApi.isRecording || liveApi.isSessionActive}
+                        processing={liveApi.isProcessing}
                         height={20}
                         barWidth={3}
                         barGap={1}
                         barRadius={4}
-                        barColor="hsl(var(--accent))" // Use accent (bright orange) for better visibility
-                        fadeEdges={true}
-                        fadeWidth={10} // Further reduced fade for more visible bars
-                        sensitivity={1.8} // More responsive to audio
-                        smoothingTimeConstant={0.5} // Faster response
-                        className={cn(
-                          'h-full w-full transition-opacity duration-300',
-                          !isSessionActive && 'opacity-0'
-                        )}
+                        barColor="hsl(var(--accent))"
+                        fadeEdges={false}
+                        sensitivity={2.5}
+                        smoothingTimeConstant={0.5}
+                        className="h-full w-full"
                       />
-                      
-                      {/* Idle state text overlay */}
-                      {!isSessionActive && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-card-foreground dark:text-foreground text-xs font-medium">
-                            Start Recording
-                          </span>
-                        </div>
-                      )}
                     </div>
-                  </div>
-          </Button>
+                  ) : (
+                    <span className="text-xs font-medium whitespace-nowrap normal-case font-mono">
+                      Start Recording
+                    </span>
+                  )}
+                </Button>
             </TooltipTrigger>
             <TooltipContent>
               {isSessionActive ? 'End call' : 'Start session'}

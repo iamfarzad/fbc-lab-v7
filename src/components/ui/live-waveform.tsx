@@ -6,6 +6,7 @@ export type LiveWaveformProps = HTMLAttributes<HTMLDivElement> & {
   active?: boolean
   processing?: boolean
   deviceId?: string
+  stream?: MediaStream
   barWidth?: number
   barGap?: number
   barRadius?: number
@@ -30,6 +31,7 @@ export const LiveWaveform = ({
   active = false,
   processing = false,
   deviceId,
+  stream,
   barWidth = 3,
   barGap = 1,
   barRadius = 1.5,
@@ -54,6 +56,7 @@ export const LiveWaveform = ({
   const historyRef = useRef<number[]>([])
   const analyserRef = useRef<AnalyserNode | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const animationRef = useRef<number>(0)
   const lastUpdateRef = useRef<number>(0)
@@ -230,11 +233,15 @@ export const LiveWaveform = ({
   // Handle microphone setup and teardown
   useEffect(() => {
     if (!active) {
-      if (streamRef.current) {
+      // Cleanup only if we created the stream (not external stream prop)
+      if (streamRef.current && !stream) {
         streamRef.current.getTracks().forEach((track) => track.stop())
         streamRef.current = null
         onStreamEnd?.()
       }
+      try {
+        sourceRef.current?.disconnect()
+      } catch {}
       if (
         audioContextRef.current &&
         audioContextRef.current.state !== "closed"
@@ -242,6 +249,8 @@ export const LiveWaveform = ({
         audioContextRef.current.close()
         audioContextRef.current = null
       }
+      analyserRef.current = null
+      sourceRef.current = null
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
         animationRef.current = 0
@@ -249,22 +258,20 @@ export const LiveWaveform = ({
       return
     }
 
-    const setupMicrophone = async () => {
+    // If stream prop is provided, use it directly (don't create new stream)
+    if (stream) {
+      // Cleanup previous audio context/analyser if stream changed
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        try {
+          sourceRef.current?.disconnect()
+        } catch {}
+        audioContextRef.current.close()
+        audioContextRef.current = null
+        analyserRef.current = null
+        sourceRef.current = null
+      }
+
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: deviceId
-            ? {
-                deviceId: { exact: deviceId },
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-              }
-            : {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-              },
-        })
         streamRef.current = stream
         onStreamReady?.(stream)
 
@@ -282,6 +289,51 @@ export const LiveWaveform = ({
 
         audioContextRef.current = audioContext
         analyserRef.current = analyser
+        sourceRef.current = source
+
+        // Clear history when starting
+        historyRef.current = []
+      } catch (error) {
+        onError?.(error as Error)
+      }
+      return
+    }
+
+    // If no stream provided and active, create our own stream (backward compatible)
+    const setupMicrophone = async () => {
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          audio: deviceId
+            ? {
+                deviceId: { exact: deviceId },
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              }
+            : {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
+        })
+        streamRef.current = newStream
+        onStreamReady?.(newStream)
+
+        const AudioContextConstructor =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext })
+            .webkitAudioContext
+        const audioContext = new AudioContextConstructor()
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = fftSize
+        analyser.smoothingTimeConstant = smoothingTimeConstant
+
+        const source = audioContext.createMediaStreamSource(newStream)
+        source.connect(analyser)
+
+        audioContextRef.current = audioContext
+        analyserRef.current = analyser
+        sourceRef.current = source
 
         // Clear history when starting
         historyRef.current = []
@@ -293,11 +345,15 @@ export const LiveWaveform = ({
     setupMicrophone()
 
     return () => {
-      if (streamRef.current) {
+      // Only stop tracks if we created the stream (not external stream prop)
+      if (streamRef.current && !stream) {
         streamRef.current.getTracks().forEach((track) => track.stop())
         streamRef.current = null
         onStreamEnd?.()
       }
+      try {
+        sourceRef.current?.disconnect()
+      } catch {}
       if (
         audioContextRef.current &&
         audioContextRef.current.state !== "closed"
@@ -305,6 +361,8 @@ export const LiveWaveform = ({
         audioContextRef.current.close()
         audioContextRef.current = null
       }
+      analyserRef.current = null
+      sourceRef.current = null
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
         animationRef.current = 0
@@ -312,6 +370,7 @@ export const LiveWaveform = ({
     }
   }, [
     active,
+    stream,
     deviceId,
     fftSize,
     smoothingTimeConstant,
@@ -547,16 +606,16 @@ export const LiveWaveform = ({
         {...restButton}
       >
         <div
-          className={cn("relative h-full w-full", className)}
+          className={cn("relative", className)}
           ref={containerRef}
-          style={{ height: heightStyle }}
+          style={{ height: heightStyle, width: '100%', maxWidth: '100%' }}
           role="img"
           aria-hidden={true}
         >
           {!active && !processing && (
             <div className="border-muted-foreground/20 absolute top-1/2 right-0 left-0 -translate-y-1/2 border-t-2 border-dotted" />
           )}
-          <canvas className="block h-full w-full" ref={canvasRef} aria-hidden="true" />
+          <canvas className="block h-full w-full max-w-full" ref={canvasRef} aria-hidden="true" />
         </div>
         <span className="sr-only">{ariaLabel}</span>
       </button>
@@ -565,9 +624,9 @@ export const LiveWaveform = ({
 
   return (
     <div
-      className={cn("relative h-full w-full", className)}
+      className={cn("relative", className)}
       ref={containerRef}
-      style={{ height: heightStyle }}
+      style={{ height: heightStyle, width: '100%', maxWidth: '100%' }}
       aria-label={ariaLabel}
       role="img"
       {...props}
@@ -575,7 +634,7 @@ export const LiveWaveform = ({
       {!active && !processing && (
         <div className="border-muted-foreground/20 absolute top-1/2 right-0 left-0 -translate-y-1/2 border-t-2 border-dotted" />
       )}
-      <canvas className="block h-full w-full" ref={canvasRef} aria-hidden="true" />
+      <canvas className="block h-full w-full max-w-full" ref={canvasRef} aria-hidden="true" />
     </div>
   )
 }
