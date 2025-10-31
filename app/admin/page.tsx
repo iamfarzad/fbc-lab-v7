@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdminDashboard } from '@/components/admin/AdminDashboard'
-import { PageHeader, PageShell } from '@/components/page-shell'
 import { LiveApiProvider } from '@/hooks/LiveApiProvider'
 
 export default function AdminPage() {
@@ -70,18 +69,14 @@ export default function AdminPage() {
   }
 
   return (
-    <PageShell>
-      <PageHeader
-        title="F.B/c AI Admin Dashboard"
-        subtitle="Monitor leads, analyze interactions, and track AI performance"
-      />
+    <div className="h-screen overflow-hidden">
       {sessionId ? (
         <LiveApiProvider sessionId={sessionId}>
           <AdminDashboard />
         </LiveApiProvider>
       ) : (
-        <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">Setting up session…</div>
+        <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">Setting up session…</div>
       )}
-    </PageShell>
+    </div>
   )
 }
