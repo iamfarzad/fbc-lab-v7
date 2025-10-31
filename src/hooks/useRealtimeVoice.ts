@@ -451,9 +451,10 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
     lastStartOptsRef.current = opts ?? {};
     
     // If socket isn't ready yet, attempt to connect with retries
+    // Increased retries and timeout to handle Fly.io cold starts (10-30s)
     if (!isSocketReadyRef.current || !liveRef.current) {
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttempts = 10; // Increased from 3 to handle Fly.io cold starts
       while (attempts < maxAttempts) {
         try {
           liveRef.current?.connect();
@@ -464,7 +465,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
                 settled = true;
                 resolve(false);
               }
-            }, 2000);
+            }, 5000); // Increased from 2000ms to 5000ms per attempt
             const off = liveRef.current?.on('open', () => {
               if (!settled) {
                 settled = true;
@@ -480,7 +481,7 @@ export function useRealtimeVoice(options: UseRealtimeVoiceOptions = {}) {
         }
         attempts++;
         if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempts)); // Increased delay between retries
         }
       }
       if (!isSocketReadyRef.current) {

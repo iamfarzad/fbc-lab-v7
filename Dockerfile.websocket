@@ -16,6 +16,7 @@ RUN pnpm install --prod
 # Copy server entrypoints
 COPY server/live-server.ts ./
 COPY server/session-logger.ts ./
+COPY server/message-types.ts ./
 
 # Copy shared source files used by the server
 COPY src/config /src/config
