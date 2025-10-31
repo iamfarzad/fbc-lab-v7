@@ -9,7 +9,7 @@ import { generateImageHash } from '@/lib/image-utils';
 
 // Create a cached function for webcam analysis (30 min TTL)
 const cachedAnalyzeImage = createCachedFunction(
-  async (_imageHash: string, base64: string, mimeType: string) => {
+  async (_imageHash: string, base64: string, mimeType: string, isAdmin?: boolean) => {
     // If no API key, return a mock analysis to avoid 500s in dev/demo
     if (!process.env.GEMINI_API_KEY) {
       return {
@@ -23,12 +23,25 @@ const cachedAnalyzeImage = createCachedFunction(
       const genAI = new GoogleGenAI({ apiKey });
       // Prefer explicit v1beta model names with required "models/" prefix
       const model = process.env.WEB_VISION_MODEL || `models/${GEMINI_MODELS.DEFAULT_MULTIMODAL}`;
+      
+      // Admin-enhanced prompt for business intelligence analysis
+      const analysisPrompt = isAdmin
+        ? `Analyze this webcam image in admin/business intelligence context. Describe exactly what you see:
+- Dashboard metrics, analytics, charts, or KPIs visible
+- Business data, lead information, conversation summaries
+- Admin interface elements, CRM data, or reporting
+- Company information, industry indicators, or market data
+- Any visible business intelligence visualizations
+
+Provide actionable insights about what business context is visible. Be factual and specific about metrics, data points, and visual elements shown.`
+        : `Describe exactly what you see in this webcam image. Include people, objects, environment, text, and any visible details. Be factual and specific without inferring business context or making assumptions.`;
+      
       const result = await genAI.models.generateContent({
         model,
         contents: [{
           role: 'user',
           parts: [
-            { text: 'Describe exactly what you see in this webcam image. Include people, objects, environment, text, and any visible details. Be factual and specific without inferring business context or making assumptions.' },
+            { text: analysisPrompt },
             { inlineData: { data: base64, mimeType } }
           ]
         }]
@@ -45,7 +58,7 @@ const cachedAnalyzeImage = createCachedFunction(
   {
     ttl: CACHE_TTL.VISION, // 30 minutes
     keyPrefix: 'webcam:',
-    keyGenerator: (imageHash) => imageHash
+    keyGenerator: (imageHash, _base64, _mimeType, isAdmin) => isAdmin ? `admin:${imageHash}` : imageHash
   }
 );
 
@@ -63,15 +76,18 @@ export async function POST(req: NextRequest) {
     const base64 = buffer.toString('base64');
     const mimeType = file.type || 'image/png';
     
+    // Check for admin mode
+    const isAdmin = req.headers.get('x-admin-query') === 'true';
+    
     // Generate hash for caching
     const imageHash = generateImageHash(buffer);
 
-    console.log('📷 Analyzing webcam image with hash:', imageHash);
-    logJsonl('webcam', 'received', { hash: imageHash, bytes: buffer.byteLength, mimeType })
+    console.log('📷 Analyzing webcam image with hash:', imageHash, isAdmin ? '(admin mode)' : '');
+    logJsonl('webcam', 'received', { hash: imageHash, bytes: buffer.byteLength, mimeType, isAdmin })
 
-    // Use cached analysis
-    const result = await cachedAnalyzeImage(imageHash, base64, mimeType);
-    logJsonl('webcam', 'analysis_complete', { hash: imageHash, analysisChars: result?.analysis?.length || 0 })
+    // Use cached analysis with admin flag
+    const result = await cachedAnalyzeImage(imageHash, base64, mimeType, isAdmin);
+    logJsonl('webcam', 'analysis_complete', { hash: imageHash, analysisChars: result?.analysis?.length || 0, isAdmin })
 
     return respond.ok(result);
   } catch (error) {

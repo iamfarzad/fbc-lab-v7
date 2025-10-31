@@ -119,8 +119,21 @@ export async function POST(req: NextRequest) {
     let analysisResult = ''
 
     try {
+      // Check for admin mode
+      const isAdmin = req.headers.get('x-admin-query') === 'true';
+      
       // 🔍 OBJECTIVE SCREEN ANALYSIS PROMPT - Fixed hallucination bug
-      let analysisPrompt = `Describe exactly what you see on this screen. Include:
+      let analysisPrompt = isAdmin
+        ? `Analyze this screen capture in admin/business intelligence context. Identify:
+- Dashboard metrics, analytics, KPIs, or performance indicators visible
+- CRM data, lead information, conversation lists, or customer details
+- Business charts, graphs, tables, or data visualizations
+- Admin interface elements, system health, or operations data
+- Lead scores, prioritization info, or business recommendations
+- Company information, industry data, or market intelligence
+
+Provide actionable insights about what business context is visible. Be factual and specific about metrics, data points, visualizations, and business intelligence elements shown.`
+        : `Describe exactly what you see on this screen. Include:
 - What application, website, or interface is displayed
 - Specific text, headings, and content visible
 - UI elements, buttons, and layout structure  
@@ -135,12 +148,13 @@ Be factual and specific. Do not infer business context or make assumptions beyon
       if (context?.trigger === 'manual') {
         analysisPrompt += '\n\nProvide detailed manual analysis of what is visible.'
       }
-
+      
       const optimizedConfig = createOptimizedConfig('analysis', { maxOutputTokens: 1024, temperature: 0.3, topP: 0.8, topK: 40 })
 
       // Ensure required v1beta prefix for model names
       const model = modelName?.startsWith('models/') ? modelName : `models/${modelName}`
-      logJsonl('screen', 'received', { bytes: image?.length || 0, trigger: context?.trigger || 'unknown', hasImage: Boolean(image), model })
+      console.log('📺 Analyzing screen', isAdmin ? '(admin mode)' : '');
+      logJsonl('screen', 'received', { bytes: image?.length || 0, trigger: context?.trigger || 'unknown', hasImage: Boolean(image), model, isAdmin })
       const result = await genAI.models.generateContent({
         model,
         config: optimizedConfig,
