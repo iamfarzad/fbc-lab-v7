@@ -14,6 +14,10 @@ import { GEMINI_MODELS, WEBSOCKET_CONFIG, VOICE_CONFIG, GEMINI_CONFIG, CONTEXT_C
 import { MESSAGE_TYPES } from './message-types.js'
 import { LIVE_FUNCTION_DECLARATIONS, ADMIN_LIVE_FUNCTION_DECLARATIONS } from '../src/config/live-tools.js'
 import { getResolvedGeminiApiKey } from '../src/config/env.js'
+import { startTrace, startStage, endStage, getTrace, cleanupTrace } from './middleware/trace.js'
+import { ToolRuntime, type ToolCall, type ToolResult } from './tools/runtime.js'
+import { resampleBase64PCM16 } from './utils/audio.js'
+import { HalfDuplexController, SimpleVAD } from './utils/vad.js'
 
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
@@ -52,6 +56,13 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
   // Logging configuration
   const DEBUG_MODE = process.env.WEBSOCKET_DEBUG === 'true'
   const AUDIO_LOG_INTERVAL = 50 // Log audio stats every N chunks to reduce spam
+
+  // Audio pipeline configuration
+  const CLIENT_SAMPLE_RATE = 16000 // Client sends 16kHz PCM
+  const SERVER_SAMPLE_RATE = 24000 // Gemini Live API expects 24kHz PCM
+  const MAX_FRAME_MS = 20 // Target 20ms audio frames
+  const TOOL_DEADLINE_MS = 4000 // Tool execution deadline (4 seconds)
+  const PING_INTERVAL_MS = 15000 // WebSocket ping interval (15 seconds)
 
   // Helper function to send turn completion and clear timer
   function sendTurnComplete(connectionId: string, client: ActiveSessionRecord, reason: string) {
@@ -169,8 +180,9 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
     }
   })
 
-  // Keep connections alive with heartbeat pings
-  const pingInterval = setInterval(() => {
+  // Keep connections alive with heartbeat pings (improved: per-connection tracking)
+  // Note: Per-connection ping/pong is handled in connection handler below
+  const globalPingInterval = setInterval(() => {
     wss.clients.forEach((ws) => {
       if (ws.readyState === WebSocket.OPEN) {
         try {
@@ -183,7 +195,7 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
       }
     })
   }, WEBSOCKET_CONFIG.HEARTBEAT_INTERVAL)
-  server.on('close', () => clearInterval(pingInterval))
+  server.on('close', () => clearInterval(globalPingInterval))
 
   // Error handlers
   const nodeProcess = (globalThis as any).process as NodeJS.Process | undefined
@@ -230,8 +242,15 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
     lastAudioActivity?: number;
     audioChunkCount?: number; // Track audio chunks for periodic logging
     userTurnCount?: number; // NEW: track turns for milestone triggers
-  lastTurnCompleteAt?: number; // Prevent double-counting turnComplete events
-  lastAssistantText?: string; // Track last assistant response for context saving
+    lastTurnCompleteAt?: number; // Prevent double-counting turnComplete events
+    lastAssistantText?: string; // Track last assistant response for context saving
+    // NEW: Real-time improvements
+    traceId?: string; // Correlation ID for tracing
+    toolRuntime?: ToolRuntime; // Tool execution with deadlines
+    halfDuplex?: HalfDuplexController; // Half-duplex control
+    vad?: SimpleVAD; // Voice activity detection
+    pingTimer?: ReturnType<typeof setTimeout>; // Per-connection ping timer
+    lastPongTime?: number; // Track last pong for connection health
   };
 
   // Store active Live API sessions
@@ -244,14 +263,22 @@ import { getResolvedGeminiApiKey } from '../src/config/env.js'
   // Avoid emitting spurious session_closed when restarting a Live session for the same WS
   const closingForRestart = new Set<string>()
 
-  // Helper function for safe WebSocket sends
+  // Helper function for safe WebSocket sends with backpressure handling
   function safeSend(ws: WebSocket, data: any, isBinary = false) {
-    if (ws.readyState !== WebSocket.OPEN) return
-    if (ws.bufferedAmount > 1_000_000) return
+    if (ws.readyState !== WebSocket.OPEN) return false
+    // Backpressure: if buffer > 1MB, skip this send (prevents memory bloat)
+    if (ws.bufferedAmount > 1_000_000) {
+      if (DEBUG_MODE) {
+        console.warn('WebSocket backpressure: skipping send (bufferedAmount > 1MB)')
+      }
+      return false
+    }
     try {
       ws.send(data, { binary: isBinary })
+      return true
     } catch (e) {
       console.error('safeSend error:', e)
+      return false
     }
   }
 
@@ -1087,6 +1114,15 @@ YOUR TOOLS IN VOICE MODE:
                     const audioBytes = Math.floor((audioBase64.length || 0) * 0.75);
                     console.log(`[${connectionId}] 🔊 [MODEL AUDIO] Received audio chunk! Size: ${audioBytes} bytes, base64Length: ${audioBase64.length}`);
                     
+                    // Notify half-duplex that TTS started (on first audio chunk)
+                    const client = activeSessions.get(connectionId);
+                    if (client?.halfDuplex && !client.halfDuplex.getState().ttsPlaying) {
+                      client.halfDuplex.onTTSStart();
+                      if (DEBUG_MODE) {
+                        console.log(`[${connectionId}] Half-duplex: TTS started, mic closed`);
+                      }
+                    }
+                    
                     // Forward audio to client
                     safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.AUDIO, payload: { audioData: audioBase64, mimeType: 'audio/pcm;rate=24000' } }));
                     activeSessions.get(connectionId)?.logger?.log('audio_chunk', { direction: 'server_to_client', bytes: audioBytes, mimeType: 'audio/pcm;rate=24000' });
@@ -1103,8 +1139,17 @@ YOUR TOOLS IN VOICE MODE:
               if (serverContent.turnComplete) {
                 safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.TURN_COMPLETE, payload: { turnComplete: true } }));
                 activeSessions.get(connectionId)?.logger?.log('turn_complete')
-                // Clear any pending turn completion timer since we received a real one
+                
+                // Notify half-duplex that TTS ended
                 const client = activeSessions.get(connectionId);
+                if (client?.halfDuplex) {
+                  client.halfDuplex.onTTSEnd();
+                  if (DEBUG_MODE) {
+                    console.log(`[${connectionId}] Half-duplex: TTS ended, mic will reopen after silence`);
+                  }
+                }
+                
+                // Clear any pending turn completion timer since we received a real one
                 if (client?.turnCompletionTimer) {
                   clearTimeout(client.turnCompletionTimer);
                   client.turnCompletionTimer = undefined;
@@ -1235,7 +1280,52 @@ YOUR TOOLS IN VOICE MODE:
 
       {
         const prev = activeSessions.get(connectionId)
-        activeSessions.set(connectionId, { ws, session, sessionId, latestContext: prev?.latestContext || {}, injectionTimers: prev?.injectionTimers, logger: prev?.logger });
+        // Initialize real-time improvements
+        const trace = startTrace(sessionId || 'anonymous', connectionId)
+        const toolRuntime = new ToolRuntime(trace)
+        const vad = new SimpleVAD()
+        const halfDuplex = new HalfDuplexController(vad)
+        
+        activeSessions.set(connectionId, { 
+          ws, 
+          session, 
+          sessionId, 
+          latestContext: prev?.latestContext || {}, 
+          injectionTimers: prev?.injectionTimers, 
+          logger: prev?.logger,
+          traceId: trace.correlationId,
+          toolRuntime,
+          halfDuplex,
+          vad,
+          lastPongTime: Date.now()
+        });
+        
+        // Start per-connection ping timer
+        const pingTimer = setInterval(() => {
+          const client = activeSessions.get(connectionId)
+          if (!client || ws.readyState !== WebSocket.OPEN) {
+            clearInterval(pingTimer)
+            return
+          }
+          
+          // Check connection health (if no pong in 2x ping interval, connection is stale)
+          const timeSinceLastPong = Date.now() - (client.lastPongTime || 0)
+          if (timeSinceLastPong > PING_INTERVAL_MS * 2) {
+            console.warn(`[${connectionId}] Connection stale (no pong in ${timeSinceLastPong}ms), closing`)
+            ws.close(1000, 'Connection stale')
+            clearInterval(pingTimer)
+            return
+          }
+          
+          try {
+            ws.ping()
+          } catch (error) {
+            console.warn(`[${connectionId}] Failed to ping client:`, error)
+            clearInterval(pingTimer)
+          }
+        }, PING_INTERVAL_MS)
+        
+        activeSessions.get(connectionId)!.pingTimer = pingTimer
       }
       console.info(`[${connectionId}] Live API session established for sessionId: ${sessionId || 'anonymous'}`)
 
@@ -1267,21 +1357,68 @@ YOUR TOOLS IN VOICE MODE:
         return
       }
 
+      // Check half-duplex: reject audio if mic should be closed
+      if (client.halfDuplex && !client.halfDuplex.shouldMicBeOpen()) {
+        if (DEBUG_MODE) {
+          console.log(`[${connectionId}] Audio rejected: mic closed (half-duplex)`)
+        }
+        return
+      }
+
       const audioData: string = String(payload.audioData || '')
       const mimeType: string = String(payload.mimeType || 'audio/pcm;rate=16000')
+      
+      // Extract sample rate from mimeType
+      const sampleRateMatch = mimeType.match(/rate=(\d+)/i)
+      const inputSampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : CLIENT_SAMPLE_RATE
+
+      // Resample audio if needed (client sends 16kHz, server expects 24kHz)
+      let processedAudio = audioData
+      let processedMimeType = mimeType
+      
+      if (inputSampleRate !== SERVER_SAMPLE_RATE) {
+        startStage(client.traceId || connectionId, 'audio_resample')
+        try {
+          processedAudio = resampleBase64PCM16(audioData, inputSampleRate, SERVER_SAMPLE_RATE)
+          processedMimeType = `audio/pcm;rate=${SERVER_SAMPLE_RATE}`
+          endStage(client.traceId || connectionId, 'audio_resample')
+          
+          if (DEBUG_MODE && client.audioChunkCount && client.audioChunkCount % AUDIO_LOG_INTERVAL === 0) {
+            console.log(`[${connectionId}] Audio resampled: ${inputSampleRate}Hz → ${SERVER_SAMPLE_RATE}Hz`)
+          }
+        } catch (error) {
+          console.error(`[${connectionId}] Failed to resample audio:`, error)
+          endStage(client.traceId || connectionId, 'audio_resample')
+          // Continue with original audio (may cause quality issues but won't break)
+        }
+      }
+
+      // Process VAD for half-duplex control
+      if (client.vad && client.halfDuplex) {
+        const vadResult = client.vad.process(processedAudio)
+        if (vadResult.isSpeaking && !client.halfDuplex.shouldMicBeOpen()) {
+          // User is speaking but mic is closed (barge-in detected)
+          client.halfDuplex.onBargeIn()
+          if (DEBUG_MODE) {
+            console.log(`[${connectionId}] Barge-in detected via VAD`)
+          }
+        }
+      }
 
       // Light base64 sanity check
-      const padding = audioData.endsWith('==') ? 2 : audioData.endsWith('=') ? 1 : 0
-      const approxBytes = Math.max(0, Math.floor((audioData.length * 3) / 4) - padding)
+      const padding = processedAudio.endsWith('==') ? 2 : processedAudio.endsWith('=') ? 1 : 0
+      const approxBytes = Math.max(0, Math.floor((processedAudio.length * 3) / 4) - padding)
       if (approxBytes === 0) {
         console.warn(`[${connectionId}] ⚠️ Audio payload appears empty after base64 calc`)
       }
 
       try {
+        startStage(client.traceId || connectionId, 'audio_send')
+        
         // Track audio chunk count for periodic logging
         client.audioChunkCount = (client.audioChunkCount || 0) + 1
         
-        client.logger?.log('audio_chunk', { direction: 'client_to_server', bytes: approxBytes, mimeType })
+        client.logger?.log('audio_chunk', { direction: 'client_to_server', bytes: approxBytes, mimeType: processedMimeType })
         
         // Update last audio activity time and reset turn completion timer
         client.lastAudioActivity = Date.now();
@@ -1297,17 +1434,20 @@ YOUR TOOLS IN VOICE MODE:
         }
         
         if (typeof client.session.sendRealtimeInput === 'function') {
-          await client.session.sendRealtimeInput({ media: { mimeType, data: audioData } })
+          await client.session.sendRealtimeInput({ media: { mimeType: processedMimeType, data: processedAudio } })
+          endStage(client.traceId || connectionId, 'audio_send')
           
           // Log audio stats periodically instead of every chunk
           if (DEBUG_MODE || client.audioChunkCount % AUDIO_LOG_INTERVAL === 0) {
-            console.info(`[${connectionId}] ✅ Audio chunks processed: ${client.audioChunkCount} (${audioData.length} chars, ${mimeType})`)
+            console.info(`[${connectionId}] ✅ Audio chunks processed: ${client.audioChunkCount} (${processedAudio.length} chars, ${processedMimeType})`)
           }
         } else {
+          endStage(client.traceId || connectionId, 'audio_send')
           console.error(`[${connectionId}] ❌ sendRealtimeInput method not available on session`) 
           safeSend(ws, JSON.stringify({ type: MESSAGE_TYPES.ERROR, payload: { message: 'Live session cannot accept audio (no sendRealtimeInput method)' } }))
         }
       } catch (e: any) {
+        endStage(client.traceId || connectionId, 'audio_send')
         const msg = e?.message || String(e)
         const stack = e?.stack || 'No stack trace'
         console.error(`[${connectionId}] ❌ Failed to send audio to Live API:`, { 
@@ -1327,6 +1467,17 @@ YOUR TOOLS IN VOICE MODE:
   async function handleClose(connectionId: string) {
     const client = activeSessions.get(connectionId);
     if (client) {
+      // Cleanup real-time improvements
+      if (client.pingTimer) {
+        clearTimeout(client.pingTimer);
+      }
+      if (client.toolRuntime) {
+        client.toolRuntime.cancelAll();
+      }
+      if (client.traceId) {
+        cleanupTrace(client.traceId);
+      }
+      
       // Clear turn completion timer
       if (client.turnCompletionTimer) {
         clearTimeout(client.turnCompletionTimer);
@@ -1490,6 +1641,16 @@ YOUR TOOLS IN VOICE MODE:
       }
     })
 
+    ws.on('pong', () => {
+      const client = activeSessions.get(connectionId)
+      if (client) {
+        client.lastPongTime = Date.now()
+        if (DEBUG_MODE) {
+          console.log(`[${connectionId}] Pong received`)
+        }
+      }
+    })
+    
     ws.on('close', (code: number, reason: Buffer) => {
       console.info(`[${connectionId}] WebSocket closed. Code: ${code}, Reason: ${reason?.toString?.() || 'N/A'}`)
       console.warn(`[${connectionId}] CLOSED early code=${code} reason=${reason?.toString()}`);
