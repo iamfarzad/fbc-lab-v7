@@ -811,30 +811,82 @@ YOUR TOOLS IN VOICE MODE:
                 const functionCalls = message.toolCall?.functionCalls || [];
                 const client = activeSessions.get(connectionId);
                 
+                // Validate tool schemas before forwarding/executing (if ToolRuntime available)
+                if (client.toolRuntime && functionCalls.length > 0) {
+                  const validCalls: any[] = [];
+                  for (const fc of functionCalls) {
+                    const toolCall: ToolCall = {
+                      id: fc.id || `tool-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                      name: fc.name as ToolName,
+                      args: fc.args || {},
+                      deadlineMs: TOOL_DEADLINE_MS
+                    };
+                    
+                    // Quick validation check
+                    const validation = client.toolRuntime.validate(toolCall);
+                    
+                    if (!validation.valid) {
+                      console.warn(`[${connectionId}] Tool ${fc.name} validation failed: ${validation.error}`);
+                      // Send error response back to Live API
+                      await client.session.sendToolResponse({
+                        functionResponses: [{
+                          name: fc.name,
+                          response: {
+                            success: false,
+                            error: validation.error
+                          }
+                        }]
+                      });
+                    } else {
+                      validCalls.push(fc);
+                    }
+                  }
+                  
+                  // Update functionCalls to only include valid ones
+                  if (validCalls.length !== functionCalls.length) {
+                    functionCalls = validCalls;
+                    // Update message.toolCall if all calls were invalid
+                    if (functionCalls.length === 0) {
+                      return; // No valid tools to forward
+                    }
+                  }
+                }
+                
                 // Handle get_dashboard_stats server-side for admin sessions
                 const dashboardStatsCall = functionCalls.find((fc: any) => fc.name === 'get_dashboard_stats');
-                if (dashboardStatsCall && client?.sessionId?.startsWith('admin-')) {
+                if (dashboardStatsCall && client?.sessionId?.startsWith('admin-') && client?.toolRuntime) {
                   try {
-                    console.log(`[${connectionId}] Handling get_dashboard_stats tool call`);
-                    const period = dashboardStatsCall.args?.period || '7d';
+                    startStage(client.traceId || connectionId, 'tool_get_dashboard_stats');
                     
-                    // Calculate stats directly (server-side, no auth needed)
-                    let statsData: any = {};
-                    try {
-                      const { supabaseService } = await import('../src/core/supabase/client.js');
-                      const now = new Date();
-                      const daysBack = period === '1d' ? 1 : period === '30d' ? 30 : period === '90d' ? 90 : 7;
-                      const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
-                      
-                      const { data, error } = await (supabaseService as any)
-                        .from('lead_summaries')
-                        .select('lead_score, ai_capabilities_shown')
-                        .gte('created_at', startDate.toISOString());
-                      
-                      if (error) {
-                        console.error('[get_dashboard_stats] Supabase error:', error);
-                        statsData = { error: 'Failed to retrieve statistics' };
-                      } else {
+                    const toolCall: ToolCall = {
+                      id: dashboardStatsCall.id || `tool-${Date.now()}`,
+                      name: 'get_dashboard_stats',
+                      args: dashboardStatsCall.args || {},
+                      deadlineMs: TOOL_DEADLINE_MS
+                    };
+                    
+                    const abortController = new AbortController();
+                    const result = await client.toolRuntime.execute(
+                      toolCall,
+                      abortController.signal,
+                      async (name, args, signal) => {
+                        const period = args.period || '7d';
+                    
+                        // Calculate stats directly (server-side, no auth needed)
+                        const { supabaseService } = await import('../src/core/supabase/client.js');
+                        const now = new Date();
+                        const daysBack = period === '1d' ? 1 : period === '30d' ? 30 : period === '90d' ? 90 : 7;
+                        const startDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+                        
+                        const { data, error } = await (supabaseService as any)
+                          .from('lead_summaries')
+                          .select('lead_score, ai_capabilities_shown')
+                          .gte('created_at', startDate.toISOString());
+                        
+                        if (error) {
+                          throw new Error('Failed to retrieve statistics');
+                        }
+                        
                         const leadRows = (data ?? []) as Array<{ lead_score: number | null; ai_capabilities_shown: string[] | null }>;
                         const totalLeads = leadRows.length;
                         const qualifiedLeads = leadRows.filter((lead) => (lead.lead_score ?? 0) >= 70).length;
@@ -858,64 +910,64 @@ YOUR TOOLS IN VOICE MODE:
                           .slice(0, 5)
                           .map(([capability]) => capability);
                         
-                        statsData = {
+                        return {
+                          success: true,
+                          period: period,
                           totalLeads,
                           conversionRate,
                           avgLeadScore,
                           engagementRate,
                           topAICapabilities,
-                          scheduledMeetings: 0 // Not available from lead_summaries
+                          scheduledMeetings: 0,
+                          summary: `Dashboard stats for ${period}: ${totalLeads} total leads, ${conversionRate}% conversion rate, ${avgLeadScore}/100 average lead score, ${engagementRate}% engagement rate.`
                         };
                       }
-                    } catch (err) {
-                      console.error(`[${connectionId}] Failed to calculate dashboard stats:`, err);
-                      statsData = { error: 'Failed to calculate dashboard stats' };
-                    }
+                    );
                     
-                    // Format response for Gemini Live API
-                    const toolResponse = statsData.error ? {
-                      success: false,
-                      error: statsData.error
-                    } : {
-                      success: true,
-                      period: period,
-                      totalLeads: statsData.totalLeads || 0,
-                      conversionRate: statsData.conversionRate || 0,
-                      avgLeadScore: statsData.avgLeadScore || 0,
-                      engagementRate: statsData.engagementRate || 0,
-                      topAICapabilities: statsData.topAICapabilities || [],
-                      scheduledMeetings: statsData.scheduledMeetings || 0,
-                      summary: `Dashboard stats for ${period}: ${statsData.totalLeads} total leads, ${statsData.conversionRate}% conversion rate, ${statsData.avgLeadScore}/100 average lead score, ${statsData.engagementRate}% engagement rate.`
-                    };
+                    endStage(client.traceId || connectionId, 'tool_get_dashboard_stats');
                     
-                    // Send tool response directly to Live API
-                    await client.session.sendToolResponse({
-                      functionResponses: [{
-                        name: 'get_dashboard_stats',
-                        response: toolResponse
-                      }]
-                    });
+                    if (result.success) {
+                      await client.session.sendToolResponse({
+                        functionResponses: [{
+                          name: 'get_dashboard_stats',
+                          response: result.data
+                        }]
+                      });
+                      console.log(`[${connectionId}] ✅ Dashboard stats tool response sent (via ToolRuntime, ${result.durationMs}ms)`);
+                      client.logger?.log('tool_call_handled', { tool: 'get_dashboard_stats', period: dashboardStatsCall.args?.period || '7d', durationMs: result.durationMs });
                     
-                    console.log(`[${connectionId}] ✅ Dashboard stats tool response sent`);
-                    client.logger?.log('tool_call_handled', { tool: 'get_dashboard_stats', period });
-                    
-                    // Track tool call for export
-                    if (client.sessionId) {
-                      try {
-                        const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
-                        await multimodalContextManager.addToolCallToLastTurn(client.sessionId, {
-                          name: dashboardStatsCall.name,
-                          args: dashboardStatsCall.args || {},
-                          id: dashboardStatsCall.id
-                        })
-                      } catch (err) {
-                        console.warn(`[${connectionId}] Failed to track tool call:`, err)
+                      // Track tool call for export
+                      if (client.sessionId) {
+                        try {
+                          const { multimodalContextManager } = await import('../src/core/context/multimodal-context.js')
+                          await multimodalContextManager.addToolCallToLastTurn(client.sessionId, {
+                            name: dashboardStatsCall.name,
+                            args: dashboardStatsCall.args || {},
+                            id: dashboardStatsCall.id
+                          })
+                        } catch (err) {
+                          console.warn(`[${connectionId}] Failed to track tool call:`, err)
+                        }
                       }
+                      
+                      // Skip forwarding to client for server-handled tools
+                      return; // Tool call handled, exit early
+                    } else {
+                      // Tool execution failed - send error response
+                      await client.session.sendToolResponse({
+                        functionResponses: [{
+                          name: 'get_dashboard_stats',
+                          response: {
+                            success: false,
+                            error: result.error || 'Tool execution failed'
+                          }
+                        }]
+                      });
+                      console.error(`[${connectionId}] ❌ Dashboard stats tool failed: ${result.error}`);
+                      return;
                     }
-                    
-                    // Skip forwarding to client for server-handled tools
-                    return; // Tool call handled, exit early
                   } catch (err) {
+                    endStage(client.traceId || connectionId, 'tool_get_dashboard_stats');
                     console.error(`[${connectionId}] Failed to handle get_dashboard_stats:`, err);
                     // Fall through to forward to client as fallback
                   }

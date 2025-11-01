@@ -43,7 +43,27 @@ export interface ToolResult {
 export class ToolRuntime {
   private runningTools = new Map<string, AbortController>()
   
-  constructor(private trace?: TraceContext) {}
+  /**
+   * Validate tool arguments against schema (without executing)
+   */
+  validate(call: ToolCall): { valid: boolean; error?: string } {
+    const schema = ToolSchemas[call.name]
+    
+    if (!schema) {
+      return { valid: false, error: `Unknown tool: ${call.name}` }
+    }
+
+    const parseResult = schema.safeParse(call.args)
+    if (!parseResult.success) {
+      const errors = parseResult.error.issues
+        .map(i => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')
+      
+      return { valid: false, error: `Schema validation failed: ${errors}` }
+    }
+    
+    return { valid: true }
+  }
 
   /**
    * Execute tool with strict schema validation, deadline, and cancellation support
